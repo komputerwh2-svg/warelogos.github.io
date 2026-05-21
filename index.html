@@ -103,59 +103,105 @@
                 box-shadow: 0 1px 0px rgba(255,255,255,0.08);
             }
 
-        /* Item pembungkus ikon & label */
-            .os-app-shortcut-mate {
+        /* --- ITEM SHORTCUT APPS (MIUI V5) --- */
+            .os-app-shortcut-miui {
                 display: flex;
                 flex-direction: column;
                 align-items: center;
                 justify-content: center;
-                width: 85px; /* Sedikit lebih lebar untuk teks label */
-                height: 105px;
+                width: 80px;
+                height: 100px;
                 cursor: pointer;
-                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            }
-            
-            /* Animasi mikro saat disentuh/di-hover */
-            .os-app-shortcut-mate:hover {
-                transform: translateY(-4px);
-            }
-            
-            .os-app-shortcut-mate:active {
-                transform: scale(0.92);
+                user-select: none;
+                transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
             }
 
-            /* Kotak Ikon MatePad Style - Kuncinya di radius 'rounded-[18px]' */
-            .os-app-box-mate {
-                width: 62px; /* Ikon besar dan tegas */
-                height: 62px;
-                border-radius: 18px; /* Kotak melengkung Squircle khas Huawei */
-                box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35); /* Shadow lembut */
+            /* Animasi tekan memantul lembut khas MIUI */
+            .os-app-shortcut-miui:active {
+                transform: scale(0.90);
+            }
+
+            /* KOTAK IKON SQUIRCLE MIUI V5 SEJATI */
+            .os-app-box-miui {
+                width: 58px;
+                height: 58px;
+                border-radius: 15px; /* Sudut lengkung ciri khas MIUI V5, tidak terlalu bulat dan tidak kaku */
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 color: #ffffff;
                 font-size: 24px;
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                transition: filter 0.15s ease;
+                
+                /* Bingkai luar tipis transparan + efek bayangan ikon tebal ikonik MIUI */
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                box-shadow: 
+                    0 8px 12px rgba(0, 0, 0, 0.4), 
+                    inset 0 2px 3px rgba(255, 255, 255, 0.25), 
+                    inset 0 -2px 3px rgba(0, 0, 0, 0.2);
+                
+                position: relative;
+                overflow: hidden;
             }
 
-            .os-app-shortcut-mate:hover .os-app-box-mate {
-                filter: brightness(1.1);
+            /* Efek Kilatan Glossy Lembut di Atas Ikon */
+            .os-app-box-miui::before {
+                content: '';
+                position: absolute;
+                top: 0; left: 0; right: 0;
+                height: 50%;
+                background: linear-gradient(to bottom, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0) 100%);
+                pointer-events: none;
             }
 
-            /* Label Teks di Bawah Ikon (Tipis, Rapih, Putih) */
-            .os-app-label-mate {
+            /* TEXT LABEL DI BAWAH (MIUI V5 SPEC) */
+            .os-app-label-miui {
                 font-size: 11px;
-                font-weight: 500;
-                color: #e2e8f0;
-                margin-top: 8px;
+                font-weight: 600; /* Sedikit tebal agar tegas di atas wallpaper */
+                color: #ffffff;
+                margin-top: 7px;
                 text-align: center;
                 width: 100%;
-                letter-spacing: 0.01em;
-                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
                 white-space: nowrap;
                 overflow: hidden;
-                text-overflow: ellipsis; /* Memotong teks jika terlalu panjang dengan titik-titik (...) */
+                text-overflow: ellipsis;
+                
+                /* Bayangan teks hitam pekat agar tulisan terbaca sangat jelas */
+                text-shadow: 0 2px 3px rgba(0, 0, 0, 0.85), 0 0 1px rgba(0, 0, 0, 0.9);
+                letter-spacing: 0.02em;
+            }
+
+            /* =========================================================================
+            RESPONSIVE TABLET & PC VIEW: BUBARKAN SLIDE JIKA LAYAR LEBAR
+            ========================================================================= */
+            @media (min-width: 640px) {
+                .os-carousel-viewport {
+                    overflow-x: visible;
+                    display: contents;
+                }
+                .os-page-grid {
+                    display: contents;
+                }
+                .w-full.max-w-6xl {
+                    display: grid;
+                    grid-template-columns: repeat(8, minmax(0, 1fr));
+                    gap: 32px 12px;
+                    justify-items: center;
+                    align-items: center;
+                }
+                .os-app-shortcut-miui {
+                    width: 90px;
+                    height: 110px;
+                }
+                .os-app-box-miui {
+                    width: 62px; /* Ukuran maksimal di tablet biar mantap di-klik */
+                    height: 62px;
+                    border-radius: 17px;
+                    font-size: 26px;
+                }
+                .os-app-label-miui {
+                    font-size: 11.5px;
+                    margin-top: 9px;
+                }
             }
 
 
@@ -193,83 +239,6 @@
                 justify-items: center;
                 align-items: center;
             }
-
-            /* --- UKURAN IKON ADAPTIF MATEPAD --- */
-            .os-app-shortcut-mate {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                width: 75px;
-                height: 95px;
-                cursor: pointer;
-                user-select: none;
-                transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            }
-            .os-app-shortcut-mate:active {
-                transform: scale(0.9);
-            }
-
-            .os-app-box-mate {
-                width: 56px;
-                height: 56px;
-                border-radius: 16px; /* Squircle melengkung sempurna */
-                box-shadow: 0 8px 16px rgba(0, 0, 0, 0.35);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: #ffffff;
-                font-size: 22px;
-                border: 1px solid rgba(255, 255, 255, 0.1);
-            }
-
-            .os-app-label-mate {
-                font-size: 10px;
-                font-weight: 500;
-                color: #e2e8f0;
-                margin-top: 6px;
-                text-align: center;
-                width: 100%;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
-            }
-
-            /* =========================================================================
-            RESPONSIVE TABLET & PC VIEW: BUBARKAN SISTEM SLIDE JIKA LAYAR LEBAR
-            ========================================================================= */
-            @media (min-width: 640px) {
-                .os-carousel-viewport {
-                    overflow-x: visible;
-                    display: contents; /* Menghilangkan efek pembungkus slide di layar besar */
-                }
-                .os-page-grid {
-                    display: contents; /* Meleburkan grid terpisah menjadi satu kesatuan di tablet */
-                }
-                /* Di tablet, gunakan layout grid 8 kolom langsung berjejer menyamping (8x2) */
-                .w-full.max-w-6xl {
-                    display: grid;
-                    grid-template-columns: repeat(8, minmax(0, 1fr));
-                    gap: 28px 12px;
-                    justify-items: center;
-                    align-items: center;
-                }
-                .os-app-shortcut-mate {
-                    width: 85px;
-                    height: 105px;
-                }
-                .os-app-box-mate {
-                    width: 62px;
-                    height: 62px;
-                    border-radius: 18px;
-                    font-size: 24px;
-                }
-                .os-app-label-mate {
-                    font-size: 11px;
-                    margin-top: 8px;
-                }
-            }    
 
 
         /* Tombol Kembali khas V5 Berbingkai Gradient */
@@ -473,109 +442,108 @@
             </div>
         </div>
 
-        <div class="w-full max-w-6xl flex flex-col items-center my-auto mt-6">
-    
-            <div class="os-carousel-viewport w-full px-4">
+        <div class="w-full max-w-6xl flex flex-col items-center my-auto mt-6 select-none">
+            <div class="os-carousel-viewport w-full">
                 
                 <div class="os-page-grid">
-                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Ceklist DO')">
-                        <div class="os-app-box-mate bg-gradient-to-br from-cyan-600 to-blue-800">
+                    <div class="os-app-shortcut-miui" onclick="alert('Membuka Ceklist DO')">
+                        <div class="os-app-box-miui bg-gradient-to-br from-[#1e88e5] to-[#1565c0]">
                             <i class="fa-solid fa-file-invoice-dollar"></i>
                         </div>
-                        <span class="os-app-label-mate">Ceklist DO</span>
+                        <span class="os-app-label-miui">Ceklist DO</span>
                     </div>
-                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Ceklist DN')">
-                        <div class="os-app-box-mate bg-gradient-to-br from-indigo-500 to-blue-700">
+                    <div class="os-app-shortcut-miui" onclick="alert('Membuka Ceklist DN')">
+                        <div class="os-app-box-miui bg-gradient-to-br from-[#5e35b1] to-[#4527a0]">
                             <i class="fa-solid fa-file-lines"></i>
                         </div>
-                        <span class="os-app-label-mate">Ceklist DN</span>
+                        <span class="os-app-label-miui">Ceklist DN</span>
                     </div>
-                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Berita Acara')">
-                        <div class="os-app-box-mate bg-gradient-to-br from-slate-500 to-slate-700">
+                    <div class="os-app-shortcut-miui" onclick="alert('Membuka Berita Acara')">
+                        <div class="os-app-box-miui bg-gradient-to-br from-[#78909c] to-[#455a64]">
                             <i class="fa-solid fa-clipboard-check"></i>
                         </div>
-                        <span class="os-app-label-mate">Berita Acara</span>
+                        <span class="os-app-label-miui">Berita Acara</span>
                     </div>
-                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Tanda Terima')">
-                        <div class="os-app-box-mate bg-gradient-to-br from-sky-500 to-cyan-600">
+                    <div class="os-app-shortcut-miui" onclick="alert('Membuka Tanda Terima')">
+                        <div class="os-app-box-miui bg-gradient-to-br from-[#00acc1] to-[#00838f]">
                             <i class="fa-solid fa-hand-holding-hand"></i>
                         </div>
-                        <span class="os-app-label-mate">Tanda Terima</span>
+                        <span class="os-app-label-miui">Tanda Terima</span>
                     </div>
-                    <div class="os-app-shortcut-mate" onclick="alert('Membuka TT Ongkir')">
-                        <div class="os-app-box-mate bg-gradient-to-br from-lime-500 to-emerald-600">
+                    <div class="os-app-shortcut-miui" onclick="alert('Membuka TT Ongkir')">
+                        <div class="os-app-box-miui bg-gradient-to-br from-[#43a047] to-[#2e7d32]">
                             <i class="fa-solid fa-receipt"></i>
                         </div>
-                        <span class="os-app-label-mate">TT Ongkir</span>
+                        <span class="os-app-label-miui">TT Ongkir</span>
                     </div>
-                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Surat Palet')">
-                        <div class="os-app-box-mate bg-gradient-to-br from-amber-700 to-amber-900">
+                    <div class="os-app-shortcut-miui" onclick="alert('Membuka Surat Palet')">
+                        <div class="os-app-box-miui bg-gradient-to-br from-[#8d6e63] to-[#5d4037]">
                             <i class="fa-solid fa-pallet"></i>
                         </div>
-                        <span class="os-app-label-mate">Surat Palet</span>
+                        <span class="os-app-label-miui">Surat Palet</span>
                     </div>
-                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Label PKT-40')">
-                        <div class="os-app-box-mate bg-gradient-to-br from-rose-500 to-red-600">
+                    <div class="os-app-shortcut-miui" onclick="alert('Membuka Label PKT-40')">
+                        <div class="os-app-box-miui bg-gradient-to-br from-[#e53935] to-[#c62828]">
                             <i class="fa-solid fa-tag"></i>
                         </div>
-                        <span class="os-app-label-mate">PKT-40</span>
+                        <span class="os-app-label-miui">PKT-40</span>
                     </div>
-                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Label PKT-59')">
-                        <div class="os-app-box-mate bg-gradient-to-br from-orange-400 to-red-500">
+                    <div class="os-app-shortcut-miui" onclick="alert('Membuka Label PKT-59')">
+                        <div class="os-app-box-miui bg-gradient-to-br from-[#fb8c00] to-[#ef6c00]">
                             <i class="fa-solid fa-tag"></i>
                         </div>
-                        <span class="os-app-label-mate">PKT-59</span>
+                        <span class="os-app-label-miui">PKT-59</span>
                     </div>
                 </div>
 
                 <div class="os-page-grid">
-                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Label PKT-82')">
-                        <div class="os-app-box-mate bg-gradient-to-br from-amber-400 to-orange-500">
+                    <div class="os-app-shortcut-miui" onclick="alert('Membuka Label PKT-82')">
+                        <div class="os-app-box-miui bg-gradient-to-br from-[#fdd835] to-[#f57f17]">
                             <i class="fa-solid fa-tag"></i>
                         </div>
-                        <span class="os-app-label-mate">PKT-82</span>
+                        <span class="os-app-label-miui">PKT-82</span>
                     </div>
-                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Form Klaim')">
-                        <div class="os-app-box-mate bg-gradient-to-br from-red-600 to-rose-800">
+                    <div class="os-app-shortcut-miui" onclick="alert('Membuka Form Klaim')">
+                        <div class="os-app-box-miui bg-gradient-to-br from-[#d81b60] to-[#ad1457]">
                             <i class="fa-solid fa-circle-exclamation"></i>
                         </div>
-                        <span class="os-app-label-mate">Klaim</span>
+                        <span class="os-app-label-miui">Klaim</span>
                     </div>
-                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Rak Kosong')">
-                        <div class="os-app-box-mate bg-gradient-to-br from-zinc-600 to-zinc-800">
+                    <div class="os-app-shortcut-miui" onclick="alert('Membuka Rak Kosong')">
+                        <div class="os-app-box-miui bg-gradient-to-br from-[#546e7a] to-[#37474f]">
                             <i class="fa-solid fa-box-open"></i>
                         </div>
-                        <span class="os-app-label-mate">Rak Kosong</span>
+                        <span class="os-app-label-miui">Rak Kosong</span>
                     </div>
-                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Convert WH-2')">
-                        <div class="os-app-box-mate bg-gradient-to-br from-teal-400 to-emerald-600">
+                    <div class="os-app-shortcut-miui" onclick="alert('Membuka Convert WH-2')">
+                        <div class="os-app-box-miui bg-gradient-to-br from-[#00897b] to-[#00695c]">
                             <i class="fa-solid fa-arrow-rotate-left"></i>
                         </div>
-                        <span class="os-app-label-mate">Convert WH-2</span>
+                        <span class="os-app-label-miui">Convert WH-2</span>
                     </div>
-                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Convert WH-3')">
-                        <div class="os-app-box-mate bg-gradient-to-br from-teal-500 to-cyan-600">
+                    <div class="os-app-shortcut-miui" onclick="alert('Membuka Convert WH-3')">
+                        <div class="os-app-box-miui bg-gradient-to-br from-[#0097a7] to-[#006064]">
                             <i class="fa-solid fa-arrow-rotate-left"></i>
                         </div>
-                        <span class="os-app-label-mate">Convert WH-3</span>
+                        <span class="os-app-label-miui">Convert WH-3</span>
                     </div>
-                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Convert SO')">
-                        <div class="os-app-box-mate bg-gradient-to-br from-fuchsia-500 to-purple-700">
+                    <div class="os-app-shortcut-miui" onclick="alert('Membuka Convert SO')">
+                        <div class="os-app-box-miui bg-gradient-to-br from-[#d81b60] to-[#880e4f]">
                             <i class="fa-solid fa-right-left"></i>
                         </div>
-                        <span class="os-app-label-mate">Convert SO</span>
+                        <span class="os-app-label-miui">Convert SO</span>
                     </div>
-                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Rak Beceran')">
-                        <div class="os-app-box-mate bg-gradient-to-br from-violet-500 to-fuchsia-600">
+                    <div class="os-app-shortcut-miui" onclick="alert('Membuka Rak Beceran')">
+                        <div class="os-app-box-miui bg-gradient-to-br from-[#8e24aa] to-[#6a1b9a]">
                             <i class="fa-solid fa-cubes"></i>
                         </div>
-                        <span class="os-app-label-mate">Rak Beceran</span>
+                        <span class="os-app-label-miui">Rak Beceran</span>
                     </div>
-                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Rak Utuhan')">
-                        <div class="os-app-box-mate bg-gradient-to-br from-blue-500 to-indigo-600">
+                    <div class="os-app-shortcut-miui" onclick="alert('Membuka Rak Utuhan')">
+                        <div class="os-app-box-miui bg-gradient-to-br from-[#3949ab] to-[#283593]">
                             <i class="fa-solid fa-box"></i>
                         </div>
-                        <span class="os-app-label-mate">Rak Utuhan</span>
+                        <span class="os-app-label-miui">Rak Utuhan</span>
                     </div>
                 </div>
 
@@ -591,9 +559,15 @@
     <div id="subpage-setelan" class="hidden fixed inset-0 bg-[#f4f4f4] flex flex-col z-50 select-none font-sans">
     
         <div class="w-full bg-[#222222] text-gray-300 text-xs px-4 py-1 flex justify-between items-center border-b border-black/20">
-            <div class="flex items-center gap-1 text-[10px]">
-                <span>0 KB/s</span>
-                <i class="fa-solid fa-arrow-up text-[8px]"></i>
+            <div class="flex flex-col text-[5px] leading-none font-medium text-slate-400 font-mono text-right justify-center">
+                <div class="flex items-center justify-end gap-0.5">
+                    <span id="status-net-upload">0 KB/s</span>
+                    <span class="text-sky-400 text-[5px]">▲</span>
+                </div>
+                <div class="flex items-center justify-end gap-0.5 mt-[1px]">
+                    <span id="status-net-download">0 KB/s</span>
+                    <span class="text-emerald-400 text-[5px]">▼</span>
+                </div>
             </div>
             <div id="setelan-status-clock" class="font-bold text-white tracking-wider">
                 21:52
