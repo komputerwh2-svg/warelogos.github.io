@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LOGISTIK</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* --- WALLPAPER GRADASI DEEP NEBULA (MENIRU GAMBAR REFERENSI) --- */
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #0d1e46 0%, #1a163b 40%, #121026 70%, #050512 100%);
+            background-size: cover;
+            background-position: center;
+            overflow: hidden;
+            height: 100vh;
+            user-select: none;
+        }
+
+        /* --- WIDGET KACA TRANSPARAN (GLASSMORPHISM EFFECT) --- */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(30px) saturate(140%);
+            -webkit-backdrop-filter: blur(30px) saturate(140%);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Memberikan efek kedalaman pandangan 3 dimensi pada jam */
+            .htc-flip-clock {
+                display: flex;
+                gap: 6px;
+                justify-content: center;
+                padding: 4px;
+                perspective: 500px; 
+            }
+
+            /* Ukuran disesuaikan sedikit lebih proporsional untuk posisi atas */
+            .htc-container {
+                position: relative;
+                width: 72px;
+                height: 92px;
+                box-shadow: 0 10px 24px rgba(0, 0, 0, 0.6);
+                border-radius: 12px;
+            }
+
+            .htc-segment {
+                position: absolute;
+                left: 0;
+                right: 0;
+                overflow: hidden;
+                background: linear-gradient(180deg, #181b31 0%, #090a12 100%);
+                color: #f1f5f9;
+                font-size: 56px;
+                font-weight: 800;
+                text-align: center;
+                border: 1px solid rgba(255, 255, 255, 0.04);
+                backface-visibility: hidden;
+            }
+
+            .htc-segment.htc-top {
+                top: 0;
+                bottom: 50%;
+                border-radius: 12px 12px 0 0;
+                line-height: 92px;
+                border-bottom: 1px solid rgba(0, 0, 0, 0.5);
+            }
+
+            .htc-segment.htc-bottom {
+                top: 50%;
+                bottom: 0;
+                border-radius: 0 0 12px 12px;
+                line-height: 0;
+                border-top: 1px solid rgba(255, 255, 255, 0.06);
+            }
+
+            .htc-flipper {
+                position: absolute;
+                left: 0;
+                right: 0;
+                top: 0;
+                bottom: 0;
+                transform-style: preserve-3d;
+                transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+                transform-origin: center center;
+            }
+
+            .htc-flipped {
+                transform: rotateX(-180deg);
+            }
+
+            .htc-center-line {
+                position: absolute;
+                left: 0;
+                right: 0;
+                top: 50%;
+                height: 2px;
+                background: #000000;
+                z-index: 40;
+                pointer-events: none;
+                box-shadow: 0 1px 0px rgba(255,255,255,0.08);
+            }
+
+        /* Item pembungkus ikon & label */
+            .os-app-shortcut-mate {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                width: 85px; /* Sedikit lebih lebar untuk teks label */
+                height: 105px;
+                cursor: pointer;
+                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            
+            /* Animasi mikro saat disentuh/di-hover */
+            .os-app-shortcut-mate:hover {
+                transform: translateY(-4px);
+            }
+            
+            .os-app-shortcut-mate:active {
+                transform: scale(0.92);
+            }
+
+            /* Kotak Ikon MatePad Style - Kuncinya di radius 'rounded-[18px]' */
+            .os-app-box-mate {
+                width: 62px; /* Ikon besar dan tegas */
+                height: 62px;
+                border-radius: 18px; /* Kotak melengkung Squircle khas Huawei */
+                box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35); /* Shadow lembut */
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #ffffff;
+                font-size: 24px;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                transition: filter 0.15s ease;
+            }
+
+            .os-app-shortcut-mate:hover .os-app-box-mate {
+                filter: brightness(1.1);
+            }
+
+            /* Label Teks di Bawah Ikon (Tipis, Rapih, Putih) */
+            .os-app-label-mate {
+                font-size: 11px;
+                font-weight: 500;
+                color: #e2e8f0;
+                margin-top: 8px;
+                text-align: center;
+                width: 100%;
+                letter-spacing: 0.01em;
+                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis; /* Memotong teks jika terlalu panjang dengan titik-titik (...) */
+            }
+
+
+        /* --- VIEWPORT CAROUSEL --- */
+            .os-carousel-viewport {
+                display: flex;
+                overflow-x: auto;
+                scroll-snap-type: x mandatory; /* Mengunci slide pas di tengah saat digeser */
+                scroll-behavior: smooth;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            /* Sembunyikan scrollbar bawaan agar bersih layaknya OS asli */
+            .os-carousel-viewport::-webkit-scrollbar {
+                display: none;
+            }
+
+            /* --- LOGIKA GRID HALAMAN --- */
+            .os-page-grid {
+                display: grid;
+                flex-shrink: 0;
+                width: 100%;
+                scroll-snap-align: center; /* Titik kunci geseran */
+                
+                /* Default HP: Terkunci 4 Kolom x 2 Baris (Maksimal 8 Ikon) */
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+                grid-template-rows: repeat(2, minmax(0, 1fr));
+                gap: 16px 8px;
+                justify-items: center;
+                align-items: center;
+
+                /* Beri padding aman kanan-kiri agar ikon tidak mepet ke pinggir layar HP */
+                padding: 0 4px; 
+                gap: 20px 10px;
+                justify-items: center;
+                align-items: center;
+            }
+
+            /* --- UKURAN IKON ADAPTIF MATEPAD --- */
+            .os-app-shortcut-mate {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                width: 75px;
+                height: 95px;
+                cursor: pointer;
+                user-select: none;
+                transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            .os-app-shortcut-mate:active {
+                transform: scale(0.9);
+            }
+
+            .os-app-box-mate {
+                width: 56px;
+                height: 56px;
+                border-radius: 16px; /* Squircle melengkung sempurna */
+                box-shadow: 0 8px 16px rgba(0, 0, 0, 0.35);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #ffffff;
+                font-size: 22px;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            .os-app-label-mate {
+                font-size: 10px;
+                font-weight: 500;
+                color: #e2e8f0;
+                margin-top: 6px;
+                text-align: center;
+                width: 100%;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+            }
+
+            /* =========================================================================
+            RESPONSIVE TABLET & PC VIEW: BUBARKAN SISTEM SLIDE JIKA LAYAR LEBAR
+            ========================================================================= */
+            @media (min-width: 640px) {
+                .os-carousel-viewport {
+                    overflow-x: visible;
+                    display: contents; /* Menghilangkan efek pembungkus slide di layar besar */
+                }
+                .os-page-grid {
+                    display: contents; /* Meleburkan grid terpisah menjadi satu kesatuan di tablet */
+                }
+                /* Di tablet, gunakan layout grid 8 kolom langsung berjejer menyamping (8x2) */
+                .w-full.max-w-6xl {
+                    display: grid;
+                    grid-template-columns: repeat(8, minmax(0, 1fr));
+                    gap: 28px 12px;
+                    justify-items: center;
+                    align-items: center;
+                }
+                .os-app-shortcut-mate {
+                    width: 85px;
+                    height: 105px;
+                }
+                .os-app-box-mate {
+                    width: 62px;
+                    height: 62px;
+                    border-radius: 18px;
+                    font-size: 24px;
+                }
+                .os-app-label-mate {
+                    font-size: 11px;
+                    margin-top: 8px;
+                }
+            }    
+
+         
+
+        /* --- HUAWEI FLOATING BOTTOM DOCK --- */
+        .huawei-dock {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(20, 20, 35, 0.4);
+            backdrop-filter: blur(40px) saturate(160%);
+            -webkit-backdrop-filter: blur(40px) saturate(160%);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 12px 24px;
+            border-radius: 26px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+            z-index: 100;
+        }
+
+        .dock-line {
+            width: 1px;
+            height: 30px;
+            background-color: rgba(255, 255, 255, 0.15);
+            margin: 0 4px;
+        }
+    </style>
+</head>
+<body class="text-slate-200 relative w-full h-full">
+
+    <div class="w-full h-10 bg-black/10 backdrop-blur-md px-6 flex justify-between items-center fixed top-0 left-0 right-0 z-50 text-xs border-b border-white/5 font-light tracking-wide text-slate-300">
+        <div class="flex items-center gap-2 text-sky-400 font-semibold tracking-wider">
+            <i class="fa-solid fa-square-poll-horizontal text-[11px]"></i>
+            <span>Logistik WH-2</span>
+        </div>
+        <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 bg-white/5 px-2.5 py-1 rounded-full border border-white/5">
+                <div class="w-2 h-2 bg-emerald-400 rounded-full animate-ping"></div>
+                <span class="text-slate-200 font-medium">Admin WH-2</span>
+            </div>
+            <span class="opacity-20">|</span>
+            <div class="flex flex-col text-[9px] leading-none font-medium text-slate-400 font-mono text-right justify-center">
+                <div class="flex items-center justify-end gap-0.5">
+                    <span id="status-net-upload">0 KB/s</span>
+                    <span class="text-sky-400 text-[8px]">▲</span>
+                </div>
+                <div class="flex items-center justify-end gap-0.5 mt-[1px]">
+                    <span id="status-net-download">0 KB/s</span>
+                    <span class="text-emerald-400 text-[8px]">▼</span>
+                </div>
+            </div>
+            <i class="fa-solid fa-wifi opacity-80"></i>
+            <i class="fa-solid fa-battery-full text-sky-400"></i>
+        </div>
+    </div>
+
+    <div class="w-full h-full pt-16 pb-32 flex flex-col items-center justify-between box-border">
+        
+        <div class="text-center flex flex-col items-center mt-1 z-10 w-full">
+            <div class="htc-flip-clock">
+                
+                <div class="htc-container" id="htc-h1">
+                    <div class="htc-center-line"></div>
+                    <div class="htc-segment htc-top">0</div>
+                    <div class="htc-segment htc-bottom">0</div>
+                </div>
+                
+                <div class="htc-container" id="htc-h2">
+                    <div class="htc-center-line"></div>
+                    <div class="htc-segment htc-top">0</div>
+                    <div class="htc-segment htc-bottom">0</div>
+                </div>
+
+                <div class="text-4xl self-center font-black px-1.5 animate-pulse text-sky-400/80 select-none">:</div>
+
+                <div class="htc-container" id="htc-m1">
+                    <div class="htc-center-line"></div>
+                    <div class="htc-segment htc-top">0</div>
+                    <div class="htc-segment htc-bottom">0</div>
+                </div>
+                
+                <div class="htc-container" id="htc-m2">
+                    <div class="htc-center-line"></div>
+                    <div class="htc-segment htc-top">0</div>
+                    <div class="htc-segment htc-bottom">0</div>
+                </div>
+
+            </div>
+
+            <div id="weather-widget" class="mt-2 bg-white/5 backdrop-blur-3xl border border-white/10 px-4 py-1 rounded-full flex items-center gap-3 text-[11px] shadow-md shadow-black/20 text-slate-200">
+                <span id="weather-icon"><i class="fa-solid fa-circle-notch animate-spin text-sky-400"></i></span>
+                <span class="font-medium text-slate-300">Semarang, ID</span>
+                <span class="opacity-30">•</span>
+                <span id="weather-info" class="font-bold text-sky-400">Memuat...</span>
+                <span class="opacity-30">•</span>
+                <span id="weather-humidity" class="text-slate-400">Humi: --%</span>
+            </div>
+        </div>
+
+        <div class="w-full max-w-6xl flex flex-col items-center my-auto mt-6">
+    
+            <div class="os-carousel-viewport w-full px-4">
+                
+                <div class="os-page-grid">
+                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Ceklist DO')">
+                        <div class="os-app-box-mate bg-gradient-to-br from-cyan-600 to-blue-800">
+                            <i class="fa-solid fa-file-invoice-dollar"></i>
+                        </div>
+                        <span class="os-app-label-mate">Ceklist DO</span>
+                    </div>
+                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Ceklist DN')">
+                        <div class="os-app-box-mate bg-gradient-to-br from-indigo-500 to-blue-700">
+                            <i class="fa-solid fa-file-lines"></i>
+                        </div>
+                        <span class="os-app-label-mate">Ceklist DN</span>
+                    </div>
+                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Berita Acara')">
+                        <div class="os-app-box-mate bg-gradient-to-br from-slate-500 to-slate-700">
+                            <i class="fa-solid fa-clipboard-check"></i>
+                        </div>
+                        <span class="os-app-label-mate">Berita Acara</span>
+                    </div>
+                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Tanda Terima')">
+                        <div class="os-app-box-mate bg-gradient-to-br from-sky-500 to-cyan-600">
+                            <i class="fa-solid fa-hand-holding-hand"></i>
+                        </div>
+                        <span class="os-app-label-mate">Tanda Terima</span>
+                    </div>
+                    <div class="os-app-shortcut-mate" onclick="alert('Membuka TT Ongkir')">
+                        <div class="os-app-box-mate bg-gradient-to-br from-lime-500 to-emerald-600">
+                            <i class="fa-solid fa-receipt"></i>
+                        </div>
+                        <span class="os-app-label-mate">TT Ongkir</span>
+                    </div>
+                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Surat Palet')">
+                        <div class="os-app-box-mate bg-gradient-to-br from-amber-700 to-amber-900">
+                            <i class="fa-solid fa-pallet"></i>
+                        </div>
+                        <span class="os-app-label-mate">Surat Palet</span>
+                    </div>
+                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Label PKT-40')">
+                        <div class="os-app-box-mate bg-gradient-to-br from-rose-500 to-red-600">
+                            <i class="fa-solid fa-tag"></i>
+                        </div>
+                        <span class="os-app-label-mate">PKT-40</span>
+                    </div>
+                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Label PKT-59')">
+                        <div class="os-app-box-mate bg-gradient-to-br from-orange-400 to-red-500">
+                            <i class="fa-solid fa-tag"></i>
+                        </div>
+                        <span class="os-app-label-mate">PKT-59</span>
+                    </div>
+                </div>
+
+                <div class="os-page-grid">
+                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Label PKT-82')">
+                        <div class="os-app-box-mate bg-gradient-to-br from-amber-400 to-orange-500">
+                            <i class="fa-solid fa-tag"></i>
+                        </div>
+                        <span class="os-app-label-mate">PKT-82</span>
+                    </div>
+                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Form Klaim')">
+                        <div class="os-app-box-mate bg-gradient-to-br from-red-600 to-rose-800">
+                            <i class="fa-solid fa-circle-exclamation"></i>
+                        </div>
+                        <span class="os-app-label-mate">Klaim</span>
+                    </div>
+                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Rak Kosong')">
+                        <div class="os-app-box-mate bg-gradient-to-br from-zinc-600 to-zinc-800">
+                            <i class="fa-solid fa-box-open"></i>
+                        </div>
+                        <span class="os-app-label-mate">Rak Kosong</span>
+                    </div>
+                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Convert WH-2')">
+                        <div class="os-app-box-mate bg-gradient-to-br from-teal-400 to-emerald-600">
+                            <i class="fa-solid fa-arrow-rotate-left"></i>
+                        </div>
+                        <span class="os-app-label-mate">Convert WH-2</span>
+                    </div>
+                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Convert WH-3')">
+                        <div class="os-app-box-mate bg-gradient-to-br from-teal-500 to-cyan-600">
+                            <i class="fa-solid fa-arrow-rotate-left"></i>
+                        </div>
+                        <span class="os-app-label-mate">Convert WH-3</span>
+                    </div>
+                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Convert SO')">
+                        <div class="os-app-box-mate bg-gradient-to-br from-fuchsia-500 to-purple-700">
+                            <i class="fa-solid fa-right-left"></i>
+                        </div>
+                        <span class="os-app-label-mate">Convert SO</span>
+                    </div>
+                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Rak Beceran')">
+                        <div class="os-app-box-mate bg-gradient-to-br from-violet-500 to-fuchsia-600">
+                            <i class="fa-solid fa-cubes"></i>
+                        </div>
+                        <span class="os-app-label-mate">Rak Beceran</span>
+                    </div>
+                    <div class="os-app-shortcut-mate" onclick="alert('Membuka Rak Utuhan')">
+                        <div class="os-app-box-mate bg-gradient-to-br from-blue-500 to-indigo-600">
+                            <i class="fa-solid fa-box"></i>
+                        </div>
+                        <span class="os-app-label-mate">Rak Utuhan</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="flex items-center gap-1.5 mt-5 sm:hidden">
+                <div id="dot-page-1" class="w-1.5 h-1.5 rounded-full bg-white transition-all duration-300"></div>
+                <div id="dot-page-2" class="w-1.5 h-1.5 rounded-full bg-white/30 transition-all duration-300"></div>
+            </div>
+        </div>
+
+
+    <nav class="huawei-dock">
+        <button onclick="alert('Navigasi: Beranda Utama')" class="w-12 h-12 rounded-xl bg-sky-500 text-white flex items-center justify-center text-xl shadow-md active:scale-90 transition-all border border-sky-400/30">
+            <i class="fa-solid fa-house"></i>
+        </button>
+        <button onclick="alert('Navigasi: Chat WhatsApp Group')" class="w-12 h-12 rounded-xl bg-slate-900/80 text-emerald-400 border border-white/10 flex items-center justify-center text-xl active:scale-90 transition-all hover:bg-slate-800">
+            <i class="fa-brands fa-whatsapp"></i>
+        </button>
+        <button onclick="alert('Navigasi: Sinkronisasi Excel')" class="w-12 h-12 rounded-xl bg-slate-900/80 text-slate-200 border border-white/10 flex items-center justify-center text-xl active:scale-90 transition-all hover:bg-slate-800">
+            <i class="fa-solid fa-arrows-rotate"></i>
+        </button>
+
+        <div class="dock-line"></div>
+
+        <button onclick="alert('Navigasi: Setelan Opsi')" class="w-12 h-12 rounded-xl bg-slate-900/40 text-slate-400 border border-white/5 flex items-center justify-center text-xl active:scale-90 transition-all hover:bg-slate-800">
+            <i class="fa-solid fa-sliders"></i>
+        </button>
+    </nav>
+
+    <script>
+        
+        // ==================== LOGIKA UPDATE SPEED ANDROID STYLE ====================
+            function perbaruiKecepatanAndroidStyle() {
+                const elemenUpload = document.getElementById("status-net-upload");
+                const elemenDownload = document.getElementById("status-net-download");
+                
+                if (navigator.connection && navigator.connection.downlink) {
+                    // Konversi nilai Mbps bawaan browser ke satuan KB/s (1 Mbps sekitar 125 KB/s)
+                    const totalKecepatanKBs = navigator.connection.downlink * 125;
+                    
+                    // Simulasi pembagian beban bandwidth harian (misal: download 85%, upload 15%)
+                    let angkaDownload = Math.round(totalKecepatanKBs * 0.85);
+                    let angkaUpload = Math.round(totalKecepatanKBs * 0.15);
+                    
+                    // Beri sedikit variasi fluktuasi angka acak kecil (micro-fluctuation) agar angka terlihat bergerak live
+                    const fluktuasi = () => Math.floor(Math.random() * 15) - 7;
+                    angkaDownload = Math.max(5, angkaDownload + fluktuasi());
+                    angkaUpload = Math.max(1, angkaUpload + fluktuasi());
+                    
+                    // Render ke HTML dengan format KB/s sesuai gambar contoh
+                    elemenUpload.innerText = `${angkaUpload} KB/s`;
+                    elemenDownload.innerText = `${angkaDownload} KB/s`;
+                } else {
+                    // Jika offline atau browser tidak mendukung API
+                    elemenUpload.innerText = "0 KB/s";
+                    elemenDownload.innerText = "0 KB/s";
+                }
+            }
+
+            // Jalankan saat startup dashboard OS
+            perbaruiKecepatanAndroidStyle();
+
+            // Set interval pergerakan refresh angka setiap 2 detik agar fluktuasinya terlihat aktif di status bar
+            setInterval(perbaruiKecepatanAndroidStyle, 2000);
+
+
+        // Memori penampung status data menit/jam sebelumnya
+            const memoriAngkaLama = { 'htc-h1': '', 'htc-h2': '', 'htc-m1': '', 'htc-m2': '' };
+
+            function eksekusiMekanikFlip(containerId, angkaBaru) {
+                const kotakDigit = document.getElementById(containerId);
+                if (!kotakDigit) return;
+
+                const bagianAtas = kotakDigit.querySelector('.htc-segment.htc-top');
+                const bagianBawah = kotakDigit.querySelector('.htc-segment.htc-bottom');
+
+                // Jika angka tidak berubah dari menit sebelumnya, batalkan fungsi agar hemat memori HP
+                if (memoriAngkaLama[containerId] === angkaBaru) return;
+                memoriAngkaLama[containerId] = angkaBaru;
+
+                // Racik lembaran kertas flip tiruan baru
+                const flipperBaru = document.createElement('div');
+                flipperBaru.className = 'htc-flipper';
+                flipperBaru.innerHTML = `
+                    <div class="htc-segment htc-top">${bagianAtas.innerText}</div>
+                    <div class="htc-segment htc-bottom" style="transform: rotateX(-180deg); line-height: 98px;">${angkaBaru}</div>
+                `;
+
+                kotakDigit.appendChild(flipperBaru);
+
+                // Ubah background dasar di belakang kertas secara instan sebagai bayangan
+                bagianBawah.innerText = angkaBaru;
+
+                // Picu efek jepretan lipat ke bawah menggunakan delay frame browser
+                setTimeout(() => {
+                    flipperBaru.classList.add('htc-flipped');
+                    bagianAtas.innerText = angkaBaru;
+                }, 20);
+
+                // Bersihkan sampah elemen flipper setelah engsel putaran selesai (550ms)
+                setTimeout(() => {
+                    flipperBaru.remove();
+                }, 550);
+            }
+
+            function sinkronisasiJamSistem() {
+                const waktuSekarang = new Date();
+                const stringJam = waktuSekarang.getHours().toString().padStart(2, '0');
+                const stringMenit = waktuSekarang.getMinutes().toString().padStart(2, '0');
+
+                // Tembakkan perintah flip ke masing-masing box digit secara mandiri
+                eksekusiMekanikFlip('htc-h1', stringJam[0]);
+                eksekusiMekanikFlip('htc-h2', stringJam[1]);
+                eksekusiMekanikFlip('htc-m1', stringMenit[0]);
+                eksekusiMekanikFlip('htc-m2', stringMenit[1]);
+            }
+
+            // Jalankan mesin waktu real-time
+            setInterval(sinkronisasiJamSistem, 1000);
+            sinkronisasiJamSistem();
+
+
+            // Fungsi untuk menampilkan cuaca secara live
+            async function ambilDataCuacaLive() {
+                // Koordinat Kota Semarang (Bisa diganti sesuai lokasi gudang Anda)
+                const latitude = -6.9932;
+                const longitude = 110.4203;
+                
+                // URL Open-Meteo API (Gratis & Tanpa Perlu Daftar API Key)
+                const urlAPI = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code`;
+
+                try {
+                    const respon = await fetch(urlAPI);
+                    const data = await respon.json();
+                    
+                    // Ambil variabel penting dari hasil data mentah API
+                    const suhu = Math.round(data.current.temperature_2m);
+                    const kelembaban = data.current.relative_humidity_2m;
+                    const kodeCuaca = data.current.weather_code;
+
+                    // Terjemahkan kode cuaca internasional ke standar operasional lapangan
+                    let teksKondisi = "Cerah";
+                    let ikonKondisi = '<i class="fa-solid fa-sun text-amber-400 text-sm animate-pulse"></i>';
+
+                    // Pemetaan Kode Cuaca WMO (World Meteorological Organization)
+                    if (kodeCuaca === 0) {
+                        teksKondisi = "Cerah";
+                        ikonKondisi = '<i class="fa-solid fa-sun text-amber-400 text-sm animate-pulse"></i>';
+                    } else if (kodeCuaca >= 1 && kodeCuaca <= 3) {
+                        teksKondisi = "Cerah Berawan";
+                        ikonKondisi = '<i class="fa-solid fa-cloud-sun text-sky-300 text-sm"></i>';
+                    } else if (kodeCuaca >= 45 && kodeCuaca <= 48) {
+                        teksKondisi = "Berkabut";
+                        ikonKondisi = '<i class="fa-solid fa-smog text-slate-400 text-sm"></i>';
+                    } else if (kodeCuaca >= 51 && kodeCuaca <= 67) {
+                        teksKondisi = "Gerimis/Hujan Ringan";
+                        ikonKondisi = '<i class="fa-solid fa-cloud-rain text-blue-400 text-sm"></i>';
+                    } else if (kodeCuaca >= 71 && kodeCuaca <= 82) {
+                        teksKondisi = "Hujan Deras";
+                        ikonKondisi = '<i class="fa-solid fa-cloud-showers-heavy text-blue-500 text-sm animate-bounce"></i>';
+                    } else if (kodeCuaca >= 95) {
+                        teksKondisi = "Hujan Badai/Petir";
+                        ikonKondisi = '<i class="fa-solid fa-cloud-bolt text-amber-300 text-sm animate-bounce"></i>';
+                    }
+
+                    // Suntikkan data segar ke dalam elemen HTML secara instan
+                    document.getElementById("weather-icon").innerHTML = ikonKondisi;
+                    document.getElementById("weather-info").innerText = `${suhu}°C ${teksKondisi}`;
+                    document.getElementById("weather-humidity").innerText = `Kelembaban: ${kelembaban}%`;
+
+                } catch (error) {
+                    console.error("Gagal memuat data cuaca: ", error);
+                    // Tampilan cadangan aman jika koneksi internet terputus
+                    document.getElementById("weather-info").innerText = "Gagal Memuat Cuaca";
+                }
+            }
+
+            // Jalankan pencarian cuaca sesaat setelah halaman selesai dimuat
+            ambilDataCuacaLive();
+
+            // Auto-update cuaca berkala setiap 15 menit agar baterai HP/Tablet awet
+            setInterval(ambilDataCuacaLive, 15 * 60 * 1000);
+
+
+        // ==================== LOGIKA DETEKSI DOTS PAGE HOME SCREEN ====================
+            const viewportCarousel = document.querySelector('.os-carousel-viewport');
+            const dot1 = document.getElementById('dot-page-1');
+            const dot2 = document.getElementById('dot-page-2');
+
+            if (viewportCarousel && dot1 && dot2) {
+                viewportCarousel.addEventListener('scroll', () => {
+                    const lebarHalaman = viewportCarousel.clientWidth;
+                    const posisiScroll = viewportCarousel.scrollLeft;
+                    
+                    // Jika scroll melewati setengah halaman pertama, pindahkan dot aktif ke halaman 2
+                    if (posisiScroll >= lebarHalaman / 2) {
+                        dot1.classList.replace('bg-white', 'bg-white/30');
+                        dot2.classList.replace('bg-white/30', 'bg-white');
+                    } else {
+                        dot1.classList.replace('bg-white/30', 'bg-white');
+                        dot2.classList.replace('bg-white', 'bg-white/30');
+                    }
+                });
+            }
+    </script>
+</body>
+</html>
