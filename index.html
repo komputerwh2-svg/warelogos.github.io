@@ -271,6 +271,107 @@
                 }
             }    
 
+
+        /* Tombol Kembali khas V5 Berbingkai Gradient */
+            .miui-btn-back {
+                background: linear-gradient(to bottom, #5a5a5a, #383838);
+                border: 1px solid #222222;
+                box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0,0,0,0.3);
+            }
+            .miui-btn-back:active {
+                background: linear-gradient(to bottom, #333333, #222222);
+            }
+
+            /* Box Grouping dengan background putih bersudut melengkung halus */
+            .miui-group-box {
+                background-color: #ffffff;
+                border: 1px solid #e0e0e0;
+                border-radius: 10px;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+                overflow: hidden;
+            }
+
+            /* Item List Baris */
+            .miui-item {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 12px 14px;
+                border-bottom: 1px solid #f0f0f0;
+                transition: background-color 0.1s ease;
+            }
+            .miui-item:last-child {
+                border-bottom: none;
+            }
+            .miui-item:active {
+                background-color: #f9f9f9;
+            }
+
+            /* Ikon Bundar Berwarna khas MIUI */
+            .miui-icon-wrapper {
+                width: 30px;
+                height: 30px;
+                border-radius: 7px; /* Agak squircle melengkung manis */
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #ffffff;
+                font-size: 14px;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            }
+
+            /* Teks Menu */
+            .miui-item-text {
+                font-size: 14px;
+                font-weight: 500;
+                color: #333333;
+            }
+
+            /* --- TOGGLE SAKLAR KAPSUL MIUI V5 --- */
+            .miui-switch {
+                position: relative;
+                display: inline-block;
+                width: 52px;
+                height: 28px;
+            }
+            .miui-switch input { 
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }
+            .miui-slider {
+                position: absolute;
+                cursor: pointer;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background-color: #e5e5e5;
+                border: 1px solid #d1d1d1;
+                transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+                border-radius: 34px;
+                box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .miui-slider:before {
+                position: absolute;
+                content: "";
+                height: 22px;
+                width: 22px;
+                left: 2px;
+                bottom: 2px;
+                background-color: white;
+                border: 1px solid #c5c5c5;
+                transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+                border-radius: 50%;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            }
+            /* Efek saat saklar menyala (Warna Orange Khas Xiaomi / MIUI lama) */
+            input:checked + .miui-slider {
+                background-color: #ff7e00;
+                border-color: #db6c00;
+            }
+            input:checked + .miui-slider:before {
+                transform: translateX(24px);
+                border-color: #db6c00;
+            }    
+
          
 
         /* --- HUAWEI FLOATING BOTTOM DOCK --- */
@@ -486,6 +587,123 @@
         </div>
 
 
+    <div id="subpage-setelan" class="hidden fixed inset-0 bg-[#f4f4f4] flex flex-col z-50 select-none font-sans">
+    
+        <div class="w-full bg-[#222222] text-gray-300 text-xs px-4 py-1 flex justify-between items-center border-b border-black/20">
+            <div class="flex items-center gap-1 text-[10px]">
+                <span>0 KB/s</span>
+                <i class="fa-solid fa-arrow-up text-[8px]"></i>
+            </div>
+            <div id="setelan-status-clock" class="font-bold text-white tracking-wider">
+                21:52
+            </div>
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-wifi"></i>
+                <i class="fa-solid fa-battery-three-quarters"></i>
+            </div>
+        </div>
+
+        <div class="w-full h-14 bg-gradient-to-b from-[#3c3c3c] to-[#2a2a2a] flex items-center px-3 shadow-md border-b border-[#1a1a1a]">
+            <button onclick="tutupSetelan()" class="miui-btn-back flex items-center justify-center gap-1 px-3 py-1.5 rounded text-xs font-bold text-white shadow-inner">
+                <i class="fa-solid fa-chevron-left text-sm"></i>
+                <span>Kembali</span>
+            </button>
+            <h1 class="text-white font-semibold text-lg ml-4 tracking-wide drop-shadow-md">Setelan</h1>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-4 space-y-5">
+            
+            <div class="miui-group-box">
+                <div class="miui-item">
+                    <div class="flex items-center gap-3">
+                        <div class="miui-icon-wrapper bg-[#ff9c00]">
+                            <i class="fa-solid fa-user-gear"></i>
+                        </div>
+                        <span class="miui-item-text">Akun</span>
+                    </div>
+                    <div class="flex items-center text-gray-400 text-xs gap-1">
+                        <span>WH-2 Admin</span>
+                        <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="miui-group-box">
+                <div class="miui-item">
+                    <div class="flex items-center gap-3">
+                        <div class="miui-icon-wrapper bg-[#00beff]">
+                            <i class="fa-solid fa-display"></i>
+                        </div>
+                        <span class="miui-item-text">Tampilan</span>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-gray-400 text-[10px]"></i>
+                </div>
+
+                <div class="miui-item">
+                    <div class="flex items-center gap-3">
+                        <div class="miui-icon-wrapper bg-[#33d011]">
+                            <i class="fa-solid fa-house-laptop"></i>
+                        </div>
+                        <span class="miui-item-text">Layar Utama</span>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-gray-400 text-[10px]"></i>
+                </div>
+
+                <div class="miui-item">
+                    <div class="flex items-center gap-3">
+                        <div class="miui-icon-wrapper bg-[#ff4b4b]">
+                            <i class="fa-solid fa-bell"></i>
+                        </div>
+                        <span class="miui-item-text">Notifikasi</span>
+                    </div>
+                    <label class="miui-switch">
+                        <input type="checkbox" checked>
+                        <span class="miui-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="miui-group-box">
+                <div class="miui-item">
+                    <div class="flex items-center gap-3">
+                        <div class="miui-icon-wrapper bg-[#b633ff]">
+                            <i class="fa-solid fa-palette"></i>
+                        </div>
+                        <span class="miui-item-text">Tema</span>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-gray-400 text-[10px]"></i>
+                </div>
+
+                <div class="miui-item">
+                    <div class="flex items-center gap-3">
+                        <div class="miui-icon-wrapper bg-[#00d4a7]">
+                            <i class="fa-solid fa-image"></i>
+                        </div>
+                        <span class="miui-item-text">Wallpaper</span>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-gray-400 text-[10px]"></i>
+                </div>
+            </div>
+
+            <div class="miui-group-box">
+                <div class="miui-item">
+                    <div class="flex items-center gap-3">
+                        <div class="miui-icon-wrapper bg-[#8c9eff]">
+                            <i class="fa-solid fa-circle-info"></i>
+                        </div>
+                        <span class="miui-item-text">Tentang Aplikasi</span>
+                    </div>
+                    <div class="flex items-center text-gray-400 text-xs gap-1">
+                        <span class="bg-orange-500 text-white font-bold text-[9px] px-1.5 py-0.5 rounded-full">v3.6.1</span>
+                        <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+
     <nav class="huawei-dock">
         <button onclick="alert('Navigasi: Beranda Utama')" class="w-12 h-12 rounded-xl bg-sky-500 text-white flex items-center justify-center text-xl shadow-md active:scale-90 transition-all border border-sky-400/30">
             <i class="fa-solid fa-house"></i>
@@ -499,7 +717,7 @@
 
         <div class="dock-line"></div>
 
-        <button onclick="alert('Navigasi: Setelan Opsi')" class="w-12 h-12 rounded-xl bg-slate-900/40 text-slate-400 border border-white/5 flex items-center justify-center text-xl active:scale-90 transition-all hover:bg-slate-800">
+        <button onclick="bukaSetelan()" class="w-12 h-12 rounded-xl bg-slate-900/40 text-slate-400 border border-white/5 flex items-center justify-center text-xl active:scale-90 transition-all hover:bg-slate-800">
             <i class="fa-solid fa-sliders"></i>
         </button>
     </nav>
@@ -597,6 +815,23 @@
             sinkronisasiJamSistem();
 
 
+            // ==================== RUNNER SINKRONISASI JAM STATUS BAR ====================
+            function jalankanJamSetelan() {
+                const elemenJam = document.getElementById('setelan-status-clock');
+                if (!elemenJam) return;
+
+                const waktu = new Date();
+                let jam = waktu.getHours().toString().padStart(2, '0');
+                let menit = waktu.getMinutes().toString().padStart(2, '0');
+                
+                elemenJam.textContent = `${jam}:${menit}`;
+            }
+
+            // Perbarui waktu setiap 1 detik sekali
+            setInterval(jalankanJamSetelan, 1000);
+            jalankanJamSetelan(); // Eksekusi langsung di awal load
+
+
             // Fungsi untuk menampilkan cuaca secara live
             async function ambilDataCuacaLive() {
                 // Koordinat Kota Semarang (Bisa diganti sesuai lokasi gudang Anda)
@@ -678,6 +913,24 @@
                         dot2.classList.replace('bg-white', 'bg-white/30');
                     }
                 });
+            }
+
+        // ==================== LOGIKA NAVIGASI SUB-PAGE SETELAN ====================
+
+            // Fungsi untuk memunculkan halaman setelan
+            function bukaSetelan() {
+                const pageSetelan = document.getElementById('subpage-setelan');
+                if (pageSetelan) {
+                    pageSetelan.classList.remove('hidden');
+                }
+            }
+
+            // Fungsi untuk menutup dan kembali ke homescreen utama
+            function tutupSetelan() {
+                const pageSetelan = document.getElementById('subpage-setelan');
+                if (pageSetelan) {
+                    pageSetelan.classList.add('hidden');
+                }
             }
     </script>
 </body>
