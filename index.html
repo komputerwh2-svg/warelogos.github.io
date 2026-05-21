@@ -171,36 +171,46 @@
             }
 
             /* =========================================================================
-            RESPONSIVE TABLET & PC VIEW: BUBARKAN SLIDE JIKA LAYAR LEBAR
+            RESPONSIVE TABLET & PC VIEW: PERBAIKAN GRID TOTAL (ANTI-TUMPUK)
             ========================================================================= */
             @media (min-width: 640px) {
+                /* 1. Paksa Viewport agar tidak membuat slide menyamping lagi di layar lebar */
                 .os-carousel-viewport {
-                    overflow-x: visible;
-                    display: contents;
+                    display: flex !important;
+                    flex-direction: column !important;
+                    overflow-x: visible !important;
+                    width: 100% !important;
                 }
+
+                /* 2. Ubah Halaman Grid dari yang tadinya slide terpisah menjadi kesatuan baris */
                 .os-page-grid {
-                    display: contents;
+                    display: flex !important;
+                    flex-wrap: wrap !important;
+                    justify-content: center !important;
+                    gap: 32px 20px !important;
+                    width: 100% !important;
+                    padding: 0 !important;
+                    margin-bottom: 24px;
                 }
-                .w-full.max-w-6xl {
-                    display: grid;
-                    grid-template-columns: repeat(8, minmax(0, 1fr));
-                    gap: 32px 12px;
-                    justify-items: center;
-                    align-items: center;
-                }
+
+                /* Modifikasi ukuran item shortcut agar proporsional di tablet */
                 .os-app-shortcut-miui {
-                    width: 90px;
-                    height: 110px;
+                    width: 95px !important;
+                    height: 115px !important;
                 }
+
+                /* Ukuran kotak squircle MIUI V5 dioptimalkan untuk layar lebar */
                 .os-app-box-miui {
-                    width: 62px; /* Ukuran maksimal di tablet biar mantap di-klik */
-                    height: 62px;
-                    border-radius: 17px;
-                    font-size: 26px;
+                    width: 64px !important;
+                    height: 64px !important;
+                    border-radius: 16px !important;
+                    font-size: 26px !important;
                 }
+
+                /* Label teks disesuaikan keterbacaannya */
                 .os-app-label-miui {
-                    font-size: 11.5px;
-                    margin-top: 9px;
+                    font-size: 12px !important;
+                    margin-top: 8px !important;
                 }
             }
 
@@ -693,9 +703,9 @@
     </div>
 
 
-    <nav id="os-dock-bottom" class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-900/25 backdrop-blur-2xl border border-white/10 px-4 py-3 rounded-[24px] flex items-center gap-4 transition-all duration-300 z-40 shadow-xl shadow-black/40 select-none">
+    <nav id="os-dock-bottom" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-900/25 backdrop-blur-2xl border border-white/10 px-4 py-3 rounded-[26px] flex items-center gap-4 transition-all duration-300 z-40 shadow-xl shadow-black/40 select-none">
     
-        <button onclick="alert('Navigasi: Beranda Utama')" class="w-12 h-12 rounded-xl bg-sky-500 text-white flex items-center justify-center text-xl shadow-lg shadow-sky-500/20 active:scale-90 transition-all border border-sky-400/30">
+        <button onclick="alert('Navigasi: Beranda Utama')" class="w-12 h-12 rounded-xl bg-sky-500 text-white flex items-center justify-center text-xl shadow-lg active:scale-90 transition-all border border-sky-400/30">
             <i class="fa-solid fa-house"></i>
         </button>
         
@@ -712,7 +722,6 @@
         <button onclick="bukaSetelan()" class="w-12 h-12 rounded-xl bg-slate-950/40 text-slate-400 border border-white/5 flex items-center justify-center text-xl active:scale-90 transition-all hover:bg-slate-900/60 shadow-md">
             <i class="fa-solid fa-sliders"></i>
         </button>
-
     </nav>
 
     <script>
