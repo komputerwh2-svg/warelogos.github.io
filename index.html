@@ -934,6 +934,17 @@
                     pageSetelan.classList.add('hidden');
                 }
             }
+
+            // =========================================================================
+            // 2. REGISTRASI SERVICE WORKER UNTUK INSTALASI PWA
+            // =========================================================================
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('./sw.js')
+                        .then((reg) => console.log('PWA Service Worker Berhasil Didaftar!', reg.scope))
+                        .catch((err) => console.log('Gagal mendaftarkan Service Worker:', err));
+                });
+            }
     </script>
 </body>
 </html>
