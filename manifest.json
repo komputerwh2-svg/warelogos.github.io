@@ -1,24 +1,22 @@
 {
   "name": "Sistem Logistik WH",
-  "short_name": "Logistik WH-2",
+  "short_name": "Logistik",
   "description": "Sistem Aplikasi Operasional Gudang WH-2 & WH-3 Berbasis MIUI V5",
-  "start_url": "index.html",
+  "start_url": ".",
   "display": "standalone",
-  "background_color": "#0a0f1d",
-  "theme_color": "#ff7e00",
-  "orientation": "any",
+  "background_color": "#1e3a8a",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "image.png",
+      "src": "icon.png",
       "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     },
     {
-      "src": "image.png",
+      "src": "icon.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     }
   ]
 }
