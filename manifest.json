@@ -4,7 +4,7 @@
   "description": "Sistem Aplikasi Operasional Gudang WH-2 & WH-3 Berbasis MIUI V5",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#1e3a8a",
+  "background_color": "#0a0f1d",
   "theme_color": "#2563eb",
   "orientation": "any",
   "icons": [
