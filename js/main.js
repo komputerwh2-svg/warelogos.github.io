@@ -150,14 +150,13 @@ function tutupSetelan() {
 // =========================================================================
 // 5. FUNCTION LOGIC FOR MODAL RAK KOSONG PRINT SYSTEM (LOKAL & CLOUD)
 // =========================================================================
-// Memanggil sesama file di dalam folder 'js' yang sama
-//import { dbPrinter, ref, push, serverTimestamp, query, orderByChild, equalTo, onChildAdded, update } from "./firebase-printer-config.js";
+import { dbPrinter, ref, push, serverTimestamp, query, orderByChild, equalTo, onChildAdded, update } from "./firebase-printer-config.js";
 
 function bukaModalRakKosong() {
     const modal = document.getElementById('modal-rak-kosong');
     const inputJumlah = document.getElementById('input-lembar-rak');
     if (modal) {
-        if (inputJumlah) inputJumlah.value = "1"; // Reset ke angka 1 setiap kali dibuka
+        if (inputJumlah) inputJumlah.value = "1"; 
         modal.classList.remove('hidden');
     }
 }
@@ -169,35 +168,29 @@ function tutupModalRakKosong() {
     }
 }
 
-// FUNGSI UTAMA (Di HP bertindak sebagai pengirim Cloud, di PC bertindak sebagai cetak lokal)
 function eksekusiCetakRakKosong() {
     const inputJumlah = document.getElementById('input-lembar-rak');
     const jumlahLembar = inputJumlah ? parseInt(inputJumlah.value) : 1;
 
-    // 1. Validasi proteksi angka kosong atau di bawah 1
     if (isNaN(jumlahLembar) || jumlahLembar < 1) {
         miuiAlert("Harap masukkan jumlah lembar cetak yang valid (minimal 1)!");
         return;
     }
 
-    // CEK PERANGKAT: Jika dibuka di HP, kirim perintah ke Cloud Printer Firebase
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     
     if (isMobile) {
-        // Panggil fungsi Firebase Cloud Print project baru
         kirimAntreanCetakKeCloud(jumlahLembar);
         tutupModalRakKosong();
-        return; // Stop di sini, biar PC kantor yang mengeksekusi kertasnya
+        return; 
     }
 
-    // JIKA DIBUKA DI PC KANTOR secara manual (Tetap pertahankan fungsi lokal asli Anda)
     const areaCetak = document.getElementById('print-area-rak-kosong');
     if (!areaCetak) {
         miuiAlert("Sistem Cetak Error: Elemen area cetak tidak ditemukan!");
         return;
     }
 
-    // Simpan template asli ke memori window jika belum ada
     if (!window.masterTemplateCetakRak && areaCetak.innerHTML.trim() !== "") {
         window.masterTemplateCetakRak = areaCetak.innerHTML;
     }
@@ -212,15 +205,11 @@ function eksekusiCetakRakKosong() {
 
     setTimeout(() => {
         window.print();
-    }, 1000); // Jeda 1 detik anti-blank Chrome tetap dipertahankan
+    }, 1000); 
 }
 
-// =========================================================================
-// SUB-FUNCTION A: PENGIRIM DATA DARI HP FIELD KE CLOUD DATABASE
-// =========================================================================
 async function kirimAntreanCetakKeCloud(jumlahLembar) {
     const printerRef = ref(dbPrinter, 'antrean_cetak');
-
     try {
         await push(printerRef, {
             jenisDokumen: "rak_kosong",
@@ -235,20 +224,14 @@ async function kirimAntreanCetakKeCloud(jumlahLembar) {
     }
 }
 
-// =========================================================================
-// SUB-FUNCTION B: BYPASS ENGINE KHUSUS PC KANTOR (MENERIMA DARI CLOUD)
-// =========================================================================
 function eksekusiCetakRakKosongBypass(jumlahLembar) {
     const areaCetak = document.getElementById('print-area-rak-kosong');
     if (!areaCetak) return;
 
-    // PENGAMANAN KRUSIAL: Jika menu Rak Kosong sedang tidak dibuka di layar PC kantor, 
-    // areaCetak.innerHTML bisa jadi kosong murni. Kita amankan dengan fallback HTML string:
     if (!window.masterTemplateCetakRak || window.masterTemplateCetakRak.trim() === "") {
         if (areaCetak.innerHTML.trim() !== "") {
             window.masterTemplateCetakRak = areaCetak.innerHTML;
         } else {
-            // JALUR DARURAT: Jika benar-benar kosong, buatkan kerangka dasarnya secara dinamis
             window.masterTemplateCetakRak = `
                 <div style="text-align:center; font-family:sans-serif;">
                     <h2>DAFTAR RAK KOSONG</h2>
@@ -263,15 +246,11 @@ function eksekusiCetakRakKosongBypass(jumlahLembar) {
     }
     areaCetak.innerHTML = kontenGabungan;
 
-    // Kiosk printing langsung memuntahkan kertas setelah struktur siap
     setTimeout(() => {
         window.print();
-    }, 1200); // Jeda 1200ms agar rendering background maping tabel aman
+    }, 1200); 
 }
 
-// =========================================================================
-// SUB-FUNCTION C: LISTENER DATABASE REAL-TIME UNTUK INTERFACES KANTOR
-// =========================================================================
 function aktifkanCloudPrintEngine() {
     console.log("Robot Printer Cloud Berjalan & Memantau Antrean...");
     
@@ -289,7 +268,6 @@ function aktifkanCloudPrintEngine() {
                 eksekusiCetakRakKosongBypass(dataCetak.salinan);
             }
 
-            // Tandai sukses di database baru agar tidak terjadi cetak ganda
             const dataUpdate = {};
             dataUpdate[`antrean_cetak/${docId}/status`] = "success";
             
@@ -323,7 +301,7 @@ function tutupMiuiAlert() {
 }
 
 // =========================================================================
-// BRIDGE INTERFACE: MENGEKSPOS SEMUA FUNGSI KE GLOBAL (WAJIB KARENA MODULE)
+// BRIDGE INTERFACE: EKSPOS SEMUA FUNGSI KE GLOBAL WINDOW (WAJIB JIKA MODULE)
 // =========================================================================
 window.bukaSetelan = bukaSetelan;
 window.tutupSetelan = tutupSetelan;
@@ -333,11 +311,10 @@ window.eksekusiCetakRakKosong = eksekusiCetakRakKosong;
 window.miuiAlert = miuiAlert;
 window.tutupMiuiAlert = tutupMiuiAlert;
 
-// NYALAKAN ROBOT PRINTER BEGITU APLIKASI DIBUKA (Hanya aktif penuh jika diakses di PC)
+// RUNNING ROBOT CLOUD PRINTER PADA LAYAR PC UTAMA KANTOR
 document.addEventListener("DOMContentLoaded", () => {
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     if (!isMobile) {
         aktifkanCloudPrintEngine();
     }
 });
-// =========================================================================
