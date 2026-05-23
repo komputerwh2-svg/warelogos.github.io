@@ -148,7 +148,7 @@ function tutupSetelan() {
 }
 
 // =========================================================================
-// 5. FUNCTION LOGIC FOR MODAL RAK KOSONG PRINT SYSTEM
+// 5. FUNCTION LOGIC FOR MODAL RAK KOSONG PRINT SYSTEM (LOKAL & CLOUD)
 // =========================================================================
 function bukaModalRakKosong() {
     const modal = document.getElementById('modal-rak-kosong');
@@ -166,6 +166,7 @@ function tutupModalRakKosong() {
     }
 }
 
+// FUNGSI UTAMA (Di HP bertindak sebagai pengirim Cloud, di PC bertindak sebagai cetak lokal)
 function eksekusiCetakRakKosong() {
     const inputJumlah = document.getElementById('input-lembar-rak');
     const jumlahLembar = inputJumlah ? parseInt(inputJumlah.value) : 1;
@@ -176,32 +177,59 @@ function eksekusiCetakRakKosong() {
         return;
     }
 
-    // 2. Ambil elemen utama area cetak kita
+    // CEK PERANGKAT: Jika dibuka di HP, kirim perintah ke Cloud Printer Firebase
+    // (Deteksi sederhana jika user menggunakan HP Android/Mobile)
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+        // Panggil fungsi Firebase Cloud Print project baru
+        kirimAntreanCetakKeCloud(jumlahLembar);
+        tutupModalRakKosong();
+        return; // Stop di sini, biar PC kantor yang mengeksekusi kertasnya
+    }
+
+    // JIKA DIBUKA DI PC KANTOR (Tetap pertahankan fungsi lokal asli Anda)
     const areaCetak = document.getElementById('print-area-rak-kosong');
     if (!areaCetak) {
         miuiAlert("Sistem Cetak Error: Elemen area cetak tidak ditemukan!");
         return;
     }
 
-    // 3. Simpan template master asli agar data tidak hilang saat digandakan berulang kali
     if (!window.masterTemplateCetakRak) {
         window.masterTemplateCetakRak = areaCetak.innerHTML;
     }
 
-    // 4. Proses Regenerasi Konten Berdasarkan Jumlah Input Salinan
     let kontenGabungan = "";
     for (let i = 1; i <= jumlahLembar; i++) {
         kontenGabungan += `<div class="print-page-wrapper">${window.masterTemplateCetakRak}</div>`;
     }
     
-    // Suntikkan konten yang sudah digandakan ke area cetak fisik HTML
     areaCetak.innerHTML = kontenGabungan;
-
-    // 5. Tutup modal input biar layar bersih
     tutupModalRakKosong(); 
 
-    // 6. JALANKAN PEMICU DENGAN JEDA RENDERING LEBIH LAMA (ANTI-BLANK CHROME)
-    // Kita naikkan dari 400ms menjadi 1000ms agar Chrome sempat menyusun grid tabel
+    setTimeout(() => {
+        window.print();
+    }, 1000); // Jeda 1 detik anti-blank Chrome tetap dipertahankan
+}
+
+// =========================================================================
+// FITUR TAMBAHAN: BYPASS ENGINE KHUSUS PC KANTOR (MENERIMA DARI CLOUD)
+// =========================================================================
+function eksekusiCetakRakKosongBypass(jumlahLembar) {
+    const areaCetak = document.getElementById('print-area-rak-kosong');
+    if (!areaCetak) return;
+
+    if (!window.masterTemplateCetakRak) {
+        window.masterTemplateCetakRak = areaCetak.innerHTML;
+    }
+
+    let kontenGabungan = "";
+    for (let i = 1; i <= jumlahLembar; i++) {
+        kontenGabungan += `<div class="print-page-wrapper">${window.masterTemplateCetakRak}</div>`;
+    }
+    areaCetak.innerHTML = kontenGabungan;
+
+    // Kiosk printing langsung memuntahkan kertas
     setTimeout(() => {
         window.print();
     }, 1000); 
