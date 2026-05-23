@@ -206,7 +206,6 @@ function eksekusiCetakRakKosong() {
         window.print();
     }, 1000); 
 }
-}
 
 // =========================================================================
 // 6. SYSTEM COMPONENT: CUSTOM NOTIF ALERT ENGINE (MIUI V5 SPEC)
