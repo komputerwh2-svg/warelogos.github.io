@@ -135,7 +135,7 @@ fetchWeather();
 setInterval(fetchWeather, 15 * 60 * 1000);
 
 // =========================================================================
-// 4. NAVIGATION NAVIGATION TO SUB-PAGE CONFIGURATION MODAL
+// 4. NAVIGATION TO SUB-PAGE CONFIGURATION MODAL
 // =========================================================================
 function bukaSetelan() {
     const pageSetelan = document.getElementById('subpage-setelan');
@@ -150,6 +150,9 @@ function tutupSetelan() {
 // =========================================================================
 // 5. FUNCTION LOGIC FOR MODAL RAK KOSONG PRINT SYSTEM (LOKAL & CLOUD)
 // =========================================================================
+// Memanggil sesama file di dalam folder 'js' yang sama
+//import { dbPrinter, ref, push, serverTimestamp, query, orderByChild, equalTo, onChildAdded, update } from "./firebase-printer-config.js";
+
 function bukaModalRakKosong() {
     const modal = document.getElementById('modal-rak-kosong');
     const inputJumlah = document.getElementById('input-lembar-rak');
@@ -178,7 +181,6 @@ function eksekusiCetakRakKosong() {
     }
 
     // CEK PERANGKAT: Jika dibuka di HP, kirim perintah ke Cloud Printer Firebase
-    // (Deteksi sederhana jika user menggunakan HP Android/Mobile)
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     
     if (isMobile) {
@@ -188,14 +190,15 @@ function eksekusiCetakRakKosong() {
         return; // Stop di sini, biar PC kantor yang mengeksekusi kertasnya
     }
 
-    // JIKA DIBUKA DI PC KANTOR (Tetap pertahankan fungsi lokal asli Anda)
+    // JIKA DIBUKA DI PC KANTOR secara manual (Tetap pertahankan fungsi lokal asli Anda)
     const areaCetak = document.getElementById('print-area-rak-kosong');
     if (!areaCetak) {
         miuiAlert("Sistem Cetak Error: Elemen area cetak tidak ditemukan!");
         return;
     }
 
-    if (!window.masterTemplateCetakRak) {
+    // Simpan template asli ke memori window jika belum ada
+    if (!window.masterTemplateCetakRak && areaCetak.innerHTML.trim() !== "") {
         window.masterTemplateCetakRak = areaCetak.innerHTML;
     }
 
@@ -213,14 +216,45 @@ function eksekusiCetakRakKosong() {
 }
 
 // =========================================================================
-// FITUR TAMBAHAN: BYPASS ENGINE KHUSUS PC KANTOR (MENERIMA DARI CLOUD)
+// SUB-FUNCTION A: PENGIRIM DATA DARI HP FIELD KE CLOUD DATABASE
+// =========================================================================
+async function kirimAntreanCetakKeCloud(jumlahLembar) {
+    const printerRef = ref(dbPrinter, 'antrean_cetak');
+
+    try {
+        await push(printerRef, {
+            jenisDokumen: "rak_kosong",
+            salinan: parseInt(jumlahLembar) || 1,
+            status: "pending",
+            waktuPemicu: serverTimestamp()
+        });
+        miuiAlert("Sukses! Dokumen dikirim ke mesin printer kantor WH-2."); 
+    } catch (error) {
+        console.error("Gagal kirim cloud printer:", error);
+        miuiAlert("Koneksi Cloud Printer Bermasalah!");
+    }
+}
+
+// =========================================================================
+// SUB-FUNCTION B: BYPASS ENGINE KHUSUS PC KANTOR (MENERIMA DARI CLOUD)
 // =========================================================================
 function eksekusiCetakRakKosongBypass(jumlahLembar) {
     const areaCetak = document.getElementById('print-area-rak-kosong');
     if (!areaCetak) return;
 
-    if (!window.masterTemplateCetakRak) {
-        window.masterTemplateCetakRak = areaCetak.innerHTML;
+    // PENGAMANAN KRUSIAL: Jika menu Rak Kosong sedang tidak dibuka di layar PC kantor, 
+    // areaCetak.innerHTML bisa jadi kosong murni. Kita amankan dengan fallback HTML string:
+    if (!window.masterTemplateCetakRak || window.masterTemplateCetakRak.trim() === "") {
+        if (areaCetak.innerHTML.trim() !== "") {
+            window.masterTemplateCetakRak = areaCetak.innerHTML;
+        } else {
+            // JALUR DARURAT: Jika benar-benar kosong, buatkan kerangka dasarnya secara dinamis
+            window.masterTemplateCetakRak = `
+                <div style="text-align:center; font-family:sans-serif;">
+                    <h2>DAFTAR RAK KOSONG</h2>
+                </div>
+            `;
+        }
     }
 
     let kontenGabungan = "";
@@ -229,10 +263,43 @@ function eksekusiCetakRakKosongBypass(jumlahLembar) {
     }
     areaCetak.innerHTML = kontenGabungan;
 
-    // Kiosk printing langsung memuntahkan kertas
+    // Kiosk printing langsung memuntahkan kertas setelah struktur siap
     setTimeout(() => {
         window.print();
-    }, 1000); 
+    }, 1200); // Jeda 1200ms agar rendering background maping tabel aman
+}
+
+// =========================================================================
+// SUB-FUNCTION C: LISTENER DATABASE REAL-TIME UNTUK INTERFACES KANTOR
+// =========================================================================
+function aktifkanCloudPrintEngine() {
+    console.log("Robot Printer Cloud Berjalan & Memantau Antrean...");
+    
+    const printerRef = ref(dbPrinter, 'antrean_cetak');
+    const antreanQuery = query(printerRef, orderByChild('status'), equalTo('pending'));
+
+    onChildAdded(antreanQuery, async (snapshot) => {
+        const docId = snapshot.key;
+        const dataCetak = snapshot.val();
+
+        console.log(`Cloud Command: Cetak ${dataCetak.jenisDokumen} sebanyak ${dataCetak.salinan} lembar.`);
+
+        try {
+            if (dataCetak.jenisDokumen === "rak_kosong") {
+                eksekusiCetakRakKosongBypass(dataCetak.salinan);
+            }
+
+            // Tandai sukses di database baru agar tidak terjadi cetak ganda
+            const dataUpdate = {};
+            dataUpdate[`antrean_cetak/${docId}/status`] = "success";
+            
+            await update(ref(dbPrinter), dataUpdate);
+            console.log(`Dokumen ${docId} berhasil diproses printer.`);
+
+        } catch (error) {
+            console.error("Gagal mengeksekusi printer:", error);
+        }
+    });
 }
 
 // =========================================================================
@@ -243,15 +310,34 @@ function miuiAlert(pesan) {
     const teksAlert = document.getElementById('miui-alert-message');
     
     if (boxAlert && teksAlert) {
-        teksAlert.innerText = pesan; // Masukkan teks pesan dinamis
-        boxAlert.classList.remove('hidden'); // Munculkan ke layar
+        teksAlert.innerText = pesan; 
+        boxAlert.classList.remove('hidden'); 
     }
 }
 
 function tutupMiuiAlert() {
     const boxAlert = document.getElementById('miui-global-alert');
     if (boxAlert) {
-        boxAlert.classList.add('hidden'); // Sembunyikan kembali
+        boxAlert.classList.add('hidden'); 
     }
 }
 
+// =========================================================================
+// BRIDGE INTERFACE: MENGEKSPOS SEMUA FUNGSI KE GLOBAL (WAJIB KARENA MODULE)
+// =========================================================================
+window.bukaSetelan = bukaSetelan;
+window.tutupSetelan = tutupSetelan;
+window.bukaModalRakKosong = bukaModalRakKosong;
+window.tutupModalRakKosong = tutupModalRakKosong;
+window.eksekusiCetakRakKosong = eksekusiCetakRakKosong;
+window.miuiAlert = miuiAlert;
+window.tutupMiuiAlert = tutupMiuiAlert;
+
+// NYALAKAN ROBOT PRINTER BEGITU APLIKASI DIBUKA (Hanya aktif penuh jika diakses di PC)
+document.addEventListener("DOMContentLoaded", () => {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (!isMobile) {
+        aktifkanCloudPrintEngine();
+    }
+});
+// =========================================================================
