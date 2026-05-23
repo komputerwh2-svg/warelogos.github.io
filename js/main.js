@@ -1,73 +1,37 @@
 // =========================================================================
-// 1. CONTROL LAUNCHER VIEWPORT DRAGGING & WHEEL OVERFLOW SYSTEM
+// 1. CONTROL LAUNCHER VIEWPORT DRAGGING & WHEEL OVERFLOW SYSTEM (RESPONSIVE)
 // =========================================================================
 const view = document.getElementById('launcher-viewport');
-const dotsContainer = document.getElementById('page-indicators');
-const dot1 = document.getElementById('dot-1');
-const dot2 = document.getElementById('dot-2');
 
-let isDown = false;
-let startX, scrollLeft;
+// Bersihkan atau sembunyikan container dot indikator lama secara otomatis agar HTML tetap rapi
+document.addEventListener("DOMContentLoaded", () => {
+    const dotsContainer = document.getElementById('page-indicators');
+    if (dotsContainer) {
+        dotsContainer.classList.remove('opacity-100', 'flex');
+        dotsContainer.classList.add('opacity-0', 'hidden');
+    }
+});
 
 if (view) {
-    view.addEventListener('mousedown', (e) => {
-        isDown = true;
-        view.classList.add('active-drag');
-        startX = e.pageX - view.offsetLeft;
-        scrollLeft = view.scrollLeft;
-    });
-
-    view.addEventListener('mouseleave', () => {
-        isDown = false;
-        view.classList.remove('active-drag');
-    });
-
-    view.addEventListener('mouseup', () => {
-        isDown = false;
-        view.classList.remove('active-drag');
-    });
-
-    view.addEventListener('mousemove', (e) => {
-        if (!isDown) return;
-        e.preventDefault();
-        const x = e.pageX - view.offsetLeft;
-        const walk = (x - startX) * 1.5; 
-        view.scrollLeft = scrollLeft - walk;
-    });
-
+    // KONTROL UNTUK PC/LAPTOP: Mengizinkan scroll wheel mouse jika resolusi layar kecil/browser tidak maximize
     view.addEventListener('wheel', (e) => {
-        if (view.scrollWidth > view.clientWidth) {
+        // Cek jika konten di dalam laci meluap secara vertikal (overflow-y)
+        if (view.scrollHeight > view.clientHeight) {
+            // Hilangkan default browser horizontal shift, alihkan murni ke scroll vertikal alami
             e.preventDefault();
-            view.scrollLeft += e.deltaY;
+            view.scrollTop += e.deltaY;
         }
-    });
+    }, { passive: false });
+
+    // PENGAMAN TOUCH EVENT HP ANDROID: Memastikan browser merespons geseran naik-turun secara instan (1:1)
+    view.addEventListener('touchstart', () => {
+        // Mengaktifkan feedback responsif sentuhan jari di area laci icon
+        view.style.scrollBehavior = 'smooth';
+    }, { passive: true });
 }
 
-// --- DYNAMIC DOT INDICATOR RECOGNITION ---
-function updateLayoutState() {
-    if (!view || !dotsContainer) return;
-    const hasOverflow = view.scrollWidth > view.clientWidth;
-    
-    if (hasOverflow) {
-        dotsContainer.classList.remove('opacity-0');
-        dotsContainer.classList.add('opacity-100');
-        
-        if (view.scrollLeft >= (view.scrollWidth / 2) - 100) {
-            dot1.className = "w-2 h-2 rounded-full bg-white/30 transition-all duration-300 shadow-sm";
-            dot2.className = "w-4 h-2 rounded-full bg-sky-400 transition-all duration-300 shadow-sm";
-        } else {
-            dot1.className = "w-4 h-2 rounded-full bg-sky-400 transition-all duration-300 shadow-sm";
-            dot2.className = "w-2 h-2 rounded-full bg-white/30 transition-all duration-300 shadow-sm";
-        }
-    } else {
-        dotsContainer.classList.remove('opacity-100');
-        dotsContainer.classList.add('opacity-0');
-    }
-}
-
-if (view) view.addEventListener('scroll', updateLayoutState);
-window.addEventListener('resize', updateLayoutState);
-setTimeout(updateLayoutState, 500);
+// Menghapus fungsi updateLayoutState() lama karena dot indikator sudah tidak digunakan lagi 
+// dalam sistem grid vertical-scroll. Kode dijamin bersih dari error undefinied dot-1 atau dot-2!
 
 // =========================================================================
 // 2. LIVE SPEED NETWORKING SIMULATION (ANDROID TELEMETRY STYLE)

@@ -79,123 +79,122 @@
         </div>
     </div>
 
-    <div id="launcher-viewport" class="os-carousel-viewport w-full flex-1 my-auto flex overflow-x-auto scroll-smooth snap-x snap-mandatory z-10 no-scrollbar cursor-grab active:cursor-grabbing select-none py-4">
-        <div class="w-full px-8 md:px-16 flex items-center justify-center shrink-0 snap-start">
-            <div class="w-full max-w-6xl grid grid-rows-2 grid-flow-col auto-cols-[calc(25%-12px)] md:auto-cols-[calc(16.666%-16px)] lg:auto-cols-[calc(12.5%-20px)] gap-y-8 gap-x-3 md:gap-x-4 lg:gap-x-6 justify-items-center items-center content-center">
-                
-                <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Ceklist DO')">
-                    <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
-                        <img src="img/do.png" alt="Ceklist DO" class="w-full h-full object-cover">
-                    </div>
-                    <span class="text-[11px] font-bold text-slate-700/90 text-center truncate w-20">Ceklist DO</span>
+    <div id="launcher-viewport" class="w-full flex-1 min-h-0 my-auto flex flex-col overflow-y-auto md:overflow-y-hidden overflow-x-hidden z-10 no-scrollbar select-none py-2 px-6 md:px-16">
+    
+        <div class="w-full max-w-6xl mx-auto grid grid-cols-3 md:grid-cols-8 gap-y-7 gap-x-2 md:gap-x-4 lg:gap-x-6 justify-items-center items-center content-center py-2">
+            
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Ceklist DO')">
+                <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
+                    <img src="img/do.png" alt="Ceklist DO" class="w-full h-full object-cover">
                 </div>
-
-                <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Ceklist DN')">
-                    <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
-                        <img src="img/dn.png" alt="Ceklist DN" class="w-full h-full object-cover">
-                    </div>
-                    <span class="text-[11px] font-bold text-slate-700/90 text-center truncate w-20">Ceklist DN</span>
-                </div>
-
-                <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Berita Acara')">
-                    <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
-                        <img src="img/berita.png" alt="Berita Acara" class="w-full h-full object-cover">
-                    </div>
-                    <span class="text-[11px] font-bold text-slate-700/90 text-center truncate w-20">Berita Acara</span>
-                </div>
-
-                <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Tanda Terima')">
-                    <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
-                        <img src="img/tterima.png" alt="Tanda Terima" class="w-full h-full object-cover">
-                    </div>
-                    <span class="text-[11px] font-bold text-slate-700/90 text-center truncate w-20">Tanda Terima</span>
-                </div>
-
-                <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka TT Ongkir')">
-                    <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
-                        <img src="img/ongkir.png" alt="TT Ongkir" class="w-full h-full object-cover">
-                    </div>
-                    <span class="text-[11px] font-bold text-slate-700/90 text-center truncate w-20">TT Ongkir</span>
-                </div>
-
-                <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Surat Palet')">
-                    <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
-                        <img src="img/palet.png" alt="Surat Palet" class="w-full h-full object-cover">
-                    </div>
-                    <span class="text-[11px] font-bold text-slate-700/90 text-center truncate w-20">Surat Palet</span>
-                </div>
-
-                <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Label PKT-40')">
-                    <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
-                        <img src="img/pkt40.png" alt="PKT-40" class="w-full h-full object-cover">
-                    </div>
-                    <span class="text-[11px] font-bold text-slate-700/90 text-center truncate w-20">PKT-40</span>
-                </div>
-
-                <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Label PKT-59')">
-                    <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
-                        <img src="img/pkt59.png" alt="PKT-59" class="w-full h-full object-cover">
-                    </div>
-                    <span class="text-[11px] font-bold text-slate-700/90 text-center truncate w-20">PKT-59</span>
-                </div>
-
-                <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Label PKT-82')">
-                    <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
-                        <img src="img/pkt82.png" alt="PKT-82" class="w-full h-full object-cover">
-                    </div>
-                    <span class="text-[11px] font-bold text-slate-700/90 text-center truncate w-20">PKT-82</span>
-                </div>
-
-                <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Form Klaim')">
-                    <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
-                        <img src="img/klaim.png" alt="Klaim" class="w-full h-full object-cover">
-                    </div>
-                    <span class="text-[11px] font-bold text-slate-700/90 text-center truncate w-20">Klaim</span>
-                </div>
-
-                <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="bukaModalRakKosong()">
-                    <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
-                        <img src="img/rak.png" alt="Rak Kosong" class="w-full h-full object-cover">
-                    </div>
-                    <span class="text-[11px] font-bold text-slate-700/90 text-center truncate w-20">Rak Kosong</span>
-                </div>
-
-                <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Data Convert WH-2')">
-                    <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
-                        <img src="img/cvwh2.png" alt="Convert WH-2" class="w-full h-full object-cover">
-                    </div>
-                    <span class="text-[11px] font-bold text-slate-700/90 text-center truncate w-20">Convert WH-2</span>
-                </div>
-
-                <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Data Convert WH-3')">
-                    <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
-                        <img src="img/cvwh3.png" alt="Convert WH-3" class="w-full h-full object-cover">
-                    </div>
-                    <span class="text-[11px] font-bold text-slate-700/90 text-center truncate w-20">Convert WH-3</span>
-                </div>
-
-                <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Fitur Convert SO')">
-                    <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
-                        <img src="img/cvdo.png" alt="Convert SO" class="w-full h-full object-cover">
-                    </div>
-                    <span class="text-[11px] font-bold text-slate-700/90 text-center truncate w-20">Convert SO</span>
-                </div>
-
-                <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Monitor Rak Beceran')">
-                    <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
-                        <img src="img/rak.png" alt="Rak Beceran" class="w-full h-full object-cover">
-                    </div>
-                    <span class="text-[11px] font-bold text-slate-700/90 text-center truncate w-20">Rak Beceran</span>
-                </div>
-
-                <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Monitor Rak Utuhan')">
-                    <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
-                        <img src="img/rak.png" alt="Rak Utuhan" class="w-full h-full object-cover">
-                    </div>
-                    <span class="text-[11px] font-bold text-slate-700/90 text-center truncate w-20">Rak Utuhan</span>
-                </div>
-
+                <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Ceklist DO</span>
             </div>
+
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Ceklist DN')">
+                <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
+                    <img src="img/dn.png" alt="Ceklist DN" class="w-full h-full object-cover">
+                </div>
+                <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Ceklist DN</span>
+            </div>
+
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Berita Acara')">
+                <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
+                    <img src="img/berita.png" alt="Berita Acara" class="w-full h-full object-cover">
+                </div>
+                <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Berita Acara</span>
+            </div>
+
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Tanda Terima')">
+                <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
+                    <img src="img/tterima.png" alt="Tanda Terima" class="w-full h-full object-cover">
+                </div>
+                <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Tanda Terima</span>
+            </div>
+
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka TT Ongkir')">
+                <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
+                    <img src="img/ongkir.png" alt="TT Ongkir" class="w-full h-full object-cover">
+                </div>
+                <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">TT Ongkir</span>
+            </div>
+
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Surat Palet')">
+                <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
+                    <img src="img/palet.png" alt="Surat Palet" class="w-full h-full object-cover">
+                </div>
+                <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Surat Palet</span>
+            </div>
+
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Label PKT-40')">
+                <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
+                    <img src="img/pkt40.png" alt="PKT-40" class="w-full h-full object-cover">
+                </div>
+                <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">PKT-40</span>
+            </div>
+
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Label PKT-59')">
+                <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
+                    <img src="img/pkt59.png" alt="PKT-59" class="w-full h-full object-cover">
+                </div>
+                <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">PKT-59</span>
+            </div>
+
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Label PKT-82')">
+                <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
+                    <img src="img/pkt82.png" alt="PKT-82" class="w-full h-full object-cover">
+                </div>
+                <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">PKT-82</span>
+            </div>
+
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Form Klaim')">
+                <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
+                    <img src="img/klaim.png" alt="Klaim" class="w-full h-full object-cover">
+                </div>
+                <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Klaim</span>
+            </div>
+
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="bukaModalRakKosong()">
+                <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
+                    <img src="img/rak.png" alt="Rak Kosong" class="w-full h-full object-cover">
+                </div>
+                <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Rak Kosong</span>
+            </div>
+
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Data Convert WH-2')">
+                <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
+                    <img src="img/cvwh2.png" alt="Convert WH-2" class="w-full h-full object-cover">
+                </div>
+                <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Convert WH-2</span>
+            </div>
+
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Data Convert WH-3')">
+                <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
+                    <img src="img/cvwh3.png" alt="Convert WH-3" class="w-full h-full object-cover">
+                </div>
+                <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Convert WH-3</span>
+            </div>
+
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Fitur Convert SO')">
+                <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
+                    <img src="img/cvdo.png" alt="Convert SO" class="w-full h-full object-cover">
+                </div>
+                <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Convert SO</span>
+            </div>
+
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Monitor Rak Beceran')">
+                <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
+                    <img src="img/rak.png" alt="Rak Beceran" class="w-full h-full object-cover">
+                </div>
+                <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Rak Beceran</span>
+            </div>
+
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="alert('Membuka Monitor Rak Utuhan')">
+                <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
+                    <img src="img/rak.png" alt="Rak Utuhan" class="w-full h-full object-cover">
+                </div>
+                <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Rak Utuhan</span>
+            </div>
+
         </div>
     </div>
 
