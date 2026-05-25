@@ -470,7 +470,7 @@ window.toggleEngineTransaksi = function(isOut) {
         titleSide.innerText = "Input Barang Masuk";
         titleSide.className = "text-[10px] font-bold text-emerald-700 uppercase tracking-wide";
         
-        lblSwitch.innerText = "IN";
+        lblSwitch.innerText = "MASUK";
         lblSwitch.className = "text-[9px] font-bold text-emerald-600 bg-emerald-100/80 px-1.5 py-0.5 rounded uppercase tracking-wider";
         
         lblTanggal.innerText = "Tanggal Masuk";
