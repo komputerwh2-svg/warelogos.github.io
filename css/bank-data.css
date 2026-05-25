@@ -43,3 +43,21 @@
     .miui-switch input:checked + .miui-slider:before {
         transform: translateX(22px);
     }
+
+    /* Memaksa teks input yang di-disabled/readonly tetap berwarna putih tegas */
+    input:disabled, 
+    input[readonly] {
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important; /* Khusus untuk browser berbasis Chrome/Webview Android */
+        opacity: 1 !important; /* Menghilangkan efek transparan bawaan browser */
+        background-color: #2b3035 !important; /* Menjaga background input tetap gelap kontras */
+    }
+
+    .mode-content {
+        transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    .hidden {
+        display: none;
+        opacity: 0;
+        transform: translateY(10px);
+    }

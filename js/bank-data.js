@@ -1,3 +1,26 @@
+function gantiSwitchModeBankData(mode) {
+    // 1. Sembunyikan semua konten mode
+    document.querySelectorAll('.mode-content').forEach(el => {
+        el.classList.add('hidden');
+    });
+
+    // 2. Tampilkan form dan tabel yang dipilih
+    document.getElementById('form-' + mode).classList.remove('hidden');
+    document.getElementById('table-' + mode).classList.remove('hidden');
+
+    // 3. Update Header & Badge
+    document.getElementById('txt-table-header-title-bd').innerText = "Database Master Register [" + mode + "]";
+    
+    // Opsional: Tambahkan animasi fade-in sederhana
+    const activeForm = document.getElementById('form-' + mode);
+    activeForm.style.opacity = 0;
+    setTimeout(() => {
+        activeForm.style.transition = "opacity 0.3s ease";
+        activeForm.style.opacity = 1;
+    }, 50);
+}
+
+
 // ==========================================================================
 // LOGIKA KHUSUS: MODUL SETELAN BANK DATA & KAMUS BARANG (v2026.05.25.0.0.3 - INTEGRATED WITH CELL)
 // ==========================================================================
