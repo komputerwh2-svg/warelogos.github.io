@@ -1,16 +1,15 @@
 // ==========================================================================
-// LOGIKA KHUSUS: MODUL SETELAN BANK DATA & KAMUS BARANG (v2026.05.25.0.0.1 - 2-WAY SYNC)
+// LOGIKA KHUSUS: MODUL SETELAN BANK DATA & KAMUS BARANG (v2026.05.25.0.0.2 - INTEGRATED)
 // ==========================================================================
-
 
 const BD_FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
 
-// Taruh URL Web App Google Apps Script Anda di sini agar sinkron 2 arah ke Spreadsheet
+// URL Web App Google Apps Script untuk sinkronisasi 2 arah ke Spreadsheet (Sheet KODE - 7 Kolom)
 const SPREADSHEET_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyU5JxZCeVFtA1mi5wC6H-H-Bx9WHU2SwR7b8CMlkSp2ymCF-Lh1jL1XVArmCSxAPJt/exec";
 
 /**
  * Mengunduh Data 'master_barang' secara utuh dari Firebase Realtime DB
- * Dan mengurutkannya berdasarkan INISIAL barang agar rapi secara urutan angka
+ * Dan merendernya dengan kolom KELOMPOK yang sudah melebur di dalamnya.
  */
 function muatDataDariFirebase() {
     const bodiTabel = document.getElementById("tabel-body-bank-data");
@@ -26,7 +25,7 @@ function muatDataDariFirebase() {
             if (!kumpulanData) {
                 bodiTabel.innerHTML = `
                     <tr>
-                        <td colspan="7" class="text-center py-10 text-gray-400 font-bold">
+                        <td colspan="8" class="text-center py-10 text-gray-400 font-bold">
                             <i class="fa-solid fa-box-open mr-1"></i> Tidak ada data barang terdaftar.
                         </td>
                     </tr>
@@ -35,7 +34,7 @@ function muatDataDariFirebase() {
                 return;
             }
 
-            // 1. STRUKTURISASI: Ubah objek Firebase menjadi Array agar bisa kita urutkan (Sort)
+            // 1. STRUKTURISASI: Ubah objek Firebase menjadi Array dengan penambahan field KELOMPOK
             let listBarangArr = [];
             for (const key in kumpulanData) {
                 const item = kumpulanData[key];
@@ -43,6 +42,7 @@ function muatDataDariFirebase() {
                     firebaseKey: key,
                     KODE_BARANG: item.KODE_BARANG || key,
                     INISIAL: item.INISIAL || "-",
+                    KELOMPOK: item.KELOMPOK || "-", 
                     NAMA_BARANG: item.NAMA_BARANG || "-",
                     QTY: item.QTY !== undefined ? item.QTY : 0,
                     Satuan: item.Satuan || "KRT",
@@ -50,7 +50,7 @@ function muatDataDariFirebase() {
                 });
             }
 
-            // 2. PROSES SORTING: Urutkan data berdasarkan string INISIAL secara lokal/alamiah (Alfanumerik)
+            // 2. PROSES SORTING: Urutkan data berdasarkan string INISIAL secara lokal/alfanumerik alamiah
             listBarangArr.sort((itemA, itemB) => {
                 return itemA.INISIAL.localeCompare(itemB.INISIAL, undefined, {
                     numeric: true,
@@ -58,7 +58,7 @@ function muatDataDariFirebase() {
                 });
             });
 
-            // 3. RENDERING: Cetak tumpukan data yang sudah terurut dengan pewarnaan khas MIUI v5
+            // 3. RENDERING: Cetak data ke tabel (Total 8 kolom dengan Nomor Indeks & Aksi)
             let indeks = 1;
             let barisHtml = "";
 
@@ -66,6 +66,7 @@ function muatDataDariFirebase() {
                 const key           = detailItem.firebaseKey;
                 const inisialBarang = detailItem.INISIAL;
                 const kodeBarang    = detailItem.KODE_BARANG;
+                const kelompokBarang = detailItem.KELOMPOK;
                 const namaItem      = detailItem.NAMA_BARANG;
                 const kuantitas     = detailItem.QTY;
                 const satuanPack    = detailItem.Satuan;
@@ -76,7 +77,8 @@ function muatDataDariFirebase() {
                         <td class="py-3 px-2 text-center font-mono text-gray-400 font-normal">${indeks++}</td>
                         <td class="py-3 px-3 font-mono font-black text-[#e04a00] uppercase tracking-wide text-xs">${inisialBarang}</td>
                         <td class="py-3 px-3 font-mono font-bold text-[#2a67e0] tracking-wider uppercase">${kodeBarang}</td>
-                        <td class="py-3 px-3 text-slate-800 font-bold uppercase leading-tight">${namaItem}</td>
+                        <td class="py-3 px-3 font-mono font-bold text-emerald-600 tracking-wide uppercase text-xs">${kelompokBarang}</td>
+                        <td class="py-3 px-3 text-slate-800 font-bold uppercase leading-tight text-xs">${namaItem}</td>
                         <td class="py-3 px-4 text-center font-mono font-black text-slate-900 bg-slate-50/50 text-xs">
                             ${kuantitas} <span class="text-[9px] font-normal text-gray-400 ml-0.5">${satuanPack}</span>
                         </td>
@@ -87,7 +89,7 @@ function muatDataDariFirebase() {
                             </label>
                         </td>
                         <td class="py-3 px-2 text-center">
-                            <button onclick="editBarangBD('${key}', '${inisialBarang.replace(/'/g, "\\'")}', '${namaItem.replace(/'/g, "\\'")}', ${kuantitas})" class="text-[10px] font-black text-blue-600 hover:bg-blue-100 p-1.5 rounded-lg transition-all">
+                            <button onclick="editBarangBD('${key}', '${inisialBarang.replace(/'/g, "\\'")}', '${kelompokBarang.replace(/'/g, "\\'")}', '${namaItem.replace(/'/g, "\\'")}', ${kuantitas})" class="text-[10px] font-black text-blue-600 hover:bg-blue-100 p-1.5 rounded-lg transition-all">
                                 <i class="fa-solid fa-pen-to-square text-base"></i>
                             </button>
                         </td>
@@ -102,7 +104,7 @@ function muatDataDariFirebase() {
             console.error("Gagal sinkronisasi dengan Firebase:", err);
             bodiTabel.innerHTML = `
                 <tr>
-                    <td colspan="7" class="text-center py-10 text-red-500 font-bold">
+                    <td colspan="8" class="text-center py-10 text-red-500 font-bold">
                         <i class="fa-solid fa-triangle-exclamation mr-1"></i> Gagal Sinkronisasi Database Web.
                     </td>
                 </tr>
@@ -115,20 +117,22 @@ function muatDataDariFirebase() {
  * Sekaligus menembakkan data terbaru ke Google Spreadsheet via Apps Script Webhook.
  */
 function simpanDataMasterBD() {
-    const inKode    = document.getElementById("tx-kode-barang-bd");
-    const inInisial = document.getElementById("tx-inisial-barang-bd");
-    const inNama    = document.getElementById("tx-nama-barang-bd");
-    const inQty     = document.getElementById("tx-qty-utuhan-bd");
+    const inKode     = document.getElementById("tx-kode-barang-bd");
+    const inInisial  = document.getElementById("tx-inisial-barang-bd");
+    const inKelompok = document.getElementById("tx-kelompok-barang-bd"); // Selektor komponen kelompok terintegrasi
+    const inNama     = document.getElementById("tx-nama-barang-bd");
+    const inQty      = document.getElementById("tx-qty-utuhan-bd");
 
-    if (!inKode || !inInisial || !inNama || !inQty) return;
+    if (!inKode || !inInisial || !inKelompok || !inNama || !inQty) return;
 
-    const kodeVal    = inKode.value.trim().toUpperCase();
-    const inisialVal = inInisial.value.trim().toUpperCase();
-    const namaVal    = inNama.value.trim().toUpperCase();
-    const qtyVal     = inQty.value.trim() !== "" ? parseInt(inQty.value) : 0;
+    const kodeVal     = inKode.value.trim().toUpperCase();
+    const inisialVal  = inInisial.value.trim().toUpperCase();
+    const kelompokVal = inKelompok.value.trim().toUpperCase();
+    const namaVal     = inNama.value.trim().toUpperCase();
+    const qtyVal      = inQty.value.trim() !== "" ? parseInt(inQty.value) : 0;
 
-    if (!kodeVal || !inisialVal || !namaVal) {
-        alert("Mohon lengkapi seluruh kolom input Kode, Inisial, dan Nama Barang!");
+    if (!kodeVal || !inisialVal || !kelompokVal || !namaVal) {
+        alert("Mohon lengkapi seluruh kolom input Kode, Inisial, Kelompok, dan Nama Barang!");
         return;
     }
 
@@ -137,6 +141,7 @@ function simpanDataMasterBD() {
     const payload = {
         KODE_BARANG: kodeVal,
         INISIAL: inisialVal,
+        KELOMPOK: kelompokVal, // Menyimpan parameter kelompok gabungan
         NAMA_BARANG: namaVal,
         QTY: qtyVal,
         Satuan: "KRT",
@@ -148,7 +153,7 @@ function simpanDataMasterBD() {
     btnSubmit.innerText = "MENYIMPAN...";
     btnSubmit.disabled = true;
 
-    // Langkah A: Kirim Pembaruan Data ke Firebase Realtime Database
+    // Langkah A: Kirim data terpadu ke Firebase Realtime Database
     fetch(`${BD_FIREBASE_URL}master_barang/${cleanKey}.json`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -157,24 +162,24 @@ function simpanDataMasterBD() {
     .then(res => {
         if (!res.ok) throw new Error("Gagal menyimpan ke server database.");
         
-        // Langkah B: Kirim Data Yang Sama ke Google Spreadsheet (2-Way Sync Webhook)
-        if (SPREADSHEET_WEBHOOK_URL && !SPREADSHEET_WEBHOOK_URL.includes("https://script.google.com/macros/s/AKfycbyU5JxZCeVFtA1mi5wC6H-H-Bx9WHU2SwR7b8CMlkSp2ymCF-Lh1jL1XVArmCSxAPJt/exec")) {
+        // Langkah B: Kirim payload terpadu ke Google Spreadsheet Apps Script (2-Way Sync)
+        if (SPREADSHEET_WEBHOOK_URL) {
             return fetch(SPREADSHEET_WEBHOOK_URL, {
                 method: "POST",
-                mode: "no-cors", // Menghindari batasan CORS Kebijakan Browser
+                mode: "no-cors", 
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             });
         }
     })
     .then(() => {
-        alert("Data master kamus barang berhasil disinkronisasi ke Firebase & Spreadsheet!");
+        alert("Data master kamus barang & kelompok berhasil disinkronisasi ke Firebase & Spreadsheet!");
         resetFormMasterBD();
         muatDataDariFirebase();
     })
     .catch(err => {
         console.error(err);
-        alert("Terjadi masalah koneksi saat menyelaraskan data.");
+        alert("Terjadi masalah koneksi internet saat menyelaraskan data.");
     })
     .finally(() => {
         btnSubmit.innerText = txtAsli;
@@ -205,25 +210,27 @@ function ubahStatusAktifBarangBD(nodeKey, statusCentang) {
 /**
  * Mengisi Form dengan Data Terpilih untuk Mode Edit
  */
-function editBarangBD(kd, ins, nm, qt) {
-    const inKode    = document.getElementById("tx-kode-barang-bd");
-    const inInisial = document.getElementById("tx-inisial-barang-bd");
-    const inNama    = document.getElementById("tx-nama-barang-bd");
-    const inQty     = document.getElementById("tx-qty-utuhan-bd");
+function editBarangBD(kd, ins, klmpk, nm, qt) {
+    const inKode     = document.getElementById("tx-kode-barang-bd");
+    const inInisial  = document.getElementById("tx-inisial-barang-bd");
+    const inKelompok = document.getElementById("tx-kelompok-barang-bd");
+    const inNama     = document.getElementById("tx-nama-barang-bd");
+    const inQty      = document.getElementById("tx-qty-utuhan-bd");
     
     const lblTitle  = document.getElementById("title-mode-form-bd");
     const lblBadge  = document.getElementById("badge-mode-bd");
     const btnAksi   = document.getElementById("btn-submit-master-bd");
     const panelBox  = document.getElementById("box-workspace-input-bd");
 
-    if (inKode && inInisial && inNama && inQty) {
+    if (inKode && inInisial && inKelompok && inNama && inQty) {
         inKode.value = kd;
         inKode.readOnly = true;
         inInisial.value = ins;
+        inKelompok.value = klmpk;
         inNama.value = nm;
         inQty.value = qt;
 
-        if (lblTitle) lblTitle.innerHTML = `<i class="fa-solid fa-pen-to-square text-amber-600"></i> Ubah Data Barang`;
+        if (lblTitle) lblTitle.innerHTML = `<i class="fa-solid fa-pen-to-square text-amber-600"></i> Ubah Data Barang & Kelompok`;
         if (lblBadge) {
             lblBadge.innerText = "EDIT";
             lblBadge.className = "text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded uppercase tracking-wider";
@@ -239,7 +246,6 @@ function editBarangBD(kd, ins, nm, qt) {
  * Mereset Form Kembali ke Mode Tambah Baru (Batal)
  */
 function resetFormMasterBD() {
-    // Diselaraskan dengan ID form di HTML baru yaitu form-master-general-bd
     const formBD    = document.getElementById("form-master-general-bd");
     const inKode    = document.getElementById("tx-kode-barang-bd");
     
@@ -251,7 +257,6 @@ function resetFormMasterBD() {
     if (formBD) formBD.reset();
     if (inKode) inKode.readOnly = false;
 
-    // Diseragamkan ke icon text-orange-500
     if (lblTitle) lblTitle.innerHTML = `<i class="fa-solid fa-square-plus text-orange-500 text-sm"></i> Tambah Kode Barang Baru`;
     if (lblBadge) {
         lblBadge.innerText = "BARU";
@@ -264,27 +269,28 @@ function resetFormMasterBD() {
 }
 
 /**
- * Mengontrol visibilitas panel berdasarkan Radio Button yang dipilih
- * @param {string} modePilihan - Nilai dari radio button ('KODE' | 'TUJUAN' | 'KELOMPOK')
+ * Mengontrol visibilitas panel berdasarkan Radio Button yang dipilih (KODE, DRIVER, TUJUAN)
+ * Menghapus rujukan panel kelompok lama demi efisiensi berkas.
+ * @param {string} modePilihan - Nilai dari radio button ('KODE' | 'DRIVER' | 'TUJUAN')
  */
 function gantiSwitchModeBankData(modePilihan) {
     const pnlKode = document.getElementById("panel-workspace-mode-kode");
     const pnlTujuan = document.getElementById("panel-workspace-mode-tujuan");
-    const pnlKelompok = document.getElementById("panel-workspace-mode-kelompok");
+    const pnlDriver = document.getElementById("panel-workspace-mode-driver");
 
     // Sembunyikan seluruh workspace panel terlebih dahulu
     if (pnlKode) pnlKode.classList.replace("block", "hidden");
     if (pnlTujuan) pnlTujuan.classList.replace("block", "hidden");
-    if (pnlKelompok) pnlKelompok.classList.replace("block", "hidden");
+    if (pnlDriver) pnlDriver.classList.replace("block", "hidden");
 
     // Tampilkan panel yang sesuai secara eksklusif
     if (modePilihan === "KODE" && pnlKode) {
         pnlKode.classList.replace("hidden", "block");
-        muatDataDariFirebase(); // Muat ulang data firebase khusus barang
+        muatDataDariFirebase(); 
+    } else if (modePilihan === "DRIVER" && pnlDriver) {
+        pnlDriver.classList.replace("hidden", "block");
     } else if (modePilihan === "TUJUAN" && pnlTujuan) {
         pnlTujuan.classList.replace("hidden", "block");
-    } else if (modePilihan === "KELOMPOK" && pnlKelompok) {
-        pnlKelompok.classList.replace("hidden", "block");
     }
 }
 
