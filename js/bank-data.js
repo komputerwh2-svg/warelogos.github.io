@@ -1,8 +1,12 @@
 // ==========================================================================
-// LOGIKA KHUSUS: MODUL SETELAN BANK DATA & KAMUS BARANG (v3.6.1)
+// LOGIKA KHUSUS: MODUL SETELAN BANK DATA & KAMUS BARANG (v2026.05.25.0.0.1 - 2-WAY SYNC)
 // ==========================================================================
 
+
 const BD_FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
+
+// Taruh URL Web App Google Apps Script Anda di sini agar sinkron 2 arah ke Spreadsheet
+const SPREADSHEET_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyU5JxZCeVFtA1mi5wC6H-H-Bx9WHU2SwR7b8CMlkSp2ymCF-Lh1jL1XVArmCSxAPJt/exec";
 
 /**
  * Mengunduh Data 'master_barang' secara utuh dari Firebase Realtime DB
@@ -107,7 +111,8 @@ function muatDataDariFirebase() {
 }
 
 /**
- * Menyimpan data input baru atau memperbarui perubahan edit ke Firebase
+ * Menyimpan data input baru atau memperbarui perubahan edit ke Firebase,
+ * Sekaligus menembakkan data terbaru ke Google Spreadsheet via Apps Script Webhook.
  */
 function simpanDataMasterBD() {
     const inKode    = document.getElementById("tx-kode-barang-bd");
@@ -143,6 +148,7 @@ function simpanDataMasterBD() {
     btnSubmit.innerText = "MENYIMPAN...";
     btnSubmit.disabled = true;
 
+    // Langkah A: Kirim Pembaruan Data ke Firebase Realtime Database
     fetch(`${BD_FIREBASE_URL}master_barang/${cleanKey}.json`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -150,13 +156,25 @@ function simpanDataMasterBD() {
     })
     .then(res => {
         if (!res.ok) throw new Error("Gagal menyimpan ke server database.");
-        alert("Data master kamus barang berhasil disinkronisasi!");
+        
+        // Langkah B: Kirim Data Yang Sama ke Google Spreadsheet (2-Way Sync Webhook)
+        if (SPREADSHEET_WEBHOOK_URL && !SPREADSHEET_WEBHOOK_URL.includes("https://script.google.com/macros/s/AKfycbyU5JxZCeVFtA1mi5wC6H-H-Bx9WHU2SwR7b8CMlkSp2ymCF-Lh1jL1XVArmCSxAPJt/exec")) {
+            return fetch(SPREADSHEET_WEBHOOK_URL, {
+                method: "POST",
+                mode: "no-cors", // Menghindari batasan CORS Kebijakan Browser
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+        }
+    })
+    .then(() => {
+        alert("Data master kamus barang berhasil disinkronisasi ke Firebase & Spreadsheet!");
         resetFormMasterBD();
         muatDataDariFirebase();
     })
     .catch(err => {
         console.error(err);
-        alert("Terjadi masalah koneksi internet saat menyimpan data.");
+        alert("Terjadi masalah koneksi saat menyelaraskan data.");
     })
     .finally(() => {
         btnSubmit.innerText = txtAsli;
@@ -221,7 +239,8 @@ function editBarangBD(kd, ins, nm, qt) {
  * Mereset Form Kembali ke Mode Tambah Baru (Batal)
  */
 function resetFormMasterBD() {
-    const formBD    = document.getElementById("form-master-barang-bd");
+    // Diselaraskan dengan ID form di HTML baru yaitu form-master-general-bd
+    const formBD    = document.getElementById("form-master-general-bd");
     const inKode    = document.getElementById("tx-kode-barang-bd");
     
     const lblTitle  = document.getElementById("title-mode-form-bd");
@@ -232,10 +251,11 @@ function resetFormMasterBD() {
     if (formBD) formBD.reset();
     if (inKode) inKode.readOnly = false;
 
-    if (lblTitle) lblTitle.innerHTML = `<i class="fa-solid fa-square-plus text-emerald-600"></i> Tambah Kode Barang Baru`;
+    // Diseragamkan ke icon text-orange-500
+    if (lblTitle) lblTitle.innerHTML = `<i class="fa-solid fa-square-plus text-orange-500 text-sm"></i> Tambah Kode Barang Baru`;
     if (lblBadge) {
         lblBadge.innerText = "BARU";
-        lblBadge.className = "text-[9px] font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded uppercase tracking-wider";
+        lblBadge.className = "text-[9px] font-black text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded uppercase tracking-wider";
     }
     if (btnAksi) btnAksi.innerText = "TAMBAH KODE";
     if (panelBox) {
@@ -244,7 +264,7 @@ function resetFormMasterBD() {
 }
 
 /**
- * LOGIKA BARU: Mengontrol visibilitas panel berdasarkan Radio Button yang dipilih
+ * Mengontrol visibilitas panel berdasarkan Radio Button yang dipilih
  * @param {string} modePilihan - Nilai dari radio button ('KODE' | 'TUJUAN' | 'KELOMPOK')
  */
 function gantiSwitchModeBankData(modePilihan) {
