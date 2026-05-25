@@ -143,6 +143,7 @@ function eksekusiCetakRakKosong() {
 
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     
+    // Jika diakses dari HP Checker di lapangan, lempar antrean ke Firebase Cloud Printer
     if (isMobile) {
         kirimAntreanCetakKeCloud(jumlahLembar);
         tutupModalRakKosong();
@@ -155,21 +156,31 @@ function eksekusiCetakRakKosong() {
         return;
     }
 
-    if (!window.masterTemplateCetakRak && areaCetak.innerHTML.trim() !== "") {
-        window.masterTemplateCetakRak = areaCetak.innerHTML;
-    }
+    // AMBIL DATA DARI FOLDER MODULAR APPS
+    fetch('apps/rak-kosong.html')
+        .then(response => {
+            if (!response.ok) throw new Error("Gagal mengambil file template rak kosong");
+            return response.text();
+        })
+        .then(htmlTemplate => {
+            let kontenGabungan = "";
+            // Lakukan perulangan salinan lembar dokumen di sini
+            for (let i = 1; i <= jumlahLembar; i++) {
+                kontenGabungan += htmlTemplate; // File dari apps/rak-kosong.html sudah dibungkus .print-page-wrapper
+            }
+            
+            areaCetak.innerHTML = kontenGabungan;
+            tutupModalRakKosong(); 
 
-    let kontenGabungan = "";
-    for (let i = 1; i <= jumlahLembar; i++) {
-        kontenGabungan += `<div class="print-page-wrapper">${window.masterTemplateCetakRak}</div>`;
-    }
-    
-    areaCetak.innerHTML = kontenGabungan;
-    tutupModalRakKosong(); 
-
-    setTimeout(() => {
-        window.print();
-    }, 1000); 
+            // Beri jeda 500ms agar engine browser selesai me-render css flexbox sebelum print preview muncul
+            setTimeout(() => {
+                window.print();
+            }, 500);
+        })
+        .catch(error => {
+            console.error(error);
+            miuiAlert("Gagal memuat template cetakan Rak Kosong!");
+        });
 }
 
 async function kirimAntreanCetakKeCloud(jumlahLembar) {
@@ -188,31 +199,30 @@ async function kirimAntreanCetakKeCloud(jumlahLembar) {
     }
 }
 
+// BYPASS ENGINE UNTUK PC MONITOR PRINTER DI KANTOR WH-2
 function eksekusiCetakRakKosongBypass(jumlahLembar) {
     const areaCetak = document.getElementById('print-area-rak-kosong');
     if (!areaCetak) return;
 
-    if (!window.masterTemplateCetakRak || window.masterTemplateCetakRak.trim() === "") {
-        if (areaCetak.innerHTML.trim() !== "") {
-            window.masterTemplateCetakRak = areaCetak.innerHTML;
-        } else {
-            window.masterTemplateCetakRak = `
-                <div style="text-align:center; font-family:sans-serif;">
-                    <h2>DAFTAR RAK KOSONG</h2>
-                </div>
-            `;
-        }
-    }
+    // AMBIL DATA DARI FOLDER MODULAR APPS SECARA DINAMIS
+    fetch('apps/rak-kosong.html')
+        .then(response => {
+            if (!response.ok) throw new Error("Gagal memuat template bypass");
+            return response.text();
+        })
+        .then(htmlTemplate => {
+            let kontenGabungan = "";
+            for (let i = 1; i <= jumlahLembar; i++) {
+                kontenGabungan += htmlTemplate;
+            }
+            areaCetak.innerHTML = kontenGabungan;
 
-    let kontenGabungan = "";
-    for (let i = 1; i <= jumlahLembar; i++) {
-        kontenGabungan += `<div class="print-page-wrapper">${window.masterTemplateCetakRak}</div>`;
-    }
-    areaCetak.innerHTML = kontenGabungan;
-
-    setTimeout(() => {
-        window.print();
-    }, 1200); 
+            // Eksekusi print langsung otomatis pada PC server printer
+            setTimeout(() => {
+                window.print();
+            }, 600); 
+        })
+        .catch(error => console.error("Bypass Print Error:", error));
 }
 
 function aktifkanCloudPrintEngine() {
