@@ -113,7 +113,7 @@ function simpanDataMasterBD() {
     const inKode    = document.getElementById("tx-kode-barang-bd");
     const inInisial = document.getElementById("tx-inisial-barang-bd");
     const inNama    = document.getElementById("tx-nama-barang-bd");
-    const inQty     = document.getElementById("tx-qty-utuhan-bd"); // Mengikuti id Qty Utuhan
+    const inQty     = document.getElementById("tx-qty-utuhan-bd");
 
     if (!inKode || !inInisial || !inNama || !inQty) return;
 
@@ -191,7 +191,7 @@ function editBarangBD(kd, ins, nm, qt) {
     const inKode    = document.getElementById("tx-kode-barang-bd");
     const inInisial = document.getElementById("tx-inisial-barang-bd");
     const inNama    = document.getElementById("tx-nama-barang-bd");
-    const inQty     = document.getElementById("tx-qty-utuhan-bd"); // Mengikuti id Qty Utuhan
+    const inQty     = document.getElementById("tx-qty-utuhan-bd");
     
     const lblTitle  = document.getElementById("title-mode-form-bd");
     const lblBadge  = document.getElementById("badge-mode-bd");
@@ -243,9 +243,35 @@ function resetFormMasterBD() {
     }
 }
 
+/**
+ * LOGIKA BARU: Mengontrol visibilitas panel berdasarkan Radio Button yang dipilih
+ * @param {string} modePilihan - Nilai dari radio button ('KODE' | 'TUJUAN' | 'KELOMPOK')
+ */
+function gantiSwitchModeBankData(modePilihan) {
+    const pnlKode = document.getElementById("panel-workspace-mode-kode");
+    const pnlTujuan = document.getElementById("panel-workspace-mode-tujuan");
+    const pnlKelompok = document.getElementById("panel-workspace-mode-kelompok");
+
+    // Sembunyikan seluruh workspace panel terlebih dahulu
+    if (pnlKode) pnlKode.classList.replace("block", "hidden");
+    if (pnlTujuan) pnlTujuan.classList.replace("block", "hidden");
+    if (pnlKelompok) pnlKelompok.classList.replace("block", "hidden");
+
+    // Tampilkan panel yang sesuai secara eksklusif
+    if (modePilihan === "KODE" && pnlKode) {
+        pnlKode.classList.replace("hidden", "block");
+        muatDataDariFirebase(); // Muat ulang data firebase khusus barang
+    } else if (modePilihan === "TUJUAN" && pnlTujuan) {
+        pnlTujuan.classList.replace("hidden", "block");
+    } else if (modePilihan === "KELOMPOK" && pnlKelompok) {
+        pnlKelompok.classList.replace("hidden", "block");
+    }
+}
+
 // EKSPOS KE SCOPE GLOBAL WINDOW
 window.muatDataDariFirebase = muatDataDariFirebase;
 window.simpanDataMasterBD = simpanDataMasterBD;
 window.ubahStatusAktifBarangBD = ubahStatusAktifBarangBD;
 window.editBarangBD = editBarangBD;
 window.resetFormMasterBD = resetFormMasterBD;
+window.gantiSwitchModeBankData = gantiSwitchModeBankData;
