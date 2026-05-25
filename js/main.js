@@ -503,3 +503,160 @@ window.hitungKonversiKartonOtomatis = function(valPalet) {
 window.exportRekapBlokPDF = function() {
     alert("Memproses Export File PDF untuk Rekapitulasi Data Blok... Selesai!");
 }
+
+
+// ==========================================
+// KONTROLER SUB-PAGE NAVIGATION BANK DATA
+// ==========================================
+
+function bukaSubPageBankData() {
+    const sp = document.getElementById("subpage-bank-data");
+    sp.classList.remove("translate-x-full");
+    initRealtimeBankDataListener(); // Mulai memantau Firebase saat halaman dibuka
+}
+
+function tutupSubPageBankData() {
+    const sp = document.getElementById("subpage-bank-data");
+    sp.classList.add("translate-x-full");
+}
+
+// ==========================================
+// DATABASE ENGINE FOR BANK DATA SUB-PAGE
+// ==========================================
+let localMasterStateBD = {};
+let isListenerActive = false;
+
+function cleanBDKey(key) {
+    return key.replace(/[\.\$\#\[\]\/]/g, "_").trim().toUpperCase();
+}
+
+// Nyalakan sinkronisasi data dari Firebase secara realtime
+function initRealtimeBankDataListener() {
+    if (isListenerActive) return; // Mencegah duplikasi trigger
+    
+    // Pastikan variabel 'db' di script utama kamu sudah mengarah ke database proyek Firebase kamu
+    db.ref("master_barang").on("value", (snapshot) => {
+        localMasterStateBD = snapshot.val() || {};
+        renderMasterTableBD(localMasterStateBD);
+        document.getElementById("db-status-bd").innerText = "ONLINE";
+        document.getElementById("db-status-bd").className = "text-emerald-400 font-bold";
+        isListenerActive = true;
+    }, (error) => {
+        document.getElementById("db-status-bd").innerText = "OFFLINE";
+        document.getElementById("db-status-bd").className = "text-rose-400 font-bold";
+    });
+}
+
+function renderMasterTableBD(data, filterKeyword = "") {
+    const tbody = document.getElementById("table-master-body-bd");
+    tbody.innerHTML = "";
+    let nomorUrut = 1;
+    const keyword = filterKeyword.toLowerCase().trim();
+    const itemsArray = Object.values(data);
+    
+    const filteredItems = itemsArray.filter(item => {
+        return item.kode_barang.toLowerCase().includes(keyword) || 
+               item.nama_barang.toLowerCase().includes(keyword);
+    });
+
+    document.getElementById("info-total-item-bd").innerHTML = `${filteredItems.length} <span class="text-[8px] font-normal text-slate-400">ITEM</span>`;
+
+    if (filteredItems.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-400 font-bold">Tidak ada data master barang.</td></tr>`;
+        return;
+    }
+
+    filteredItems.forEach((item) => {
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-slate-50/80 transition-colors";
+        tr.innerHTML = `
+            <td class="py-2 px-3 text-center font-mono text-slate-400 text-[10px]">${nomorUrut++}</td>
+            <td class="py-2 px-4 font-bold text-slate-900 tracking-wide font-mono text-[11px]">${item.kode_barang}</td>
+            <td class="py-2 px-4 text-slate-700 font-medium">${item.nama_barang}</td>
+            <td class="py-2 px-4 text-center font-black text-slate-900 font-mono text-[11px]">${item.qty_utuhan}</td>
+            <td class="py-2 px-3 text-center">
+                <button type="button" onclick="pemicuEditMasterBD('${cleanBDKey(item.kode_barang)}')" 
+                        class="bg-gradient-to-b from-[#ff8b00] to-[#f36c00] text-white text-[9px] font-bold px-2 py-1 rounded shadow active:scale-95 transition-all border border-orange-600">
+                    <i class="fa-solid fa-pen-to-square"></i> EDIT
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// Deteksi Input Otomatis untuk Switch Mode Baru vs Revisi
+document.getElementById("tx-kode-barang-bd").addEventListener("input", (e) => {
+    const kodeClean = cleanBDKey(e.target.value);
+    const workspaceBox = document.getElementById("box-workspace-input-bd");
+    const titleModeForm = document.getElementById("title-mode-form-bd");
+    const badgeMode = document.getElementById("badge-mode-bd");
+    const btnSubmitMaster = document.getElementById("btn-submit-master-bd");
+    
+    if (localMasterStateBD[kodeClean]) {
+        workspaceBox.className = "col-span-7 bg-amber-50/60 rounded-xl border border-amber-300 shadow-sm overflow-hidden flex flex-col transition-colors duration-200";
+        titleModeForm.innerHTML = `<i class="fa-solid fa-pen-to-square text-amber-600"></i> Revisi Kode Barang Terdaftar`;
+        badgeMode.className = "text-[9px] font-black text-amber-600 bg-amber-100/80 px-2 py-0.5 rounded uppercase tracking-wider";
+        badgeMode.innerText = "REVISI";
+        btnSubmitMaster.className = "flex-1 py-1.5 bg-gradient-to-b from-[#ff8b00] to-[#f36c00] text-white font-bold text-[10px] rounded-lg shadow-md border border-orange-600 tracking-wide text-center uppercase";
+        btnSubmitMaster.innerText = "REVISI KODE";
+        
+        document.getElementById("tx-nama-barang-bd").value = localMasterStateBD[kodeClean].nama_barang;
+        document.getElementById("tx-qty-utuhan-bd").value = localMasterStateBD[kodeClean].qty_utuhan;
+    } else {
+        setFormToInsertModeBD();
+    }
+});
+
+function setFormToInsertModeBD() {
+    document.getElementById("box-workspace-input-bd").className = "col-span-7 bg-emerald-50/60 rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col transition-colors duration-200";
+    document.getElementById("title-mode-form-bd").innerHTML = `<i class="fa-solid fa-square-plus text-emerald-600"></i> Tambah Kode Barang Baru`;
+    document.getElementById("badge-mode-bd").className = "text-[9px] font-black text-emerald-600 bg-emerald-100/80 px-2 py-0.5 rounded uppercase tracking-wider";
+    document.getElementById("badge-mode-bd").innerText = "BARU";
+    document.getElementById("btn-submit-master-bd").className = "flex-1 py-1.5 bg-gradient-to-b from-[#10b981] to-[#059669] text-white font-bold text-[10px] rounded-lg shadow-md border border-emerald-600 tracking-wide text-center uppercase";
+    document.getElementById("btn-submit-master-bd").innerText = "TAMBAH KODE";
+}
+
+window.pemicuEditMasterBD = function(firebaseKey) {
+    const itemTarget = localMasterStateBD[firebaseKey];
+    if (itemTarget) {
+        document.getElementById("tx-kode-barang-bd").value = itemTarget.kode_barang;
+        document.getElementById("tx-nama-barang-bd").value = itemTarget.nama_barang;
+        document.getElementById("tx-qty-utuhan-bd").value = itemTarget.qty_utuhan;
+        
+        // Trigger event input agar warna form langsung berubah jadi oranye revisi
+        document.getElementById("tx-kode-barang-bd").dispatchEvent(new Event('input'));
+    }
+};
+
+function simpanMasterDataFirebase(e) {
+    e.preventDefault();
+    const kodeRaw = document.getElementById("tx-kode-barang-bd").value.trim().toUpperCase();
+    const namaVal = document.getElementById("tx-nama-barang-bd").value.trim();
+    const qtyVal = parseInt(document.getElementById("tx-qty-utuhan-bd").value) || 0;
+    
+    if(!kodeRaw || !namaVal) return;
+    const targetKey = cleanBDKey(kodeRaw);
+    
+    const payload = {
+        kode_barang: kodeRaw,
+        nama_barang: namaVal,
+        qty_utuhan: qtyVal,
+        satuan: "KRT"
+    };
+    
+    db.ref("master_barang").child(targetKey).set(payload, (error) => {
+        if (!error) {
+            resetFormMasterBD();
+        }
+    });
+}
+
+function resetFormMasterBD() {
+    document.getElementById("form-master-barang-bd").reset();
+    setFormToInsertModeBD();
+}
+
+function liveSearchBankData(val) {
+    renderMasterTableBD(localMasterStateBD, val);
+}
