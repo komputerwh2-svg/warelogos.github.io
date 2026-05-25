@@ -506,65 +506,73 @@ window.exportRekapBlokPDF = function() {
 
 
 // ==========================================================================
-// NAVIGATION & LAUNCHER UTAMA (MAIN CORE SYSTEM)
+// REGISTRASI NAVIGASI UTAMA LAUNCHER SUB-PAGE SETELAN (v3.6.1)
 // ==========================================================================
 
-let bankDataLoaded = false;
+let isBankDataLoaded = false;
 
 /**
- * Membuka Modul Bank Data (Injeksi HTML, JS, dan CSS secara Asinkronus)
+ * Membuka Sub-Page Bank Data dari Menu Setelan (Fetch Modular Mode)
+ * Dipicu oleh: Tombol Bank Data di menu Setelan Anda
  */
 async function bukaSubPageBankData() {
     const container = document.getElementById("bank-data-container");
-    if (!container) return;
+    
+    if (!container) {
+        console.error("Elemen 'bank-data-container' tidak ditemukan di index.html!");
+        return;
+    }
 
     try {
-        if (!bankDataLoaded) {
-            // 1. Fetch dan suntik HTML Halaman
-            const htmlRes = await fetch("apps/bank-data/bank-data.html");
-            if (!htmlRes.ok) throw new Error("Gagal memuat HTML Bank Data");
+        // Jika modul belum pernah di-load, lakukan proses penarikan berkas eksternal
+        if (!isBankDataLoaded) {
+            
+            // 1. Fetch dan suntik file arsitektur HTML Halaman
+            const htmlRes = await fetch("apps/bank-data.html");
+            if (!htmlRes.ok) throw new Error("Gagal memuat komponen HTML Bank Data");
             container.innerHTML = await htmlRes.text();
 
-            // 2. Suntik CSS secara dinamis ke <head>
+            // 2. Suntik berkas CSS khusus ke dalam <head> dokumen secara dinamis
             const linkCSS = document.createElement("link");
             linkCSS.rel = "stylesheet";
-            linkCSS.href = "apps/bank-data/bank-data.css";
+            linkCSS.href = "css/bank-data.css";
             document.head.appendChild(linkCSS);
 
-            // 3. Suntik JS secara dinamis ke <body>
+            // 3. Suntik berkas Javascript operasional ke dalam body dokumen secara dinamis
             const scriptJS = document.createElement("script");
-            scriptJS.src = "apps/bank-data/bank-data.js";
-            // Pastikan script selesai di-load sebelum menjalankan fungsi di dalamnya
+            scriptJS.src = "js/bank-data.js";
+            
+            // Pastikan skrip js selesai dibaca penuh oleh browser sebelum mengeksekusi fungsi di dalamnya
             await new Promise((resolve) => {
                 scriptJS.onload = resolve;
                 document.body.appendChild(scriptJS);
             });
 
-            bankDataLoaded = true;
+            isBankDataLoaded = true;
         }
 
-        // Tampilkan Sub-Page dengan Animasi Geser
-        const subPage = document.getElementById("subpage-bank-data");
-        if (subPage) {
-            setTimeout(() => {
+        // 4. Jalankan efek transisi visual geser masuk (Slide-In) dengan jeda aman 50ms
+        setTimeout(() => {
+            const subPage = document.getElementById("subpage-bank-data");
+            if (subPage) {
                 subPage.classList.remove("translate-x-full");
                 subPage.classList.add("translate-x-0");
-            }, 40);
-        }
-
-        // Jalankan fungsi fetch database yang berada di file bank-data.js
-        if (typeof ambilDataMasterFirebase === "function") {
-            ambilDataMasterFirebase();
-        }
+            }
+            
+            // Ambil data live pertama kali dari Firebase untuk merender tabel database
+            if (typeof window.muatDataDariFirebase === "function") {
+                window.muatDataDariFirebase();
+            }
+        }, 50);
 
     } catch (error) {
-        console.error("Gagal memuat Modul Modular:", error);
-        alert("Terjadi kesalahan sistem saat memuat komponen Bank Data.");
+        console.error("Gagal menjalankan modul modular:", error);
+        alert("Sistem gagal memuat komponen Setelan Bank Data.");
     }
 }
 
 /**
- * Menutup Halaman Bank Data
+ * Menutup halaman Bank Data (Slide-Out kembali ke arah kanan)
  */
 function tutupSubPageBankData() {
     const subPage = document.getElementById("subpage-bank-data");
@@ -573,3 +581,7 @@ function tutupSubPageBankData() {
         subPage.classList.add("translate-x-full");
     }
 }
+
+// EKSPOS KE WINDOW GLOBAL SCOPE
+window.bukaSubPageBankData = bukaSubPageBankData;
+window.tutupSubPageBankData = tutupSubPageBankData;
