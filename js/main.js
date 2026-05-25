@@ -425,7 +425,7 @@ window.pilihBlokGudang = function(namaBlok) {
     // Sinkronisasi teks monitor dan tabel bawah
     document.getElementById('lbl-monitor-stok').innerText = "STOK GUDANG : " + namaBlok;
     document.getElementById('lbl-title-riwayat').innerText = "RIWAYAT TRANSAKSI : " + namaBlok;
-    document.getElementById('lbl-rekap-blok').innerText = + namaBlok;
+    document.getElementById('lbl-rekap-blok').innerText = ""+ namaBlok;
     
     // Disini area Bos melakukan pemanggilan data snapshot Firebase real-time sesuai namaBlok
     console.log(`Mengambil data real-time server untuk Blok: ${namaBlok}`);
