@@ -300,7 +300,6 @@ document.addEventListener("DOMContentLoaded", () => {
 function bukaSubPageRekapBlok() {
     const container = document.getElementById('subpage-rekap-blok-container');
     
-    // Keamanan 1: Jika wadah utama di index.html lupa belum dipasang
     if (!container) {
         console.error("Wadah 'subpage-rekap-blok-container' tidak ditemukan di index.html!");
         return;
@@ -314,32 +313,25 @@ function bukaSubPageRekapBlok() {
         return;
     }
 
-    // Jika belum ada di layar index, lakukan fetch data terpisah dari folder apps/
+    // Ambil data langsung dari file apps/rekap-blok.html yang sudah di-commit ke GitHub
     fetch('apps/rekap-blok.html')
         .then(response => {
-            if (!response.ok) throw new Error("Gagal memuat halaman Rekap Blok. Pastikan file ada di folder apps/");
+            if (!response.ok) throw new Error("Gagal mengambil file apps/rekap-blok.html");
             return response.text();
         })
         .then(htmlContent => {
-            // 1. Suntikkan HTML ke dalam wadah container jangkar
             container.innerHTML = htmlContent;
 
-            // 2. Ambil elemen yang baru saja disuntikkan
             const elemenBaru = document.getElementById('subpage-rekap-blok');
-            
             if (elemenBaru) {
-                // Trik Utama: Paksa browser melakukan "Force Reflow" agar mendeteksi posisi awal elemen
-                // sebelum menghapus class animasi translate-x
+                // Trik force reflow agar CSS transition Tailwind terbaca sempurna
                 void elemenBaru.offsetHeight; 
-                
-                // 3. Langsung hilangkan class sembunyi, animasi slide-in dijamin langsung jalan
                 elemenBaru.classList.remove('translate-x-full');
             }
         })
         .catch(error => {
             console.error(error);
-            // Gunakan alert standar jika miuiAlert belum ke-load
-            alert("Koneksi gagal atau file apps/rekap-blok.html tidak ditemukan!");
+            alert("Sistem Gagal Memuat Template Rekap Blok dari Server GitHub!");
         });
 }
 
@@ -349,6 +341,12 @@ function tutupSubPageRekapBlok() {
         subpage.classList.add('translate-x-full');
     }
 }
+
+// -------------------------------------------------------------------------
+// JALUR PROTEKSI AKSES: Ikat fungsi ke Window agar bisa ditembak oleh onclick HTML
+// -------------------------------------------------------------------------
+window.bukaSubPageRekapBlok = bukaSubPageRekapBlok;
+window.tutupSubPageRekapBlok = tutupSubPageRekapBlok;
 
 // Handler Ganti Blok Gudang
 function pilihBlokGudang(namaBlok) {
