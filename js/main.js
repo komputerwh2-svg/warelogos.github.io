@@ -299,6 +299,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function bukaSubPageRekapBlok() {
     const container = document.getElementById('subpage-rekap-blok-container');
+    
+    // Keamanan 1: Jika wadah utama di index.html lupa belum dipasang
+    if (!container) {
+        console.error("Wadah 'subpage-rekap-blok-container' tidak ditemukan di index.html!");
+        return;
+    }
+
     const subpage = document.getElementById('subpage-rekap-blok');
 
     // Jika sub-page sudah pernah di-fetch sebelumnya, langsung geser buka
@@ -310,22 +317,29 @@ function bukaSubPageRekapBlok() {
     // Jika belum ada di layar index, lakukan fetch data terpisah dari folder apps/
     fetch('apps/rekap-blok.html')
         .then(response => {
-            if (!response.ok) throw new Error("Gagal memuat halaman Rekap Blok");
+            if (!response.ok) throw new Error("Gagal memuat halaman Rekap Blok. Pastikan file ada di folder apps/");
             return response.text();
         })
         .then(htmlContent => {
-            // Masukkan komponen HTML ke wadah container jangkar
+            // 1. Suntikkan HTML ke dalam wadah container jangkar
             container.innerHTML = htmlContent;
 
-            // Beri jeda micro-seconds agar browser mendeteksi elemen baru sebelum animasi kelas Tailwind dijalankan
-            setTimeout(() => {
-                const elemenBaru = document.getElementById('subpage-rekap-blok');
-                if (elemenBaru) elemenBaru.classList.remove('translate-x-full');
-            }, 50);
+            // 2. Ambil elemen yang baru saja disuntikkan
+            const elemenBaru = document.getElementById('subpage-rekap-blok');
+            
+            if (elemenBaru) {
+                // Trik Utama: Paksa browser melakukan "Force Reflow" agar mendeteksi posisi awal elemen
+                // sebelum menghapus class animasi translate-x
+                void elemenBaru.offsetHeight; 
+                
+                // 3. Langsung hilangkan class sembunyi, animasi slide-in dijamin langsung jalan
+                elemenBaru.classList.remove('translate-x-full');
+            }
         })
         .catch(error => {
             console.error(error);
-            miuiAlert("Koneksi gagal atau file apps/rekap-blok.html tidak ditemukan!");
+            // Gunakan alert standar jika miuiAlert belum ke-load
+            alert("Koneksi gagal atau file apps/rekap-blok.html tidak ditemukan!");
         });
 }
 
