@@ -292,3 +292,77 @@ document.addEventListener("DOMContentLoaded", () => {
         aktifkanCloudPrintEngine();
     }
 });
+
+// =========================================================================
+// ENGINE SUB-PAGE DYNAMIC LOADING (MODULAR APPS)
+// =========================================================================
+
+function bukaSubPageRekapBlok() {
+    const container = document.getElementById('subpage-rekap-blok-container');
+    const subpage = document.getElementById('subpage-rekap-blok');
+
+    // Jika sub-page sudah pernah di-fetch sebelumnya, langsung geser buka
+    if (subpage) {
+        subpage.classList.remove('translate-x-full');
+        return;
+    }
+
+    // Jika belum ada di layar index, lakukan fetch data terpisah dari folder apps/
+    fetch('apps/rekap-blok.html')
+        .then(response => {
+            if (!response.ok) throw new Error("Gagal memuat halaman Rekap Blok");
+            return response.text();
+        })
+        .then(htmlContent => {
+            // Masukkan komponen HTML ke wadah container jangkar
+            container.innerHTML = htmlContent;
+
+            // Beri jeda micro-seconds agar browser mendeteksi elemen baru sebelum animasi kelas Tailwind dijalankan
+            setTimeout(() => {
+                const elemenBaru = document.getElementById('subpage-rekap-blok');
+                if (elemenBaru) elemenBaru.classList.remove('translate-x-full');
+            }, 50);
+        })
+        .catch(error => {
+            console.error(error);
+            miuiAlert("Koneksi gagal atau file apps/rekap-blok.html tidak ditemukan!");
+        });
+}
+
+function tutupSubPageRekapBlok() {
+    const subpage = document.getElementById('subpage-rekap-blok');
+    if (subpage) {
+        subpage.classList.add('translate-x-full');
+    }
+}
+
+// Handler Ganti Blok Gudang
+function pilihBlokGudang(namaBlok) {
+    document.getElementById('lbl-rekap-blok').innerText = "BLOK " + namaBlok;
+    // Disini tempat Bos melakukan filter query real-time database Firebase
+}
+
+// Handler Switch Tab Transaksi IN / OUT
+let currentTabTransaksi = "IN";
+function gantiTabTransaksi(tipe) {
+    currentTabTransaksi = tipe;
+    const btnIn = document.getElementById('btn-tab-in');
+    const btnOut = document.getElementById('btn-tab-out');
+    const btnSimpan = document.getElementById('btn-simpan-transaksi');
+
+    if (tipe === 'IN') {
+        btnIn.className = "py-2.5 text-center text-xs font-bold text-emerald-700 bg-white border-b-2 border-emerald-500 transition-all";
+        btnOut.className = "py-2.5 text-center text-xs font-bold text-slate-500 hover:bg-slate-100 transition-all";
+        btnSimpan.className = "w-full py-2.5 bg-gradient-to-b from-[#10b981] to-[#059669] active:from-[#047857] text-white font-bold text-xs rounded-xl shadow-md transition-all";
+        btnSimpan.innerText = "SIMPAN DATA MASUK (IN)";
+    } else {
+        btnIn.className = "py-2.5 text-center text-xs font-bold text-slate-500 hover:bg-slate-100 transition-all";
+        btnOut.className = "py-2.5 text-center text-xs font-bold text-rose-700 bg-white border-b-2 border-rose-500 transition-all";
+        btnSimpan.className = "w-full py-2.5 bg-gradient-to-b from-[#f43f5e] to-[#e11d48] active:from-[#be123c] text-white font-bold text-xs rounded-xl shadow-md transition-all";
+        btnSimpan.innerText = "SIMPAN DATA KELUAR (OUT)";
+    }
+}
+
+function simpanTransaksiBlok() {
+    miuiAlert(`Sukses memproses data ${currentTabTransaksi} ke Server!`);
+}
