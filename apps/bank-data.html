@@ -8,35 +8,35 @@
         </div>
     </div>
 
-    <div class="w-full h-14 bg-gradient-to-b from-[#3273ec] to-[#1a51c5] flex items-center justify-between px-3 shadow-md border-b-2 border-[#103891] relative z-10">
+    <div class="w-full h-14 bg-gradient-to-b from-[#3c3c3c] to-[#2a2a2a] flex items-center justify-between px-3 shadow-md border-b border-[#1a1a1a] relative z-10">
         <div class="flex items-center">
-            <button onclick="tutupSubPageBankData()" class="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold bg-black/15 hover:bg-black/25 text-white border border-white/10 active:scale-95 transition-all shadow-inner">
+            <button onclick="tutupSubPageBankData()" class="miui-btn-back flex items-center justify-center gap-1 px-3 py-1.5 rounded text-xs font-bold text-orange-400 shadow-inner">
                 <i class="fa-solid fa-chevron-left text-sm"></i>
                 <span>Kembali</span>
             </button>
-            <h1 class="text-white font-bold text-base ml-4 tracking-wide drop-shadow-[0_2px_2px_rgba(0,0,0,0.4)] mr-6">Setelan Bank Data</h1>
+            <h1 class="text-white font-semibold text-sm ml-3 tracking-wide drop-shadow-md">Setelan Bank Data</h1>
         </div>
 
-        <div class="flex items-center bg-black/25 p-1 rounded-xl border border-black/20 shadow-inner">
+        <div class="flex items-center bg-black/35 p-1 rounded-xl border border-black/30 shadow-inner">
             <label class="relative flex items-center justify-center px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider cursor-pointer transition-all select-none group">
                 <input type="radio" name="rb-mode-bank-data" value="KODE" checked onchange="gantiSwitchModeBankData(this.value)" class="sr-only peer">
-                <span class="z-10 text-blue-200 peer-checked:text-white transition-colors">KODE</span>
+                <span class="z-10 text-gray-400 peer-checked:text-transparent transition-colors">KODE</span>
                 <div class="absolute inset-0 bg-gradient-to-b from-white to-gray-100 rounded-lg shadow-sm border border-white opacity-0 scale-95 peer-checked:opacity-100 peer-checked:scale-100 transition-all duration-200"></div>
-                <span class="absolute z-20 opacity-0 peer-checked:opacity-100 font-black text-[#1a51c5] text-xs uppercase tracking-wider">KODE</span>
+                <span class="absolute z-20 opacity-0 peer-checked:opacity-100 font-black text-[#f36c00] text-xs uppercase tracking-wider">KODE</span>
             </label>
 
             <label class="relative flex items-center justify-center px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider cursor-pointer transition-all select-none group">
                 <input type="radio" name="rb-mode-bank-data" value="TUJUAN" onchange="gantiSwitchModeBankData(this.value)" class="sr-only peer">
-                <span class="z-10 text-blue-200 peer-checked:text-white transition-colors">TUJUAN</span>
+                <span class="z-10 text-gray-400 peer-checked:text-transparent transition-colors">TUJUAN</span>
                 <div class="absolute inset-0 bg-gradient-to-b from-white to-gray-100 rounded-lg shadow-sm border border-white opacity-0 scale-95 peer-checked:opacity-100 peer-checked:scale-100 transition-all duration-200"></div>
-                <span class="absolute z-20 opacity-0 peer-checked:opacity-100 font-black text-[#1a51c5] text-xs uppercase tracking-wider">TUJUAN</span>
+                <span class="absolute z-20 opacity-0 peer-checked:opacity-100 font-black text-[#f36c00] text-xs uppercase tracking-wider">TUJUAN</span>
             </label>
 
             <label class="relative flex items-center justify-center px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider cursor-pointer transition-all select-none group">
                 <input type="radio" name="rb-mode-bank-data" value="KELOMPOK" onchange="gantiSwitchModeBankData(this.value)" class="sr-only peer">
-                <span class="z-10 text-blue-200 peer-checked:text-white transition-colors">KODE KELOMPOK</span>
+                <span class="z-10 text-gray-400 peer-checked:text-transparent transition-colors">KODE KELOMPOK</span>
                 <div class="absolute inset-0 bg-gradient-to-b from-white to-gray-100 rounded-lg shadow-sm border border-white opacity-0 scale-95 peer-checked:opacity-100 peer-checked:scale-100 transition-all duration-200"></div>
-                <span class="absolute z-20 opacity-0 peer-checked:opacity-100 font-black text-[#1a51c5] text-xs uppercase tracking-wider">KODE KELOMPOK</span>
+                <span class="absolute z-20 opacity-0 peer-checked:opacity-100 font-black text-[#f36c00] text-xs uppercase tracking-wider">KODE KELOMPOK</span>
             </label>
         </div>
     </div>
@@ -79,7 +79,7 @@
                     </div>
 
                     <div class="pt-2 flex items-center gap-2.5">
-                        <button type="button" id="btn-submit-master-bd" onclick="simpanDataMasterBD()" class="flex-1 py-2.5 bg-[#2a67e0] hover:bg-[#1c4eb3] text-white font-black text-xs rounded-xl shadow-md border border-[#1d4ed8] active:scale-[0.98] transition-all uppercase tracking-widest">
+                        <button type="button" id="btn-submit-master-bd" onclick="simpanDataMasterBD()" class="flex-1 py-2.5 bg-gradient-to-b from-[#ff8b00] to-[#f36c00] text-white font-black text-xs rounded-xl shadow-md border border-orange-600 active:scale-[0.98] transition-all uppercase tracking-widest">
                             TAMBAH KODE
                         </button>
                         <button type="button" onclick="resetFormMasterBD()" class="px-6 py-2.5 bg-[#666666] hover:bg-[#555555] text-white font-black text-xs rounded-xl shadow-md border border-[#444444] active:scale-[0.98] transition-all uppercase tracking-widest">
