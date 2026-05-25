@@ -378,3 +378,40 @@ function gantiTabTransaksi(tipe) {
 function simpanTransaksiBlok() {
     miuiAlert(`Sukses memproses data ${currentTabTransaksi} ke Server!`);
 }
+
+// HANDLER SLIDER SWITCH TOGGLE TRANSAKSI (IN/OUT)
+window.toggleEngineTransaksi = function(isOut) {
+    const titleSide = document.getElementById('title-transaksi-side');
+    const lblTanggal = document.getElementById('lbl-tx-tanggal');
+    const lblQty = document.getElementById('lbl-tx-qty');
+    const wrapperExpired = document.getElementById('wrapper-expired-input');
+    const btnSimpan = document.getElementById('btn-simpan-transaksi');
+
+    if (isOut) {
+        // JIKA DIGESER KE KANAN (BARANG KELUAR - OUT)
+        titleSide.innerText = "Input Barang Keluar";
+        titleSide.className = "text-[10px] font-bold text-rose-700 uppercase tracking-wide";
+        lblTanggal.innerText = "Tanggal Keluar";
+        lblQty.innerText = "Jumlah QTY / KRT";
+        wrapperExpired.style.display = "none"; // Hilangkan kolom expired jika barang keluar
+        
+        btnSimpan.className = "flex-1 py-1.5 bg-gradient-to-b from-[#f43f5e] to-[#e11d48] text-white font-bold text-[10px] rounded-lg shadow-md border border-rose-600 tracking-wide text-center uppercase";
+        btnSimpan.innerText = "SIMPAN OUT";
+    } else {
+        // JIKA KEMBALI KE KIRI (BARANG MASUK - IN)
+        titleSide.innerText = "Input Barang Masuk";
+        titleSide.className = "text-[10px] font-bold text-emerald-700 uppercase tracking-wide";
+        lblTanggal.innerText = "Tanggal Masuk";
+        lblQty.innerText = "Jumlah Palet";
+        wrapperExpired.style.style.display = "block"; // Munculkan kembali kolom expired
+        
+        btnSimpan.className = "flex-1 py-1.5 bg-gradient-to-b from-[#10b981] to-[#059669] text-white font-bold text-[10px] rounded-lg shadow-md border border-emerald-600 tracking-wide text-center uppercase";
+        btnSimpan.innerText = "SIMPAN IN";
+    }
+}
+
+window.resetFormTransaksi = function() {
+    document.getElementById('tx-tanggal').value = "";
+    document.getElementById('tx-palet').value = "";
+    document.getElementById('tx-expired').value = "";
+}
