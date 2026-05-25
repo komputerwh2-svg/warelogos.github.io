@@ -512,6 +512,11 @@ window.exportRekapBlokPDF = function() {
 async function bukaSubPageBankData() {
     const container = document.getElementById("bank-data-container");
     
+    if (!container) {
+        console.error("Wadah 'bank-data-container' tidak ditemukan di index.html!");
+        return;
+    }
+
     // 1. Jika komponen belum pernah di-load, ambil dulu dari folder apps/
     if (!document.getElementById("subpage-bank-data")) {
         try {
@@ -520,7 +525,7 @@ async function bukaSubPageBankData() {
             const htmlText = await response.text();
             container.innerHTML = htmlText;
             
-            // Pasang ulang event listener untuk input kode barang setelah HTML terpasang
+            // Pasang event listener untuk input kode barang setelah HTML resmi terpasang di DOM
             inisialisasiEventListenerBD();
         } catch (error) {
             console.error("Error Bank Data:", error);
@@ -532,6 +537,8 @@ async function bukaSubPageBankData() {
     // 2. Tampilkan sub-page dengan menghapus class translate
     const sp = document.getElementById("subpage-bank-data");
     if (sp) {
+        // Naikkan paksa z-index ke 60 agar berada di atas subpage-setelan (z-50)
+        sp.style.zIndex = "60"; 
         sp.classList.remove("translate-x-full");
         initRealtimeBankDataListener(); // Jalankan sinkronisasi Firebase
     }
@@ -542,47 +549,65 @@ function tutupSubPageBankData() {
     if (sp) sp.classList.add("translate-x-full");
 }
 
-// Fungsi tambahan untuk mengikat event listener input setelah komponen dimuat secara dinamis
-function inisialisasiEventListenerBD() {
-    const inputKode = document.getElementById("tx-kode-barang-bd");
-    if (inputKode) {
-        inputKode.addEventListener("input", (e) => {
-            const kodeClean = cleanBDKey(e.target.value);
-            const workspaceBox = document.getElementById("box-workspace-input-bd");
-            const titleModeForm = document.getElementById("title-mode-form-bd");
-            const badgeMode = document.getElementById("badge-mode-bd");
-            const btnSubmitMaster = document.getElementById("btn-submit-master-bd");
-            
-            if (localMasterStateBD[kodeClean]) {
-                workspaceBox.className = "col-span-7 bg-amber-50/60 rounded-xl border border-amber-300 shadow-sm overflow-hidden flex flex-col transition-colors duration-200";
-                titleModeForm.innerHTML = `<i class="fa-solid fa-pen-to-square text-amber-600"></i> Revisi Kode Barang Terdaftar`;
-                badgeMode.className = "text-[9px] font-black text-amber-600 bg-amber-100/80 px-2 py-0.5 rounded uppercase tracking-wider";
-                badgeMode.innerText = "REVISI";
-                btnSubmitMaster.className = "flex-1 py-1.5 bg-gradient-to-b from-[#ff8b00] to-[#f36c00] text-white font-bold text-[10px] rounded-lg shadow-md border border-orange-600 tracking-wide text-center uppercase";
-                btnSubmitMaster.innerText = "REVISI KODE";
-                
-                document.getElementById("tx-nama-barang-bd").value = localMasterStateBD[kodeClean].nama_barang;
-                document.getElementById("tx-qty-utuhan-bd").value = localMasterStateBD[kodeClean].qty_utuhan;
-            } else {
-                setFormToInsertModeBD();
-            }
-        });
+// ==========================================
+// DATABASE ENGINE FOR BANK DATA SUB-PAGE
+// ==========================================
+let localMasterStateBD = {};
+let isListenerActive = false;
+
+function cleanBDKey(key) {
+    if (!key) return "";
+    return key.replace(/[\.\$\#\[\]\/]/g, "_").trim().toUpperCase();
+}
+
+// Nyalakan sinkronisasi data dari Firebase secara realtime
+function initRealtimeBankDataListener() {
+    if (isListenerActive) return; // Mencegah duplikasi trigger listener
+    
+    if (typeof db === "undefined") {
+        console.error("Firebase 'db' belum terdefinisi di script utama!");
+        return;
     }
+
+    db.ref("master_barang").on("value", (snapshot) => {
+        localMasterStateBD = snapshot.val() || {};
+        renderMasterTableBD(localMasterStateBD);
+        
+        const statusBadge = document.getElementById("db-status-bd");
+        if (statusBadge) {
+            statusBadge.innerText = "ONLINE";
+            statusBadge.className = "text-emerald-400 font-bold";
+        }
+        isListenerActive = true;
+    }, (error) => {
+        console.error("Firebase Error:", error);
+        const statusBadge = document.getElementById("db-status-bd");
+        if (statusBadge) {
+            statusBadge.innerText = "OFFLINE";
+            statusBadge.className = "text-rose-400 font-bold";
+        }
+    });
 }
 
 function renderMasterTableBD(data, filterKeyword = "") {
     const tbody = document.getElementById("table-master-body-bd");
+    if (!tbody) return;
+    
     tbody.innerHTML = "";
     let nomorUrut = 1;
     const keyword = filterKeyword.toLowerCase().trim();
     const itemsArray = Object.values(data);
     
     const filteredItems = itemsArray.filter(item => {
-        return item.kode_barang.toLowerCase().includes(keyword) || 
-               item.nama_barang.toLowerCase().includes(keyword);
+        const kode = item.kode_barang ? item.kode_barang.toLowerCase() : "";
+        const nama = item.nama_barang ? item.nama_barang.toLowerCase() : "";
+        return kode.includes(keyword) || nama.includes(keyword);
     });
 
-    document.getElementById("info-total-item-bd").innerHTML = `${filteredItems.length} <span class="text-[8px] font-normal text-slate-400">ITEM</span>`;
+    const infoTotal = document.getElementById("info-total-item-bd");
+    if (infoTotal) {
+        infoTotal.innerHTML = `${filteredItems.length} <span class="text-[8px] font-normal text-slate-400">ITEM</span>`;
+    }
 
     if (filteredItems.length === 0) {
         tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-400 font-bold">Tidak ada data master barang.</td></tr>`;
@@ -608,30 +633,41 @@ function renderMasterTableBD(data, filterKeyword = "") {
     });
 }
 
-// Deteksi Input Otomatis untuk Switch Mode Baru vs Revisi
-document.getElementById("tx-kode-barang-bd").addEventListener("input", (e) => {
-    const kodeClean = cleanBDKey(e.target.value);
-    const workspaceBox = document.getElementById("box-workspace-input-bd");
-    const titleModeForm = document.getElementById("title-mode-form-bd");
-    const badgeMode = document.getElementById("badge-mode-bd");
-    const btnSubmitMaster = document.getElementById("btn-submit-master-bd");
+// Fungsi Pengikat Event Listener Aman (Hanya dipanggil setelah HTML berhasil di-fetch)
+function inisialisasiEventListenerBD() {
+    const inputKode = document.getElementById("tx-kode-barang-bd");
+    if (!inputKode) return;
     
-    if (localMasterStateBD[kodeClean]) {
-        workspaceBox.className = "col-span-7 bg-amber-50/60 rounded-xl border border-amber-300 shadow-sm overflow-hidden flex flex-col transition-colors duration-200";
-        titleModeForm.innerHTML = `<i class="fa-solid fa-pen-to-square text-amber-600"></i> Revisi Kode Barang Terdaftar`;
-        badgeMode.className = "text-[9px] font-black text-amber-600 bg-amber-100/80 px-2 py-0.5 rounded uppercase tracking-wider";
-        badgeMode.innerText = "REVISI";
-        btnSubmitMaster.className = "flex-1 py-1.5 bg-gradient-to-b from-[#ff8b00] to-[#f36c00] text-white font-bold text-[10px] rounded-lg shadow-md border border-orange-600 tracking-wide text-center uppercase";
-        btnSubmitMaster.innerText = "REVISI KODE";
+    inputKode.addEventListener("input", (e) => {
+        const kodeClean = cleanBDKey(e.target.value);
+        const workspaceBox = document.getElementById("box-workspace-input-bd");
+        const titleModeForm = document.getElementById("title-mode-form-bd");
+        const badgeMode = document.getElementById("badge-mode-bd");
+        const btnSubmitMaster = document.getElementById("btn-submit-master-bd");
         
-        document.getElementById("tx-nama-barang-bd").value = localMasterStateBD[kodeClean].nama_barang;
-        document.getElementById("tx-qty-utuhan-bd").value = localMasterStateBD[kodeClean].qty_utuhan;
-    } else {
-        setFormToInsertModeBD();
-    }
-});
+        // Pastikan seluruh elemen form tersedia sebelum manipulasi class dilakukan
+        if (!workspaceBox || !titleModeForm || !badgeMode || !btnSubmitMaster) return;
+        
+        if (localMasterStateBD[kodeClean]) {
+            workspaceBox.className = "col-span-7 bg-amber-50/60 rounded-xl border border-amber-300 shadow-sm overflow-hidden flex flex-col transition-colors duration-200";
+            titleModeForm.innerHTML = `<i class="fa-solid fa-pen-to-square text-amber-600"></i> Revisi Kode Barang Terdaftar`;
+            badgeMode.className = "text-[9px] font-black text-amber-600 bg-amber-100/80 px-2 py-0.5 rounded uppercase tracking-wider";
+            badgeMode.innerText = "REVISI";
+            btnSubmitMaster.className = "flex-1 py-1.5 bg-gradient-to-b from-[#ff8b00] to-[#f36c00] text-white font-bold text-[10px] rounded-lg shadow-md border border-orange-600 tracking-wide text-center uppercase";
+            btnSubmitMaster.innerText = "REVISI KODE";
+            
+            document.getElementById("tx-nama-barang-bd").value = localMasterStateBD[kodeClean].nama_barang || "";
+            document.getElementById("tx-qty-utuhan-bd").value = localMasterStateBD[kodeClean].qty_utuhan || "";
+        } else {
+            setFormToInsertModeBD();
+        }
+    });
+}
 
 function setFormToInsertModeBD() {
+    const workspaceBox = document.getElementById("box-workspace-input-bd");
+    if (!workspaceBox) return;
+
     document.getElementById("box-workspace-input-bd").className = "col-span-7 bg-emerald-50/60 rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col transition-colors duration-200";
     document.getElementById("title-mode-form-bd").innerHTML = `<i class="fa-solid fa-square-plus text-emerald-600"></i> Tambah Kode Barang Baru`;
     document.getElementById("badge-mode-bd").className = "text-[9px] font-black text-emerald-600 bg-emerald-100/80 px-2 py-0.5 rounded uppercase tracking-wider";
@@ -643,9 +679,9 @@ function setFormToInsertModeBD() {
 window.pemicuEditMasterBD = function(firebaseKey) {
     const itemTarget = localMasterStateBD[firebaseKey];
     if (itemTarget) {
-        document.getElementById("tx-kode-barang-bd").value = itemTarget.kode_barang;
-        document.getElementById("tx-nama-barang-bd").value = itemTarget.nama_barang;
-        document.getElementById("tx-qty-utuhan-bd").value = itemTarget.qty_utuhan;
+        document.getElementById("tx-kode-barang-bd").value = itemTarget.kode_barang || "";
+        document.getElementById("tx-nama-barang-bd").value = itemTarget.nama_barang || "";
+        document.getElementById("tx-qty-utuhan-bd").value = itemTarget.qty_utuhan || "";
         
         // Trigger event input agar warna form langsung berubah jadi oranye revisi
         document.getElementById("tx-kode-barang-bd").dispatchEvent(new Event('input'));
@@ -676,8 +712,11 @@ function simpanMasterDataFirebase(e) {
 }
 
 function resetFormMasterBD() {
-    document.getElementById("form-master-barang-bd").reset();
-    setFormToInsertModeBD();
+    const form = document.getElementById("form-master-barang-bd");
+    if (form) {
+        form.reset();
+        setFormToInsertModeBD();
+    }
 }
 
 function liveSearchBankData(val) {
