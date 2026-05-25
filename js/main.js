@@ -509,44 +509,130 @@ window.exportRekapBlokPDF = function() {
 // KONTROLER SUB-PAGE NAVIGATION BANK DATA (FETCH MODE)
 // ==========================================
 
-async function bukaSubPageBankData() {
-    const container = document.getElementById("subpage-bank-data-container");
+// ==========================================================================
+// KONFIGURASI FIREBASE REALTIME DATABASE (Sesuai Proyek bank-data-cbd97)
+// ==========================================================================
+const FIREBASE_CONFIG = {
+    databaseURL: "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/"
+};
+
+// Variabel status global untuk melacak apakah file apps/bank-data.html sudah di-load
+let isBankDataLoaded = false;
+
+/**
+ * Membuka Sub-Page Bank Data dengan Fetch Mode
+ * Dipicu oleh: onclick="bukaSubPageBankData()" di menu Setelan
+ */
+function bukaSubPageBankData() {
+    const container = document.getElementById("bank-data-container");
     
     if (!container) {
-        console.error("Wadah 'bank-data-container' tidak ditemukan di index.html!");
+        console.error("Elemen 'bank-data-container' tidak ditemukan di index.html!");
         return;
     }
 
-    // 1. Jika komponen belum pernah di-load, ambil dulu dari folder apps/
-    if (!document.getElementById("subpage-bank-data")) {
-        try {
-            const response = await fetch('apps/bank-data.html');
-            if (!response.ok) throw new Error('Gagal memuat file bank-data.html');
-            const htmlText = await response.text();
-            container.innerHTML = htmlText;
-            
-            // Pasang event listener untuk input kode barang setelah HTML resmi terpasang di DOM
-            inisialisasiEventListenerBD();
-        } catch (error) {
-            console.error("Error Bank Data:", error);
-            alert("Gagal memuat halaman Bank Data!");
-            return;
-        }
-    }
-    
-    // 2. Tampilkan sub-page dengan menghapus class translate
-    const sp = document.getElementById("subpage-bank-data");
-    if (sp) {
-        // Naikkan paksa z-index ke 60 agar berada di atas subpage-setelan (z-50)
-        sp.style.zIndex = "60"; 
-        sp.classList.remove("translate-x-full");
-        initRealtimeBankDataListener(); // Jalankan sinkronisasi Firebase
+    // Jika belum pernah di-load, lakukan fetch HTML eksternal terlebih dahulu
+    if (!isBankDataLoaded) {
+        fetch("apps/bank-data.html")
+            .then(response => {
+                if (!response.ok) throw new Error("Gagal memuat halaman apps/bank-data.html");
+                return response.text();
+            })
+            .then(htmlText => {
+                // Suntikkan konten HTML langsung ke wadah container
+                container.innerHTML = htmlText;
+                isBankDataLoaded = true;
+
+                // Eksekusi efek transisi geser masuk (Slide-In)
+                tampilkanSubPageBankData();
+                
+                // Ambil data dari Firebase dan tampilkan ke tabel di dalam bank-data.html
+                muatDataDariFirebase();
+            })
+            .catch(error => {
+                console.error("Error Fetch Bank Data:", error);
+                alert("Gagal memuat halaman Bank Data. Pastikan file tersedia di folder apps/.");
+            });
+    } else {
+        // Jika sudah pernah di-load sebelumnya, langsung tampilkan tanpa fetch ulang
+        tampilkanSubPageBankData();
+        muatDataDariFirebase();
     }
 }
 
+/**
+ * Menampilkan elemen halaman subpage-bank-data dengan transisi CSS
+ */
+function tampilkanSubPageBankData() {
+    const subPage = document.getElementById("subpage-bank-data");
+    if (subPage) {
+        // Menghapus kelas sembunyi (jika ada) dan menggeser layar masuk dari kanan
+        subPage.classList.remove("translate-x-full");
+        subPage.classList.add("translate-x-0");
+    } else {
+        console.error("Elemen id 'subpage-bank-data' tidak ditemukan di dalam berkas eksternal!");
+    }
+}
+
+/**
+ * Menutup halaman Bank Data (Kembali ke menu Setelan)
+ * Dipicu oleh tombol kembali di dalam apps/bank-data.html
+ */
 function tutupSubPageBankData() {
-    const sp = document.getElementById("subpage-bank-data");
-    if (sp) sp.classList.add("translate-x-full");
+    const subPage = document.getElementById("subpage-bank-data");
+    if (subPage) {
+        subPage.classList.remove("translate-x-0");
+        subPage.classList.add("translate-x-full");
+    }
+}
+
+/**
+ * Mengambil data real-time dari Realtime Database Firebase
+ * Node target: master_barang
+ */
+function muatDataDariFirebase() {
+    const tabelBody = document.getElementById("tabel-body-bank-data");
+    if (!tabelBody) {
+        // Beri jeda waktu singkat jika DOM baru saja disuntikkan dan belum siap sepenuhnya
+        setTimeout(muatDataDariFirebase, 100);
+        return;
+    }
+
+    tabelBody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-gray-500 animate-pulse">Menghubungkan ke database...</td></tr>`;
+
+    // Ambil data via REST API Firebase dengan menambahkan ekstensi .json
+    fetch(`${FIREBASE_CONFIG.databaseURL}master_barang.json`)
+        .then(response => response.json())
+        .then(data => {
+            tabelBody.innerHTML = ""; // Bersihkan teks loading
+
+            if (!data) {
+                tabelBody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-gray-500">Tidak ada data di database.</td></tr>`;
+                return;
+            }
+
+            let no = 1;
+            // Looping baris data dari objek Firebase (Key berupa KODE BARANG seperti CRR4A01)
+            for (const kodeBarang in data) {
+                const item = data[kodeBarang];
+                const namaBarang = item.NAMA_BARANG || item.nama_barang || "-";
+                const qty = item.QTY || item.qty || 0;
+
+                const row = document.createElement("tr");
+                row.className = "border-b border-gray-200 hover:bg-slate-50 transition-colors text-xs text-gray-700 text-center";
+                row.innerHTML = `
+                    <td class="py-2.5 px-2">${no++}</td>
+                    <td class="py-2.5 px-2 font-mono font-semibold text-left text-blue-600">${kodeBarang}</td>
+                    <td class="py-2.5 px-2 text-left">${namaBarang}</td>
+                    <td class="py-2.5 px-2 font-bold text-gray-900">${qty}</td>
+                `;
+                tabelBody.innerHTML += row.outerHTML;
+            }
+        })
+        .catch(error => {
+            console.error("Error Firebase Fetch:", error);
+            tabelBody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-red-500 font-semibold">Gagal memuat database (Periksa Jaringan)</td></tr>`;
+        });
 }
 
 // ==========================================
