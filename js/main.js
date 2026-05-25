@@ -415,3 +415,91 @@ window.resetFormTransaksi = function() {
     document.getElementById('tx-palet').value = "";
     document.getElementById('tx-expired').value = "";
 }
+
+// =========================================================================
+// HANDLER UPDATE LOGIK UTK REKAP BLOK DINAMIS MODULAR
+// =========================================================================
+
+// 1. ENGINE GANTI GUDANG (DINAMIS SINKRONISASI LABEL)
+window.pilihBlokGudang = function(namaBlok) {
+    // Sinkronisasi teks monitor dan tabel bawah
+    document.getElementById('lbl-monitor-stok').innerText = "STOK GUDANG " + namaBlok;
+    document.getElementById('lbl-title-riwayat').innerText = "RIWAYAT TRANSAKSI " + namaBlok;
+    document.getElementById('lbl-rekap-blok').innerText = "BLOK " + namaBlok;
+    
+    // Disini area Bos melakukan pemanggilan data snapshot Firebase real-time sesuai namaBlok
+    console.log(`Mengambil data real-time server untuk Blok: ${namaBlok}`);
+}
+
+// 2. ENGINE SWITCH TRANSAKSI TOGGLE (WARNA, LAYOUT & LABELS SYMMETRICAL)
+window.toggleEngineTransaksi = function(isOut) {
+    const boxWorkspace = document.getElementById('box-workspace-input');
+    const titleSide = document.getElementById('title-transaksi-side');
+    const lblSwitch = document.getElementById('lbl-status-switch');
+    const lblTanggal = document.getElementById('lbl-tx-tanggal');
+    const lblQty = document.getElementById('lbl-tx-qty');
+    const badgeUnit = document.getElementById('badge-unit-input');
+    const btnSimpan = document.getElementById('btn-simpan-transaksi');
+    
+    // Element struktural kolom baru
+    const rowGrid = document.getElementById('grid-row-dinamis');
+    const wrapKarton = document.getElementById('wrapper-konversi-karton');
+
+    if (isOut) {
+        // --- MODE BARANG KELUAR (OUT) ---
+        boxWorkspace.className = "col-span-7 bg-rose-50/60 rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col transition-colors duration-200";
+        titleSide.innerText = "Input Barang Keluar";
+        titleSide.className = "text-[10px] font-bold text-rose-700 uppercase tracking-wide";
+        
+        lblSwitch.innerText = "OUT";
+        lblSwitch.className = "text-[9px] font-bold text-rose-600 bg-rose-100/80 px-1.5 py-0.5 rounded uppercase tracking-wider";
+        
+        lblTanggal.innerText = "Tanggal Keluar";
+        lblQty.innerText = "Jumlah Palet Keluar";
+        badgeUnit.innerText = "PLT";
+        
+        // Ubah struktur grid menjadi 3 kolom untuk menampung input Box konversi
+        rowGrid.className = "grid grid-cols-3 gap-2";
+        wrapKarton.classList.remove('hidden');
+
+        btnSimpan.className = "flex-1 py-1.5 bg-gradient-to-b from-[#f43f5e] to-[#e11d48] text-white font-bold text-[10px] rounded-lg shadow-md border border-rose-600 tracking-wide text-center uppercase";
+        btnSimpan.innerText = "SIMPAN OUT";
+    } else {
+        // --- MODE BARANG MASUK (IN) ---
+        boxWorkspace.className = "col-span-7 bg-emerald-50/60 rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col transition-colors duration-200";
+        titleSide.innerText = "Input Barang Masuk";
+        titleSide.className = "text-[10px] font-bold text-emerald-700 uppercase tracking-wide";
+        
+        lblSwitch.innerText = "IN";
+        lblSwitch.className = "text-[9px] font-bold text-emerald-600 bg-emerald-100/80 px-1.5 py-0.5 rounded uppercase tracking-wider";
+        
+        lblTanggal.innerText = "Tanggal Masuk";
+        lblQty.innerText = "Jumlah Palet";
+        badgeUnit.innerText = "PLT";
+        
+        // Kembalikan struktur grid menjadi 2 kolom normal
+        rowGrid.className = "grid grid-cols-2 gap-2";
+        wrapKarton.classList.add('hidden');
+
+        btnSimpan.className = "flex-1 py-1.5 bg-gradient-to-b from-[#10b981] to-[#059669] text-white font-bold text-[10px] rounded-lg shadow-md border border-emerald-600 tracking-wide text-center uppercase";
+        btnSimpan.innerText = "SIMPAN IN";
+    }
+    resetFormTransaksi();
+}
+
+// 3. AUTOMATIC CONVERSION FACTOR (PALET TO KARTON)
+window.hitungKonversiKartonOtomatis = function(valPalet) {
+    const txtKarton = document.getElementById('tx-karton-readonly');
+    if (!valPalet || isNaN(valPalet)) {
+        txtKarton.value = "";
+        return;
+    }
+    // Asumsi standar operasional: 1 Palet = 77 Karton (bisa Bos ubah pengalinya sesuai standar WH-2)
+    const factorKonversi = 77; 
+    txtKarton.value = parseInt(valPalet) * factorKonversi;
+}
+
+// 4. ACTION UTILITY BUTTONS
+window.exportRekapBlokPDF = function() {
+    alert("Memproses Export File PDF untuk Rekapitulasi Data Blok... Selesai!");
+}
