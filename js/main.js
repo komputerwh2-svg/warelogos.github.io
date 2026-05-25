@@ -510,7 +510,7 @@ window.exportRekapBlokPDF = function() {
 // ==========================================
 
 async function bukaSubPageBankData() {
-    const container = document.getElementById("bank-data-container");
+    const container = document.getElementById("subpage-bank-data-container");
     
     if (!container) {
         console.error("Wadah 'bank-data-container' tidak ditemukan di index.html!");
