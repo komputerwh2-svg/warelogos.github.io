@@ -355,14 +355,14 @@ function pilihBlokGudang(namaBlok) {
 }
 
 // Handler Switch Tab Transaksi IN / OUT
-let currentTabTransaksi = "IN";
+let currentTabTransaksi = "MASUK";
 function gantiTabTransaksi(tipe) {
     currentTabTransaksi = tipe;
     const btnIn = document.getElementById('btn-tab-in');
     const btnOut = document.getElementById('btn-tab-out');
     const btnSimpan = document.getElementById('btn-simpan-transaksi');
 
-    if (tipe === 'IN') {
+    if (tipe === 'MASUK') {
         btnIn.className = "py-2.5 text-center text-xs font-bold text-emerald-700 bg-white border-b-2 border-emerald-500 transition-all";
         btnOut.className = "py-2.5 text-center text-xs font-bold text-slate-500 hover:bg-slate-100 transition-all";
         btnSimpan.className = "w-full py-2.5 bg-gradient-to-b from-[#10b981] to-[#059669] active:from-[#047857] text-white font-bold text-xs rounded-xl shadow-md transition-all";
