@@ -1,15 +1,15 @@
 // ==========================================================================
-// LOGIKA KHUSUS: MODUL SETELAN BANK DATA & KAMUS BARANG (v2026.05.25.0.0.2 - INTEGRATED)
+// LOGIKA KHUSUS: MODUL SETELAN BANK DATA & KAMUS BARANG (v2026.05.25.0.0.3 - INTEGRATED WITH CELL)
 // ==========================================================================
 
 const BD_FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
 
 // URL Web App Google Apps Script untuk sinkronisasi 2 arah ke Spreadsheet (Sheet KODE - 7 Kolom)
-const SPREADSHEET_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyU5JxZCeVFtA1mi5wC6H-H-Bx9WHU2SwR7b8CMlkSp2ymCF-Lh1jL1XVArmCSxAPJt/exec";
+const SPREADSHEET_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzm_qpI-LrvsWn2MWgBhIrIaZsxOSrMPV3hKymx-kZpr-OCxm_fBImoUVGuVP3bQlkmvA/exec";
 
 /**
  * Mengunduh Data 'master_barang' secara utuh dari Firebase Realtime DB
- * Dan merendernya dengan kolom KELOMPOK yang sudah melebur di dalamnya.
+ * Dan merendernya dengan kolom KELOMPOK serta CELL yang sudah melebur di dalamnya.
  */
 function muatDataDariFirebase() {
     const bodiTabel = document.getElementById("tabel-body-bank-data");
@@ -34,7 +34,7 @@ function muatDataDariFirebase() {
                 return;
             }
 
-            // 1. STRUKTURISASI: Ubah objek Firebase menjadi Array dengan penambahan field KELOMPOK
+            // 1. STRUKTURISASI: Ubah objek Firebase menjadi Array dengan penambahan field KELOMPOK dan CELL
             let listBarangArr = [];
             for (const key in kumpulanData) {
                 const item = kumpulanData[key];
@@ -43,6 +43,7 @@ function muatDataDariFirebase() {
                     KODE_BARANG: item.KODE_BARANG || key,
                     INISIAL: item.INISIAL || "-",
                     KELOMPOK: item.KELOMPOK || "-", 
+                    CELL: item.CELL || "-", // Integrasi komponen cell lokasi warehouse
                     NAMA_BARANG: item.NAMA_BARANG || "-",
                     QTY: item.QTY !== undefined ? item.QTY : 0,
                     Satuan: item.Satuan || "KRT",
@@ -67,6 +68,7 @@ function muatDataDariFirebase() {
                 const inisialBarang = detailItem.INISIAL;
                 const kodeBarang    = detailItem.KODE_BARANG;
                 const kelompokBarang = detailItem.KELOMPOK;
+                const cellBarang    = detailItem.CELL; // Membaca field CELL
                 const namaItem      = detailItem.NAMA_BARANG;
                 const kuantitas     = detailItem.QTY;
                 const satuanPack    = detailItem.Satuan;
@@ -77,7 +79,9 @@ function muatDataDariFirebase() {
                         <td class="py-3 px-2 text-center font-mono text-gray-400 font-normal">${indeks++}</td>
                         <td class="py-3 px-3 font-mono font-black text-[#e04a00] uppercase tracking-wide text-xs">${inisialBarang}</td>
                         <td class="py-3 px-3 font-mono font-bold text-[#2a67e0] tracking-wider uppercase">${kodeBarang}</td>
-                        <td class="py-3 px-3 font-mono font-bold text-emerald-600 tracking-wide uppercase text-xs">${kelompokBarang}</td>
+                        <td class="py-3 px-3 font-mono font-bold text-emerald-600 tracking-wide uppercase text-xs">
+                            ${kelompokBarang} <span class="text-gray-400 font-normal mx-1">|</span> <span class="text-purple-600">${cellBarang}</span>
+                        </td>
                         <td class="py-3 px-3 text-slate-800 font-bold uppercase leading-tight text-xs">${namaItem}</td>
                         <td class="py-3 px-4 text-center font-mono font-black text-slate-900 bg-slate-50/50 text-xs">
                             ${kuantitas} <span class="text-[9px] font-normal text-gray-400 ml-0.5">${satuanPack}</span>
@@ -89,7 +93,7 @@ function muatDataDariFirebase() {
                             </label>
                         </td>
                         <td class="py-3 px-2 text-center">
-                            <button onclick="editBarangBD('${key}', '${inisialBarang.replace(/'/g, "\\'")}', '${kelompokBarang.replace(/'/g, "\\'")}', '${namaItem.replace(/'/g, "\\'")}', ${kuantitas})" class="text-[10px] font-black text-blue-600 hover:bg-blue-100 p-1.5 rounded-lg transition-all">
+                            <button onclick="editBarangBD('${key}', '${inisialBarang.replace(/'/g, "\\'")}', '${kelompokBarang.replace(/'/g, "\\'")}', '${cellBarang.replace(/'/g, "\\'")}', '${namaItem.replace(/'/g, "\\'")}', ${kuantitas})" class="text-[10px] font-black text-blue-600 hover:bg-blue-100 p-1.5 rounded-lg transition-all">
                                 <i class="fa-solid fa-pen-to-square text-base"></i>
                             </button>
                         </td>
@@ -119,20 +123,22 @@ function muatDataDariFirebase() {
 function simpanDataMasterBD() {
     const inKode     = document.getElementById("tx-kode-barang-bd");
     const inInisial  = document.getElementById("tx-inisial-barang-bd");
-    const inKelompok = document.getElementById("tx-kelompok-barang-bd"); // Selektor komponen kelompok terintegrasi
+    const inKelompok = document.getElementById("tx-kelompok-barang-bd"); 
+    const inCell     = document.getElementById("tx-cell-barang-bd"); // Selektor komponen input cell baru
     const inNama     = document.getElementById("tx-nama-barang-bd");
     const inQty      = document.getElementById("tx-qty-utuhan-bd");
 
-    if (!inKode || !inInisial || !inKelompok || !inNama || !inQty) return;
+    if (!inKode || !inInisial || !inKelompok || !inCell || !inNama || !inQty) return;
 
     const kodeVal     = inKode.value.trim().toUpperCase();
     const inisialVal  = inInisial.value.trim().toUpperCase();
     const kelompokVal = inKelompok.value.trim().toUpperCase();
+    const cellVal     = inCell.value.trim().toUpperCase(); // Mengambil nilai cell
     const namaVal     = inNama.value.trim().toUpperCase();
     const qtyVal      = inQty.value.trim() !== "" ? parseInt(inQty.value) : 0;
 
-    if (!kodeVal || !inisialVal || !kelompokVal || !namaVal) {
-        alert("Mohon lengkapi seluruh kolom input Kode, Inisial, Kelompok, dan Nama Barang!");
+    if (!kodeVal || !inisialVal || !kelompokVal || !cellVal || !namaVal) {
+        alert("Mohon lengkapi seluruh kolom input Kode, Inisial, Kelompok, Cell, dan Nama Barang!");
         return;
     }
 
@@ -141,7 +147,8 @@ function simpanDataMasterBD() {
     const payload = {
         KODE_BARANG: kodeVal,
         INISIAL: inisialVal,
-        KELOMPOK: kelompokVal, // Menyimpan parameter kelompok gabungan
+        KELOMPOK: kelompokVal, 
+        CELL: cellVal, // Menyimpan parameter cell lokasi ke database
         NAMA_BARANG: namaVal,
         QTY: qtyVal,
         Satuan: "KRT",
@@ -173,7 +180,7 @@ function simpanDataMasterBD() {
         }
     })
     .then(() => {
-        alert("Data master kamus barang & kelompok berhasil disinkronisasi ke Firebase & Spreadsheet!");
+        alert("Data master kamus barang, kelompok, & cell berhasil disinkronisasi ke Firebase & Spreadsheet!");
         resetFormMasterBD();
         muatDataDariFirebase();
     })
@@ -210,10 +217,11 @@ function ubahStatusAktifBarangBD(nodeKey, statusCentang) {
 /**
  * Mengisi Form dengan Data Terpilih untuk Mode Edit
  */
-function editBarangBD(kd, ins, klmpk, nm, qt) {
+function editBarangBD(kd, ins, klmpk, cl, nm, qt) {
     const inKode     = document.getElementById("tx-kode-barang-bd");
     const inInisial  = document.getElementById("tx-inisial-barang-bd");
     const inKelompok = document.getElementById("tx-kelompok-barang-bd");
+    const inCell     = document.getElementById("tx-cell-barang-bd"); // Rujukan input cell
     const inNama     = document.getElementById("tx-nama-barang-bd");
     const inQty      = document.getElementById("tx-qty-utuhan-bd");
     
@@ -222,11 +230,12 @@ function editBarangBD(kd, ins, klmpk, nm, qt) {
     const btnAksi   = document.getElementById("btn-submit-master-bd");
     const panelBox  = document.getElementById("box-workspace-input-bd");
 
-    if (inKode && inInisial && inKelompok && inNama && inQty) {
+    if (inKode && inInisial && inKelompok && inCell && inNama && inQty) {
         inKode.value = kd;
         inKode.readOnly = true;
         inInisial.value = ins;
         inKelompok.value = klmpk;
+        inCell.value = cl; // Mengisi value cell saat mode edit aktif
         inNama.value = nm;
         inQty.value = qt;
 
