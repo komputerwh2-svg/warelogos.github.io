@@ -6,6 +6,7 @@ const BD_FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.fi
 
 /**
  * Mengunduh Data 'master_barang' secara utuh dari Firebase Realtime DB
+ * Dan mengurutkannya berdasarkan INISIAL barang agar rapi secara urutan angka
  */
 function muatDataDariFirebase() {
     const bodiTabel = document.getElementById("tabel-body-bank-data");
@@ -30,50 +31,68 @@ function muatDataDariFirebase() {
                 return;
             }
 
+            // 1. STRUKTURISASI: Ubah objek Firebase menjadi Array agar bisa kita urutkan (Sort)
+            let listBarangArr = [];
+            for (const key in kumpulanData) {
+                const item = kumpulanData[key];
+                listBarangArr.push({
+                    firebaseKey: key,
+                    KODE_BARANG: item.KODE_BARANG || key,
+                    INISIAL: item.INISIAL || "-",
+                    NAMA_BARANG: item.NAMA_BARANG || "-",
+                    QTY: item.QTY !== undefined ? item.QTY : 0,
+                    Satuan: item.Satuan || "KRT",
+                    IS_ACTIVE: item.IS_ACTIVE !== undefined ? item.IS_ACTIVE : true
+                });
+            }
+
+            // 2. PROSES SORTING: Urutkan data berdasarkan string INISIAL secara lokal/alamiah (Alfanumerik)
+            listBarangArr.sort((itemA, itemB) => {
+                return itemA.INISIAL.localeCompare(itemB.INISIAL, undefined, {
+                    numeric: true,
+                    sensitivity: 'base'
+                });
+            });
+
+            // 3. RENDERING: Cetak tumpukan data yang sudah terurut dengan pewarnaan khas MIUI v5
             let indeks = 1;
-            let hitungTotal = 0;
             let barisHtml = "";
 
-            for (const key in kumpulanData) {
-                const detailItem = kumpulanData[key];
-                
-                const inisialBarang = detailItem.INISIAL || "-";
-                const kodeBarang    = detailItem.KODE_BARANG || key;
-                const namaItem      = detailItem.NAMA_BARANG || "-";
-                const kuantitas     = detailItem.QTY !== undefined ? detailItem.QTY : 0;
-                const satuanPack    = detailItem.Satuan || "KRT";
-                
-                // Kondisi default status jika di database belum ada properti IS_ACTIVE
-                // true = Aktif, false = Tidak Digunakan
-                const isActive      = detailItem.IS_ACTIVE !== undefined ? detailItem.IS_ACTIVE : true;
+            listBarangArr.forEach(detailItem => {
+                const key           = detailItem.firebaseKey;
+                const inisialBarang = detailItem.INISIAL;
+                const kodeBarang    = detailItem.KODE_BARANG;
+                const namaItem      = detailItem.NAMA_BARANG;
+                const kuantitas     = detailItem.QTY;
+                const satuanPack    = detailItem.Satuan;
+                const isActive      = detailItem.IS_ACTIVE;
 
                 barisHtml += `
                     <tr class="border-b border-gray-100 hover:bg-slate-50 transition-colors">
-                        <td class="py-2.5 px-2 text-center font-mono text-gray-400">${indeks++}</td>
-                        <td class="py-2.5 px-3 font-mono font-black text-orange-600 uppercase tracking-wide">${inisialBarang}</td>
-                        <td class="py-2.5 px-3 font-mono font-bold text-blue-600 tracking-wide uppercase">${kodeBarang}</td>
-                        <td class="py-2.5 px-3 text-slate-800 font-semibold uppercase">${namaItem}</td>
-                        <td class="py-2.5 px-4 text-center font-mono font-bold text-slate-900 bg-slate-50/40">
-                            ${kuantitas} <span class="text-[9px] font-normal text-gray-400">${satuanPack}</span>
+                        <td class="py-3 px-2 text-center font-mono text-gray-400 font-normal">${indeks++}</td>
+                        <td class="py-3 px-3 font-mono font-black text-[#e04a00] uppercase tracking-wide text-xs">${inisialBarang}</td>
+                        <td class="py-3 px-3 font-mono font-bold text-[#2a67e0] tracking-wider uppercase">${kodeBarang}</td>
+                        <td class="py-3 px-3 text-slate-800 font-bold uppercase leading-tight">${namaItem}</td>
+                        <td class="py-3 px-4 text-center font-mono font-black text-slate-900 bg-slate-50/50 text-xs">
+                            ${kuantitas} <span class="text-[9px] font-normal text-gray-400 ml-0.5">${satuanPack}</span>
                         </td>
-                        <td class="py-2.5 px-3 text-center">
+                        <td class="py-3 px-3 text-center">
                             <label class="miui-switch">
                                 <input type="checkbox" id="toggle-${key}" ${isActive ? 'checked' : ''} onchange="ubahStatusAktifBarangBD('${key}', this.checked)">
                                 <span class="miui-slider"></span>
                             </label>
                         </td>
-                        <td class="py-2.5 px-2 text-center">
-                            <button onclick="editBarangBD('${key}', '${inisialBarang.replace(/'/g, "\\'")}', '${namaItem.replace(/'/g, "\\'")}', ${kuantitas})" class="text-xs font-bold text-blue-500 hover:text-blue-600 px-1.5 py-0.5 rounded border border-blue-200 bg-blue-50/50 active:bg-blue-100 transition-all">
-                                <i class="fa-solid fa-pen-to-square"></i>
+                        <td class="py-3 px-2 text-center">
+                            <button onclick="editBarangBD('${key}', '${inisialBarang.replace(/'/g, "\\'")}', '${namaItem.replace(/'/g, "\\'")}', ${kuantitas})" class="text-[10px] font-black text-blue-600 hover:bg-blue-100 p-1.5 rounded-lg transition-all">
+                                <i class="fa-solid fa-pen-to-square text-base"></i>
                             </button>
                         </td>
                     </tr>
                 `;
-                hitungTotal++;
-            }
+            });
 
             bodiTabel.innerHTML = barisHtml;
-            if (badgeTotal) badgeTotal.innerHTML = `${hitungTotal} <span class="text-[9px] font-normal text-slate-500">ITEM</span>`;
+            if (badgeTotal) badgeTotal.innerHTML = `${listBarangArr.length} <span class="text-[9px] font-normal text-slate-500">ITEM</span>`;
         })
         .catch(err => {
             console.error("Gagal sinkronisasi dengan Firebase:", err);
@@ -94,7 +113,7 @@ function simpanDataMasterBD() {
     const inKode    = document.getElementById("tx-kode-barang-bd");
     const inInisial = document.getElementById("tx-inisial-barang-bd");
     const inNama    = document.getElementById("tx-nama-barang-bd");
-    const inQty     = document.getElementById("tx-qty-utuhan-bd");
+    const inQty     = document.getElementById("tx-qty-utuhan-bd"); // Mengikuti id Qty Utuhan
 
     if (!inKode || !inInisial || !inNama || !inQty) return;
 
@@ -108,7 +127,6 @@ function simpanDataMasterBD() {
         return;
     }
 
-    // Bersihkan karakter terlarang untuk key node Firebase
     const cleanKey = kodeVal.replace(/[\.\$\#\[\]\/]/g, "_");
 
     const payload = {
@@ -117,17 +135,16 @@ function simpanDataMasterBD() {
         NAMA_BARANG: namaVal,
         QTY: qtyVal,
         Satuan: "KRT",
-        IS_ACTIVE: true // Setiap penambahan atau simpan baru diset otomatis aktif
+        IS_ACTIVE: true
     };
 
-    // Ambil tombol submit untuk efek loading singkat
     const btnSubmit = document.getElementById("btn-submit-master-bd");
     const txtAsli = btnSubmit.innerText;
     btnSubmit.innerText = "MENYIMPAN...";
     btnSubmit.disabled = true;
 
     fetch(`${BD_FIREBASE_URL}master_barang/${cleanKey}.json`, {
-        method: "PUT", // Menggunakan PUT agar jika datanya ada langsung menimpa (mode simpan perubahan)
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
     })
@@ -163,7 +180,6 @@ function ubahStatusAktifBarangBD(nodeKey, statusCentang) {
     .catch(err => {
         console.error(err);
         alert("Gagal merubah status item. Hubungkan kembali koneksi internet!");
-        // Balikkan visual checkbox jika gagal ke database
         document.getElementById(`toggle-${nodeKey}`).checked = !statusCentang;
     });
 }
@@ -175,7 +191,7 @@ function editBarangBD(kd, ins, nm, qt) {
     const inKode    = document.getElementById("tx-kode-barang-bd");
     const inInisial = document.getElementById("tx-inisial-barang-bd");
     const inNama    = document.getElementById("tx-nama-barang-bd");
-    const inQty     = document.getElementById("tx-qty-utuhan-bd");
+    const inQty     = document.getElementById("tx-qty-utuhan-bd"); // Mengikuti id Qty Utuhan
     
     const lblTitle  = document.getElementById("title-mode-form-bd");
     const lblBadge  = document.getElementById("badge-mode-bd");
@@ -184,7 +200,7 @@ function editBarangBD(kd, ins, nm, qt) {
 
     if (inKode && inInisial && inNama && inQty) {
         inKode.value = kd;
-        inKode.readOnly = true; // Kunci kode barang (tidak boleh diedit key utamanya)
+        inKode.readOnly = true;
         inInisial.value = ins;
         inNama.value = nm;
         inQty.value = qt;
@@ -227,7 +243,7 @@ function resetFormMasterBD() {
     }
 }
 
-// EKSPOS KE SCOPE GLOBAL WINDOW AGAR BISA DIAKSES ATRIBUT ONCLICK HTML EKSTERNAL
+// EKSPOS KE SCOPE GLOBAL WINDOW
 window.muatDataDariFirebase = muatDataDariFirebase;
 window.simpanDataMasterBD = simpanDataMasterBD;
 window.ubahStatusAktifBarangBD = ubahStatusAktifBarangBD;
