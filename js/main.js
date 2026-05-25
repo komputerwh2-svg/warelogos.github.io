@@ -423,9 +423,9 @@ window.resetFormTransaksi = function() {
 // 1. ENGINE GANTI GUDANG (DINAMIS SINKRONISASI LABEL)
 window.pilihBlokGudang = function(namaBlok) {
     // Sinkronisasi teks monitor dan tabel bawah
-    document.getElementById('lbl-monitor-stok').innerText = "STOK GUDANG " + namaBlok;
-    document.getElementById('lbl-title-riwayat').innerText = "RIWAYAT TRANSAKSI " + namaBlok;
-    document.getElementById('lbl-rekap-blok').innerText = "BLOK " + namaBlok;
+    document.getElementById('lbl-monitor-stok').innerText = "STOK GUDANG : " + namaBlok;
+    document.getElementById('lbl-title-riwayat').innerText = "RIWAYAT TRANSAKSI : " + namaBlok;
+    document.getElementById('lbl-rekap-blok').innerText = + namaBlok;
     
     // Disini area Bos melakukan pemanggilan data snapshot Firebase real-time sesuai namaBlok
     console.log(`Mengambil data real-time server untuk Blok: ${namaBlok}`);
@@ -451,7 +451,7 @@ window.toggleEngineTransaksi = function(isOut) {
         titleSide.innerText = "Input Barang Keluar";
         titleSide.className = "text-[10px] font-bold text-rose-700 uppercase tracking-wide";
         
-        lblSwitch.innerText = "OUT";
+        lblSwitch.innerText = "KELUAR";
         lblSwitch.className = "text-[9px] font-bold text-rose-600 bg-rose-100/80 px-1.5 py-0.5 rounded uppercase tracking-wider";
         
         lblTanggal.innerText = "Tanggal Keluar";

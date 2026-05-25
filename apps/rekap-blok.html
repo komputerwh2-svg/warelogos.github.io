@@ -44,6 +44,10 @@
                         <input type="radio" name="pilih_blok" value="TEKOMAS" class="hidden peer" onchange="pilihBlokGudang(this.value)">
                         <div class="py-1 text-center text-[10px] font-bold border border-[#c8c8c8] rounded-md text-slate-700 bg-[#f9f9f9] peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-600 transition-all active:scale-95">TEKOMAS</div>
                     </label>
+                    <label class="cursor-pointer col-span-2">
+                        <input type="radio" name="pilih_blok" value="PROMOSI" class="hidden peer" onchange="pilihBlokGudang(this.value)">
+                        <div class="py-1 text-center text-[10px] font-bold border border-[#c8c8c8] rounded-md text-slate-700 bg-[#f9f9f9] peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-600 transition-all active:scale-95">PROMOSI</div>
+                    </label>
                     <label class="cursor-pointer">
                         <input type="radio" name="pilih_blok" value="BL18CD" class="hidden peer" onchange="pilihBlokGudang(this.value)">
                         <div class="py-1 text-center text-[10px] font-bold border border-[#c8c8c8] rounded-md text-slate-700 bg-[#f9f9f9] peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-600 transition-all active:scale-95">BL 18CD</div>
@@ -59,10 +63,6 @@
                     <label class="cursor-pointer">
                         <input type="radio" name="pilih_blok" value="BLH" class="hidden peer" onchange="pilihBlokGudang(this.value)">
                         <div class="py-1 text-center text-[10px] font-bold border border-[#c8c8c8] rounded-md text-slate-700 bg-[#f9f9f9] peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-600 transition-all active:scale-95">BL H</div>
-                    </label>
-                    <label class="cursor-pointer col-span-2">
-                        <input type="radio" name="pilih_blok" value="PROMOSI" class="hidden peer" onchange="pilihBlokGudang(this.value)">
-                        <div class="py-1 text-center text-[10px] font-bold border border-[#c8c8c8] rounded-md text-slate-700 bg-[#f9f9f9] peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-600 transition-all active:scale-95">PROMOSI</div>
                     </label>
                 </div>
             </div>
@@ -90,7 +90,7 @@
                     <span id="title-transaksi-side" class="text-[10px] font-bold text-emerald-700 uppercase tracking-wide">Input Barang Masuk</span>
                     
                     <div class="flex items-center gap-2">
-                        <span id="lbl-status-switch" class="text-[9px] font-bold text-emerald-600 bg-emerald-100/80 px-1.5 py-0.5 rounded uppercase tracking-wider">IN</span>
+                        <span id="lbl-status-switch" class="text-[9px] font-bold text-emerald-600 bg-emerald-100/80 px-1.5 py-0.5 rounded uppercase tracking-wider">MASUK</span>
                         <label class="miui-switch transform scale-90 origin-right">
                             <input type="checkbox" id="toggle-tipe-transaksi" onchange="toggleEngineTransaksi(this.checked)">
                             <span class="miui-slider"></span>
