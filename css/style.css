@@ -254,9 +254,9 @@ input[type=number] {
     box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-/* =========================================================================
-   7. LAYOUT PRINT ENGINE SYSTEM (PERFECT MATCH - EXCEL MULTI-COPY LAYOUT)
-   ========================================================================= */
+/* ========================================================================= */
+/* 7. LAYOUT PRINT ENGINE SYSTEM (PERFECT MATCH - F4 SIMETRIS TWO-COPY)    */
+/* ========================================================================= */
 
 /* A. KONDISI DEFAULT (SAAT DILIHAT DI LAYAR HP / BROWSER DASHBOARD) */
 #print-area-rak-kosong {
@@ -276,18 +276,24 @@ input[type=number] {
         position: absolute !important;
         left: 0 !important;
         top: 0 !important;
-        width: 100% !important;
+        width: 215mm !important; /* Kunci lebar fisik F4 */
+        height: 330mm !important; /* Kunci tinggi fisik F4 */
         background: #ffffff !important;
         margin: 0 !important;
         padding: 0 !important;
+        box-sizing: border-box !important;
     }
 
-    /* 3. WRAPPER UTAMA SALINAN (Bypass Lembar Printer - Otomatis Ganti Kertas) */
+    /* 3. WRAPPER UTAMA SALINAN (Bypass Lembar Printer & Distribusi Simetris) */
     .print-page-wrapper {
-        display: block !important;
-        width: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important; /* Mendorong tabel ke ujung atas & bawah secara adil */
+        width: 215mm !important;
+        height: 330mm !important;
         box-sizing: border-box !important;
-        page-break-after: always !important; /* Paksa printer ganti kertas untuk input salinan berikutnya */
+        padding: 15mm 15mm !important; /* Margin dalam pembungkus untuk area aman cetak printer */
+        page-break-after: always !important; /* Paksa printer ganti kertas untuk nomor salinan berikutnya */
     }
 
     /* Proteksi halaman terakhir agar printer tidak membuang kertas kosong tambahan */
@@ -295,13 +301,15 @@ input[type=number] {
         page-break-after: avoid !important;
     }
 
-    /* 4. Aturan Blok Kontainer Lembar Form di Dalam Halaman */
+    /* 4. Aturan Blok Kontainer Lembar Form (Bagian Atas dan Bawah Halaman) */
     .print-block-container {
-        display: block !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important; /* Memastikan isi form selalu center di areanya */
         width: 100% !important;
+        height: 135mm !important; /* Batas tinggi maksimal tiap wilayah agar simetris saat dilipat */
         box-sizing: border-box !important;
         page-break-inside: avoid !important;
-        margin-bottom: 25px !important; /* Jarak aman antar tabel atas & bawah */
     }
 
     /* Styling Judul Format Excel Bergelombang Ringan */
@@ -312,7 +320,7 @@ input[type=number] {
         font-weight: bold !important;
         text-align: center !important;
         color: #000000 !important;
-        margin: 0 0 8px 0 !important;
+        margin: 0 0 12px 0 !important;
         letter-spacing: 1px !important;
     }
 
@@ -346,7 +354,7 @@ input[type=number] {
         font-size: 10pt !important;
         font-weight: bold !important;
         background-color: #e5e7eb !important; /* Shading abu-abu standar excel */
-        padding: 4px 2px !important;
+        padding: 5px 2px !important;
         text-align: center !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
@@ -378,9 +386,9 @@ input[type=number] {
     .print-table-pure-excel th:not(:first-child),
     .print-table-pure-excel td:not(:first-child) { width: 9.4% !important; }
 
-    /* 7. SETTING UKURAN KERTAS */
+    /* 7. SETTING UKURAN KERTAS HARDCODE F4 INDONESIA */
     @page {
-        size: portrait;
-        margin: 0.8cm 1cm; /* Margin disesuaikan agar 2 tabel pas dalam 1 lembar */
+        size: 215mm 330mm; /* Mengabaikan setelan otomatis browser, langsung dikunci ke spesifikasi F4/Folio */
+        margin: 0 !important; /* Margin dinolkan karena sudah diganti dengan padding aman di komponen .print-page-wrapper */
     }
 }
