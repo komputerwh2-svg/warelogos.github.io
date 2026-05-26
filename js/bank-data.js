@@ -283,55 +283,43 @@ function resetFormMasterBD() {
     }
 }
 
-// Data referensi (bisa Anda ambil dari fetch data master di awal)
-const mappingKelompokCell = {
+// Data referensi berdasarkan gambar yang Anda berikan
+const mappingKelompok = {
     "MTR": "B60",
     "PDR": "E60",
-    "MRR / CRR EA": "G59",
     "MRMR": "G60",
     "CRR / THR": "J59",
-    "MJR": "J60",
+    "MRR / CRR EA": "G59",
     "MOR / MOB": "M59",
-    "MP / LTGR / MTGR": "M60"
+    "MP / LTGR / MTGR": "M60",
+    "MJR": "J60"
 };
 
-/**
- * Inisialisasi Dropdown
- */
-// Tambahkan console log untuk debugging di dalam fungsi
+// Fungsi untuk mengisi dropdown saat halaman dimuat
 function isiDropdownKelompok() {
     const selectKelompok = document.getElementById("tx-kelompok-barang-bd");
-    if (!selectKelompok) {
-        console.error("ID tx-kelompok-barang-bd tidak ditemukan di HTML!");
-        return;
-    }
-    
-    // Pastikan reset dulu
-    selectKelompok.innerHTML = '<option value="">Pilih Kelompok</option>';
-
-    Object.keys(mappingKelompokCell).forEach(kelompok => {
-        let opt = document.createElement("option");
-        opt.value = kelompok;
-        opt.innerHTML = kelompok;
-        selectKelompok.appendChild(opt);
+    Object.keys(mappingKelompok).forEach(item => {
+        const option = document.createElement("option");
+        option.value = item;
+        option.textContent = item;
+        selectKelompok.appendChild(option);
     });
-    console.log("Dropdown Kelompok terisi.");
 }
 
-/**
- * Logika Sinkronisasi Otomatis
- */
+// Fungsi untuk mengisi Target Cell otomatis saat kelompok dipilih
 function sinkronisasiCell() {
     const kelompok = document.getElementById("tx-kelompok-barang-bd").value;
-    const selectCell = document.getElementById("tx-cell-barang-bd");
+    const inputCell = document.getElementById("tx-cell-barang-bd");
     
-    // Reset dan isi Cell otomatis
-    selectCell.innerHTML = `<option value="${mappingKelompokCell[kelompok] || ''}">${mappingKelompokCell[kelompok] || 'Pilih Cell'}</option>`;
+    if (kelompok && mappingKelompok[kelompok]) {
+        inputCell.value = mappingKelompok[kelompok];
+    } else {
+        inputCell.value = "";
+    }
 }
 
-// Jalankan saat halaman dimuat
+// Panggil fungsi ini saat DOM siap
 document.addEventListener("DOMContentLoaded", isiDropdownKelompok);
-
 
 function gantiSwitchModeBankData(mode) {
     const slider = document.getElementById('slider-content-bd');
