@@ -43,3 +43,48 @@
     .miui-switch input:checked + .miui-slider:before {
         transform: translateX(22px);
     }
+
+/* Targetkan semua elemen input, select, dan textarea */
+input, select, textarea {
+    color: #1e293b !important; /* Warna Slate-800 yang sangat gelap/kontras */
+    font-weight: 700 !important; /* Membuat teks tebal/bold agar jelas */
+    background-color: #ffffff !important; /* Pastikan background selalu putih */
+    border: 1px solid #94a3b8 !important; /* Border lebih gelap agar terlihat jelas */
+}
+
+/* Khusus untuk teks placeholder (agar tidak abu-abu pudar) */
+input::placeholder {
+    color: #64748b !important; /* Slate-500 agar tetap kontras tapi beda dari teks input */
+    font-weight: 400 !important;
+}
+
+/* Khusus untuk elemen select/dropdown */
+select {
+    appearance: auto !important; /* Memastikan dropdown terlihat standar sistem */
+    cursor: pointer !important;
+}
+
+/* Memberikan gaya saat input sedang diklik (focus) */
+input:focus, select:focus {
+    border-color: #f97316 !important; /* Oranye */
+    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.2) !important;
+    outline: none !important;
+}    
+
+/* Memaksa warna font di select dan option */
+    #tx-kelompok-barang-bd {
+        color: #1e293b !important; /* Slate-800: gelap dan jelas */
+        background-color: white !important;
+    }
+
+    #tx-kelompok-barang-bd option {
+        color: #1e293b !important;
+        background-color: white !important;
+        padding: 10px; /* Memberi ruang agar tidak terlalu rapat */
+    }
+
+    /* Opsional: Efek saat dipilih agar lebih jelas */
+    #tx-kelompok-barang-bd option:checked {
+        background-color: #f97316 !important; /* Warna oranye saat terpilih */
+        color: white !important;
+    }
