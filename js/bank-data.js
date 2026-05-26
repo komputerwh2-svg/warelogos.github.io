@@ -241,6 +241,7 @@ function editBarangBD(kd, ins, klmpk, cl, nm, qt) {
         inInisial.value = ins;
         inKelompok.value = klmpk;
         inCell.value = cl; // Mengisi value cell saat mode edit aktif
+        sinkronisasiCell();
         inNama.value = nm;
         inQty.value = qt;
 
@@ -297,14 +298,24 @@ const mappingKelompokCell = {
 /**
  * Inisialisasi Dropdown
  */
+// Tambahkan console log untuk debugging di dalam fungsi
 function isiDropdownKelompok() {
     const selectKelompok = document.getElementById("tx-kelompok-barang-bd");
+    if (!selectKelompok) {
+        console.error("ID tx-kelompok-barang-bd tidak ditemukan di HTML!");
+        return;
+    }
+    
+    // Pastikan reset dulu
+    selectKelompok.innerHTML = '<option value="">Pilih Kelompok</option>';
+
     Object.keys(mappingKelompokCell).forEach(kelompok => {
         let opt = document.createElement("option");
         opt.value = kelompok;
         opt.innerHTML = kelompok;
         selectKelompok.appendChild(opt);
     });
+    console.log("Dropdown Kelompok terisi.");
 }
 
 /**
