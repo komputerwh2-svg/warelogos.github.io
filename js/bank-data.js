@@ -449,6 +449,34 @@ function renderDriverTable(drivers, nominals) {
     });
 }
 
+
+/**
+ * Fungsi Pemuat Data Tujuan
+ */
+async function muatDataTujuanDariFirebase() {
+    const response = await fetch(`${BD_FIREBASE_URL}master_tujuan.json`);
+    const data = await response.json();
+    const tbody = document.getElementById("tabel-tujuan-bd");
+    
+    tbody.innerHTML = ""; // Bersihkan tabel
+    
+    if (!data) return;
+
+    Object.keys(data).forEach(key => {
+        const item = data[key];
+        const row = `
+            <tr class="border-b">
+                <td class="p-2">${item.TUJUAN}</td>
+                <td class="p-2">${item.KOTA}</td>
+                <td class="p-2">
+                    <button class="bg-yellow-500 text-white px-2 py-1 rounded" onclick="editTujuan('${key}')">EDIT</button>
+                </td>
+            </tr>
+        `;
+        tbody.innerHTML += row;
+    });
+}
+
 // EKSPOS KE SCOPE GLOBAL WINDOW
 window.muatDataDariFirebase = muatDataDariFirebase;
 window.simpanDataMasterBD = simpanDataMasterBD;
