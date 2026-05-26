@@ -283,7 +283,8 @@ function resetFormMasterBD() {
     }
 }
 
-// Data referensi berdasarkan gambar yang Anda berikan
+// js/bank-data.js
+
 const mappingKelompok = {
     "MTR": "B60",
     "PDR": "E60",
@@ -295,9 +296,18 @@ const mappingKelompok = {
     "MJR": "J60"
 };
 
-// Fungsi untuk mengisi dropdown saat halaman dimuat
 function isiDropdownKelompok() {
     const selectKelompok = document.getElementById("tx-kelompok-barang-bd");
+    
+    // Debug: Cek apakah elemen ditemukan
+    if (!selectKelompok) {
+        console.log("Error: Elemen #tx-kelompok-barang-bd tidak ditemukan di HTML!");
+        return;
+    }
+
+    // Pastikan tidak duplikat
+    selectKelompok.innerHTML = '<option value="">Pilih Kelompok</option>';
+
     Object.keys(mappingKelompok).forEach(item => {
         const option = document.createElement("option");
         option.value = item;
@@ -306,7 +316,9 @@ function isiDropdownKelompok() {
     });
 }
 
-// Fungsi untuk mengisi Target Cell otomatis saat kelompok dipilih
+// EKSEKUSI: Panggil fungsi segera saat file JS ini di-load oleh browser
+isiDropdownKelompok();
+
 function sinkronisasiCell() {
     const kelompok = document.getElementById("tx-kelompok-barang-bd").value;
     const inputCell = document.getElementById("tx-cell-barang-bd");
@@ -317,32 +329,6 @@ function sinkronisasiCell() {
         inputCell.value = "";
     }
 }
-
-// Panggil fungsi ini saat DOM siap
-// Gunakan fungsi ini untuk memastikan DOM benar-benar siap
-function initBankData() {
-    console.log("Inisialisasi Dropdown Kelompok...");
-    const selectKelompok = document.getElementById("tx-kelompok-barang-bd");
-    
-    if (!selectKelompok) {
-        console.error("Elemen #tx-kelompok-barang-bd tidak ditemukan!");
-        return;
-    }
-
-    // Bersihkan dulu agar tidak duplikat jika dipanggil berulang
-    selectKelompok.innerHTML = '<option value="">Pilih Kelompok</option>';
-
-    Object.keys(mappingKelompok).forEach(item => {
-        const option = document.createElement("option");
-        option.value = item;
-        option.textContent = item;
-        selectKelompok.appendChild(option);
-    });
-    console.log("Dropdown Kelompok berhasil diisi.");
-}
-
-// Panggil saat window load (lebih aman daripada DOMContentLoaded di beberapa lingkungan)
-window.addEventListener("load", initBankData);
 
 function gantiSwitchModeBankData(mode) {
     const slider = document.getElementById('slider-content-bd');
