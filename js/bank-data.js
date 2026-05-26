@@ -299,11 +299,11 @@ function gantiSwitchModeBankData(mode) {
 }
 
 /**
- * Fungsi Simpan Driver (Firebase + Spreadsheet)
+ * FUNGSI SIMPAN DRIVER & NOMINAL (Logika tidak diubah, hanya dirapikan)
  */
 function simpanDataDriverBD() {
     const payload = {
-        TIPE_DATA: "MASTER_DRIVER", // Identifikasi untuk Webhook
+        TIPE_DATA: "MASTER_DRIVER",
         DRIVER: document.getElementById("tx-driver-nama").value.trim().toUpperCase(),
         PLAT: document.getElementById("tx-driver-plat").value.trim().toUpperCase(),
         ISI: document.getElementById("tx-driver-isi").value.trim(),
@@ -313,34 +313,26 @@ function simpanDataDriverBD() {
 
     if (!payload.DRIVER || !payload.PLAT) return alert("Data Driver & Plat wajib diisi!");
 
-    // 1. Simpan ke Firebase (Node master_driver)
     fetch(`${BD_FIREBASE_URL}master_driver/${payload.DRIVER}.json`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
     }).then(() => {
-        // 2. Kirim ke Webhook Spreadsheet
         fetch(SPREADSHEET_DRIVER_WEBHOOK_URL, {
-            method: "POST",
-            mode: "no-cors",
+            method: "POST", mode: "no-cors",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
         }).then(() => {
             alert("Data Driver berhasil disimpan!");
-            muatDataDriverDariFirebase(); 
+            muatDataDriverTerpadu(); // Panggil fungsi tunggal
         });
     });
 }
 
-/**
- * Fungsi Simpan Nominal (Firebase + Spreadsheet)
- */
 function simpanNominalDriverBD() {
-    // Ambil nama driver sebagai referensi baris (PENTING untuk sinkronisasi)
     const refDriver = document.getElementById("tx-driver-nama").value.trim().toUpperCase();
-    
     const payload = {
-        TIPE_DATA: "MASTER_NOMINAL", // Identifikasi untuk Webhook
+        TIPE_DATA: "MASTER_NOMINAL",
         NAMA_DRIVER_REF: refDriver,
         NOMINAL: document.getElementById("tx-nominal").value.trim(),
         TERBILANG: document.getElementById("tx-terbilang").value.trim()
@@ -348,132 +340,137 @@ function simpanNominalDriverBD() {
 
     if (!refDriver) return alert("Silakan isi nama driver sebagai referensi!");
 
-    // 1. Simpan ke Firebase (Node master_nominal)
     fetch(`${BD_FIREBASE_URL}master_nominal/${refDriver}.json`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
     }).then(() => {
-        // 2. Kirim ke Webhook Spreadsheet
         fetch(SPREADSHEET_DRIVER_WEBHOOK_URL, {
-            method: "POST",
-            mode: "no-cors",
+            method: "POST", mode: "no-cors",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
-        }).then(() => alert("Data Nominal tersimpan!"));
+        }).then(() => {
+            alert("Data Nominal tersimpan!");
+            muatDataDriverTerpadu();
+        });
     });
 }
 
 /**
- * Fungsi Muat Data Driver & Nominal (Menggabungkan tampilan)
+ * FUNGSI MUAT TERPADU (Gunakan ini untuk semua kebutuhan tabel Driver)
+ * Menghapus redundansi antara muatDataDriverDariFirebase & loadDriverData
  */
-async function muatDataDriverDariFirebase() {
-    // Ambil data driver dan nominal secara bersamaan
-    const [driverRes, nominalRes] = await Promise.all([
-        fetch(`${BD_FIREBASE_URL}master_driver.json`),
-        fetch(`${BD_FIREBASE_URL}master_nominal.json`)
-    ]);
-
-    const drivers = await driverRes.json();
-    const nominals = await nominalRes.json();
-
+async function muatDataDriverTerpadu() {
     const tbody = document.getElementById("tabel-driver-bd");
-    tbody.innerHTML = "";
+    if (!tbody) return;
 
-    if (!drivers) return;
-
-    Object.keys(drivers).forEach(key => {
-        const d = drivers[key];
-        const n = nominals ? (nominals[key] || {}) : {}; // Cari nominal berdasarkan key driver yang sama
-
-        const row = `
-            <tr>
-                <td>${d.DRIVER}</td>
-                <td>${d.PLAT}</td>
-                <td>${d.ISI}</td>
-                <td>${d.HARGA_8_1}</td>
-                <td>${d.HARGA_18}</td>
-                <td class="font-bold text-blue-600">${n.NOMINAL || '-'}</td>
-                <td>
-                    <button class="bg-yellow-500 text-white px-2 py-1 rounded" onclick="editDriver('${key}')">EDIT</button>
-                </td>
-            </tr>
-        `;
-        tbody.innerHTML += row;
-    });
-}
-
-/**
- * Fungsi untuk mengambil data Master Driver dan Nominal
- */
-async function loadDriverData() {
     try {
-        // Mengambil data dari Firebase
-        const driverResponse = await fetch(`${FIREBASE_DB_URL}master_driver.json`);
-        const nominalResponse = await fetch(`${FIREBASE_DB_URL}master_nominal.json`);
+        const [driverRes, nominalRes] = await Promise.all([
+            fetch(`${BD_FIREBASE_URL}master_driver.json`),
+            fetch(`${BD_FIREBASE_URL}master_nominal.json`)
+        ]);
 
-        const drivers = await driverResponse.json();
-        const nominals = await nominalResponse.json();
+        const drivers = await driverRes.json();
+        const nominals = await nominalRes.json();
 
-        renderDriverTable(drivers, nominals);
-    } catch (error) {
-        console.error("Gagal mengambil data driver:", error);
+        tbody.innerHTML = "";
+        if (!drivers) return;
+
+        Object.keys(drivers).forEach((key, index) => {
+            const d = drivers[key];
+            const n = nominals ? (nominals[d.DRIVER] || {}) : {}; 
+
+            tbody.innerHTML += `
+                <tr class="border-b hover:bg-slate-50 transition-colors">
+                    <td class="p-3 text-center text-gray-500">${index + 1}</td>
+                    <td class="p-3 font-bold text-slate-800">${d.DRIVER}</td>
+                    <td class="p-3 font-mono text-xs">${d.PLAT}</td>
+                    <td class="p-3 text-xs">${d.ISI}</td>
+                    <td class="p-3 text-xs">${d.HARGA_8_1}</td>
+                    <td class="p-3 text-xs">${d.HARGA_18}</td>
+                    <td class="p-3 font-bold text-blue-600">${n.NOMINAL || '-'}</td>
+                    <td class="p-3 text-center">
+                        <button class="text-amber-600 hover:text-amber-800" onclick="editDriver('${key}')">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+    } catch (err) {
+        console.error("Gagal sinkronisasi:", err);
     }
 }
 
-function renderDriverTable(drivers, nominals) {
-    const tableBody = document.getElementById('table-body-driver'); // ID elemen tbody Anda
-    tableBody.innerHTML = ""; // Bersihkan tabel sebelum diisi
 
-    if (!drivers) return;
+/**
+ * Fungsi Simpan Tujuan (Firebase + Spreadsheet)
+ */
+function simpanDataTujuanBD() {
+    const inTujuan = document.getElementById("tx-tujuan-nama"); // Pastikan ID ini sesuai di HTML
+    const inKota   = document.getElementById("tx-tujuan-kota");
 
-    Object.keys(drivers).forEach((key, index) => {
-        const driver = drivers[key];
-        // Mencari data nominal yang cocok, misalnya berdasarkan urutan atau logika lain
-        // Karena nominalKey di Firebase adalah "NOM_1", "NOM_2", dst sesuai baris
-        const nominalData = nominals ? nominals[`NOM_${index + 1}`] : null;
+    if (!inTujuan || !inKota) return;
 
-        const row = `
-            <tr>
-                <td>${index + 1}</td>
-                <td>${driver.DRIVER}</td>
-                <td>${driver.PLAT}</td>
-                <td>${driver.ISI}</td>
-                <td>${driver.HARGA_8_1}</td>
-                <td>${driver.HARGA_18}</td>
-                <td>${nominalData ? nominalData.NOMINAL : '-'}</td>
-                <td>${nominalData ? nominalData.TERBILANG : '-'}</td>
-            </tr>
-        `;
-        tableBody.innerHTML += row;
+    const payload = {
+        TIPE_DATA: "MASTER_TUJUAN",
+        TUJUAN: inTujuan.value.trim().toUpperCase(),
+        KOTA: inKota.value.trim().toUpperCase()
+    };
+
+    if (!payload.TUJUAN || !payload.KOTA) return alert("Tujuan dan Kota wajib diisi!");
+
+    const cleanKey = payload.TUJUAN.replace(/[\.\$\#\[\]\/]/g, "_");
+
+    fetch(`${BD_FIREBASE_URL}master_tujuan/${cleanKey}.json`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    }).then(() => {
+        // Kirim ke Webhook Spreadsheet
+        fetch(SPREADSHEET_WEBHOOK_URL, {
+            method: "POST", mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        }).then(() => {
+            alert("Data Tujuan berhasil disimpan!");
+            inTujuan.value = "";
+            inKota.value = "";
+            muatDataTujuanDariFirebase();
+        });
     });
 }
 
-
 /**
- * Fungsi Pemuat Data Tujuan
+ * Fungsi Pemuat Data Tujuan (Versi Rapi)
  */
 async function muatDataTujuanDariFirebase() {
+    const tbody = document.getElementById("tabel-tujuan-bd");
+    if (!tbody) return;
+
     const response = await fetch(`${BD_FIREBASE_URL}master_tujuan.json`);
     const data = await response.json();
-    const tbody = document.getElementById("tabel-tujuan-bd");
     
-    tbody.innerHTML = ""; // Bersihkan tabel
+    tbody.innerHTML = ""; 
     
-    if (!data) return;
+    if (!data) {
+        tbody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-gray-400">Belum ada tujuan terdaftar.</td></tr>`;
+        return;
+    }
 
-    Object.keys(data).forEach(key => {
+    Object.keys(data).forEach((key, index) => {
         const item = data[key];
-        const row = `
-            <tr class="border-b">
-                <td class="p-2">${item.TUJUAN}</td>
-                <td class="p-2">${item.KOTA}</td>
-                <td class="p-2">
-                    <button class="bg-yellow-500 text-white px-2 py-1 rounded" onclick="editTujuan('${key}')">EDIT</button>
+        tbody.innerHTML += `
+            <tr class="border-b hover:bg-slate-50 transition-colors">
+                <td class="p-3 text-slate-800 font-bold">${item.TUJUAN}</td>
+                <td class="p-3 text-slate-600">${item.KOTA}</td>
+                <td class="p-3 text-center">
+                    <button class="text-blue-600 hover:bg-blue-100 p-1.5 rounded-lg transition-all" onclick="editTujuan('${key}')">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </button>
                 </td>
             </tr>
         `;
-        tbody.innerHTML += row;
     });
 }
 
@@ -484,3 +481,6 @@ window.ubahStatusAktifBarangBD = ubahStatusAktifBarangBD;
 window.editBarangBD = editBarangBD;
 window.resetFormMasterBD = resetFormMasterBD;
 window.gantiSwitchModeBankData = gantiSwitchModeBankData;
+window.muatDataDriverTerpadu = muatDataDriverTerpadu;
+window.simpanDataTujuanBD = simpanDataTujuanBD;
+window.muatDataTujuanDariFirebase = muatDataTujuanDariFirebase;
