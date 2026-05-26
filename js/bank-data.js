@@ -5,7 +5,7 @@
 const BD_FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
 
 // URL Web App Google Apps Script untuk sinkronisasi 2 arah ke Spreadsheet (Sheet KODE - 7 Kolom)
-const SPREADSHEET_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzm_qpI-LrvsWn2MWgBhIrIaZsxOSrMPV3hKymx-kZpr-OCxm_fBImoUVGuVP3bQlkmvA/exec";
+const SPREADSHEET_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbw7t9pv3LXVP1GSGCua98RNIpvCWWeWcp5V_GFAX93tkyu9E1XhtwnUVDm2lf09SihwWA/exec";
 
 /**
  * Mengunduh Data 'master_barang' secara utuh dari Firebase Realtime DB
@@ -299,54 +299,154 @@ function gantiSwitchModeBankData(mode) {
 }
 
 /**
- * Fungsi khusus untuk menyimpan data MASTER KODE BARANG
+ * Fungsi Simpan Driver (Firebase + Spreadsheet)
  */
 function simpanDataDriverBD() {
-    // 1. Ambil nilai input
     const payload = {
+        TIPE_DATA: "MASTER_DRIVER", // Identifikasi untuk Webhook
         DRIVER: document.getElementById("tx-driver-nama").value.trim().toUpperCase(),
         PLAT: document.getElementById("tx-driver-plat").value.trim().toUpperCase(),
-        ISI: document.getElementById("tx-driver-isi").value,
-        HARGA_8_1: document.getElementById("tx-harga-81").value,
-        HARGA_18: document.getElementById("tx-harga-18").value,
-        NOMINAL: document.getElementById("tx-nominal").value,
-        TERBILANG: document.getElementById("tx-terbilang").value.trim(),
-        IS_ACTIVE: true
+        ISI: document.getElementById("tx-driver-isi").value.trim(),
+        HARGA_8_1: document.getElementById("tx-harga-81").value.trim(),
+        HARGA_18: document.getElementById("tx-harga-18").value.trim()
     };
 
-    // 2. Validasi sederhana
-    if (!payload.DRIVER || !payload.PLAT) {
-        alert("Nama Driver dan Plat Nomor wajib diisi!");
-        return;
-    }
+    if (!payload.DRIVER || !payload.PLAT) return alert("Data Driver & Plat wajib diisi!");
 
-    const cleanKey = payload.DRIVER.replace(/[\.\$\#\[\]\/]/g, "_");
-
-    // 3. Simpan ke Firebase
-    fetch(`${BD_FIREBASE_URL}master_driver/${cleanKey}.json`, {
+    // 1. Simpan ke Firebase (Node master_driver)
+    fetch(`${BD_FIREBASE_URL}master_driver/${payload.DRIVER}.json`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
-    })
-    .then(res => {
-        if (!res.ok) throw new Error("Gagal menyimpan ke Firebase");
-        
-        // 4. Kirim ke Spreadsheet (Sync)
-        if (SPREADSHEET_WEBHOOK_URL) {
-            return fetch(SPREADSHEET_WEBHOOK_URL, {
-                method: "POST",
-                mode: "no-cors",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
-        }
-    })
-    .then(() => {
-        alert("Data Driver berhasil disimpan & disinkronisasi!");
-        resetFormDriverBD();
-        // muatDataDriverDariFirebase(); // Tambahkan fungsi ini nanti
-    })
-    .catch(err => console.error(err));
+    }).then(() => {
+        // 2. Kirim ke Webhook Spreadsheet
+        fetch(SPREADSHEET_DRIVER_WEBHOOK_URL, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        }).then(() => {
+            alert("Data Driver berhasil disimpan!");
+            muatDataDriverDariFirebase(); 
+        });
+    });
+}
+
+/**
+ * Fungsi Simpan Nominal (Firebase + Spreadsheet)
+ */
+function simpanNominalDriverBD() {
+    // Ambil nama driver sebagai referensi baris (PENTING untuk sinkronisasi)
+    const refDriver = document.getElementById("tx-driver-nama").value.trim().toUpperCase();
+    
+    const payload = {
+        TIPE_DATA: "MASTER_NOMINAL", // Identifikasi untuk Webhook
+        NAMA_DRIVER_REF: refDriver,
+        NOMINAL: document.getElementById("tx-nominal").value.trim(),
+        TERBILANG: document.getElementById("tx-terbilang").value.trim()
+    };
+
+    if (!refDriver) return alert("Silakan isi nama driver sebagai referensi!");
+
+    // 1. Simpan ke Firebase (Node master_nominal)
+    fetch(`${BD_FIREBASE_URL}master_nominal/${refDriver}.json`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    }).then(() => {
+        // 2. Kirim ke Webhook Spreadsheet
+        fetch(SPREADSHEET_DRIVER_WEBHOOK_URL, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        }).then(() => alert("Data Nominal tersimpan!"));
+    });
+}
+
+/**
+ * Fungsi Muat Data Driver & Nominal (Menggabungkan tampilan)
+ */
+async function muatDataDriverDariFirebase() {
+    // Ambil data driver dan nominal secara bersamaan
+    const [driverRes, nominalRes] = await Promise.all([
+        fetch(`${BD_FIREBASE_URL}master_driver.json`),
+        fetch(`${BD_FIREBASE_URL}master_nominal.json`)
+    ]);
+
+    const drivers = await driverRes.json();
+    const nominals = await nominalRes.json();
+
+    const tbody = document.getElementById("tabel-driver-bd");
+    tbody.innerHTML = "";
+
+    if (!drivers) return;
+
+    Object.keys(drivers).forEach(key => {
+        const d = drivers[key];
+        const n = nominals ? (nominals[key] || {}) : {}; // Cari nominal berdasarkan key driver yang sama
+
+        const row = `
+            <tr>
+                <td>${d.DRIVER}</td>
+                <td>${d.PLAT}</td>
+                <td>${d.ISI}</td>
+                <td>${d.HARGA_8_1}</td>
+                <td>${d.HARGA_18}</td>
+                <td class="font-bold text-blue-600">${n.NOMINAL || '-'}</td>
+                <td>
+                    <button class="bg-yellow-500 text-white px-2 py-1 rounded" onclick="editDriver('${key}')">EDIT</button>
+                </td>
+            </tr>
+        `;
+        tbody.innerHTML += row;
+    });
+}
+
+/**
+ * Fungsi untuk mengambil data Master Driver dan Nominal
+ */
+async function loadDriverData() {
+    try {
+        // Mengambil data dari Firebase
+        const driverResponse = await fetch(`${FIREBASE_DB_URL}master_driver.json`);
+        const nominalResponse = await fetch(`${FIREBASE_DB_URL}master_nominal.json`);
+
+        const drivers = await driverResponse.json();
+        const nominals = await nominalResponse.json();
+
+        renderDriverTable(drivers, nominals);
+    } catch (error) {
+        console.error("Gagal mengambil data driver:", error);
+    }
+}
+
+function renderDriverTable(drivers, nominals) {
+    const tableBody = document.getElementById('table-body-driver'); // ID elemen tbody Anda
+    tableBody.innerHTML = ""; // Bersihkan tabel sebelum diisi
+
+    if (!drivers) return;
+
+    Object.keys(drivers).forEach((key, index) => {
+        const driver = drivers[key];
+        // Mencari data nominal yang cocok, misalnya berdasarkan urutan atau logika lain
+        // Karena nominalKey di Firebase adalah "NOM_1", "NOM_2", dst sesuai baris
+        const nominalData = nominals ? nominals[`NOM_${index + 1}`] : null;
+
+        const row = `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${driver.DRIVER}</td>
+                <td>${driver.PLAT}</td>
+                <td>${driver.ISI}</td>
+                <td>${driver.HARGA_8_1}</td>
+                <td>${driver.HARGA_18}</td>
+                <td>${nominalData ? nominalData.NOMINAL : '-'}</td>
+                <td>${nominalData ? nominalData.TERBILANG : '-'}</td>
+            </tr>
+        `;
+        tableBody.innerHTML += row;
+    });
 }
 
 // EKSPOS KE SCOPE GLOBAL WINDOW
