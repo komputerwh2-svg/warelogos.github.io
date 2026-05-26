@@ -500,18 +500,24 @@ async function muatDataDriverTerpadu() {
             return;
         }
 
-        // Konversi nominals menjadi array agar mudah dicari
-        const nominalList = nominals ? Object.values(nominals) : [];
-
+        // PENTING: Untuk mencocokkan nominal ke driver, 
+        // Anda harus memastikan ada field DRIVER di setiap record master_nominal.
+        // Jika tidak ada, kita tidak bisa menebak data nominal milik siapa.
+        
         let indeks = 1;
         Object.keys(drivers).forEach((key) => {
             const d = drivers[key];
             
-            // LOGIKA PERBAIKAN: 
-            // Kita cari di nominalList apakah ada yang memiliki field DRIVER yang cocok
-            // Catatan: Pastikan di Firebase master_nominal, setiap objek punya field 'DRIVER' 
-            // agar bisa dicocokkan. Jika belum ada, Anda harus menambahkannya di Firebase.
-            const n = nominalList.find(item => item.DRIVER === d.DRIVER) || {};
+            // Mencari nominal:
+            // Pastikan Anda telah menambahkan field 'DRIVER' di Firebase master_nominal
+            // Contoh isi record master_nominal/NOM_1: { DRIVER: "AAN", NOMINAL: 20000, ... }
+            let nominalTampil = "-";
+            if (nominals) {
+                const ditemukan = Object.values(nominals).find(n => n.DRIVER === d.DRIVER);
+                if (ditemukan) {
+                    nominalTampil = parseInt(ditemukan.NOMINAL).toLocaleString();
+                }
+            }
 
             tbody.innerHTML += `
                 <tr class="hover:bg-slate-50 transition-colors">
@@ -521,7 +527,7 @@ async function muatDataDriverTerpadu() {
                     <td class="py-3 px-3 text-xs">${d.ISI || '0'}</td>
                     <td class="py-3 px-3 text-xs">${d.HARGA_8_1 || '0'}</td>
                     <td class="py-3 px-3 text-xs">${d.HARGA_18 || '0'}</td>
-                    <td class="py-3 px-3 font-bold text-emerald-600">${n.NOMINAL ? n.NOMINAL.toLocaleString() : '-'}</td>
+                    <td class="py-3 px-3 font-bold text-emerald-600">${nominalTampil}</td>
                     <td class="py-3 px-3 text-center">
                         <button class="text-amber-600 hover:bg-amber-100 p-1.5 rounded-lg transition-all" onclick="editDriver('${key}')">
                             <i class="fa-solid fa-pen-to-square"></i>
