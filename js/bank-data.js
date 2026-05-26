@@ -1,26 +1,3 @@
-function gantiSwitchModeBankData(mode) {
-    // 1. Sembunyikan semua konten mode
-    document.querySelectorAll('.mode-content').forEach(el => {
-        el.classList.add('hidden');
-    });
-
-    // 2. Tampilkan form dan tabel yang dipilih
-    document.getElementById('form-' + mode).classList.remove('hidden');
-    document.getElementById('table-' + mode).classList.remove('hidden');
-
-    // 3. Update Header & Badge
-    document.getElementById('txt-table-header-title-bd').innerText = "Database Master Register [" + mode + "]";
-    
-    // Opsional: Tambahkan animasi fade-in sederhana
-    const activeForm = document.getElementById('form-' + mode);
-    activeForm.style.opacity = 0;
-    setTimeout(() => {
-        activeForm.style.transition = "opacity 0.3s ease";
-        activeForm.style.opacity = 1;
-    }, 50);
-}
-
-
 // ==========================================================================
 // LOGIKA KHUSUS: MODUL SETELAN BANK DATA & KAMUS BARANG (v2026.05.25.0.0.3 - INTEGRATED WITH CELL)
 // ==========================================================================
@@ -300,30 +277,20 @@ function resetFormMasterBD() {
     }
 }
 
-/**
- * Mengontrol visibilitas panel berdasarkan Radio Button yang dipilih (KODE, DRIVER, TUJUAN)
- * Menghapus rujukan panel kelompok lama demi efisiensi berkas.
- * @param {string} modePilihan - Nilai dari radio button ('KODE' | 'DRIVER' | 'TUJUAN')
- */
-function gantiSwitchModeBankData(modePilihan) {
-    const pnlKode = document.getElementById("panel-workspace-mode-kode");
-    const pnlTujuan = document.getElementById("panel-workspace-mode-tujuan");
-    const pnlDriver = document.getElementById("panel-workspace-mode-driver");
-
-    // Sembunyikan seluruh workspace panel terlebih dahulu
-    if (pnlKode) pnlKode.classList.replace("block", "hidden");
-    if (pnlTujuan) pnlTujuan.classList.replace("block", "hidden");
-    if (pnlDriver) pnlDriver.classList.replace("block", "hidden");
-
-    // Tampilkan panel yang sesuai secara eksklusif
-    if (modePilihan === "KODE" && pnlKode) {
-        pnlKode.classList.replace("hidden", "block");
-        muatDataDariFirebase(); 
-    } else if (modePilihan === "DRIVER" && pnlDriver) {
-        pnlDriver.classList.replace("hidden", "block");
-    } else if (modePilihan === "TUJUAN" && pnlTujuan) {
-        pnlTujuan.classList.replace("hidden", "block");
+function gantiSwitchModeBankData(mode) {
+    const slider = document.getElementById('slider-content-bd');
+    
+    // Geser berdasarkan mode
+    if (mode === 'KODE') {
+        slider.style.transform = 'translateX(0%)';
+    } else if (mode === 'DRIVER') {
+        slider.style.transform = 'translateX(-33.333%)';
+    } else if (mode === 'TUJUAN') {
+        slider.style.transform = 'translateX(-66.666%)';
     }
+
+    // Update Judul di Header utama
+    document.getElementById('txt-table-header-title-bd').innerText = `Database Master Register [${mode}]`;
 }
 
 // EKSPOS KE SCOPE GLOBAL WINDOW
