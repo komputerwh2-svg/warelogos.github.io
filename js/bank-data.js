@@ -477,13 +477,11 @@ function resetFormNominalBD() {
 }
 
 /**
- * FUNGSI MUAT TERPADU (Revisi agar sinkron dengan ID HTML & Firebase)
+ * Fungsi sinkronisasi Driver & Nominal yang stabil
  */
 async function muatDataDriverTerpadu() {
-    // 1. Sesuaikan dengan ID yang ada di HTML Anda
-    const tbody = document.getElementById("tabel-body-bank-data"); 
-    const badgeTotal = document.getElementById("info-total-item-bd");
-    
+    const tbody = document.getElementById("tabel-driver-bd");
+    const badge = document.getElementById("info-total-driver-bd");
     if (!tbody) return;
 
     try {
@@ -496,42 +494,41 @@ async function muatDataDriverTerpadu() {
         const nominals = await nominalRes.json();
 
         tbody.innerHTML = "";
+        
         if (!drivers) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-gray-400">Tidak ada data.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-slate-400 font-bold">Tidak ada data driver.</td></tr>`;
             return;
         }
 
-        let count = 0;
-        Object.keys(drivers).forEach((key, index) => {
+        let indeks = 1;
+        Object.keys(drivers).forEach((key) => {
             const d = drivers[key];
-            // Pastikan key nominal sesuai dengan field yang ada di data driver (misal: d.DRIVER)
+            // Mengambil nominal berdasarkan nama driver
             const n = nominals ? (nominals[d.DRIVER] || {}) : {}; 
 
             tbody.innerHTML += `
-                <tr class="border-b hover:bg-slate-50 transition-colors">
-                    <td class="p-3 text-center text-gray-400 font-mono">${index + 1}</td>
-                    <td class="p-3 font-bold text-slate-800 uppercase text-xs">${d.DRIVER || '-'}</td>
-                    <td class="p-3 font-mono text-xs text-blue-600">${d.PLAT || '-'}</td>
-                    <td class="p-3 text-xs">${d.ISI || '0'}</td>
-                    <td class="p-3 text-xs">${d.HARGA_8_1 || '0'}</td>
-                    <td class="p-3 text-xs">${d.HARGA_18 || '0'}</td>
-                    <td class="p-3 font-bold text-emerald-600">${n.NOMINAL || '-'}</td>
-                    <td class="p-3 text-center">
-                        <button class="text-amber-600 hover:bg-amber-100 p-1.5 rounded-lg" onclick="editDriver('${key}')">
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="py-3 px-3 text-center text-slate-400 font-mono">${indeks++}</td>
+                    <td class="py-3 px-3 font-bold text-slate-800 uppercase text-xs">${d.DRIVER || '-'}</td>
+                    <td class="py-3 px-3 font-mono text-xs text-blue-600">${d.PLAT || '-'}</td>
+                    <td class="py-3 px-3 text-xs">${d.ISI || '0'}</td>
+                    <td class="py-3 px-3 text-xs">${d.HARGA_8_1 || '0'}</td>
+                    <td class="py-3 px-3 text-xs">${d.HARGA_18 || '0'}</td>
+                    <td class="py-3 px-3 font-bold text-emerald-600">${n.NOMINAL ? n.NOMINAL.toLocaleString() : '-'}</td>
+                    <td class="py-3 px-3 text-center">
+                        <button class="text-amber-600 hover:bg-amber-100 p-1.5 rounded-lg transition-all" onclick="editDriver('${key}')">
                             <i class="fa-solid fa-pen-to-square"></i>
                         </button>
                     </td>
                 </tr>
             `;
-            count++;
         });
 
-        // Update badge total
-        if (badgeTotal) badgeTotal.innerHTML = `${count} <span class="text-[9px] font-normal text-slate-500">ITEM</span>`;
+        if (badge) badge.innerHTML = `${indeks - 1} <span class="text-[9px] font-normal text-slate-500 ml-0.5">DRIVER</span>`;
         
     } catch (err) {
-        console.error("Gagal sinkronisasi:", err);
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-red-500">Gagal memuat data.</td></tr>`;
+        console.error("Error loading driver data:", err);
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-red-500 font-bold">Gagal memuat data.</td></tr>`;
     }
 }
 
