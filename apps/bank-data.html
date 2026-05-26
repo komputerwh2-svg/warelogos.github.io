@@ -47,20 +47,94 @@
     </div>
 
     <div class="flex-1 overflow-x-hidden overflow-y-auto bg-[#f4f4f4]">
-        <div id="slider-content-bd" class="flex w-[300%] transition-transform duration-500 ease-in-out" style="transform: translateX(0%);">
-            
-            <div class="w-1/3 p-3.5 space-y-4">
-                <div class="w-full bg-white rounded-xl border border-gray-300 shadow-sm overflow-hidden">
-                    <div class="px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-xs font-bold text-slate-700 uppercase">Tambah Data Kode</div>
-                    <div class="p-4 space-y-3.5">
-                        <input type="text" id="tx-kode-barang-bd" placeholder="Kode Barang" class="w-full px-3 py-2 text-xs font-bold uppercase border rounded-lg bg-gray-50/50">
-                        <button onclick="simpanDataMasterBD('KODE')" class="w-full py-2.5 text-white font-black text-xs rounded-xl bg-orange-600">SIMPAN KODE</button>
-                    </div>
+        <div id="slider-content-bd" class="flex w-[300%] transition-transform duration-500 ease-in-out" style="transform: translateX(0%);">           
+                <div class="w-1/3 p-3.5 space-y-4">
+                    <div class="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                    <span id="title-mode-form-bd" class="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+                        <i class="fa-solid fa-square-plus text-orange-500 text-sm"></i> Tambah Kode Barang Baru
+                    </span>
+                    <span id="badge-mode-bd" class="text-[9px] font-black text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded uppercase tracking-wider">BARU</span>
                 </div>
-                <div class="w-full bg-white rounded-xl border overflow-hidden">
-                    <table class="w-full text-left">
-                        <thead class="bg-gray-50 text-[10px] uppercase text-slate-500"><tr><th class="p-3">Kode</th><th>Nama</th></tr></thead>
-                        <tbody id="tabel-body-kode" class="divide-y text-[12px]"></tbody>
+
+                <form id="form-master-general-bd" onsubmit="event.preventDefault();" class="p-4">
+                    
+                    <div id="slot-fields-mode-kode" class="space-y-3.5 block">
+                        <div class="grid grid-cols-4 gap-3">
+                            <div class="flex flex-col gap-1">
+                                <label class="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Kode Barang</label>
+                                <input type="text" id="tx-kode-barang-bd" placeholder="Contoh: MTR3A01" class="w-full px-3 py-2 text-xs font-mono font-bold uppercase border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 bg-gray-50/50 transition-all">
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <label class="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Inisial Ringkas</label>
+                                <input type="text" id="tx-inisial-barang-bd" placeholder="Contoh: MTR 01" class="w-full px-3 py-2 text-xs font-mono font-bold uppercase border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 bg-gray-50/50 transition-all">
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <label class="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Kelompok</label>
+                                <input type="text" id="tx-kelompok-barang-bd" placeholder="Contoh: MTR" class="w-full px-3 py-2 text-xs font-mono font-bold uppercase border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 bg-gray-50/50 transition-all">
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <label class="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Target Cell</label>
+                                <input type="text" id="tx-cell-barang-bd" placeholder="Contoh: G59" class="w-full px-3 py-2 text-xs font-mono font-bold uppercase border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 bg-gray-50/50 transition-all">
+                            </div>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <label class="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Nama Barang Utuh</label>
+                            <input type="text" id="tx-nama-barang-bd" placeholder="Masukkan nama item deskriptif..." class="w-full px-3 py-2 text-xs font-semibold uppercase border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 bg-gray-50/50 transition-all">
+                        </div>
+                        <div class="flex flex-col gap-1 w-1/4">
+                            <label class="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Qty Utuhan (Karton)</label>
+                            <div class="relative flex items-center">
+                                <input type="number" id="tx-qty-utuhan-bd" min="0" placeholder="0" class="w-full px-3 py-2 text-xs font-mono font-bold border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 bg-gray-50/50 transition-all">
+                                <span class="absolute right-3 text-[10px] font-bold text-slate-400">KRT</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="slot-fields-mode-tujuan" class="space-y-3.5 hidden">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="flex flex-col gap-1">
+                                <label class="text-[11px] font-bold text-slate-500 uppercase tracking-tight">ID / Kode Tujuan</label>
+                                <input type="text" id="tx-id-tujuan-bd" placeholder="Contoh: TJN01" class="w-full px-3 py-2 text-xs font-mono font-bold uppercase border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 bg-gray-50/50 transition-all">
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <label class="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Nama Lokasi / Tujuan</label>
+                                <input type="text" id="tx-nama-tujuan-bd" placeholder="Contoh: GUDANG UTAMA BARAT" class="w-full px-3 py-2 text-xs font-bold uppercase border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 bg-gray-50/50 transition-all">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 flex items-center gap-2.5">
+                        <button type="button" id="btn-submit-master-bd" onclick="simpanDataMasterBD()" 
+                                class="flex-1 py-2.5 text-white font-black text-xs rounded-xl shadow-md active:scale-[0.98] transition-all uppercase tracking-widest"
+                                style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #ea580c;">
+                            TAMBAH KODE
+                        </button>
+                        <button type="button" onclick="resetFormMasterBD()" class="px-6 py-2.5 bg-[#666666] hover:bg-[#555555] text-white font-black text-xs rounded-xl shadow-md border border-[#444444] active:scale-[0.98] transition-all uppercase tracking-widest">
+                            BATAL
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="w-full bg-white rounded-xl border border-gray-300 shadow-[0_2px_4px_rgba(0,0,0,0.06)] overflow-hidden">
+                <div class="px-3.5 py-2.5 bg-gradient-to-r from-gray-50 to-slate-50 border-b border-gray-200 flex justify-between items-center">
+                    <span id="txt-table-header-title-bd" class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Database Master Register [KODE]</span>
+                    <span id="info-total-item-bd" class="text-xs font-mono font-black text-slate-800 bg-slate-200/60 px-2 py-0.5 rounded">
+                        0 <span class="text-[9px] font-normal text-slate-500 ml-0.5">ITEM</span>
+                    </span>
+                </div>
+
+                <div class="overflow-x-auto max-h-[380px]">
+                    <table class="w-full text-left border-collapse">
+                        <thead id="tabel-head-bank-data">
+                        </thead>
+                        <tbody id="tabel-body-bank-data" class="divide-y divide-gray-200 text-[12px] font-medium text-slate-700">
+                            <tr>
+                                <td colspan="8" class="text-center py-14 text-slate-400 font-bold">
+                                    <i class="fa-solid fa-spinner fa-spin mr-1.5 text-orange-500"></i> Menghubungkan ke Live Firebase...
+                                </td>
+                            </tr>
+                        </tbody>
                     </table>
                 </div>
             </div>
