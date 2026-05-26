@@ -330,12 +330,29 @@ function sinkronisasiCell() {
     }
 }
 
+// Di bank-data.js
+function tampilkanDropdownKelompok() {
+    const selectKelompok = document.getElementById("tx-kelompok-barang-bd");
+    if (!selectKelompok) return;
+
+    // Bersihkan isi lama (agar tidak menumpuk)
+    selectKelompok.innerHTML = '<option value="">Pilih Kelompok</option>';
+
+    Object.keys(mappingKelompok).forEach(item => {
+        const option = document.createElement("option");
+        option.value = item;
+        option.textContent = item;
+        selectKelompok.appendChild(option);
+    });
+}
+
 function gantiSwitchModeBankData(mode) {
     const slider = document.getElementById('slider-content-bd');
     
     // Geser berdasarkan mode
     if (mode === 'KODE') {
         slider.style.transform = 'translateX(0%)';
+        setTimeout(tampilkanDropdownKelompok, 100);
     } else if (mode === 'DRIVER') {
         slider.style.transform = 'translateX(-33.333%)';
     } else if (mode === 'TUJUAN') {
