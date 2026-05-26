@@ -72,11 +72,16 @@
                                 </div>
                                 <div class="flex flex-col gap-1">
                                     <label class="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Kelompok</label>
-                                    <input type="text" id="tx-kelompok-barang-bd" placeholder="Contoh: MTR" class="w-full px-3 py-2 text-xs font-mono font-bold uppercase border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 bg-gray-50/50 transition-all">
+                                    <select id="tx-kelompok-barang-bd" onchange="sinkronisasiCell()" class="w-full px-3 py-2 text-xs font-mono font-bold uppercase border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 bg-gray-50/50 transition-all">
+                                        <option value="">Pilih Kelompok</option>
+                                    </select>
                                 </div>
+
                                 <div class="flex flex-col gap-1">
                                     <label class="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Target Cell</label>
-                                    <input type="text" id="tx-cell-barang-bd" placeholder="Contoh: G59" class="w-full px-3 py-2 text-xs font-mono font-bold uppercase border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 bg-gray-50/50 transition-all">
+                                    <select id="tx-cell-barang-bd" class="w-full px-3 py-2 text-xs font-mono font-bold uppercase border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 bg-gray-50/50 transition-all">
+                                        <option value="">Pilih Cell</option>
+                                    </select>
                                 </div>
                             </div>
                             <div class="flex flex-col gap-1">

@@ -282,6 +282,46 @@ function resetFormMasterBD() {
     }
 }
 
+// Data referensi (bisa Anda ambil dari fetch data master di awal)
+const mappingKelompokCell = {
+    "MTR": "B60",
+    "PDR": "E60",
+    "MRR / CRR EA": "G59",
+    "MRMR": "G60",
+    "CRR / THR": "J59",
+    "MJR": "J60",
+    "MOR / MOB": "M59",
+    "MP / LTGR / MTGR": "M60"
+};
+
+/**
+ * Inisialisasi Dropdown
+ */
+function isiDropdownKelompok() {
+    const selectKelompok = document.getElementById("tx-kelompok-barang-bd");
+    Object.keys(mappingKelompokCell).forEach(kelompok => {
+        let opt = document.createElement("option");
+        opt.value = kelompok;
+        opt.innerHTML = kelompok;
+        selectKelompok.appendChild(opt);
+    });
+}
+
+/**
+ * Logika Sinkronisasi Otomatis
+ */
+function sinkronisasiCell() {
+    const kelompok = document.getElementById("tx-kelompok-barang-bd").value;
+    const selectCell = document.getElementById("tx-cell-barang-bd");
+    
+    // Reset dan isi Cell otomatis
+    selectCell.innerHTML = `<option value="${mappingKelompokCell[kelompok] || ''}">${mappingKelompokCell[kelompok] || 'Pilih Cell'}</option>`;
+}
+
+// Jalankan saat halaman dimuat
+document.addEventListener("DOMContentLoaded", isiDropdownKelompok);
+
+
 function gantiSwitchModeBankData(mode) {
     const slider = document.getElementById('slider-content-bd');
     
