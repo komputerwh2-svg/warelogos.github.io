@@ -117,26 +117,27 @@ function muatDataDariFirebase() {
 }
 
 /**
- * Menyimpan data input baru atau memperbarui perubahan edit ke Firebase,
- * Sekaligus menembakkan data terbaru ke Google Spreadsheet via Apps Script Webhook.
+ * Fungsi khusus untuk menyimpan data MASTER KODE BARANG
  */
 function simpanDataMasterBD() {
     const inKode     = document.getElementById("tx-kode-barang-bd");
     const inInisial  = document.getElementById("tx-inisial-barang-bd");
     const inKelompok = document.getElementById("tx-kelompok-barang-bd"); 
-    const inCell     = document.getElementById("tx-cell-barang-bd"); // Selektor komponen input cell baru
+    const inCell     = document.getElementById("tx-cell-barang-bd");
     const inNama     = document.getElementById("tx-nama-barang-bd");
     const inQty      = document.getElementById("tx-qty-utuhan-bd");
 
+    // Validasi elemen form
     if (!inKode || !inInisial || !inKelompok || !inCell || !inNama || !inQty) return;
 
     const kodeVal     = inKode.value.trim().toUpperCase();
     const inisialVal  = inInisial.value.trim().toUpperCase();
     const kelompokVal = inKelompok.value.trim().toUpperCase();
-    const cellVal     = inCell.value.trim().toUpperCase(); // Mengambil nilai cell
+    const cellVal     = inCell.value.trim().toUpperCase();
     const namaVal     = inNama.value.trim().toUpperCase();
     const qtyVal      = inQty.value.trim() !== "" ? parseInt(inQty.value) : 0;
 
+    // Validasi input wajib
     if (!kodeVal || !inisialVal || !kelompokVal || !cellVal || !namaVal) {
         alert("Mohon lengkapi seluruh kolom input Kode, Inisial, Kelompok, Cell, dan Nama Barang!");
         return;
@@ -148,11 +149,12 @@ function simpanDataMasterBD() {
         KODE_BARANG: kodeVal,
         INISIAL: inisialVal,
         KELOMPOK: kelompokVal, 
-        CELL: cellVal, // Menyimpan parameter cell lokasi ke database
+        CELL: cellVal,
         NAMA_BARANG: namaVal,
         QTY: qtyVal,
         Satuan: "KRT",
-        IS_ACTIVE: true
+        IS_ACTIVE: true,
+        TIPE_DATA: "MASTER_KODE" // Penanda untuk mempermudah filter di Spreadsheet
     };
 
     const btnSubmit = document.getElementById("btn-submit-master-bd");
@@ -160,7 +162,7 @@ function simpanDataMasterBD() {
     btnSubmit.innerText = "MENYIMPAN...";
     btnSubmit.disabled = true;
 
-    // Langkah A: Kirim data terpadu ke Firebase Realtime Database
+    // 1. Kirim ke Firebase (Node: master_barang)
     fetch(`${BD_FIREBASE_URL}master_barang/${cleanKey}.json`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -169,7 +171,7 @@ function simpanDataMasterBD() {
     .then(res => {
         if (!res.ok) throw new Error("Gagal menyimpan ke server database.");
         
-        // Langkah B: Kirim payload terpadu ke Google Spreadsheet Apps Script (2-Way Sync)
+        // 2. Sync ke Spreadsheet
         if (SPREADSHEET_WEBHOOK_URL) {
             return fetch(SPREADSHEET_WEBHOOK_URL, {
                 method: "POST",
@@ -180,13 +182,16 @@ function simpanDataMasterBD() {
         }
     })
     .then(() => {
-        alert("Data master kamus barang, kelompok, & cell berhasil disinkronisasi ke Firebase & Spreadsheet!");
+        alert("Data master KODE berhasil disimpan!");
         resetFormMasterBD();
-        muatDataDariFirebase();
+        // Pastikan fungsi ini memuat ulang tabel khusus mode KODE
+        if (typeof muatDataDariFirebase === 'function') {
+            muatDataDariFirebase();
+        }
     })
     .catch(err => {
         console.error(err);
-        alert("Terjadi masalah koneksi internet saat menyelaraskan data.");
+        alert("Terjadi masalah koneksi internet.");
     })
     .finally(() => {
         btnSubmit.innerText = txtAsli;
@@ -291,6 +296,57 @@ function gantiSwitchModeBankData(mode) {
 
     // Update Judul di Header utama
     document.getElementById('txt-table-header-title-bd').innerText = `Database Master Register [${mode}]`;
+}
+
+/**
+ * Fungsi khusus untuk menyimpan data MASTER KODE BARANG
+ */
+function simpanDataDriverBD() {
+    // 1. Ambil nilai input
+    const payload = {
+        DRIVER: document.getElementById("tx-driver-nama").value.trim().toUpperCase(),
+        PLAT: document.getElementById("tx-driver-plat").value.trim().toUpperCase(),
+        ISI: document.getElementById("tx-driver-isi").value,
+        HARGA_8_1: document.getElementById("tx-harga-81").value,
+        HARGA_18: document.getElementById("tx-harga-18").value,
+        NOMINAL: document.getElementById("tx-nominal").value,
+        TERBILANG: document.getElementById("tx-terbilang").value.trim(),
+        IS_ACTIVE: true
+    };
+
+    // 2. Validasi sederhana
+    if (!payload.DRIVER || !payload.PLAT) {
+        alert("Nama Driver dan Plat Nomor wajib diisi!");
+        return;
+    }
+
+    const cleanKey = payload.DRIVER.replace(/[\.\$\#\[\]\/]/g, "_");
+
+    // 3. Simpan ke Firebase
+    fetch(`${BD_FIREBASE_URL}master_driver/${cleanKey}.json`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("Gagal menyimpan ke Firebase");
+        
+        // 4. Kirim ke Spreadsheet (Sync)
+        if (SPREADSHEET_WEBHOOK_URL) {
+            return fetch(SPREADSHEET_WEBHOOK_URL, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+        }
+    })
+    .then(() => {
+        alert("Data Driver berhasil disimpan & disinkronisasi!");
+        resetFormDriverBD();
+        // muatDataDriverDariFirebase(); // Tambahkan fungsi ini nanti
+    })
+    .catch(err => console.error(err));
 }
 
 // EKSPOS KE SCOPE GLOBAL WINDOW
