@@ -394,6 +394,36 @@ function simpanDataDriverBD() {
     });
 }
 
+/**
+ * Mereset Form Kembali ke Mode Tambah Driver Baru (Batal)
+ */
+function resetFormDriverBD() {
+    // 1. Ambil elemen-elemen terkait
+    const formDriver = document.getElementById("box-workspace-input-driver"); 
+    const btnAksi    = document.getElementById("btn-submit-driver");
+    const h3Title    = document.querySelector("#box-workspace-input-driver h3");
+
+    // 2. Bersihkan semua input di dalam box tersebut
+    const inputs = document.querySelectorAll("#box-workspace-input-driver input");
+    inputs.forEach(input => input.value = "");
+
+    // 3. Reset Teks Judul
+    if (h3Title) {
+        h3Title.innerHTML = `<i class="fa-solid fa-truck text-amber-500"></i> TAMBAH DATA DRIVER`;
+    }
+
+    // 4. Reset Teks Tombol
+    if (btnAksi) {
+        btnAksi.innerText = "TAMBAH DRIVER";
+        btnAksi.onclick = function() { simpanDataDriverBD(); }; // Pastikan fungsi simpan kembali aktif
+    }
+
+    // 5. Reset Style (jika sebelumnya ada perubahan warna saat mode edit)
+    if (formDriver) {
+        formDriver.className = "w-full bg-amber-50/40 rounded-xl border border-amber-300 shadow-[0_2px_4px_rgba(0,0,0,0.06)] overflow-hidden transition-all duration-300 p-4 mb-4";
+    }
+}
+
 function simpanNominalDriverBD() {
     const refDriver = document.getElementById("tx-driver-nama").value.trim().toUpperCase();
     const payload = {
@@ -419,6 +449,31 @@ function simpanNominalDriverBD() {
             muatDataDriverTerpadu();
         });
     });
+}
+
+/**
+ * Mereset Form Kembali ke Mode Tambah Nominal Baru (Batal)
+ */
+function resetFormNominalBD() {
+    // 1. Target container box
+    const boxNominal = document.getElementById("box-workspace-input-nominal");
+    
+    // 2. Bersihkan semua input di dalam box tersebut
+    const inputs = boxNominal.querySelectorAll("input");
+    inputs.forEach(input => input.value = "");
+
+    // 3. Reset Teks Tombol (Kembalikan ke 'TAMBAH NOMINAL')
+    const btnAksi = document.getElementById("btn-submit-nominal");
+    if (btnAksi) {
+        btnAksi.innerText = "TAMBAH NOMINAL";
+        btnAksi.onclick = function() { simpanNominalDriverBD(); }; 
+    }
+
+    // 4. (Opsional) Jika Anda ingin mengembalikan judul ke semula
+    const h3Title = boxNominal.querySelector("h3");
+    if (h3Title) {
+        h3Title.innerHTML = `<i class="fa-solid fa-money-bill text-amber-600"></i> SETELAN NOMINAL & TERBILANG`;
+    }
 }
 
 /**
@@ -537,6 +592,31 @@ async function muatDataTujuanDariFirebase() {
             </tr>
         `;
     });
+}
+
+/**
+ * Mereset Form Kembali ke Mode Tambah Tujuan Baru (Batal)
+ */
+function resetFormTujuanBD() {
+    // 1. Target container box
+    const boxTujuan = document.getElementById("box-workspace-input-tujuan");
+    
+    // 2. Bersihkan semua input di dalam box tersebut
+    const inputs = boxTujuan.querySelectorAll("input");
+    inputs.forEach(input => input.value = "");
+
+    // 3. Reset Teks Tombol (Kembalikan ke 'TAMBAH TUJUAN')
+    const btnAksi = document.getElementById("btn-submit-tujuan");
+    if (btnAksi) {
+        btnAksi.innerText = "TAMBAH TUJUAN";
+        btnAksi.onclick = function() { simpanDataTujuanBD(); }; 
+    }
+
+    // 4. Reset Judul H3
+    const h3Title = boxTujuan.querySelector("h3");
+    if (h3Title) {
+        h3Title.innerHTML = `<i class="fa-solid fa-location-dot text-amber-500"></i> TAMBAH DATA TUJUAN`;
+    }
 }
 
 // EKSPOS KE SCOPE GLOBAL WINDOW
