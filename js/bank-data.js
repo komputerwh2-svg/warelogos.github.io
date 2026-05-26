@@ -473,43 +473,33 @@ function resetFormNominalBD() {
 }
 
 /**
- * Fungsi sinkronisasi Driver & Nominal yang stabil
+ * Fungsi Pemuat Data Driver (Mandiri)
  */
-async function muatDataDriverTerpadu() {
-    const tbody = document.getElementById("tabel-driver-bd");
+async function muatDataDriver() {
+    const tbody = document.getElementById("tabel-driver-terpisah");
     if (!tbody) return;
 
     try {
-        const [driverRes, nominalRes] = await Promise.all([
-            fetch(`${BD_FIREBASE_URL}master_driver.json`),
-            fetch(`${BD_FIREBASE_URL}master_nominal.json`)
-        ]);
-
-        const drivers = await driverRes.json();
-        const nominals = await nominalRes.json(); // Sekarang bentuknya: { "AAN": {...}, "AGUNG": {...} }
+        const response = await fetch(`${BD_FIREBASE_URL}master_driver.json`);
+        const drivers = await response.json();
 
         tbody.innerHTML = "";
         
         if (!drivers) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-slate-400 font-bold">Tidak ada data driver.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center py-10 text-slate-400">Tidak ada data driver.</td></tr>`;
             return;
         }
 
         Object.keys(drivers).forEach((key, index) => {
             const d = drivers[key];
-            // AKSES LANGSUNG: Tidak perlu .find() lagi!
-            const n = nominals ? nominals[d.DRIVER] : null; 
-            const nominalTampil = n ? parseInt(n.NOMINAL).toLocaleString() : '-';
-
             tbody.innerHTML += `
-                <tr class="hover:bg-slate-50 transition-colors">
-                    <td class="py-3 px-3 text-center text-slate-400 font-mono">${index + 1}</td>
+                <tr class="hover:bg-slate-50 transition-colors border-b">
+                    <td class="py-3 px-3 text-center text-slate-400 font-mono text-xs">${index + 1}</td>
                     <td class="py-3 px-3 font-bold text-slate-800 uppercase text-xs">${d.DRIVER}</td>
                     <td class="py-3 px-3 font-mono text-xs text-blue-600">${d.PLAT || '-'}</td>
                     <td class="py-3 px-3 text-xs">${d.ISI || '0'}</td>
                     <td class="py-3 px-3 text-xs">${d.HARGA_8_1 || '0'}</td>
                     <td class="py-3 px-3 text-xs">${d.HARGA_18 || '0'}</td>
-                    <td class="py-3 px-3 font-bold text-emerald-600">${nominalTampil}</td>
                     <td class="py-3 px-3 text-center">
                         <button class="text-amber-600 hover:bg-amber-100 p-1.5 rounded-lg" onclick="editDriver('${key}')">
                             <i class="fa-solid fa-pen-to-square"></i>
@@ -519,7 +509,46 @@ async function muatDataDriverTerpadu() {
             `;
         });
     } catch (err) {
-        console.error("Error:", err);
+        console.error("Error loading driver:", err);
+    }
+}
+
+/**
+ * Fungsi Pemuat Data Nominal (Mandiri)
+ */
+async function muatDataNominal() {
+    const tbody = document.getElementById("tabel-nominal-terpisah");
+    if (!tbody) return;
+
+    try {
+        const response = await fetch(`${BD_FIREBASE_URL}master_nominal.json`);
+        const nominals = await response.json();
+
+        tbody.innerHTML = "";
+        
+        if (!nominals) {
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-10 text-slate-400">Tidak ada data nominal.</td></tr>`;
+            return;
+        }
+
+        Object.keys(nominals).forEach((key, index) => {
+            const n = nominals[key];
+            tbody.innerHTML += `
+                <tr class="hover:bg-slate-50 transition-colors border-b">
+                    <td class="py-3 px-3 text-center text-slate-400 font-mono text-xs">${index + 1}</td>
+                    <td class="py-3 px-3 font-bold text-slate-800 uppercase text-xs">${key}</td>
+                    <td class="py-3 px-3 font-bold text-emerald-600 text-xs">${parseInt(n.NOMINAL || 0).toLocaleString()}</td>
+                    <td class="py-3 px-3 text-slate-600 text-xs">${n.TERBILANG || '-'}</td>
+                    <td class="py-3 px-3 text-center">
+                        <button class="text-blue-600 hover:bg-blue-100 p-1.5 rounded-lg" onclick="editNominal('${key}')">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+    } catch (err) {
+        console.error("Error loading nominal:", err);
     }
 }
 
