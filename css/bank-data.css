@@ -88,3 +88,24 @@ input:focus, select:focus {
         background-color: #f97316 !important; /* Warna oranye saat terpilih */
         color: white !important;
     }
+
+/* Gunakan ID agar prioritas lebih tinggi daripada class Tailwind */
+#tx-kode-barang-bd, 
+#tx-inisial-barang-bd, 
+#tx-kelompok-barang-bd, 
+#tx-cell-barang-bd, 
+#tx-nama-barang-bd, 
+#tx-qty-utuhan-bd,
+#tx-id-tujuan-bd,
+#tx-nama-tujuan-bd {
+    color: #1e293b !important; 
+    background-color: #ffffff !important;
+    border: 1px solid #94a3b8 !important;
+    font-weight: 700 !important;
+}
+
+/* Memastikan dropdown option tetap terlihat jelas */
+select#tx-kelompok-barang-bd option {
+    color: #1e293b !important;
+    background-color: #ffffff !important;
+}
