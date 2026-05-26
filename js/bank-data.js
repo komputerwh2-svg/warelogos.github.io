@@ -425,25 +425,32 @@ function resetFormDriverBD() {
 }
 
 function simpanNominalDriverBD() {
-    // Pastikan nama driver diambil dari input atau referensi yang konsisten
-    const refDriver = document.getElementById("tx-driver-nama").value.trim().toUpperCase();
+    // 1. Ambil nilai langsung dari input nominal, bukan dari input driver
+    const nominalValue = document.getElementById("tx-nominal").value.trim();
+    const terbilangValue = document.getElementById("tx-terbilang").value.trim();
     
-    if (!refDriver) return alert("Silakan pilih/isi nama driver terlebih dahulu!");
+    // 2. Validasi nominal saja
+    if (!nominalValue || !terbilangValue) return alert("Nominal dan Terbilang wajib diisi!");
+
+    // 3. Buat ID unik (Contoh: NOM_1716723456789)
+    const nominalId = "NOM_" + Date.now();
 
     const payload = {
-        DRIVER: refDriver, // PENTING: Tambahkan ini agar bisa dicocokkan
-        NOMINAL: document.getElementById("tx-nominal").value.trim(),
-        TERBILANG: document.getElementById("tx-terbilang").value.trim()
+        NOMINAL: nominalValue,
+        TERBILANG: terbilangValue,
+        DIBUAT: new Date().toISOString()
     };
 
-    // SIMPAN LANGSUNG DENGAN KEY NAMA DRIVER
-    fetch(`${BD_FIREBASE_URL}master_nominal/${refDriver}.json`, {
+    // 4. Simpan ke master_nominal dengan ID unik, TANPA referensi driver
+    fetch(`${BD_FIREBASE_URL}master_nominal/${nominalId}.json`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
     }).then(() => {
-        alert("Data Nominal tersimpan!");
-        muatDataDriverTerpadu();
+        alert("Data Nominal berhasil disimpan secara mandiri!");
+        // 5. Hanya panggil pemuat nominal, jangan panggil pemuat driver
+        muatDataNominal(); 
+        resetFormNominalBD(); // Bersihkan form setelah simpan
     });
 }
 
@@ -470,6 +477,36 @@ function resetFormNominalBD() {
     if (h3Title) {
         h3Title.innerHTML = `<i class="fa-solid fa-money-bill text-amber-600"></i> SETELAN NOMINAL & TERBILANG`;
     }
+}
+
+/**
+ * Fungsi untuk memicu mode edit pada form nominal
+ */
+function editNominal(key, nominal, terbilang) {
+    // 1. Isi input form
+    document.getElementById("tx-nominal").value = nominal;
+    document.getElementById("tx-terbilang").value = terbilang;
+
+    // 2. Ubah UI tombol ke mode UPDATE
+    const btnAksi = document.getElementById("btn-submit-nominal");
+    btnAksi.innerText = "UPDATE NOMINAL";
+    btnAksi.onclick = function() {
+        const payload = {
+            NOMINAL: document.getElementById("tx-nominal").value,
+            TERBILANG: document.getElementById("tx-terbilang").value
+        };
+
+        // Langsung update berdasarkan key (yang sekarang sudah unik)
+        fetch(`${BD_FIREBASE_URL}master_nominal/${key}.json`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        }).then(() => {
+            alert("Berhasil diperbarui!");
+            muatDataNominal();
+            resetFormNominalBD();
+        });
+    };
 }
 
 /**
@@ -539,8 +576,8 @@ async function muatDataNominal() {
                     <td class="py-3 px-3 font-bold text-slate-800 uppercase text-xs">${key}</td>
                     <td class="py-3 px-3 font-bold text-emerald-600 text-xs">${parseInt(n.NOMINAL || 0).toLocaleString()}</td>
                     <td class="py-3 px-3 text-slate-600 text-xs">${n.TERBILANG || '-'}</td>
-                    <td class="py-3 px-3 text-center">
-                        <button class="text-blue-600 hover:bg-blue-100 p-1.5 rounded-lg" onclick="editNominal('${key}')">
+                    <td class="p-3 text-center">
+                        <button onclick="editNominal('${key}', '${n.NOMINAL}', '${n.TERBILANG.replace(/'/g, "\\'")}')" class="text-blue-600 hover:bg-blue-100 p-1.5 rounded-lg transition-all">
                             <i class="fa-solid fa-pen-to-square"></i>
                         </button>
                     </td>
