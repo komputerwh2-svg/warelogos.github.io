@@ -500,11 +500,18 @@ async function muatDataDriverTerpadu() {
             return;
         }
 
+        // Konversi nominals menjadi array agar mudah dicari
+        const nominalList = nominals ? Object.values(nominals) : [];
+
         let indeks = 1;
         Object.keys(drivers).forEach((key) => {
             const d = drivers[key];
-            // Mengambil nominal berdasarkan nama driver
-            const n = nominals ? (nominals[d.DRIVER] || {}) : {}; 
+            
+            // LOGIKA PERBAIKAN: 
+            // Kita cari di nominalList apakah ada yang memiliki field DRIVER yang cocok
+            // Catatan: Pastikan di Firebase master_nominal, setiap objek punya field 'DRIVER' 
+            // agar bisa dicocokkan. Jika belum ada, Anda harus menambahkannya di Firebase.
+            const n = nominalList.find(item => item.DRIVER === d.DRIVER) || {};
 
             tbody.innerHTML += `
                 <tr class="hover:bg-slate-50 transition-colors">
@@ -572,36 +579,50 @@ function simpanDataTujuanBD() {
 }
 
 /**
- * Fungsi Pemuat Data Tujuan (Versi Rapi)
+ * Fungsi Pemuat Data Tujuan yang stabil
  */
 async function muatDataTujuanDariFirebase() {
     const tbody = document.getElementById("tabel-tujuan-bd");
+    const badge = document.getElementById("info-total-tujuan-bd"); // Pastikan elemen ini ada di HTML Anda
     if (!tbody) return;
 
-    const response = await fetch(`${BD_FIREBASE_URL}master_tujuan.json`);
-    const data = await response.json();
-    
-    tbody.innerHTML = ""; 
-    
-    if (!data) {
-        tbody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-gray-400">Belum ada tujuan terdaftar.</td></tr>`;
-        return;
-    }
+    try {
+        tbody.innerHTML = `<tr><td colspan="3" class="text-center py-14 text-slate-400 font-bold"><i class="fa-solid fa-spinner fa-spin mr-1.5 text-orange-500"></i> Memuat tujuan...</td></tr>`;
 
-    Object.keys(data).forEach((key, index) => {
-        const item = data[key];
-        tbody.innerHTML += `
-            <tr class="border-b hover:bg-slate-50 transition-colors">
-                <td class="p-3 text-slate-800 font-bold">${item.TUJUAN}</td>
-                <td class="p-3 text-slate-600">${item.KOTA}</td>
-                <td class="p-3 text-center">
-                    <button class="text-blue-600 hover:bg-blue-100 p-1.5 rounded-lg transition-all" onclick="editTujuan('${key}')">
-                        <i class="fa-solid fa-pen-to-square"></i>
-                    </button>
-                </td>
-            </tr>
-        `;
-    });
+        const response = await fetch(`${BD_FIREBASE_URL}master_tujuan.json`);
+        const data = await response.json();
+        
+        tbody.innerHTML = ""; 
+        
+        if (!data) {
+            tbody.innerHTML = `<tr><td colspan="3" class="text-center py-10 text-slate-400 font-bold">Belum ada tujuan terdaftar.</td></tr>`;
+            if (badge) badge.innerText = "0";
+            return;
+        }
+
+        let count = 0;
+        Object.keys(data).forEach((key) => {
+            const item = data[key];
+            count++;
+            tbody.innerHTML += `
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="py-3 px-3 text-slate-800 font-bold text-xs uppercase">${item.TUJUAN || key}</td>
+                    <td class="py-3 px-3 text-slate-600 text-xs">${item.KOTA || '-'}</td>
+                    <td class="py-3 px-3 text-center">
+                        <button class="text-blue-600 hover:bg-blue-100 p-1.5 rounded-lg transition-all" onclick="editTujuan('${key}')">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        if (badge) badge.innerHTML = `${count} <span class="text-[9px] font-normal text-slate-500 ml-0.5">LOKASI</span>`;
+        
+    } catch (err) {
+        console.error("Error loading tujuan:", err);
+        tbody.innerHTML = `<tr><td colspan="3" class="text-center py-10 text-red-500 font-bold">Gagal memuat data.</td></tr>`;
+    }
 }
 
 /**
