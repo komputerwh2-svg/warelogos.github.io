@@ -319,7 +319,30 @@ function sinkronisasiCell() {
 }
 
 // Panggil fungsi ini saat DOM siap
-document.addEventListener("DOMContentLoaded", isiDropdownKelompok);
+// Gunakan fungsi ini untuk memastikan DOM benar-benar siap
+function initBankData() {
+    console.log("Inisialisasi Dropdown Kelompok...");
+    const selectKelompok = document.getElementById("tx-kelompok-barang-bd");
+    
+    if (!selectKelompok) {
+        console.error("Elemen #tx-kelompok-barang-bd tidak ditemukan!");
+        return;
+    }
+
+    // Bersihkan dulu agar tidak duplikat jika dipanggil berulang
+    selectKelompok.innerHTML = '<option value="">Pilih Kelompok</option>';
+
+    Object.keys(mappingKelompok).forEach(item => {
+        const option = document.createElement("option");
+        option.value = item;
+        option.textContent = item;
+        selectKelompok.appendChild(option);
+    });
+    console.log("Dropdown Kelompok berhasil diisi.");
+}
+
+// Panggil saat window load (lebih aman daripada DOMContentLoaded di beberapa lingkungan)
+window.addEventListener("load", initBankData);
 
 function gantiSwitchModeBankData(mode) {
     const slider = document.getElementById('slider-content-bd');
