@@ -425,29 +425,25 @@ function resetFormDriverBD() {
 }
 
 function simpanNominalDriverBD() {
+    // Pastikan nama driver diambil dari input atau referensi yang konsisten
     const refDriver = document.getElementById("tx-driver-nama").value.trim().toUpperCase();
+    
+    if (!refDriver) return alert("Silakan pilih/isi nama driver terlebih dahulu!");
+
     const payload = {
-        TIPE_DATA: "MASTER_NOMINAL",
-        NAMA_DRIVER_REF: refDriver,
+        DRIVER: refDriver, // PENTING: Tambahkan ini agar bisa dicocokkan
         NOMINAL: document.getElementById("tx-nominal").value.trim(),
         TERBILANG: document.getElementById("tx-terbilang").value.trim()
     };
 
-    if (!refDriver) return alert("Silakan isi nama driver sebagai referensi!");
-
+    // SIMPAN LANGSUNG DENGAN KEY NAMA DRIVER
     fetch(`${BD_FIREBASE_URL}master_nominal/${refDriver}.json`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
     }).then(() => {
-        fetch(SPREADSHEET_DRIVER_WEBHOOK_URL, {
-            method: "POST", mode: "no-cors",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        }).then(() => {
-            alert("Data Nominal tersimpan!");
-            muatDataDriverTerpadu();
-        });
+        alert("Data Nominal tersimpan!");
+        muatDataDriverTerpadu();
     });
 }
 
@@ -481,7 +477,6 @@ function resetFormNominalBD() {
  */
 async function muatDataDriverTerpadu() {
     const tbody = document.getElementById("tabel-driver-bd");
-    const badge = document.getElementById("info-total-driver-bd");
     if (!tbody) return;
 
     try {
@@ -491,7 +486,7 @@ async function muatDataDriverTerpadu() {
         ]);
 
         const drivers = await driverRes.json();
-        const nominals = await nominalRes.json();
+        const nominals = await nominalRes.json(); // Sekarang bentuknya: { "AAN": {...}, "AGUNG": {...} }
 
         tbody.innerHTML = "";
         
@@ -500,48 +495,31 @@ async function muatDataDriverTerpadu() {
             return;
         }
 
-        // PENTING: Untuk mencocokkan nominal ke driver, 
-        // Anda harus memastikan ada field DRIVER di setiap record master_nominal.
-        // Jika tidak ada, kita tidak bisa menebak data nominal milik siapa.
-        
-        let indeks = 1;
-        Object.keys(drivers).forEach((key) => {
+        Object.keys(drivers).forEach((key, index) => {
             const d = drivers[key];
-            
-            // Mencari nominal:
-            // Pastikan Anda telah menambahkan field 'DRIVER' di Firebase master_nominal
-            // Contoh isi record master_nominal/NOM_1: { DRIVER: "AAN", NOMINAL: 20000, ... }
-            let nominalTampil = "-";
-            if (nominals) {
-                const ditemukan = Object.values(nominals).find(n => n.DRIVER === d.DRIVER);
-                if (ditemukan) {
-                    nominalTampil = parseInt(ditemukan.NOMINAL).toLocaleString();
-                }
-            }
+            // AKSES LANGSUNG: Tidak perlu .find() lagi!
+            const n = nominals ? nominals[d.DRIVER] : null; 
+            const nominalTampil = n ? parseInt(n.NOMINAL).toLocaleString() : '-';
 
             tbody.innerHTML += `
                 <tr class="hover:bg-slate-50 transition-colors">
-                    <td class="py-3 px-3 text-center text-slate-400 font-mono">${indeks++}</td>
-                    <td class="py-3 px-3 font-bold text-slate-800 uppercase text-xs">${d.DRIVER || '-'}</td>
+                    <td class="py-3 px-3 text-center text-slate-400 font-mono">${index + 1}</td>
+                    <td class="py-3 px-3 font-bold text-slate-800 uppercase text-xs">${d.DRIVER}</td>
                     <td class="py-3 px-3 font-mono text-xs text-blue-600">${d.PLAT || '-'}</td>
                     <td class="py-3 px-3 text-xs">${d.ISI || '0'}</td>
                     <td class="py-3 px-3 text-xs">${d.HARGA_8_1 || '0'}</td>
                     <td class="py-3 px-3 text-xs">${d.HARGA_18 || '0'}</td>
                     <td class="py-3 px-3 font-bold text-emerald-600">${nominalTampil}</td>
                     <td class="py-3 px-3 text-center">
-                        <button class="text-amber-600 hover:bg-amber-100 p-1.5 rounded-lg transition-all" onclick="editDriver('${key}')">
+                        <button class="text-amber-600 hover:bg-amber-100 p-1.5 rounded-lg" onclick="editDriver('${key}')">
                             <i class="fa-solid fa-pen-to-square"></i>
                         </button>
                     </td>
                 </tr>
             `;
         });
-
-        if (badge) badge.innerHTML = `${indeks - 1} <span class="text-[9px] font-normal text-slate-500 ml-0.5">DRIVER</span>`;
-        
     } catch (err) {
-        console.error("Error loading driver data:", err);
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-red-500 font-bold">Gagal memuat data.</td></tr>`;
+        console.error("Error:", err);
     }
 }
 
