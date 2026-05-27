@@ -88,7 +88,7 @@ async function fetchWeather() {
         const humidityEl = document.getElementById("weather-humidity");
 
         if (iconEl) iconEl.innerHTML = ico;
-        if (infoEl) infoEl.innerText = `Semarang: ${Math.round(data.current.temperature_2m)}°C, ${txt}`;
+        if (infoEl) infoEl.innerText = `Semarang : ${Math.round(data.current.temperature_2m)}°C, ${txt}`;
         if (humidityEl) humidityEl.innerText = `• Kelembaban: ${data.current.relative_humidity_2m}%`;
     } catch {
         const infoEl = document.getElementById("weather-info");
@@ -276,6 +276,62 @@ function tutupmiuiAlert() {
     }
 }
 
+
+// Variabel penyimpan target aplikasi yang ingin dibuka
+// Konfigurasi Keamanan Lokal
+const APP_CONFIG = {
+    ADMIN_USER: "admin",
+    ADMIN_PASS: "adminwh2",
+    APLIKASI_KUNCI: ["APP_MASTER_DATA", "APP_REKAP_BLOK"] // List ID aplikasi yang dikunci
+};
+
+let pendingTargetApp = "";
+
+function requestAksesAplikasi(appId) {
+    // Cek apakah aplikasi ada di dalam daftar kunci
+    if (APP_CONFIG.APLIKASI_KUNCI.includes(appId)) {
+        // Jika terkunci, tampilkan modal
+        pendingTargetApp = appId;
+        document.getElementById('modal-admin-lock').classList.remove('hidden');
+    } else {
+        // Jika tidak ada dalam daftar, langsung buka
+        bukaAplikasi(appId);
+    }
+}
+
+function cekLoginAdmin() {
+    const u = document.getElementById('admin-user').value;
+    const p = document.getElementById('admin-pass').value;
+
+    if (u === APP_CONFIG.ADMIN_USER && p === APP_CONFIG.ADMIN_PASS) {
+        // Berhasil Login
+        document.getElementById('modal-admin-lock').classList.add('hidden');
+        bukaAplikasi(pendingTargetApp);
+        
+        // Reset input
+        document.getElementById('admin-user').value = "";
+        document.getElementById('admin-pass').value = "";
+    } else {
+        // Gagal Login
+        miuiAlert("Username atau password salah! Akses ditolak.");
+    }
+}
+
+function closeModalAdmin() {
+    document.getElementById('modal-admin-lock').classList.add('hidden');
+}
+
+function bukaAplikasi(appId) {
+    console.log("Akses diberikan untuk:", appId);
+    
+   if (appId === 'APP_MASTER_DATA') {
+        bukaSubPageBankData(); // Memanggil fungsi master data
+    } else if (appId === 'APP_REKAP_BLOK') {
+        bukaSubPageRekapBlok(); // Memanggil fungsi rekap blok
+    }
+    
+}
+
 // =========================================================================
 // BRIDGE INTERFACE: EKSPOS SEMUA FUNGSI KE GLOBAL WINDOW (WAJIB JIKA MODULE)
 // =========================================================================
@@ -286,6 +342,9 @@ window.tutupModalRakKosong = tutupModalRakKosong;
 window.eksekusiCetakRakKosong = eksekusiCetakRakKosong;
 window.miuiAlert = miuiAlert;
 window.tutupmiuiAlert = tutupmiuiAlert;
+window.requestAksesAplikasi = requestAksesAplikasi;
+window.cekLoginAdmin = cekLoginAdmin;
+window.closeModalAdmin = closeModalAdmin;
 
 // RUNNING ROBOT CLOUD PRINTER PADA LAYAR PC UTAMA KANTOR
 document.addEventListener("DOMContentLoaded", () => {
