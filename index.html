@@ -73,7 +73,7 @@
 
             <div class="mt-4 bg-slate-900/60 border border-white/10 px-4 py-1.5 rounded-full flex items-center gap-2.5 text-[11px] text-slate-300 shadow-md">
                 <span id="weather-icon" class="flex items-center"><i class="fa-solid fa-shadow-rotate animate-spin text-sky-400"></i></span>
-                <span id="weather-info">Memuat ramalan cuaca lapangan...</span>
+                <span id="weather-info">Memuat lokasi prakiraan cuaca...</span>
                 <span id="weather-humidity" class="opacity-100"></span>
             </div>
         </div>
@@ -160,7 +160,8 @@
                 <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Klaim</span>
             </div>
 
-            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="bukaSubPageRekapBlok()">
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" 
+                onclick="requestAksesAplikasi('APP_REKAP_BLOK')">
                 <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
                     <img src="img/blok.png" alt="Rekap Blok" class="w-full h-full object-cover">
                 </div>
@@ -271,7 +272,7 @@
         </nav>
     </div>
 
-    <div id="miui-global-miuiAlert" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-[100] p-6 select-none animate-fade-in">
+    <div id="miui-global-miuiAlert" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-[10000] p-6 select-none animate-fade-in">
         <div class="bg-[#e4e4e4] w-full max-w-[260px] rounded-[14px] overflow-hidden shadow-2xl border border-[#b2b2b2] flex flex-col font-sans text-slate-800">
             
             <div class="bg-gradient-to-b from-[#323232] to-[#202020] px-4 py-2.5 flex items-center border-b border-[#151515]">
@@ -308,7 +309,6 @@
     <div id="subpage-rekap-blok-container"></div>
     <div id="bank-data-container"></div>
 
-
     <div id="subpage-setelan" class="hidden fixed inset-0 bg-[#f4f4f4] flex flex-col z-50 select-none font-sans">
         <div class="w-full bg-[#222222] text-gray-300 text-xs px-4 py-1 flex justify-between items-center border-b border-black/20">
             <div class="flex items-center gap-2 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
@@ -343,7 +343,8 @@
                         <i class="fa-solid fa-chevron-right text-[10px]"></i>
                     </div>
                 </div>
-                <div class="miui-item cursor-pointer active:bg-slate-100/80 transition-all" onclick="bukaSubPageBankData()">
+                <div class="miui-item cursor-pointer active:bg-slate-100/80 transition-all" 
+                    onclick="requestAksesAplikasi('APP_MASTER_DATA')">
                     <div class="flex items-center gap-3">
                         <div class="miui-icon-wrapper bg-[#2a67e0]"><i class="fa-solid fa-database"></i></div>
                         <span class="miui-item-text">Master Data</span>
@@ -444,6 +445,23 @@
                         class="py-3 text-center text-xs font-bold text-white bg-gradient-to-b from-[#ff8b00] to-[#f36c00] active:from-[#e56000] active:to-[#d65500] shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] transition-all">
                     Cetak
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-admin-lock" class="fixed inset-0 z-[9999] hidden flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl">
+            <h3 class="text-lg font-black text-slate-800 mb-1"><i class="fa-solid fa-lock text-orange-500"></i> AKSES TERKUNCI</h3>
+            <p class="text-[11px] text-slate-500 mb-4 uppercase font-bold">Masukkan username dan password.</p>
+            
+            <div class="space-y-3">
+                <input type="text" id="admin-user" placeholder="Username" class="w-full px-4 py-2 text-slate-600 border rounded-lg text-sm">
+                <input type="password" id="admin-pass" placeholder="Password" class="w-full px-4 py-2 text-slate-600 border rounded-lg text-sm">
+            </div>
+            
+            <div class="mt-6 flex gap-2">
+                <button onclick="cekLoginAdmin()" class="flex-1 py-2 bg-orange-500 text-white font-bold rounded-lg text-xs">BUKA AKSES</button>
+                <button onclick="closeModalAdmin()" class="px-4 py-2 bg-gray-200 text-slate-600 font-bold rounded-lg text-xs">BATAL</button>
             </div>
         </div>
     </div>
