@@ -57,7 +57,7 @@
                         <span id="title-mode-form-bd" class="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
                             <i class="fa-solid fa-square-plus text-orange-500 text-sm"></i> Tambah Kode Barang Baru
                         </span>
-                        <span id="badge-mode-bd" class="text-[9px] font-black text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded uppercase tracking-wider">BARU</span>
+                        <span id="badge-mode-bd" class="text-[9px] font-black text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded uppercase tracking-wider">KODE BARU</span>
                     </div>
 
                     <form id="form-master-general-bd" onsubmit="event.preventDefault();" class="p-4">
@@ -89,7 +89,7 @@
                                 <input type="text" id="tx-nama-barang-bd" placeholder="Masukkan nama item deskriptif..." class="w-full px-3 py-2 text-xs font-semibold uppercase border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 bg-gray-50/50 transition-all">
                             </div>
                             <div class="flex flex-col gap-1 w-1/4">
-                                <label class="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Qty Utuhan(Karton)</label>
+                                <label class="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Qty Utuhan (Karton)</label>
                                 <div class="relative flex items-center">
                                     <input type="number" id="tx-qty-utuhan-bd" min="0" placeholder="0" class="w-full px-3 py-2 text-xs font-mono font-bold border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 bg-gray-50/50 transition-all">
                                     <span class="absolute right-3 text-[10px] font-bold text-slate-400">KRT</span>
@@ -125,7 +125,7 @@
 
                 <div class="w-full bg-white rounded-xl border border-gray-300 shadow-[0_2px_4px_rgba(0,0,0,0.06)] overflow-hidden">
                     <div class="px-3.5 py-2.5 bg-gradient-to-r from-gray-50 to-slate-50 border-b border-gray-200 flex justify-between items-center">
-                        <span id="txt-table-header-title-bd" class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Database Master Register Kode</span>
+                        <span id="txt-table-header-title-bd" class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Database Register Master Kode</span>
                         <span id="info-total-item-bd" class="text-xs font-mono font-black text-slate-800 bg-slate-200/60 px-2 py-0.5 rounded">
                             0 <span class="text-[9px] font-normal text-slate-500 ml-0.5">ITEM</span>
                         </span>
@@ -158,73 +158,125 @@
             </div>
 
             <div class="w-1/3 p-3.5 space-y-4">
-                <div id="box-workspace-input-driver" class="w-full bg-amber-50/40 rounded-xl border border-amber-300 shadow-[0_2px_4px_rgba(0,0,0,0.06)] overflow-hidden transition-all duration-300 p-4 mb-4">
-                    <div class="mb-4">
-                        <h3 class="text-sm font-bold text-gray-700 mb-3"><i class="fa-solid fa-truck text-amber-500"></i> TAMBAH DATA DRIVER</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
-                            <input type="text" id="tx-driver-nama" placeholder="NAMA DRIVER" class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm">
-                            <input type="text" id="tx-driver-plat" placeholder="PLAT NOMOR (CONTOH: UTH - H 9295 LQ)" class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm">
-                            <input type="number" id="tx-driver-isi" placeholder="ISI (KAPASITAS BOX)" class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm">
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <input type="number" id="tx-harga-81" placeholder="TARIF KE BLOK 8/1" class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm">
-                            <input type="number" id="tx-harga-18" placeholder="TARIF KE BLOK 18" class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm">
-                        </div>
+                <div id="box-workspace-input-driver" class="w-full bg-white rounded-xl border border-gray-300 shadow-[0_2px_4px_rgba(0,0,0,0.06)] overflow-hidden transition-all duration-300">
+                    <div class="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                        <span class="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+                            <i class="fa-solid fa-truck text-amber-500 text-sm"></i> Tambah Data Driver
+                        </span>
+                        <span class="text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded uppercase tracking-wider">DRIVER</span>
                     </div>
-                    <div class="flex gap-2">
-                        <button type="button" id="btn-submit-driver" onclick="simpanDataDriverBD()" 
-                            class="flex-1 py-2.5 text-white font-black text-xs rounded-xl shadow-md active:scale-[0.98] transition-all uppercase tracking-widest"
-                            style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #ea580c;">
-                            TAMBAH DRIVER
-                        </button>
-                        <button type="button" onclick="resetFormDriverBD()" class="px-6 py-2.5 bg-[#666666] hover:bg-[#555555] text-white font-black text-xs rounded-xl shadow-md border border-[#444444] active:scale-[0.98] transition-all uppercase tracking-widest">
-                            BATAL
-                        </button>
-                    </div>
+
+                    <form id="form-driver-bd" onsubmit="event.preventDefault();" class="p-4 space-y-3.5">
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div class="flex flex-col gap-1">
+                                <label class="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Nama Driver</label>
+                                <input type="text" id="tx-driver-nama" placeholder="Contoh: JONI" class="w-full px-3 py-2 text-xs font-bold uppercase border border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100 bg-gray-50/50 transition-all">
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <label class="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Ekspedisi - Plat Nomor</label>
+                                <input type="text" id="tx-driver-plat" placeholder="Contoh: UTH - H 9295 LQ" class="w-full px-3 py-2 text-xs font-mono font-bold uppercase border border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100 bg-gray-50/50 transition-all">
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <label class="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Isi (Kapasitas Palet)</label>
+                                <div class="relative flex items-center">
+                                    <input type="number" id="tx-driver-isi" min="0" placeholder="0" class="w-full px-3 py-2 text-xs font-mono font-bold border border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100 bg-gray-50/50 transition-all">
+                                    <span class="absolute right-3 text-[10px] font-bold text-slate-400">PALET</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="flex flex-col gap-1">
+                                <label class="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Tarif Ke Blok 8/1</label>
+                                <div class="relative flex items-center">
+                                    <span class="absolute left-3 text-[10px] font-bold text-slate-400">RP</span>
+                                    <input type="number" id="tx-harga-81" placeholder="50.000" class="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold border border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100 bg-gray-50/50 transition-all">
+                                </div>
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <label class="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Tarif Ke Blok 18</label>
+                                <div class="relative flex items-center">
+                                    <span class="absolute left-3 text-[10px] font-bold text-slate-400">RP</span>
+                                    <input type="number" id="tx-harga-18" placeholder="60.000" class="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold border border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100 bg-gray-50/50 transition-all">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-2 flex items-center gap-2.5">
+                            <button type="button" id="btn-submit-driver" onclick="simpanDataDriverBD()" 
+                                    class="flex-1 py-2.5 text-white font-black text-xs rounded-xl shadow-md active:scale-[0.98] transition-all uppercase tracking-widest"
+                                    style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #ea580c;">
+                                TAMBAH DRIVER
+                            </button>
+                            <button type="button" onclick="resetFormDriverBD()" class="px-6 py-2.5 bg-[#666666] hover:bg-[#555555] text-white font-black text-xs rounded-xl shadow-md border border-[#444444] active:scale-[0.98] transition-all uppercase tracking-widest">
+                                BATAL
+                            </button>
+                        </div>
+                    </form>
                 </div>
 
-                <div id="box-workspace-input-nominal" class="w-full bg-amber-50/40 rounded-xl border border-amber-300 shadow-[0_2px_4px_rgba(0,0,0,0.06)] overflow-hidden transition-all duration-300 p-4 mb-6">
-                    <h3 class="text-sm font-bold text-gray-700 mb-3"><i class="fa-solid fa-money-bill text-amber-600"></i> Setelan Nominal & Terbilang</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-                        <input type="number" id="tx-nominal" placeholder="NOMINAL (RUPIAH)" class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm">
-                        <input type="text" id="tx-terbilang" placeholder="TERBILANG (CONTOH: DUA PULUH RIBU)" class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm">
+                <div id="box-workspace-input-nominal" class="w-full bg-white rounded-xl border border-gray-300 shadow-[0_2px_4px_rgba(0,0,0,0.06)] overflow-hidden transition-all duration-300">
+                    <div class="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                        <span class="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+                            <i class="fa-solid fa-money-bill text-amber-600 text-sm"></i> Setelan Nominal & Terbilang
+                        </span>
+                        <span class="text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded uppercase tracking-wider">NOMINAL</span>
                     </div>
-                    <div class="flex gap-2">
-                        <button type="button" id="btn-submit-nominal" onclick="simpanNominalDriverBD()" 
-                            class="flex-1 py-2.5 text-white font-black text-xs rounded-xl shadow-md active:scale-[0.98] transition-all uppercase tracking-widest"
-                            style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #ea580c;">
-                            TAMBAH NOMINAL
-                        </button>
-                        <button type="button" onclick="resetFormNominalBD()" class="px-6 py-2.5 bg-[#666666] hover:bg-[#555555] text-white font-black text-xs rounded-xl shadow-md border border-[#444444] active:scale-[0.98] transition-all uppercase tracking-widest">
-                            BATAL
-                        </button>
-                    </div>
+
+                    <form id="form-nominal-bd" onsubmit="event.preventDefault();" class="p-4 space-y-3.5">
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div class="flex flex-col gap-1">
+                                <label class="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Isi Nominal</label>
+                                <div class="relative flex items-center">
+                                    <span class="absolute left-3 text-[10px] font-bold text-slate-400">RP</span>
+                                    <input type="number" id="tx-nominal" placeholder="20.000" class="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold border border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100 bg-gray-50/50 transition-all">
+                                </div>
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <label class="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Isi Terbilang</label>
+                                <input type="text" id="tx-terbilang" placeholder="DUA PULUH RIBU RUPIAH" class="w-full px-3 py-2 text-xs font-bold uppercase border border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100 bg-gray-50/50 transition-all">
+                            </div>
+                        </div>
+
+                        <div class="pt-2 flex items-center gap-2.5">
+                            <button type="button" id="btn-submit-nominal" onclick="simpanNominalDriverBD()" 
+                                    class="flex-1 py-2.5 text-white font-black text-xs rounded-xl shadow-md active:scale-[0.98] transition-all uppercase tracking-widest"
+                                    style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #ea580c;">
+                                TAMBAH NOMINAL
+                            </button>
+                            <button type="button" onclick="resetFormNominalBD()" class="px-6 py-2.5 bg-[#666666] hover:bg-[#555555] text-white font-black text-xs rounded-xl shadow-md border border-[#444444] active:scale-[0.98] transition-all uppercase tracking-widest">
+                                BATAL
+                            </button>
+                        </div>
+                    </form>
                 </div>
 
                 <div class="w-full bg-white rounded-xl border border-gray-300 shadow-[0_2px_4px_rgba(0,0,0,0.06)] overflow-hidden">
                     <div class="px-3.5 py-2.5 bg-gradient-to-r from-gray-50 to-slate-50 border-b border-gray-200 flex justify-between items-center">
                         <span class="text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                            <i class="fa-solid fa-truck mr-1"></i> Database Master Register Driver & Nominal
-                        </span>
-                        <span id="info-total-driver-bd" class="text-xs font-mono font-black text-slate-800 bg-slate-200/60 px-2 py-0.5 rounded">
-                            0 <span class="text-[9px] font-normal text-slate-500 ml-0.5">DRIVER</span>
+                            <i class="fa-solid fa-truck mr-1"></i> Database Master Register Driver & Nominal <i class="fa-solid fa-money-bill mr-1"></i>
                         </span>
                     </div>
 
                     <div class="w-full bg-white rounded-xl border border-gray-300 shadow-[0_2px_4px_rgba(0,0,0,0.06)] overflow-hidden mb-8">
                         <div class="px-3.5 py-2.5 bg-gradient-to-r from-gray-50 to-slate-50 border-b border-gray-200">
-                            <span class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Database Master Register Driver</span>
+                            <span class="fa-solid fa-truck mr-1 text-[10px] font-black text-slate-500 uppercase tracking-wider"> Database Register Master Driver</span>
+                            <span id="info-total-driver-bd" class="text-xs font-mono font-black text-slate-800 bg-slate-200/60 px-2 py-0.5 rounded">
+                                0 <span class="text-[9px] font-normal text-slate-500 ml-0.5">DRIVER</span>
+                            </span>
                         </div>
                         <div class="overflow-x-auto max-h-[300px]">
                             <table class="w-full text-left border-collapse">
                                 <thead class="bg-slate-50 sticky top-0 z-10">
                                     <tr class="text-[10px] text-slate-500 uppercase">
-                                        <th class="py-2.5 px-3 border-b">No</th>
-                                        <th class="py-2.5 px-3 border-b">Driver</th>
-                                        <th class="py-2.5 px-3 border-b">Plat</th>
-                                        <th class="py-2.5 px-3 border-b">Isi</th>
-                                        <th class="py-2.5 px-3 border-b">Trf 8-1</th>
-                                        <th class="py-2.5 px-3 border-b">Trf 18</th>
+                                        <th class="py-2.5 px-3 border-b">Nomor</th>
+                                        <th class="py-2.5 px-3 border-b">Nama Driver</th>
+                                        <th class="py-2.5 px-3 border-b">Ekspedisi - Plat</th>
+                                        <th class="py-2.5 px-3 border-b">Isi Kargo</th>
+                                        <th class="py-2.5 px-3 border-b">Tarif Blok 8/1</th>
+                                        <th class="py-2.5 px-3 border-b">Tarif Blok 18</th>
                                         <th class="py-2.5 px-3 border-b text-center">Aksi</th>
                                     </tr>
                                 </thead>
@@ -236,7 +288,10 @@
 
                     <div class="w-full bg-white rounded-xl border border-gray-300 shadow-[0_2px_4px_rgba(0,0,0,0.06)] overflow-hidden">
                         <div class="px-3.5 py-2.5 bg-gradient-to-r from-gray-50 to-slate-50 border-b border-gray-200">
-                            <span class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Database Master Register Nominal</span>
+                            <span class="fa-solid fa-money-bill mr-1 text-[10px] font-black text-slate-500 uppercase tracking-wider"> Database Register Master Nominal</span>
+                            <span id="info-total-item-nominal" class="text-xs font-mono font-black text-slate-800 bg-slate-200/60 px-2 py-0.5 rounded">
+                                0 <span class="text-[9px] font-normal text-slate-500 ml-0.5">ITEM</span>
+                            </span>
                         </div>
                         <div class="overflow-x-auto max-h-[300px]">
                             <table class="w-full text-left border-collapse">
@@ -257,38 +312,57 @@
             </div>
 
             <div class="w-1/3 p-3.5 space-y-4">
-                <div id="box-workspace-input-tujuan" class="w-full bg-amber-50/40 rounded-xl border border-amber-300 shadow-[0_2px_4px_rgba(0,0,0,0.06)] p-4 mb-4">
-                    <h3 class="text-sm font-bold text-gray-700 mb-3"><i class="fa-solid fa-location-dot text-amber-500"></i> TAMBAH DATA TUJUAN</h3>
-                    <div class="grid grid-cols-1 gap-4 mb-3">
-                        <input type="text" id="tx-tujuan-nama" placeholder="NAMA TUJUAN" class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm">
-                        <input type="text" id="tx-tujuan-kota" placeholder="NAMA KOTA" class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm">
+                <div id="box-workspace-input-tujuan" class="w-full bg-white rounded-xl border border-gray-300 shadow-[0_2px_4px_rgba(0,0,0,0.06)] overflow-hidden transition-all duration-300">
+                    <div class="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                        <span class="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+                            <i class="fa-solid fa-location-dot text-amber-600 text-sm"></i> Tambah Data Tujuan
+                        </span>
+                        <span class="text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded uppercase tracking-wider">TUJUAN</span>
                     </div>
-                    <div class="flex gap-2">
-                        <button type="button" id="btn-submit-tujuan" onclick="simpanDataTujuanBD()" 
-                            class="flex-1 py-2.5 text-white font-black text-xs rounded-xl shadow-md active:scale-[0.98] transition-all uppercase tracking-widest"
-                            style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #ea580c;">
-                            TAMBAH TUJUAN
-                        </button>
-                        <button type="button" onclick="resetFormTujuanBD()" class="px-6 py-2.5 bg-[#666666] hover:bg-[#555555] text-white font-black text-xs rounded-xl shadow-md border border-[#444444] active:scale-[0.98] transition-all uppercase tracking-widest">
-                            BATAL
-                        </button>
-                    </div>
+
+                    <form id="form-tujuan-bd" onsubmit="event.preventDefault();" class="p-4 space-y-3.5">
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div class="flex flex-col gap-1">
+                                <label class="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Nama Tujuan</label>
+                                <input type="text" id="tx-tujuan-nama" placeholder="Contoh: DEPO SEMARANG" class="w-full px-3 py-2 text-xs font-bold uppercase border border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100 bg-gray-50/50 transition-all">
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <label class="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Kota Tujuan</label>
+                                <input type="text" id="tx-tujuan-kota" placeholder="Contoh: SEMARANG" class="w-full px-3 py-2 text-xs font-bold uppercase border border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100 bg-gray-50/50 transition-all">
+                            </div>
+                        </div>
+
+                        <div class="pt-2 flex items-center gap-2.5">
+                            <button type="button" id="btn-submit-tujuan" onclick="simpanDataTujuanBD()" 
+                                    class="flex-1 py-2.5 text-white font-black text-xs rounded-xl shadow-md active:scale-[0.98] transition-all uppercase tracking-widest"
+                                    style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #ea580c;">
+                                TAMBAH TUJUAN
+                            </button>
+                            <button type="button" onclick="resetFormTujuanBD()" class="px-6 py-2.5 bg-[#666666] hover:bg-[#555555] text-white font-black text-xs rounded-xl shadow-md border border-[#444444] active:scale-[0.98] transition-all uppercase tracking-widest">
+                                BATAL
+                            </button>
+                        </div>
+                    </form>
                 </div>
 
                 <div class="w-full bg-white rounded-xl border border-gray-300 shadow-[0_2px_4px_rgba(0,0,0,0.06)] overflow-hidden">
                     <div class="px-3.5 py-2.5 bg-gradient-to-r from-gray-50 to-slate-50 border-b border-gray-200 flex justify-between items-center">
                         <span class="text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                            <i class="fa-solid fa-location-dot mr-1 text-amber-600"></i> Database Master Register Tujuan
+                            <i class="fa-solid fa-location-dot mr-1 text-amber-600"></i> Database Register Master Tujuan
                         </span>
+                        <span id="info-total-tujuan-bd" class="text-xs font-mono font-black text-slate-800 bg-slate-200/60 px-2 py-0.5 rounded">
+                                0 <span class="text-[9px] font-normal text-slate-500 ml-0.5">TUJUAN</span>
+                            </span>
                     </div>
 
                     <div class="overflow-x-auto max-h-[380px]">
                         <table class="w-full text-left border-collapse">
                             <thead class="bg-slate-50 sticky top-0 z-10 border-b border-gray-200">
                                 <tr class="text-[10px] text-slate-500 uppercase tracking-wider">
-                                    <th class="py-3 px-3 text-center">No</th>
-                                    <th class="py-3 px-3">Tujuan</th>
-                                    <th class="py-3 px-3">Kota</th>
+                                    <th class="py-3 px-3 text-center">Nomor</th>
+                                    <th class="py-3 px-3">Nama Tujuan</th>
+                                    <th class="py-3 px-3">Kota Tujuan</th>
                                     <th class="py-3 px-3 text-center">Aksi</th>
                                 </tr>
                             </thead>
