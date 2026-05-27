@@ -255,22 +255,24 @@ function aktifkanCloudPrintEngine() {
 }
 
 // =========================================================================
-// 6. SYSTEM COMPONENT: CUSTOM NOTIF ALERT ENGINE (MIUI V5 SPEC)
+// 6. SYSTEM COMPONENT: CUSTOM NOTIF miuiAlert ENGINE (MIUI V5 SPEC)
 // =========================================================================
 function miuiAlert(pesan) {
-    const boxAlert = document.getElementById('miui-global-alert');
-    const teksAlert = document.getElementById('miui-alert-message');
-    
-    if (boxAlert && teksAlert) {
-        teksAlert.innerText = pesan; 
-        boxAlert.classList.remove('hidden'); 
-    }
+    const box = document.getElementById('miui-global-miuiAlert');
+    const teks = document.getElementById('miui-miuiAlert-message');
+    const contOk = document.getElementById('miui-container-ok');
+    const contConfirm = document.getElementById('miui-container-confirm');
+
+    teks.innerText = pesan;
+    contOk.classList.remove('hidden');    // Tampilkan OK
+    contConfirm.classList.add('hidden'); // Sembunyikan Ya/Batal
+    box.classList.remove('hidden');
 }
 
-function tutupMiuiAlert() {
-    const boxAlert = document.getElementById('miui-global-alert');
-    if (boxAlert) {
-        boxAlert.classList.add('hidden'); 
+function tutupmiuiAlert() {
+    const boxmiuiAlert = document.getElementById('miui-global-miuiAlert');
+    if (boxmiuiAlert) {
+        boxmiuiAlert.classList.add('hidden'); 
     }
 }
 
@@ -283,7 +285,7 @@ window.bukaModalRakKosong = bukaModalRakKosong;
 window.tutupModalRakKosong = tutupModalRakKosong;
 window.eksekusiCetakRakKosong = eksekusiCetakRakKosong;
 window.miuiAlert = miuiAlert;
-window.tutupMiuiAlert = tutupMiuiAlert;
+window.tutupmiuiAlert = tutupmiuiAlert;
 
 // RUNNING ROBOT CLOUD PRINTER PADA LAYAR PC UTAMA KANTOR
 document.addEventListener("DOMContentLoaded", () => {
@@ -331,7 +333,7 @@ function bukaSubPageRekapBlok() {
         })
         .catch(error => {
             console.error(error);
-            alert("Sistem Gagal Memuat Template Rekap Blok dari Server GitHub!");
+            miuiAlert("Sistem Gagal Memuat Template Rekap Blok dari Server GitHub!");
         });
 }
 
@@ -501,19 +503,18 @@ window.hitungKonversiKartonOtomatis = function(valPalet) {
 
 // 4. ACTION UTILITY BUTTONS
 window.exportRekapBlokPDF = function() {
-    alert("Memproses Export File PDF untuk Rekapitulasi Data Blok... Selesai!");
+    miuiAlert("Memproses Export File PDF untuk Rekapitulasi Data Blok... Selesai!");
 }
 
 
 // ==========================================================================
-// REGISTRASI NAVIGASI UTAMA LAUNCHER SUB-PAGE SETELAN (v3.6.1)
+// REGISTRASI NAVIGASI UTAMA LAUNCHER SUB-PAGE SETELAN
 // ==========================================================================
 
 let isBankDataLoaded = false;
 
 /**
  * Membuka Sub-Page Bank Data dari Menu Setelan (Fetch Modular Mode)
- * Dipicu oleh: Tombol Bank Data di menu Setelan Anda
  */
 async function bukaSubPageBankData() {
     const container = document.getElementById("bank-data-container");
@@ -524,7 +525,6 @@ async function bukaSubPageBankData() {
     }
 
     try {
-        // Jika modul belum pernah di-load, lakukan proses penarikan berkas eksternal
         if (!isBankDataLoaded) {
             
             // 1. Fetch dan suntik file arsitektur HTML Halaman
@@ -532,17 +532,16 @@ async function bukaSubPageBankData() {
             if (!htmlRes.ok) throw new Error("Gagal memuat komponen HTML Bank Data");
             container.innerHTML = await htmlRes.text();
 
-            // 2. Suntik berkas CSS khusus ke dalam <head> dokumen secara dinamis
+            // 2. Suntik berkas CSS
             const linkCSS = document.createElement("link");
             linkCSS.rel = "stylesheet";
             linkCSS.href = "css/bank-data.css";
             document.head.appendChild(linkCSS);
 
-            // 3. Suntik berkas Javascript operasional ke dalam body dokumen secara dinamis
+            // 3. Suntik berkas Javascript
             const scriptJS = document.createElement("script");
             scriptJS.src = "js/bank-data.js";
             
-            // Pastikan skrip js selesai dibaca penuh oleh browser sebelum mengeksekusi fungsi di dalamnya
             await new Promise((resolve) => {
                 scriptJS.onload = resolve;
                 document.body.appendChild(scriptJS);
@@ -551,7 +550,7 @@ async function bukaSubPageBankData() {
             isBankDataLoaded = true;
         }
 
-        // 4. Jalankan efek transisi visual geser masuk (Slide-In) dengan jeda aman 50ms
+        // 4. Jalankan efek transisi visual
         setTimeout(() => {
             const subPage = document.getElementById("subpage-bank-data");
             if (subPage) {
@@ -559,20 +558,31 @@ async function bukaSubPageBankData() {
                 subPage.classList.add("translate-x-0");
             }
             
-            // Ambil data live pertama kali dari Firebase untuk merender tabel database
-            if (typeof window.muatDataDariFirebase === "function") {
-                window.muatDataDariFirebase();
-            }
+            // PERUBAHAN UTAMA: Memanggil fungsi sinkronisasi semua database master
+            sinkronisasiSemuaDataMaster();
         }, 50);
 
     } catch (error) {
         console.error("Gagal menjalankan modul modular:", error);
-        alert("Sistem gagal memuat komponen Setelan Bank Data.");
+        miuiAlert("Sistem gagal memuat komponen Setelan Bank Data.");
     }
 }
 
 /**
- * Menutup halaman Bank Data (Slide-Out kembali ke arah kanan)
+ * Fungsi untuk memicu semua pemuat data agar sinkron
+ */
+function sinkronisasiSemuaDataMaster() {
+    // Memanggil ketiga fungsi pemuat dari file bank-data.js
+    if (typeof window.muatDataDariFirebase === "function") window.muatDataDariFirebase();
+    if (typeof window.muatDataDriver === "function") window.muatDataDriver();
+    if (typeof window.muatDataNominal === "function") window.muatDataNominal();
+    if (typeof window.muatDataTujuanDariFirebase === "function") window.muatDataTujuanDariFirebase();
+    
+    console.log("Semua data master (Driver, Nominal, Tujuan) berhasil dimuat.");
+}
+
+/**
+ * Menutup halaman Bank Data
  */
 function tutupSubPageBankData() {
     const subPage = document.getElementById("subpage-bank-data");
@@ -585,3 +595,4 @@ function tutupSubPageBankData() {
 // EKSPOS KE WINDOW GLOBAL SCOPE
 window.bukaSubPageBankData = bukaSubPageBankData;
 window.tutupSubPageBankData = tutupSubPageBankData;
+window.sinkronisasiSemuaDataMaster = sinkronisasiSemuaDataMaster;

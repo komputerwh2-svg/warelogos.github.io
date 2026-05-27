@@ -7,6 +7,88 @@ const BD_FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.fi
 // URL Web App Google Apps Script untuk sinkronisasi 2 arah ke Spreadsheet (Sheet KODE - 7 Kolom)
 const SPREADSHEET_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbw7t9pv3LXVP1GSGCua98RNIpvCWWeWcp5V_GFAX93tkyu9E1XhtwnUVDm2lf09SihwWA/exec";
 
+// Fungsi ganti switch mode bank data (Kode, Driver, Tujuan) dengan efek geser slider MIUI v5
+function gantiSwitchModeBankData(mode) {
+    const slider = document.getElementById('slider-content-bd');
+    
+    // Geser berdasarkan mode
+    if (mode === 'KODE') {
+        slider.style.transform = 'translateX(0%)';
+        setTimeout(tampilkanDropdownKelompok, 100);
+    } else if (mode === 'DRIVER') {
+        slider.style.transform = 'translateX(-33.333%)';
+    } else if (mode === 'TUJUAN') {
+        slider.style.transform = 'translateX(-66.666%)';
+    }
+
+    // Update Judul di Header utama
+    document.getElementById('txt-table-header-title-bd').innerText = `Database Master Register [${mode}]`;
+}
+
+// Mapping Kelompok Barang ke Cell Lokasi Warehouse (Contoh: MTR -> B60, PDR -> E60, dst.)
+const mappingKelompok = {
+    "MTR": "B60",
+    "PDR": "E60",
+    "MRMR": "G60",
+    "CRR / THR": "J59",
+    "MRR / CRR EA": "G59",
+    "MOR / MOB": "M59",
+    "MP / LTGR / MTGR": "M60",
+    "MJR": "J60"
+};
+
+function isiDropdownKelompok() {
+    const selectKelompok = document.getElementById("tx-kelompok-barang-bd");
+    
+    // Debug: Cek apakah elemen ditemukan
+    if (!selectKelompok) {
+        console.log("Error: Elemen #tx-kelompok-barang-bd tidak ditemukan di HTML!");
+        return;
+    }
+
+    // Pastikan tidak duplikat
+    selectKelompok.innerHTML = '<option value="">Pilih Kelompok</option>';
+
+    Object.keys(mappingKelompok).forEach(item => {
+        const option = document.createElement("option");
+        option.value = item;
+        option.textContent = item;
+        selectKelompok.appendChild(option);
+    });
+}
+
+// EKSEKUSI: Panggil fungsi segera saat file JS ini di-load oleh browser
+isiDropdownKelompok();
+
+function sinkronisasiCell() {
+    const kelompok = document.getElementById("tx-kelompok-barang-bd").value;
+    const inputCell = document.getElementById("tx-cell-barang-bd");
+    
+    if (kelompok && mappingKelompok[kelompok]) {
+        inputCell.value = mappingKelompok[kelompok];
+    } else {
+        inputCell.value = "";
+    }
+}
+
+// fungsi tampil dropdown kelompok dengan data dari mappingKelompok (untuk memastikan dropdown selalu terisi dengan opsi yang benar saat mode KODE aktif)
+function tampilkanDropdownKelompok() {
+    const selectKelompok = document.getElementById("tx-kelompok-barang-bd");
+    if (!selectKelompok) return;
+
+    // Bersihkan isi lama (agar tidak menumpuk)
+    selectKelompok.innerHTML = '<option value="">Pilih Kelompok</option>';
+
+    Object.keys(mappingKelompok).forEach(item => {
+        const option = document.createElement("option");
+        option.value = item;
+        option.textContent = item;
+        selectKelompok.appendChild(option);
+    });
+}
+
+
+
 /**
  * Mengunduh Data 'master_barang' secara utuh dari Firebase Realtime DB
  * Dan merendernya dengan kolom KELOMPOK serta CELL yang sudah melebur di dalamnya.
@@ -96,6 +178,9 @@ function muatDataDariFirebase() {
                             <button onclick="editBarangBD('${key}', '${inisialBarang.replace(/'/g, "\\'")}', '${kelompokBarang.replace(/'/g, "\\'")}', '${cellBarang.replace(/'/g, "\\'")}', '${namaItem.replace(/'/g, "\\'")}', ${kuantitas})" class="text-[10px] font-black text-blue-600 hover:bg-blue-100 p-1.5 rounded-lg transition-all">
                                 <i class="fa-solid fa-pen-to-square text-base"></i>
                             </button>
+                            <button onclick="hapusBarangBD('${key}', '${namaItem.replace(/'/g, "\\'")}')" class="text-[10px] font-black text-red-600 hover:bg-red-100 p-1.5 rounded-lg transition-all">
+                                <i class="fa-solid fa-trash-can text-base"></i>
+                            </button>
                         </td>
                     </tr>
                 `;
@@ -139,7 +224,7 @@ function simpanDataMasterBD() {
 
     // Validasi input wajib
     if (!kodeVal || !inisialVal || !kelompokVal || !cellVal || !namaVal) {
-        alert("Mohon lengkapi seluruh kolom input Kode, Inisial, Kelompok, Cell, dan Nama Barang!");
+        miuiAlert("Mohon lengkapi seluruh kolom input Kode, Inisial, Kelompok, Cell, dan Nama Barang!");
         return;
     }
 
@@ -182,7 +267,7 @@ function simpanDataMasterBD() {
         }
     })
     .then(() => {
-        alert("Data master KODE berhasil disimpan!");
+        miuiAlert("Data master KODE berhasil disimpan!");
         resetFormMasterBD();
         // Pastikan fungsi ini memuat ulang tabel khusus mode KODE
         if (typeof muatDataDariFirebase === 'function') {
@@ -191,7 +276,7 @@ function simpanDataMasterBD() {
     })
     .catch(err => {
         console.error(err);
-        alert("Terjadi masalah koneksi internet.");
+        miuiAlert("Terjadi masalah koneksi internet.");
     })
     .finally(() => {
         btnSubmit.innerText = txtAsli;
@@ -214,7 +299,7 @@ function ubahStatusAktifBarangBD(nodeKey, statusCentang) {
     })
     .catch(err => {
         console.error(err);
-        alert("Gagal merubah status item. Hubungkan kembali koneksi internet!");
+        miuiAlert("Gagal merubah status item. Hubungkan kembali koneksi internet!");
         document.getElementById(`toggle-${nodeKey}`).checked = !statusCentang;
     });
 }
@@ -258,6 +343,49 @@ function editBarangBD(kd, ins, klmpk, cl, nm, qt) {
 }
 
 /**
+ * Menghapus Form Kembali ke Mode Tambah Baru (Batal)
+ */
+function hapusBarangBD(key, namaBarang) {
+    // Menggunakan miuiConfirm sebagai pengganti confirm() native
+    miuiConfirm(`Yakin ingin menghapus barang: ${namaBarang}?`, function() {
+        
+        // 1. Hapus dari Firebase
+        fetch(`${BD_FIREBASE_URL}master_barang/${key}.json`, {
+            method: "DELETE"
+        })
+        .then(res => {
+            if (!res.ok) throw new Error("Gagal menghapus dari Firebase");
+
+            // 2. Sync Hapus ke Spreadsheet
+            if (typeof SPREADSHEET_WEBHOOK_URL !== 'undefined') {
+                fetch(SPREADSHEET_WEBHOOK_URL, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ 
+                        ACTION: "DELETE", 
+                        NAMA_BARANG: namaBarang,
+                        TIPE_DATA: "MASTER_KODE" 
+                    })
+                });
+            }
+        })
+        .then(() => {
+            miuiAlert("Data berhasil dihapus!");
+            // Refresh tabel
+            if (typeof muatDataDariFirebase === 'function') {
+                muatDataDariFirebase();
+            }
+        })
+        .catch(err => {
+            console.error("Error:", err);
+            miuiAlert("Gagal menghapus data.");
+        });
+        
+    }); // Akhir dari callback function
+}
+
+/**
  * Mereset Form Kembali ke Mode Tambah Baru (Batal)
  */
 function resetFormMasterBD() {
@@ -283,90 +411,236 @@ function resetFormMasterBD() {
     }
 }
 
-// js/bank-data.js
 
-const mappingKelompok = {
-    "MTR": "B60",
-    "PDR": "E60",
-    "MRMR": "G60",
-    "CRR / THR": "J59",
-    "MRR / CRR EA": "G59",
-    "MOR / MOB": "M59",
-    "MP / LTGR / MTGR": "M60",
-    "MJR": "J60"
-};
 
-function isiDropdownKelompok() {
-    const selectKelompok = document.getElementById("tx-kelompok-barang-bd");
-    
-    // Debug: Cek apakah elemen ditemukan
-    if (!selectKelompok) {
-        console.log("Error: Elemen #tx-kelompok-barang-bd tidak ditemukan di HTML!");
-        return;
+/**
+ * Fungsi Pemuat Data Driver (Mandiri)
+ */
+async function muatDataDriver() {
+    const tbody = document.getElementById("tabel-driver-terpisah");
+    const badgeTotal = document.getElementById("info-total-driver-bd");
+
+    if (!tbody) return;
+
+    try {
+        const response = await fetch(`${BD_FIREBASE_URL}master_driver.json`);
+        const drivers = await response.json();
+
+        tbody.innerHTML = "";
+        
+        if (!drivers) {
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center py-10 text-slate-400">Tidak ada data driver.</td></tr>`;
+            if (badgeTotal) badgeTotal.innerHTML = `0 <span class="text-[9px] font-normal text-slate-500">DRIVER</span>`;
+            return;
+        }
+
+        // 1. Ambil keys dan urutkan
+        const keys = Object.keys(drivers).sort((a, b) => {
+            const d1 = drivers[a];
+            const d2 = drivers[b];
+            
+            // Prioritas 1: Urutkan berdasarkan PLAT
+            const plat1 = (d1.PLAT || "").toUpperCase();
+            const plat2 = (d2.PLAT || "").toUpperCase();
+            
+            if (plat1 !== plat2) {
+                return plat1.localeCompare(plat2);
+            }
+            
+            // Prioritas 2: Jika PLAT sama, urutkan berdasarkan NAMA DRIVER
+            const name1 = (d1.DRIVER || "").toUpperCase();
+            const name2 = (d2.DRIVER || "").toUpperCase();
+            return name1.localeCompare(name2);
+        });
+        
+        // 2. Iterasi menggunakan keys yang sudah terurut
+        keys.forEach((key, index) => {
+            const d = drivers[key];
+            const platTampil = d.PLAT || '-';
+            const driverTampil = d.DRIVER.replace(/'/g, "\\'");
+            const platBersih = platTampil.replace(/'/g, "\\'");
+
+            tbody.innerHTML += `
+                <tr class="hover:bg-slate-50 transition-colors border-b">
+                    <td class="py-3 px-3 text-center text-slate-400 font-mono text-xs">${index + 1}</td>
+                    <td class="py-3 px-3 font-bold text-slate-800 uppercase text-xs">${d.DRIVER}</td>
+                    <td class="py-3 px-3 font-mono text-xs text-blue-600">${platTampil}</td>
+                    <td class="py-3 px-3 text-xs">${d.ISI || '0'}</td>
+                    <td class="py-3 px-3 text-xs">${d.HARGA_8_1 || '0'}</td>
+                    <td class="py-3 px-3 text-xs">${d.HARGA_18 || '0'}</td>
+                    <td class="py-3 px-3 text-center flex justify-center gap-1">
+                        <button class="text-amber-600 hover:bg-amber-100 p-1.5 rounded-lg" onclick="editDriver('${key}', '${driverTampil}', '${platBersih}', '${d.ISI}', '${d.HARGA_8_1}', '${d.HARGA_18}')">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                        <button class="text-red-600 hover:bg-red-100 p-1.5 rounded-lg" onclick="hapusDriver('${key}', '${driverTampil}')">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        if (badgeTotal) {
+            badgeTotal.innerHTML = `${keys.length} <span class="text-[9px] font-normal text-slate-500">DRIVER</span>`;
+        }
+
+    } catch (err) {
+        console.error("Error loading driver:", err);
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-10 text-red-500 font-bold"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Gagal sinkronisasi data.</td></tr>`;
     }
-
-    // Pastikan tidak duplikat
-    selectKelompok.innerHTML = '<option value="">Pilih Kelompok</option>';
-
-    Object.keys(mappingKelompok).forEach(item => {
-        const option = document.createElement("option");
-        option.value = item;
-        option.textContent = item;
-        selectKelompok.appendChild(option);
-    });
 }
 
-// EKSEKUSI: Panggil fungsi segera saat file JS ini di-load oleh browser
-isiDropdownKelompok();
-
-function sinkronisasiCell() {
-    const kelompok = document.getElementById("tx-kelompok-barang-bd").value;
-    const inputCell = document.getElementById("tx-cell-barang-bd");
-    
-    if (kelompok && mappingKelompok[kelompok]) {
-        inputCell.value = mappingKelompok[kelompok];
-    } else {
-        inputCell.value = "";
-    }
-}
-
-// Di bank-data.js
-function tampilkanDropdownKelompok() {
-    const selectKelompok = document.getElementById("tx-kelompok-barang-bd");
-    if (!selectKelompok) return;
-
-    // Bersihkan isi lama (agar tidak menumpuk)
-    selectKelompok.innerHTML = '<option value="">Pilih Kelompok</option>';
-
-    Object.keys(mappingKelompok).forEach(item => {
-        const option = document.createElement("option");
-        option.value = item;
-        option.textContent = item;
-        selectKelompok.appendChild(option);
-    });
-}
-
-function gantiSwitchModeBankData(mode) {
-    const slider = document.getElementById('slider-content-bd');
-    
-    // Geser berdasarkan mode
-    if (mode === 'KODE') {
-        slider.style.transform = 'translateX(0%)';
-        setTimeout(tampilkanDropdownKelompok, 100);
-    } else if (mode === 'DRIVER') {
-        slider.style.transform = 'translateX(-33.333%)';
-    } else if (mode === 'TUJUAN') {
-        slider.style.transform = 'translateX(-66.666%)';
-    }
-
-    // Update Judul di Header utama
-    document.getElementById('txt-table-header-title-bd').innerText = `Database Master Register [${mode}]`;
-}
+// Pastikan untuk mengekspos ke global scope
+window.muatDataDriver = muatDataDriver;
 
 /**
  * FUNGSI SIMPAN DRIVER & NOMINAL (Logika tidak diubah, hanya dirapikan)
  */
 function simpanDataDriverBD() {
+    const inDriver = document.getElementById("tx-driver-nama");
+    const inPlat   = document.getElementById("tx-driver-plat");
+    const inIsi    = document.getElementById("tx-driver-isi");
+    const inH81    = document.getElementById("tx-harga-81");
+    const inH18    = document.getElementById("tx-harga-18");
+
+    // Validasi elemen
+    if (!inDriver || !inPlat) return;
+
+    const payload = {
+        TIPE_DATA: "MASTER_DRIVER",
+        DRIVER: inDriver.value.trim().toUpperCase(),
+        PLAT: inPlat.value.trim().toUpperCase(),
+        ISI: inIsi ? inIsi.value.trim() : "0",
+        HARGA_8_1: inH81 ? inH81.value.trim() : "0",
+        HARGA_18: inH18 ? inH18.value.trim() : "0"
+    };
+
+    if (!payload.DRIVER || !payload.PLAT) {
+        miuiAlert("Data Driver & Plat wajib diisi!");
+        return;
+    }
+
+    const btnSubmit = document.getElementById("btn-submit-driver-bd"); // Pastikan ID ini ada di HTML Anda
+    const txtAsli = btnSubmit ? btnSubmit.innerText : "SIMPAN";
+    if (btnSubmit) {
+        btnSubmit.innerText = "MENYIMPAN...";
+        btnSubmit.disabled = true;
+    }
+
+    const cleanKey = payload.DRIVER.replace(/[\.\$\#\[\]\/]/g, "_");
+
+    // 1. Kirim ke Firebase
+    fetch(`${BD_FIREBASE_URL}master_driver/${cleanKey}.json`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("Gagal menyimpan ke server database.");
+        
+        // 2. Sync ke Spreadsheet
+        if (SPREADSHEET_DRIVER_WEBHOOK_URL) {
+            return fetch(SPREADSHEET_DRIVER_WEBHOOK_URL, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+        }
+    })
+    .then(() => {
+        miuiAlert("Data Driver berhasil disimpan!");
+        // Reset form jika ada fungsi reset-nya
+        if (typeof resetFormDriverBD === 'function') resetFormDriverBD();
+        
+        // Panggil pemuat data agar tabel ter-update otomatis
+        if (typeof muatDataDriver === 'function') {
+            muatDataDriver();
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        miuiAlert("Terjadi masalah koneksi internet saat menyimpan data.");
+    })
+    .finally(() => {
+        if (btnSubmit) {
+            btnSubmit.innerText = txtAsli;
+            btnSubmit.disabled = false;
+        }
+    });
+}
+
+/**
+ * Mode Edit Data Driver
+ * Dipicu oleh tombol edit pada baris tabel
+ */
+function editDriver(kd, drv, plt, isi, h81, h18) {
+    // 1. Referensi elemen form
+    const inDriver = document.getElementById("tx-driver-nama");
+    const inPlat   = document.getElementById("tx-driver-plat");
+    const inIsi    = document.getElementById("tx-driver-isi");
+    const inH81    = document.getElementById("tx-harga-81");
+    const inH18    = document.getElementById("tx-harga-18");
+    
+    // 2. UI Elements
+    const lblTitle = document.getElementById("title-mode-form-driver");
+    const lblBadge = document.getElementById("badge-mode-driver");
+    const btnAksi  = document.getElementById("btn-submit-driver-bd");
+    const panelBox = document.getElementById("box-workspace-input-driver");
+
+    if (inDriver) {
+        // Isi form dengan data yang dikirim dari tombol
+        inDriver.value = drv;
+        inDriver.readOnly = true; // Kunci agar tidak bisa mengubah Key utama
+        inPlat.value = plt;
+        inIsi.value = isi;
+        inH81.value = h81;
+        inH18.value = h18;
+
+        // 3. Ubah UI Mode Edit
+        if (lblTitle) lblTitle.innerHTML = `<i class="fa-solid fa-pen-to-square text-amber-600"></i> Ubah Data Driver`;
+        if (lblBadge) {
+            lblBadge.innerText = "EDIT";
+            lblBadge.className = "text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded uppercase tracking-wider";
+        }
+        
+        // 4. Ubah fungsi tombol menjadi Update
+        if (btnAksi) {
+            btnAksi.innerText = "SIMPAN PERUBAHAN";
+            btnAksi.onclick = function() {
+                // Mengambil nilai terbaru dari form untuk di-update
+                const payload = {
+                    TIPE_DATA: "MASTER_DRIVER",
+                    DRIVER: inDriver.value.trim().toUpperCase(),
+                    PLAT: inPlat.value.trim().toUpperCase(),
+                    ISI: inIsi.value.trim(),
+                    HARGA_8_1: inH81.value.trim(),
+                    HARGA_18: inH18.value.trim()
+                };
+
+                // Proses PUT ke Firebase menggunakan kd (Key) yang sudah dikirim
+                fetch(`${BD_FIREBASE_URL}master_driver/${kd}.json`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                })
+                .then(() => {
+                    miuiAlert("Data Driver berhasil diperbarui!");
+                    resetFormDriverBD();
+                    muatDataDriver(); // Refresh tabel
+                })
+                .catch(err => console.error("Error updating:", err));
+            };
+        }
+
+        if (panelBox) {
+            panelBox.className = "w-full bg-amber-50/40 rounded-xl border border-amber-300 shadow-[0_2px_4px_rgba(0,0,0,0.06)] overflow-hidden transition-all duration-300";
+        }
+    }
+}
+
+//fungsi untuk menyimpan perubahan data driver ke Firebase saat mode edit aktif
+function updateDriverKeFirebase(kd) {
     const payload = {
         TIPE_DATA: "MASTER_DRIVER",
         DRIVER: document.getElementById("tx-driver-nama").value.trim().toUpperCase(),
@@ -376,22 +650,56 @@ function simpanDataDriverBD() {
         HARGA_18: document.getElementById("tx-harga-18").value.trim()
     };
 
-    if (!payload.DRIVER || !payload.PLAT) return alert("Data Driver & Plat wajib diisi!");
-
-    fetch(`${BD_FIREBASE_URL}master_driver/${payload.DRIVER}.json`, {
-        method: "PUT",
+    fetch(`${BD_FIREBASE_URL}master_driver/${kd}.json`, {
+        method: "PUT", // Gunakan PUT agar data terupdate sepenuhnya
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
     }).then(() => {
-        fetch(SPREADSHEET_DRIVER_WEBHOOK_URL, {
-            method: "POST", mode: "no-cors",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        }).then(() => {
-            alert("Data Driver berhasil disimpan!");
-            muatDataDriverTerpadu(); // Panggil fungsi tunggal
-        });
+        miuiAlert("Data Driver berhasil diperbarui!");
+        resetFormDriverBD();
+        muatDataDriver();
     });
+}
+
+/**
+ * Menghapus Data Driver
+ */
+function hapusDriver(key, namaDriver) {
+    // Panggil miuiConfirm dan masukkan seluruh logika ke dalam function() {}
+    miuiConfirm(`Yakin ingin menghapus driver: ${namaDriver}?`, function() {
+        
+        console.log("Menghapus Firebase Key:", key); 
+
+        fetch(`${BD_FIREBASE_URL}master_driver/${key}.json`, {
+            method: "DELETE"
+        })
+        .then(res => {
+            if (!res.ok) throw new Error("Gagal menghapus dari Firebase");
+            return res.json();
+        })
+        .then(() => {
+            // Sync Hapus ke Spreadsheet
+            if (typeof SPREADSHEET_DRIVER_WEBHOOK_URL !== 'undefined') {
+                fetch(SPREADSHEET_DRIVER_WEBHOOK_URL, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ 
+                        ACTION: "DELETE", 
+                        DRIVER: namaDriver 
+                    })
+                });
+            }
+            
+            miuiAlert("Data berhasil dihapus!");
+            muatDataDriver(); // Refresh tabel
+        })
+        .catch(err => {
+            console.error("Error Detail:", err);
+            miuiAlert("Gagal menghapus data. Periksa konsol.");
+        });
+
+    }); // <-- Akhir dari callback function
 }
 
 /**
@@ -400,57 +708,270 @@ function simpanDataDriverBD() {
 function resetFormDriverBD() {
     // 1. Ambil elemen-elemen terkait
     const formDriver = document.getElementById("box-workspace-input-driver"); 
-    const btnAksi    = document.getElementById("btn-submit-driver");
+    // Sesuaikan ID menjadi btn-submit-driver-bd agar sinkron dengan fungsi simpan
+    const btnAksi    = document.getElementById("btn-submit-driver-bd"); 
     const h3Title    = document.querySelector("#box-workspace-input-driver h3");
+    const inDriver   = document.getElementById("tx-driver-nama");
 
     // 2. Bersihkan semua input di dalam box tersebut
     const inputs = document.querySelectorAll("#box-workspace-input-driver input");
     inputs.forEach(input => input.value = "");
 
-    // 3. Reset Teks Judul
+    // 3. Reset ReadOnly agar nama driver bisa diisi kembali
+    if (inDriver) inDriver.readOnly = false;
+
+    // 4. Reset Teks Judul
     if (h3Title) {
         h3Title.innerHTML = `<i class="fa-solid fa-truck text-amber-500"></i> TAMBAH DATA DRIVER`;
     }
 
-    // 4. Reset Teks Tombol
+    // 5. Reset Teks Tombol & Kembalikan fungsi simpan aslinya
     if (btnAksi) {
         btnAksi.innerText = "TAMBAH DRIVER";
-        btnAksi.onclick = function() { simpanDataDriverBD(); }; // Pastikan fungsi simpan kembali aktif
+        btnAksi.disabled = false; // Pastikan tombol aktif
+        btnAksi.onclick = function() { simpanDataDriverBD(); }; 
     }
 
-    // 5. Reset Style (jika sebelumnya ada perubahan warna saat mode edit)
+    // 6. Reset Style
     if (formDriver) {
-        formDriver.className = "w-full bg-amber-50/40 rounded-xl border border-amber-300 shadow-[0_2px_4px_rgba(0,0,0,0.06)] overflow-hidden transition-all duration-300 p-4 mb-4";
+        formDriver.className = "w-full bg-slate-50/50 rounded-xl border border-slate-200 shadow-sm overflow-hidden transition-all duration-300 p-4 mb-4";
     }
 }
 
+// Ekspos ke global scope
+window.resetFormDriverBD = resetFormDriverBD;
+
+
+/**
+ * Fungsi Pemuat Data Nominal (Mandiri)
+ */
+async function muatDataNominal() {
+    const tbody = document.getElementById("tabel-nominal-terpisah");
+    const badgeTotal = document.getElementById("info-total-item-nominal");
+
+    if (!tbody) return;
+
+    try {
+        const response = await fetch(`${BD_FIREBASE_URL}master_nominal.json`);
+        const nominals = await response.json();
+
+        tbody.innerHTML = "";
+        
+        if (!nominals) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-slate-400">Tidak ada data nominal.</td></tr>`;
+            if (badgeTotal) badgeTotal.innerHTML = `0 <span class="text-[9px] font-normal text-slate-500">NOMINAL</span>`;
+            return;
+        }
+
+        // 1. Ambil keys dan urutkan berdasarkan nilai nominalnya
+        const sortedKeys = Object.keys(nominals).sort((a, b) => {
+            const valA = parseInt(nominals[a].NOMINAL || a);
+            const valB = parseInt(nominals[b].NOMINAL || b);
+            return valA - valB; // Ascending (terkecil ke terbesar)
+        });
+
+        // 2. Iterasi menggunakan sortedKeys
+        sortedKeys.forEach((key, index) => {
+            const n = nominals[key];
+            
+            const nominalValue = parseInt(n.NOMINAL || key);
+            const nominalTampil = nominalValue.toLocaleString(); 
+            const terbilangTampil = n.TERBILANG ? n.TERBILANG.replace(/'/g, "\\'") : '';
+
+            tbody.innerHTML += `
+                <tr class="hover:bg-slate-50 transition-colors border-b">
+                    <td class="py-3 px-3 text-center text-slate-400 font-mono text-xs">${index + 1}</td>
+                    <td class="py-3 px-3 font-bold text-emerald-600 text-xs">${nominalTampil}</td>
+                    <td class="py-3 px-3 text-slate-600 text-xs">${n.TERBILANG || '-'}</td>
+                    <td class="p-3 text-center flex justify-center gap-1">
+                        <button onclick="editNominal('${key}', '${n.NOMINAL}', '${terbilangTampil}')" class="text-blue-600 hover:bg-blue-100 p-1.5 rounded-lg transition-all">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                        <button onclick="hapusNominalBD('${key}', '${nominalTampil}')" class="text-red-600 hover:bg-red-100 p-1.5 rounded-lg transition-all">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        if (badgeTotal) {
+            badgeTotal.innerHTML = `${sortedKeys.length} <span class="text-[9px] font-normal text-slate-500">NOMINAL</span>`;
+        }
+
+    } catch (err) {
+        console.error("Error loading nominal:", err);
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-red-500 font-bold"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Gagal sinkronisasi data.</td></tr>`;
+    }
+}
+
+// Ekspos ke global scope
+window.muatDataNominal = muatDataNominal;
+
+// Fungsi Simpan Nominal (Mandiri)
 function simpanNominalDriverBD() {
-    // 1. Ambil nilai langsung dari input nominal, bukan dari input driver
-    const nominalValue = document.getElementById("tx-nominal").value.trim();
-    const terbilangValue = document.getElementById("tx-terbilang").value.trim();
+    const inNominal = document.getElementById("tx-nominal");
+    const inTerbilang = document.getElementById("tx-terbilang");
+
+    // 1. Validasi elemen dan input
+    if (!inNominal || !inTerbilang) return;
+
+    const nominalValue = inNominal.value.trim();
+    const terbilangValue = inTerbilang.value.trim();
     
-    // 2. Validasi nominal saja
-    if (!nominalValue || !terbilangValue) return alert("Nominal dan Terbilang wajib diisi!");
+    if (!nominalValue || !terbilangValue) {
+        miuiAlert("Nominal dan Terbilang wajib diisi!");
+        return;
+    }
 
-    // 3. Buat ID unik (Contoh: NOM_1716723456789)
+    // 2. State loading pada tombol
+    const btnSubmit = document.getElementById("btn-submit-nominal-bd"); // Pastikan ID ini sesuai
+    const txtAsli = btnSubmit ? btnSubmit.innerText : "SIMPAN";
+    if (btnSubmit) {
+        btnSubmit.innerText = "MENYIMPAN...";
+        btnSubmit.disabled = true;
+    }
+
+    // 3. ID unik dan Payload
     const nominalId = "NOM_" + Date.now();
-
     const payload = {
         NOMINAL: nominalValue,
         TERBILANG: terbilangValue,
         DIBUAT: new Date().toISOString()
     };
 
-    // 4. Simpan ke master_nominal dengan ID unik, TANPA referensi driver
+    // 4. Simpan ke Firebase
     fetch(`${BD_FIREBASE_URL}master_nominal/${nominalId}.json`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
-    }).then(() => {
-        alert("Data Nominal berhasil disimpan secara mandiri!");
-        // 5. Hanya panggil pemuat nominal, jangan panggil pemuat driver
-        muatDataNominal(); 
-        resetFormNominalBD(); // Bersihkan form setelah simpan
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("Gagal menyimpan ke server database.");
+        miuiAlert("Data Nominal berhasil disimpan secara mandiri!");
+        
+        // 5. Panggil fungsi pemuat nominal dan reset form
+        if (typeof muatDataNominal === 'function') muatDataNominal();
+        if (typeof resetFormNominalBD === 'function') resetFormNominalBD();
+    })
+    .catch(err => {
+        console.error("Gagal simpan nominal:", err);
+        miuiAlert("Terjadi masalah koneksi saat menyimpan nominal.");
+    })
+    .finally(() => {
+        if (btnSubmit) {
+            btnSubmit.innerText = txtAsli;
+            btnSubmit.disabled = false;
+        }
+    });
+}
+
+// Ekspos ke global scope
+window.simpanNominalDriverBD = simpanNominalDriverBD;
+
+/**
+ * Fungsi untuk memicu mode edit pada form nominal
+ */
+function editNominal(key, nominal, terbilang) {
+    // 1. Isi input form
+    const inNominal = document.getElementById("tx-nominal");
+    const inTerbilang = document.getElementById("tx-terbilang");
+    
+    if (inNominal) inNominal.value = nominal;
+    if (inTerbilang) inTerbilang.value = terbilang;
+
+    // 2. Ubah UI tombol ke mode UPDATE
+    const btnAksi = document.getElementById("btn-submit-nominal"); // Pastikan ID ini sesuai
+    if (!btnAksi) return;
+
+    const txtAsli = btnAksi.innerText;
+    btnAksi.innerText = "UPDATE NOMINAL";
+    
+    // Simpan referensi onclick asli agar bisa dikembalikan nanti (opsional, tapi praktik yang baik)
+    const originalOnclick = btnAksi.onclick;
+
+    btnAksi.onclick = function() {
+        const payload = {
+            NOMINAL: inNominal.value.trim(),
+            TERBILANG: inTerbilang.value.trim()
+        };
+
+        if (!payload.NOMINAL || !payload.TERBILANG) {
+            miuiAlert("Nominal dan Terbilang wajib diisi!");
+            return;
+        }
+
+        // State loading
+        btnAksi.innerText = "MEMPERBARUI...";
+        btnAksi.disabled = true;
+
+        fetch(`${BD_FIREBASE_URL}master_nominal/${key}.json`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        })
+        .then(res => {
+            if (!res.ok) throw new Error("Gagal memperbarui data.");
+            miuiAlert("Data Nominal berhasil diperbarui!");
+            
+            // Refresh data dan reset form
+            if (typeof muatDataNominal === 'function') muatDataNominal();
+            if (typeof resetFormNominalBD === 'function') resetFormNominalBD();
+            
+            // Kembalikan tombol ke kondisi semula
+            btnAksi.innerText = txtAsli;
+            btnAksi.onclick = originalOnclick; 
+        })
+        .catch(err => {
+            console.error("Gagal update:", err);
+            miuiAlert("Terjadi masalah saat memperbarui data.");
+            btnAksi.innerText = "UPDATE NOMINAL";
+        })
+        .finally(() => {
+            btnAksi.disabled = false;
+        });
+    };
+}
+
+/**
+ * Menghapus Form Kembali ke Mode Tambah Nominal Baru (Batal)
+ */
+function hapusNominalBD(key, nominal) {
+    miuiConfirm(`Yakin ingin menghapus nominal: ${nominal}?`, function() {
+        
+        // 1. Hapus dari Firebase
+        fetch(`${BD_FIREBASE_URL}master_nominal/${key}.json`, {
+            method: "DELETE"
+        })
+        .then(res => {
+            if (!res.ok) throw new Error("Gagal menghapus dari Firebase");
+
+            // 2. Sync Hapus ke Spreadsheet (sesuaikan URL webhook nominal Anda)
+            if (typeof SPREADSHEET_NOMINAL_WEBHOOK_URL !== 'undefined') {
+                fetch(SPREADSHEET_NOMINAL_WEBHOOK_URL, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ 
+                        ACTION: "DELETE", 
+                        NOMINAL: nominal,
+                        TIPE_DATA: "MASTER_NOMINAL" 
+                    })
+                });
+            }
+        })
+        .then(() => {
+            miuiAlert("Data nominal berhasil dihapus!");
+            // Refresh tabel (pastikan nama fungsi refresh Anda benar)
+            if (typeof muatDataNominal === 'function') {
+                muatDataNominal();
+            }
+        })
+        .catch(err => {
+            console.error("Error:", err);
+            miuiAlert("Gagal menghapus data nominal.");
+        });
+        
     });
 }
 
@@ -479,113 +1000,59 @@ function resetFormNominalBD() {
     }
 }
 
-/**
- * Fungsi untuk memicu mode edit pada form nominal
- */
-function editNominal(key, nominal, terbilang) {
-    // 1. Isi input form
-    document.getElementById("tx-nominal").value = nominal;
-    document.getElementById("tx-terbilang").value = terbilang;
-
-    // 2. Ubah UI tombol ke mode UPDATE
-    const btnAksi = document.getElementById("btn-submit-nominal");
-    btnAksi.innerText = "UPDATE NOMINAL";
-    btnAksi.onclick = function() {
-        const payload = {
-            NOMINAL: document.getElementById("tx-nominal").value,
-            TERBILANG: document.getElementById("tx-terbilang").value
-        };
-
-        // Langsung update berdasarkan key (yang sekarang sudah unik)
-        fetch(`${BD_FIREBASE_URL}master_nominal/${key}.json`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        }).then(() => {
-            alert("Berhasil diperbarui!");
-            muatDataNominal();
-            resetFormNominalBD();
-        });
-    };
-}
 
 /**
- * Fungsi Pemuat Data Driver (Mandiri)
+ * Fungsi Pemuat Data Tujuan yang stabil
  */
-async function muatDataDriver() {
-    const tbody = document.getElementById("tabel-driver-terpisah");
+async function muatDataTujuanDariFirebase() {
+    const tbody = document.getElementById("tabel-tujuan-bd");
+    const badge = document.getElementById("info-total-tujuan-bd");
     if (!tbody) return;
 
     try {
-        const response = await fetch(`${BD_FIREBASE_URL}master_driver.json`);
-        const drivers = await response.json();
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center py-14 text-slate-400 font-bold"><i class="fa-solid fa-spinner fa-spin mr-1.5 text-orange-500"></i> Memuat tujuan...</td></tr>`;
 
-        tbody.innerHTML = "";
+        const response = await fetch(`${BD_FIREBASE_URL}master_tujuan.json`);
+        const data = await response.json();
         
-        if (!drivers) {
-            tbody.innerHTML = `<tr><td colspan="7" class="text-center py-10 text-slate-400">Tidak ada data driver.</td></tr>`;
+        tbody.innerHTML = ""; 
+        
+        if (!data) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-slate-400 font-bold">Belum ada tujuan terdaftar.</td></tr>`;
+            if (badge) badge.innerText = "0";
             return;
         }
 
-        Object.keys(drivers).forEach((key, index) => {
-            const d = drivers[key];
+        let count = 0;
+        Object.keys(data).forEach((key, index) => {
+            const item = data[key];
+            count++;
+            
+            // Definisikan namaTujuan agar bisa dipakai di onclick
+            const namaTujuan = (item.TUJUAN || key).replace(/'/g, "\\'");
+
             tbody.innerHTML += `
                 <tr class="hover:bg-slate-50 transition-colors border-b">
                     <td class="py-3 px-3 text-center text-slate-400 font-mono text-xs">${index + 1}</td>
-                    <td class="py-3 px-3 font-bold text-slate-800 uppercase text-xs">${d.DRIVER}</td>
-                    <td class="py-3 px-3 font-mono text-xs text-blue-600">${d.PLAT || '-'}</td>
-                    <td class="py-3 px-3 text-xs">${d.ISI || '0'}</td>
-                    <td class="py-3 px-3 text-xs">${d.HARGA_8_1 || '0'}</td>
-                    <td class="py-3 px-3 text-xs">${d.HARGA_18 || '0'}</td>
-                    <td class="py-3 px-3 text-center">
-                        <button class="text-amber-600 hover:bg-amber-100 p-1.5 rounded-lg" onclick="editDriver('${key}')">
+                    <td class="py-3 px-3 text-slate-800 font-bold text-xs uppercase">${item.TUJUAN || key}</td>
+                    <td class="py-3 px-3 text-slate-600 text-xs">${item.KOTA || '-'}</td>
+                    <td class="py-3 px-3 text-center flex justify-center gap-1">
+                        <button class="text-blue-600 hover:bg-blue-100 p-1.5 rounded-lg transition-all" onclick="editTujuan('${key}')">
                             <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                        <button class="text-red-600 hover:bg-red-100 p-1.5 rounded-lg transition-all" onclick="hapusTujuanBD('${key}', '${namaTujuan}')">
+                            <i class="fa-solid fa-trash-can"></i>
                         </button>
                     </td>
                 </tr>
             `;
         });
-    } catch (err) {
-        console.error("Error loading driver:", err);
-    }
-}
 
-/**
- * Fungsi Pemuat Data Nominal (Mandiri)
- */
-async function muatDataNominal() {
-    const tbody = document.getElementById("tabel-nominal-terpisah");
-    if (!tbody) return;
-
-    try {
-        const response = await fetch(`${BD_FIREBASE_URL}master_nominal.json`);
-        const nominals = await response.json();
-
-        tbody.innerHTML = "";
+        if (badge) badge.innerHTML = `${count} <span class="text-[9px] font-normal text-slate-500 ml-0.5">TUJUAN</span>`;
         
-        if (!nominals) {
-            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-10 text-slate-400">Tidak ada data nominal.</td></tr>`;
-            return;
-        }
-
-        Object.keys(nominals).forEach((key, index) => {
-            const n = nominals[key];
-            tbody.innerHTML += `
-                <tr class="hover:bg-slate-50 transition-colors border-b">
-                    <td class="py-3 px-3 text-center text-slate-400 font-mono text-xs">${index + 1}</td>
-                    <td class="py-3 px-3 font-bold text-slate-800 uppercase text-xs">${key}</td>
-                    <td class="py-3 px-3 font-bold text-emerald-600 text-xs">${parseInt(n.NOMINAL || 0).toLocaleString()}</td>
-                    <td class="py-3 px-3 text-slate-600 text-xs">${n.TERBILANG || '-'}</td>
-                    <td class="p-3 text-center">
-                        <button onclick="editNominal('${key}', '${n.NOMINAL}', '${n.TERBILANG.replace(/'/g, "\\'")}')" class="text-blue-600 hover:bg-blue-100 p-1.5 rounded-lg transition-all">
-                            <i class="fa-solid fa-pen-to-square"></i>
-                        </button>
-                    </td>
-                </tr>
-            `;
-        });
     } catch (err) {
-        console.error("Error loading nominal:", err);
+        console.error("Error loading tujuan:", err);
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-red-500 font-bold">Gagal memuat data.</td></tr>`;
     }
 }
 
@@ -594,7 +1061,7 @@ async function muatDataNominal() {
  * Fungsi Simpan Tujuan (Firebase + Spreadsheet)
  */
 function simpanDataTujuanBD() {
-    const inTujuan = document.getElementById("tx-tujuan-nama"); // Pastikan ID ini sesuai di HTML
+    const inTujuan = document.getElementById("tx-tujuan-nama");
     const inKota   = document.getElementById("tx-tujuan-kota");
 
     if (!inTujuan || !inKota) return;
@@ -605,74 +1072,172 @@ function simpanDataTujuanBD() {
         KOTA: inKota.value.trim().toUpperCase()
     };
 
-    if (!payload.TUJUAN || !payload.KOTA) return alert("Tujuan dan Kota wajib diisi!");
+    if (!payload.TUJUAN || !payload.KOTA) {
+        miuiAlert("Tujuan dan Kota wajib diisi!");
+        return;
+    }
+
+    // 1. State loading pada tombol
+    const btnSubmit = document.getElementById("btn-submit-tujuan-bd"); // Pastikan ID ini ada
+    const txtAsli = btnSubmit ? btnSubmit.innerText : "SIMPAN";
+    if (btnSubmit) {
+        btnSubmit.innerText = "MENYIMPAN...";
+        btnSubmit.disabled = true;
+    }
 
     const cleanKey = payload.TUJUAN.replace(/[\.\$\#\[\]\/]/g, "_");
 
+    // 2. Simpan ke Firebase
     fetch(`${BD_FIREBASE_URL}master_tujuan/${cleanKey}.json`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
-    }).then(() => {
-        // Kirim ke Webhook Spreadsheet
-        fetch(SPREADSHEET_WEBHOOK_URL, {
-            method: "POST", mode: "no-cors",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        }).then(() => {
-            alert("Data Tujuan berhasil disimpan!");
-            inTujuan.value = "";
-            inKota.value = "";
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("Gagal menyimpan ke server database.");
+        
+        // 3. Kirim ke Webhook Spreadsheet
+        if (SPREADSHEET_WEBHOOK_URL) {
+            return fetch(SPREADSHEET_WEBHOOK_URL, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+        }
+    })
+    .then(() => {
+        miuiAlert("Data Tujuan berhasil disimpan!");
+        inTujuan.value = "";
+        inKota.value = "";
+        
+        // 4. Panggil pemuat data jika tersedia
+        if (typeof muatDataTujuanDariFirebase === 'function') {
             muatDataTujuanDariFirebase();
-        });
+        }
+    })
+    .catch(err => {
+        console.error("Gagal simpan tujuan:", err);
+        miuiAlert("Terjadi masalah koneksi saat menyimpan tujuan.");
+    })
+    .finally(() => {
+        if (btnSubmit) {
+            btnSubmit.innerText = txtAsli;
+            btnSubmit.disabled = false;
+        }
     });
 }
 
+// Ekspos ke global scope
+window.simpanDataTujuanBD = simpanDataTujuanBD;
+
 /**
- * Fungsi Pemuat Data Tujuan yang stabil
+ * Mode Edit Data Tujuan
+ * @param {string} key - ID unik di Firebase
+ * @param {string} tujuan - Nama tujuan
+ * @param {string} kota - Nama kota
  */
-async function muatDataTujuanDariFirebase() {
-    const tbody = document.getElementById("tabel-tujuan-bd");
-    const badge = document.getElementById("info-total-tujuan-bd"); // Pastikan elemen ini ada di HTML Anda
-    if (!tbody) return;
+function editTujuanBD(key, tujuan, kota) {
+    // 1. Isi input form
+    const inTujuan = document.getElementById("tx-tujuan-nama");
+    const inKota   = document.getElementById("tx-tujuan-kota");
+    
+    if (inTujuan) inTujuan.value = tujuan;
+    if (inKota) inKota.value = kota;
 
-    try {
-        tbody.innerHTML = `<tr><td colspan="3" class="text-center py-14 text-slate-400 font-bold"><i class="fa-solid fa-spinner fa-spin mr-1.5 text-orange-500"></i> Memuat tujuan...</td></tr>`;
+    // 2. Ubah UI tombol ke mode UPDATE
+    const btnAksi = document.getElementById("btn-submit-tujuan-bd"); // Sesuaikan ID
+    if (!btnAksi) return;
 
-        const response = await fetch(`${BD_FIREBASE_URL}master_tujuan.json`);
-        const data = await response.json();
-        
-        tbody.innerHTML = ""; 
-        
-        if (!data) {
-            tbody.innerHTML = `<tr><td colspan="3" class="text-center py-10 text-slate-400 font-bold">Belum ada tujuan terdaftar.</td></tr>`;
-            if (badge) badge.innerText = "0";
+    const txtAsli = btnAksi.innerText;
+    btnAksi.innerText = "UPDATE TUJUAN";
+    
+    // Simpan referensi onclick asli
+    const originalOnclick = btnAksi.onclick;
+
+    btnAksi.onclick = function() {
+        const payload = {
+            TUJUAN: inTujuan.value.trim().toUpperCase(),
+            KOTA: inKota.value.trim().toUpperCase()
+        };
+
+        if (!payload.TUJUAN || !payload.KOTA) {
+            miuiAlert("Tujuan dan Kota wajib diisi!");
             return;
         }
 
-        let count = 0;
-        Object.keys(data).forEach((key) => {
-            const item = data[key];
-            count++;
-            tbody.innerHTML += `
-                <tr class="hover:bg-slate-50 transition-colors">
-                    <td class="py-3 px-3 text-slate-800 font-bold text-xs uppercase">${item.TUJUAN || key}</td>
-                    <td class="py-3 px-3 text-slate-600 text-xs">${item.KOTA || '-'}</td>
-                    <td class="py-3 px-3 text-center">
-                        <button class="text-blue-600 hover:bg-blue-100 p-1.5 rounded-lg transition-all" onclick="editTujuan('${key}')">
-                            <i class="fa-solid fa-pen-to-square"></i>
-                        </button>
-                    </td>
-                </tr>
-            `;
-        });
+        // State loading
+        btnAksi.innerText = "MEMPERBARUI...";
+        btnAksi.disabled = true;
 
-        if (badge) badge.innerHTML = `${count} <span class="text-[9px] font-normal text-slate-500 ml-0.5">LOKASI</span>`;
+        fetch(`${BD_FIREBASE_URL}master_tujuan/${key}.json`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        })
+        .then(res => {
+            if (!res.ok) throw new Error("Gagal memperbarui data.");
+            miuiAlert("Data Tujuan berhasil diperbarui!");
+            
+            // Refresh data
+            if (typeof muatDataTujuanDariFirebase === 'function') muatDataTujuanDariFirebase();
+            
+            // Reset form dan kembalikan tombol
+            inTujuan.value = "";
+            inKota.value = "";
+            btnAksi.innerText = txtAsli;
+            btnAksi.onclick = originalOnclick;
+        })
+        .catch(err => {
+            console.error("Gagal update:", err);
+            miuiAlert("Terjadi masalah saat memperbarui data.");
+            btnAksi.innerText = "UPDATE TUJUAN";
+        })
+        .finally(() => {
+            btnAksi.disabled = false;
+        });
+    };
+}
+
+// Ekspos ke global scope
+window.editTujuanBD = editTujuanBD;
+
+/**
+ * Menghapus Form Kembali ke Mode Tambah Tujuan Baru (Batal)
+ */
+function hapusTujuanBD(key, namaTujuan) {
+    miuiConfirm(`Yakin ingin menghapus tujuan: ${namaTujuan}?`, function() {
         
-    } catch (err) {
-        console.error("Error loading tujuan:", err);
-        tbody.innerHTML = `<tr><td colspan="3" class="text-center py-10 text-red-500 font-bold">Gagal memuat data.</td></tr>`;
-    }
+        fetch(`${BD_FIREBASE_URL}master_tujuan/${key}.json`, {
+            method: "DELETE"
+        })
+        .then(res => {
+            if (!res.ok) throw new Error("Gagal menghapus dari Firebase");
+
+            if (typeof SPREADSHEET_TUJUAN_WEBHOOK_URL !== 'undefined') {
+                fetch(SPREADSHEET_TUJUAN_WEBHOOK_URL, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ 
+                        ACTION: "DELETE", 
+                        TUJUAN: namaTujuan,
+                        TIPE_DATA: "MASTER_TUJUAN" 
+                    })
+                });
+            }
+        })
+        .then(() => {
+            miuiAlert("Data tujuan berhasil dihapus!");
+            // Panggil nama fungsi yang benar di sini
+            muatDataTujuanDariFirebase(); 
+        })
+        .catch(err => {
+            console.error("Error:", err);
+            miuiAlert("Gagal menghapus data tujuan.");
+        });
+        
+    });
 }
 
 /**
@@ -700,6 +1265,52 @@ function resetFormTujuanBD() {
     }
 }
 
+// =========================================================================
+// SYSTEM COMPONENT: CUSTOM NOTIF miuiAlert ENGINE (MIUI V5 SPEC)
+// =========================================================================
+function miuiAlert(pesan) {
+    const box = document.getElementById('miui-global-miuiAlert');
+    const teks = document.getElementById('miui-miuiAlert-message');
+    const contOk = document.getElementById('miui-container-ok');
+    const contConfirm = document.getElementById('miui-container-confirm');
+
+    teks.innerText = pesan;
+    contOk.classList.remove('hidden');    // Tampilkan OK
+    contConfirm.classList.add('hidden'); // Sembunyikan Ya/Batal
+    box.classList.remove('hidden');
+}
+
+function tutupmiuiAlert() {
+    document.getElementById('miui-global-miuiAlert').classList.add('hidden');
+}
+
+// =========================================================================
+// SYSTEM COMPONENT: CUSTOM CONFIRM ENGINE (MIUI V5 SPEC)
+// =========================================================================
+function miuiConfirm(pesan, onConfirm) {
+    const box = document.getElementById('miui-global-miuiAlert');
+    const teks = document.getElementById('miui-miuiAlert-message');
+    const contOk = document.getElementById('miui-container-ok');
+    const contConfirm = document.getElementById('miui-container-confirm');
+    const btnYa = document.getElementById('miui-btn-ya');
+    const btnTidak = document.getElementById('miui-btn-tidak');
+
+    teks.innerText = pesan;
+    contOk.classList.add('hidden');       // Sembunyikan OK
+    contConfirm.classList.remove('hidden'); // Tampilkan Ya/Batal
+    box.classList.remove('hidden');
+
+    btnYa.onclick = function() {
+        box.classList.add('hidden');
+        if (onConfirm) onConfirm();
+    };
+
+    btnTidak.onclick = function() {
+        box.classList.add('hidden');
+    };
+}
+
+
 // EKSPOS KE SCOPE GLOBAL WINDOW
 window.muatDataDariFirebase = muatDataDariFirebase;
 window.simpanDataMasterBD = simpanDataMasterBD;
@@ -710,3 +1321,9 @@ window.gantiSwitchModeBankData = gantiSwitchModeBankData;
 window.muatDataDriverTerpadu = muatDataDriverTerpadu;
 window.simpanDataTujuanBD = simpanDataTujuanBD;
 window.muatDataTujuanDariFirebase = muatDataTujuanDariFirebase;
+window.muatDataDriver = muatDataDriver;
+window.muatDataNominal = muatDataNominal;
+window.muatDataTujuan = muatDataTujuan;
+window.miuiAlert = miuiAlert;
+window.tutupmiuiAlert = tutupmiuiAlert;
+window.miuiConfirm = miuiConfirm;
