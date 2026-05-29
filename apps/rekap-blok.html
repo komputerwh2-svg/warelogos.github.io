@@ -24,7 +24,7 @@
                 <span class="text-[10px] font-bold text-slate-500 block mb-1.5 tracking-wider uppercase">PILIH GUDANG / BLOK:</span>
                 <div class="grid grid-cols-4 gap-1.5">
                     <label class="cursor-pointer">
-                        <input type="radio" name="pilih_blok" value="RETUR" class="hidden peer" onchange="pilihBlokGudang(this.value)">
+                        <input type="radio" name="pilih_blok" value="RETUR" class="hidden peer" checked onchange="pilihBlokGudang(this.value)">
                         <div class="py-1 text-center text-[10px] font-bold border border-[#c8c8c8] rounded-md text-slate-700 bg-[#f9f9f9] peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-600 transition-all active:scale-95">RETUR</div>
                     </label>
                     <label class="cursor-pointer">
@@ -36,19 +36,19 @@
                         <div class="py-1 text-center text-[10px] font-bold border border-[#c8c8c8] rounded-md text-slate-700 bg-[#f9f9f9] peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-600 transition-all active:scale-95">PROMOSI</div>
                     </label>
                     <label class="cursor-pointer">
-                        <input type="radio" name="pilih_blok" value="BL18CD" class="hidden peer" onchange="pilihBlokGudang(this.value)">
+                        <input type="radio" name="pilih_blok" value="BLOK 18CD" class="hidden peer" onchange="pilihBlokGudang(this.value)">
                         <div class="py-1 text-center text-[10px] font-bold border border-[#c8c8c8] rounded-md text-slate-700 bg-[#f9f9f9] peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-600 transition-all active:scale-95">BLOK 18CD</div>
                     </label>
                     <label class="cursor-pointer">
-                        <input type="radio" name="pilih_blok" value="BL18E" class="hidden peer" checked onchange="pilihBlokGudang(this.value)">
+                        <input type="radio" name="pilih_blok" value="BLOK 18E" class="hidden peer" onchange="pilihBlokGudang(this.value)">
                         <div class="py-1 text-center text-[10px] font-bold border border-[#c8c8c8] rounded-md text-slate-700 bg-[#f9f9f9] peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-600 transition-all active:scale-95">BLOK 18E</div>
                     </label>
                     <label class="cursor-pointer">
-                        <input type="radio" name="pilih_blok" value="BL18F" class="hidden peer" onchange="pilihBlokGudang(this.value)">
+                        <input type="radio" name="pilih_blok" value="BLOK 18F" class="hidden peer" onchange="pilihBlokGudang(this.value)">
                         <div class="py-1 text-center text-[10px] font-bold border border-[#c8c8c8] rounded-md text-slate-700 bg-[#f9f9f9] peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-600 transition-all active:scale-95">BLOK 18F</div>
                     </label>
                     <label class="cursor-pointer">
-                        <input type="radio" name="pilih_blok" value="BLH" class="hidden peer" onchange="pilihBlokGudang(this.value)">
+                        <input type="radio" name="pilih_blok" value="BLOK H" class="hidden peer" onchange="pilihBlokGudang(this.value)">
                         <div class="py-1 text-center text-[10px] font-bold border border-[#c8c8c8] rounded-md text-slate-700 bg-[#f9f9f9] peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-600 transition-all active:scale-95">BLOK H</div>
                     </label>
                 </div>
@@ -56,23 +56,23 @@
 
             <div class="col-span-5 grid grid-rows-3 gap-1">
                 <div class="bg-gradient-to-r from-white to-emerald-50 border border-emerald-200 rounded-lg px-2 py-1 flex justify-between items-center shadow-sm">
-                    <span id="lbl-monitor-stok" class="text-[8px] font-bold text-emerald-700 uppercase tracking-tight">STOK GUDANG BL 18E</span>
-                    <span id="info-stok-blok" class="text-xs font-black text-slate-800 tracking-wide">223 <span class="text-[8px] font-normal text-slate-400">PLT</span></span>
+                    <span id="lbl-monitor-stok" class="text-[10px] font-bold text-emerald-700 uppercase tracking-tight">STOK GUDANG : RETUR</span>
+                    <span id="info-stok-blok" class="text-[10px] font-black text-slate-800 tracking-wide">0 <span class="text-[8px] font-normal text-slate-400">PLT</span></span>
                 </div>
                 <div class="bg-gradient-to-r from-white to-orange-50 border border-orange-200 rounded-lg px-2 py-1 flex justify-between items-center shadow-sm">
-                    <span class="text-[8px] font-bold text-orange-700 uppercase tracking-tight">KAPASITAS MAX</span>
-                    <span id="info-kapasitas-blok" class="text-xs font-black text-slate-800 tracking-wide">367 <span class="text-[8px] font-normal text-slate-400">MAX</span></span>
+                    <span class="text-[10px] font-bold text-orange-700 uppercase tracking-tight">KAPASITAS MAX</span>
+                    <span id="info-kapasitas-blok" class="text-[10px] font-black text-slate-800 tracking-wide">0 <span class="text-[8px] font-normal text-slate-400">MAX</span></span>
                 </div>
                 <div class="bg-gradient-to-r from-white to-blue-50 border border-blue-200 rounded-lg px-2 py-1 flex justify-between items-center shadow-sm">
-                    <span class="text-[8px] font-bold text-blue-700 uppercase tracking-tight">SISA KAPASITAS</span>
-                    <span id="info-sisa-blok" class="text-xs font-black text-slate-800 tracking-wide">144 <span class="text-[8px] font-normal text-slate-400">PLT</span></span>
+                    <span class="text-[10px] font-bold text-blue-700 uppercase tracking-tight">SISA KAPASITAS</span>
+                    <span id="info-sisa-blok" class="text-[10px] font-black text-slate-800 tracking-wide">0 <span class="text-[8px] font-normal text-slate-400">PLT</span></span>
                 </div>
             </div>
         </div>
 
         <div class="grid grid-cols-12 gap-3">
             
-            <div id="box-workspace-input" class="col-span-7 bg-emerald-50/60 rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col transition-colors duration-200">
+            <div id="box-workspace-input" class="col-span-7 bg-emerald-50/60 rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col transition-colors duration-200 opacity-50 pointer-events-none">
                 <div class="p-3 border-b border-[#eaeaea] bg-slate-50 flex justify-between items-center h-11">
                     <span id="title-transaksi-side" class="text-[10px] font-bold text-emerald-700 uppercase tracking-wide">Input Barang Masuk</span>
                     
@@ -89,36 +89,40 @@
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label id="lbl-tx-tanggal" class="text-[9px] font-bold text-slate-500 block mb-0.5">Tanggal Masuk</label>
-                            <input type="date" id="tx-tanggal" class="w-full bg-white border border-[#c8c8c8] rounded-md py-1 px-1.5 text-[11px] font-bold text-slate-800 focus:outline-none focus:border-orange-500">
+                            <select id="tx-tanggal" class="w-full bg-white border border-[#c8c8c8] rounded-md py-1 px-1.5 text-[11px] font-bold text-slate-800 focus:outline-none focus:border-orange-500">
+                                </select>
                         </div>
                         <div>
                             <label class="text-[9px] font-bold text-slate-500 block mb-0.5">Kode Barang</label>
-                            <select id="tx-kode" class="w-full bg-white border border-[#c8c8c8] rounded-md py-1 px-1 text-[11px] font-bold text-slate-800 focus:outline-none focus:border-orange-500">
-                                <option>CRR 02</option>
-                                <option>MRR 01</option>
-                                <option>MJR02HJ</option>
+                            <select id="tx-kode" required class="w-full bg-white border border-[#c8c8c8] rounded-md py-1 px-1 text-[11px] font-bold text-slate-800 focus:outline-none focus:border-orange-500">
+                                <option value="">Memuat data...</option>
                             </select>
                         </div>
                     </div>
 
-                    <div id="grid-row-dinamis" class="grid grid-cols-2 gap-2">
+                    <div id="grid-row-dinamis" class="grid grid-cols-3 gap-2">
+    
                         <div id="wrapper-qty-utama">
-                            <label id="lbl-tx-qty" class="text-[9px] font-bold text-slate-500 block mb-0.5">Jumlah Palet</label>
+                            <label id="lbl-tx-qty-plt" class="text-[9px] font-bold text-slate-500 block mb-0.5">Qty Palet Masuk</label>
                             <div class="relative">
                                 <input type="number" id="tx-palet" placeholder="0" oninput="hitungKonversiKartonOtomatis(this.value)" class="w-full bg-white border border-[#c8c8c8] rounded-md py-1 px-1.5 text-[11px] font-bold text-slate-800 focus:outline-none focus:border-orange-500">
-                                <span id="badge-unit-input" class="absolute right-2 top-1.5 text-[9px] font-bold text-slate-400 uppercase">PLT</span>
+                                <span id="badge-unit-input-plt" class="absolute right-2 top-1.5 text-[9px] font-bold text-slate-400 uppercase">PLT</span>
                             </div>
                         </div>
 
-                        <div id="wrapper-konversi-karton" class="hidden">
-                            <label class="text-[9px] font-bold text-red-600 block mb-0.5">Cvrt. Qty Karton (KRT)</label>
-                            <input type="number" id="tx-karton-readonly" readonly placeholder="0" class="w-full bg-slate-100 border border-[#c8c8c8] rounded-md py-1 px-1.5 text-[11px] font-bold text-slate-500 focus:outline-none">
+                        <div id="wrapper-konversi-karton" class="relative"> <label id="lbl-tx-qty-krt" class="text-[9px] font-bold text-slate-500 block mb-0.5">Qty Karton Masuk</label>
+                            <input type="number" id="tx-karton-readonly" placeholder="0" readonly
+                                class="w-full bg-slate-100 border border-[#c8c8c8] rounded-md py-1 px-1.5 text-[11px] font-bold text-slate-500 focus:outline-none focus:border-orange-500">
+                            <span id="badge-unit-input-krt" class="absolute right-2 top-[22px] text-[9px] font-bold text-slate-400 uppercase">KRT</span>
                         </div>
 
                         <div id="wrapper-expired-input">
                             <label class="text-[9px] font-bold text-slate-500 block mb-0.5">Tanggal Expired</label>
-                            <input type="date" id="tx-expired" class="w-full bg-white border border-[#c8c8c8] rounded-md py-1 px-1.5 text-[11px] font-bold text-slate-800 focus:outline-none focus:border-orange-500">
+                            <select id="tx-expired" class="w-full bg-white border border-[#c8c8c8] rounded-md py-1 px-1.5 text-[11px] font-bold text-slate-800 focus:outline-none focus:border-orange-500">
+                                <option value="">Pilih Expired...</option>
+                            </select>
                         </div>
+                        
                     </div>
 
                     <div class="pt-1 flex gap-1.5">
@@ -131,25 +135,25 @@
             </div>
 
             <div class="col-span-5 bg-white rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col">
-                <div class="bg-slate-50 px-3 h-11 border-b border-[#e5e5e5] flex items-center justify-between">
-                    <span id="lbl-title-riwayat" class="text-[8px] font-bold text-slate-700 tracking-wider uppercase">RIWAYAT TRANSAKSI BL18E</span>
-                    <span class="text-[8px] font-bold text-orange-600 bg-orange-50 px-1 rounded border border-orange-200">LIVE</span>
+                <div class="bg-slate-50 px-3 h-11 border-b border-[#e5e5e5] flex flex-col justify-center">
+                    <div class="flex items-center justify-between">
+                        <span id="lbl-title-riwayat" class="text-[10px] font-bold text-slate-700 tracking-wider uppercase">RIWAYAT TRANSAKSI</span>
+                        <span id="container-info-transaksi" class="flex gap-2 mt-1"></span>
+                    </div>
                 </div>
                 <div class="flex-1 overflow-y-auto max-h-[148px]">
                     <table class="w-full text-left text-[11px] border-collapse">
                         <thead>
                             <tr class="bg-slate-100/80 border-b border-slate-200 text-slate-500 text-[8px] font-bold uppercase sticky top-0">
-                                <th class="py-1 px-2">TGL</th>
-                                <th class="py-1 px-1 text-center">TP</th>
-                                <th class="py-1 px-1">KD</th>
-                                <th class="py-1 px-2 text-center">PLT</th>
+                                <th class="py-1 px-2">TANGGAL</th>
+                                <th class="py-1 px-1 text-center">TIPE</th>
+                                <th class="py-1 px-1">KODE</th>
+                                <th class="py-1 px-1 text-center">KARTON</th>
+                                <th class="py-1 px-1 text-center">PALET</th>
+                                <th class="py-1 px-1 text-center">EXPIRED</th>
                             </tr>
                         </thead>
-                        <tbody id="table-riwayat-blok" class="divide-y divide-slate-100 font-medium text-slate-700">
-                            <tr class="hover:bg-slate-50"><td class="py-1 px-2 text-slate-400 text-[9px]">18/05</td><td class="py-1 px-1 text-center"><span class="bg-emerald-100 text-emerald-800 text-[8px] px-1 rounded font-bold">IN</span></td><td class="py-1 px-1 font-bold text-slate-900 text-[10px]">MRR 33</td><td class="py-1 px-2 text-center font-bold">4</td></tr>
-                            <tr class="hover:bg-slate-50"><td class="py-1 px-2 text-slate-400 text-[9px]">25/05</td><td class="py-1 px-1 text-center"><span class="bg-rose-100 text-rose-800 text-[8px] px-1 rounded font-bold">OUT</span></td><td class="py-1 px-1 font-bold text-slate-900 text-[10px]">MRR 09</td><td class="py-1 px-2 text-center font-bold">2</td></tr>
-                            <tr class="hover:bg-slate-50"><td class="py-1 px-2 text-slate-400 text-[9px]">25/05</td><td class="py-1 px-1 text-center"><span class="bg-rose-100 text-rose-800 text-[8px] px-1 rounded font-bold">OUT</span></td><td class="py-1 px-1 font-bold text-slate-900 text-[10px]">MRR 08</td><td class="py-1 px-2 text-center font-bold">3</td></tr>
-                        </tbody>
+                        <tbody id="table-riwayat-blok" class="divide-y divide-slate-100 font-medium text-slate-700"></tbody>
                     </table>
                 </div>
             </div>
@@ -157,27 +161,28 @@
 
         <div class="bg-white rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden">
             <div class="bg-gradient-to-b from-slate-50 to-slate-100 px-3 py-2 border-b border-[#e5e5e5] flex justify-between items-center">
-                <span class="text-[10px] font-bold text-slate-700 uppercase tracking-wider">REKAP DETAIL STOK BARANG: <span id="lbl-rekap-blok" class="text-orange-600 font-black">BLOK BL18E</span></span>
-                <span class="text-[9px] bg-slate-200/80 px-2 py-0.5 rounded font-black text-slate-600 tracking-wide">Pure Item</span>
+                <span class="text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                    REKAP DETAIL STOK BARANG</span>
+                </span>
+                <span id="lbl-nama-blok-badge" class="text-[10px] bg-orange-50 px-2 py-0.5 rounded font-black text-orange-600 border-orange-200 tracking-wide">
+                    NAMA BLOK
+                </span>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-[11px] border-collapse">
                     <thead>
                         <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 text-[9px] font-bold uppercase tracking-wider">
-                            <th class="py-1.5 px-4">KODE ITEM BARANG</th>
-                            <th class="py-1.5 px-4 text-center">QTY REKAP</th>
-                            <th class="py-1.5 px-4 text-center">TOTAL PALET</th>
-                            <th class="py-1.5 px-4 text-center">EXP DATE</th>
+                            <th class="py-1.5 px-4">KODE BARANG</th>
+                            <th class="py-1.5 px-4 text-center">KARTON</th>
+                            <th class="py-1.5 px-4 text-center">PALET</th>
+                            <th class="py-1.5 px-4 text-center">RINCIAN EXPIRED DATE</th>
                         </tr>
                     </thead>
-                    <tbody id="table-rekap-stok-item" class="divide-y divide-slate-100 font-medium text-slate-800">
-                        <tr class="hover:bg-slate-50/80"><td class="py-2 px-4 font-bold text-slate-900 tracking-wide">CRR 02</td><td class="py-2 px-4 text-center">380</td><td class="py-2 px-4 text-center font-black text-slate-900">4</td><td class="py-2 px-4 text-center text-slate-500 font-bold">28-FEB</td></tr>
-                        <tr class="hover:bg-slate-50/80"><td class="py-2 px-4 font-bold text-slate-900 tracking-wide">CRR 03</td><td class="py-2 px-4 text-center">665</td><td class="py-2 px-4 text-center font-black text-slate-900">7</td><td class="py-2 px-4 text-center text-slate-500 font-bold">28-FEB</td></tr>
-                        <tr class="hover:bg-slate-50/80"><td class="py-2 px-4 font-bold text-slate-900 tracking-wide">MJR02HJ</td><td class="py-2 px-4 text-center">3705</td><td class="py-2 px-4 text-center font-black text-slate-900">39</td><td class="py-2 px-4 text-center text-slate-500 font-bold">27-AUG</td></tr>
-                    </tbody>
+                    <tbody id="table-rekap-stok-item" class="w-full table-fixed text-left divide-y divide-slate-100 font-medium text-slate-800"></tbody>
                 </table>
             </div>
         </div>
 
     </div>
 </div>
+
