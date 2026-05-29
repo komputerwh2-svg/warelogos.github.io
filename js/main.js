@@ -282,7 +282,7 @@ function tutupmiuiAlert() {
 const APP_CONFIG = {
     ADMIN_USER: "admin",
     ADMIN_PASS: "adminwh2",
-    APLIKASI_KUNCI: ["APP_MASTER_DATA", "APP_REKAP_BLOK"] // List ID aplikasi yang dikunci
+    APLIKASI_KUNCI: ["APP_MASTER_DATA", "APP_REKAP_BLOK1"] // List ID aplikasi yang dikunci
 };
 
 let pendingTargetApp = "";
@@ -371,10 +371,12 @@ function bukaSubPageRekapBlok() {
     // Jika sub-page sudah pernah di-fetch sebelumnya, langsung geser buka
     if (subpage) {
         subpage.classList.remove('translate-x-full');
+        // Tetap jalankan init jika perlu (misal: refresh tanggal atau dropdown)
+        if (typeof window.initRekapBlok === 'function') window.initRekapBlok();
         return;
     }
 
-    // Ambil data langsung dari file apps/rekap-blok.html yang sudah di-commit ke GitHub
+    // Ambil data langsung dari file apps/rekap-blok.html
     fetch('apps/rekap-blok.html')
         .then(response => {
             if (!response.ok) throw new Error("Gagal mengambil file apps/rekap-blok.html");
@@ -383,16 +385,30 @@ function bukaSubPageRekapBlok() {
         .then(htmlContent => {
             container.innerHTML = htmlContent;
 
-            const elemenBaru = document.getElementById('subpage-rekap-blok');
-            if (elemenBaru) {
-                // Trik force reflow agar CSS transition Tailwind terbaca sempurna
-                void elemenBaru.offsetHeight; 
-                elemenBaru.classList.remove('translate-x-full');
-            }
+            // --- PERBAIKAN: SUNTIKKAN SCRIPT JS SECARA DINAMIS ---
+            const script = document.createElement('script');
+            script.type = "module";
+            script.src = "js/rekap-blok.js"; // Pastikan path ini benar
+            
+            script.onload = () => {
+                // Sekarang baru panggil init setelah JS-nya benar-benar dimuat
+                const elemenBaru = document.getElementById('subpage-rekap-blok');
+                if (elemenBaru) {
+                    void elemenBaru.offsetHeight; 
+                    elemenBaru.classList.remove('translate-x-full');
+                    
+                    if (typeof window.initRekapBlok === 'function') {
+                        window.initRekapBlok();
+                        window.selectedBlok = null; // Pastikan null saat aplikasi baru jalan
+                    }
+                }
+            };
+            document.body.appendChild(script);
+            // ----------------------------------------------------
         })
         .catch(error => {
             console.error(error);
-            miuiAlert("Sistem Gagal Memuat Template Rekap Blok dari Server GitHub!");
+            miuiAlert("Sistem Gagal Memuat Template Rekap Blok!");
         });
 }
 
@@ -400,6 +416,17 @@ function tutupSubPageRekapBlok() {
     const subpage = document.getElementById('subpage-rekap-blok');
     if (subpage) {
         subpage.classList.add('translate-x-full');
+    }
+
+    // 1. KUNCI KEMBALI UI form input
+    const boxInput = document.getElementById('box-workspace-input');
+    if (boxInput) {
+        boxInput.classList.add('opacity-50', 'pointer-events-none');
+    }
+
+    // 2. Opsional: Reset form agar saat dibuka kembali data lama sudah hilang
+    if (typeof resetFormTransaksi === 'function') {
+        resetFormTransaksi();
     }
 }
 
@@ -409,161 +436,6 @@ function tutupSubPageRekapBlok() {
 window.bukaSubPageRekapBlok = bukaSubPageRekapBlok;
 window.tutupSubPageRekapBlok = tutupSubPageRekapBlok;
 
-// Handler Ganti Blok Gudang
-function pilihBlokGudang(namaBlok) {
-    document.getElementById('lbl-rekap-blok').innerText = "BLOK " + namaBlok;
-    // Disini tempat Bos melakukan filter query real-time database Firebase
-}
-
-// Handler Switch Tab Transaksi IN / OUT
-let currentTabTransaksi = "MASUK";
-function gantiTabTransaksi(tipe) {
-    currentTabTransaksi = tipe;
-    const btnIn = document.getElementById('btn-tab-in');
-    const btnOut = document.getElementById('btn-tab-out');
-    const btnSimpan = document.getElementById('btn-simpan-transaksi');
-
-    if (tipe === 'MASUK') {
-        btnIn.className = "py-2.5 text-center text-xs font-bold text-emerald-700 bg-white border-b-2 border-emerald-500 transition-all";
-        btnOut.className = "py-2.5 text-center text-xs font-bold text-slate-500 hover:bg-slate-100 transition-all";
-        btnSimpan.className = "w-full py-2.5 bg-gradient-to-b from-[#10b981] to-[#059669] active:from-[#047857] text-white font-bold text-xs rounded-xl shadow-md transition-all";
-        btnSimpan.innerText = "SIMPAN DATA MASUK (IN)";
-    } else {
-        btnIn.className = "py-2.5 text-center text-xs font-bold text-slate-500 hover:bg-slate-100 transition-all";
-        btnOut.className = "py-2.5 text-center text-xs font-bold text-rose-700 bg-white border-b-2 border-rose-500 transition-all";
-        btnSimpan.className = "w-full py-2.5 bg-gradient-to-b from-[#f43f5e] to-[#e11d48] active:from-[#be123c] text-white font-bold text-xs rounded-xl shadow-md transition-all";
-        btnSimpan.innerText = "SIMPAN DATA KELUAR (OUT)";
-    }
-}
-
-function simpanTransaksiBlok() {
-    miuiAlert(`Sukses memproses data ${currentTabTransaksi} ke Server!`);
-}
-
-// HANDLER SLIDER SWITCH TOGGLE TRANSAKSI (IN/OUT)
-window.toggleEngineTransaksi = function(isOut) {
-    const titleSide = document.getElementById('title-transaksi-side');
-    const lblTanggal = document.getElementById('lbl-tx-tanggal');
-    const lblQty = document.getElementById('lbl-tx-qty');
-    const wrapperExpired = document.getElementById('wrapper-expired-input');
-    const btnSimpan = document.getElementById('btn-simpan-transaksi');
-
-    if (isOut) {
-        // JIKA DIGESER KE KANAN (BARANG KELUAR - OUT)
-        titleSide.innerText = "Input Barang Keluar";
-        titleSide.className = "text-[10px] font-bold text-rose-700 uppercase tracking-wide";
-        lblTanggal.innerText = "Tanggal Keluar";
-        lblQty.innerText = "Jumlah QTY / KRT";
-        wrapperExpired.style.display = "none"; // Hilangkan kolom expired jika barang keluar
-        
-        btnSimpan.className = "flex-1 py-1.5 bg-gradient-to-b from-[#f43f5e] to-[#e11d48] text-white font-bold text-[10px] rounded-lg shadow-md border border-rose-600 tracking-wide text-center uppercase";
-        btnSimpan.innerText = "SIMPAN OUT";
-    } else {
-        // JIKA KEMBALI KE KIRI (BARANG MASUK - IN)
-        titleSide.innerText = "Input Barang Masuk";
-        titleSide.className = "text-[10px] font-bold text-emerald-700 uppercase tracking-wide";
-        lblTanggal.innerText = "Tanggal Masuk";
-        lblQty.innerText = "Jumlah Palet";
-        wrapperExpired.style.style.display = "block"; // Munculkan kembali kolom expired
-        
-        btnSimpan.className = "flex-1 py-1.5 bg-gradient-to-b from-[#10b981] to-[#059669] text-white font-bold text-[10px] rounded-lg shadow-md border border-emerald-600 tracking-wide text-center uppercase";
-        btnSimpan.innerText = "SIMPAN IN";
-    }
-}
-
-window.resetFormTransaksi = function() {
-    document.getElementById('tx-tanggal').value = "";
-    document.getElementById('tx-palet').value = "";
-    document.getElementById('tx-expired').value = "";
-}
-
-// =========================================================================
-// HANDLER UPDATE LOGIK UTK REKAP BLOK DINAMIS MODULAR
-// =========================================================================
-
-// 1. ENGINE GANTI GUDANG (DINAMIS SINKRONISASI LABEL)
-window.pilihBlokGudang = function(namaBlok) {
-    // Sinkronisasi teks monitor dan tabel bawah
-    document.getElementById('lbl-monitor-stok').innerText = "STOK GUDANG : " + namaBlok;
-    document.getElementById('lbl-title-riwayat').innerText = "RIWAYAT TRANSAKSI : " + namaBlok;
-    document.getElementById('lbl-rekap-blok').innerText = ""+ namaBlok;
-    
-    // Disini area Bos melakukan pemanggilan data snapshot Firebase real-time sesuai namaBlok
-    console.log(`Mengambil data real-time server untuk Blok: ${namaBlok}`);
-}
-
-// 2. ENGINE SWITCH TRANSAKSI TOGGLE (WARNA, LAYOUT & LABELS SYMMETRICAL)
-window.toggleEngineTransaksi = function(isOut) {
-    const boxWorkspace = document.getElementById('box-workspace-input');
-    const titleSide = document.getElementById('title-transaksi-side');
-    const lblSwitch = document.getElementById('lbl-status-switch');
-    const lblTanggal = document.getElementById('lbl-tx-tanggal');
-    const lblQty = document.getElementById('lbl-tx-qty');
-    const badgeUnit = document.getElementById('badge-unit-input');
-    const btnSimpan = document.getElementById('btn-simpan-transaksi');
-    
-    // Element struktural kolom baru
-    const rowGrid = document.getElementById('grid-row-dinamis');
-    const wrapKarton = document.getElementById('wrapper-konversi-karton');
-
-    if (isOut) {
-        // --- MODE BARANG KELUAR (OUT) ---
-        boxWorkspace.className = "col-span-7 bg-rose-50/60 rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col transition-colors duration-200";
-        titleSide.innerText = "Input Barang Keluar";
-        titleSide.className = "text-[10px] font-bold text-rose-700 uppercase tracking-wide";
-        
-        lblSwitch.innerText = "KELUAR";
-        lblSwitch.className = "text-[9px] font-bold text-rose-600 bg-rose-100/80 px-1.5 py-0.5 rounded uppercase tracking-wider";
-        
-        lblTanggal.innerText = "Tanggal Keluar";
-        lblQty.innerText = "Jumlah Palet Keluar";
-        badgeUnit.innerText = "PLT";
-        
-        // Ubah struktur grid menjadi 3 kolom untuk menampung input Box konversi
-        rowGrid.className = "grid grid-cols-3 gap-2";
-        wrapKarton.classList.remove('hidden');
-
-        btnSimpan.className = "flex-1 py-1.5 bg-gradient-to-b from-[#f43f5e] to-[#e11d48] text-white font-bold text-[10px] rounded-lg shadow-md border border-rose-600 tracking-wide text-center uppercase";
-        btnSimpan.innerText = "SIMPAN OUT";
-    } else {
-        // --- MODE BARANG MASUK (IN) ---
-        boxWorkspace.className = "col-span-7 bg-emerald-50/60 rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col transition-colors duration-200";
-        titleSide.innerText = "Input Barang Masuk";
-        titleSide.className = "text-[10px] font-bold text-emerald-700 uppercase tracking-wide";
-        
-        lblSwitch.innerText = "MASUK";
-        lblSwitch.className = "text-[9px] font-bold text-emerald-600 bg-emerald-100/80 px-1.5 py-0.5 rounded uppercase tracking-wider";
-        
-        lblTanggal.innerText = "Tanggal Masuk";
-        lblQty.innerText = "Jumlah Palet";
-        badgeUnit.innerText = "PLT";
-        
-        // Kembalikan struktur grid menjadi 2 kolom normal
-        rowGrid.className = "grid grid-cols-2 gap-2";
-        wrapKarton.classList.add('hidden');
-
-        btnSimpan.className = "flex-1 py-1.5 bg-gradient-to-b from-[#10b981] to-[#059669] text-white font-bold text-[10px] rounded-lg shadow-md border border-emerald-600 tracking-wide text-center uppercase";
-        btnSimpan.innerText = "SIMPAN IN";
-    }
-    resetFormTransaksi();
-}
-
-// 3. AUTOMATIC CONVERSION FACTOR (PALET TO KARTON)
-window.hitungKonversiKartonOtomatis = function(valPalet) {
-    const txtKarton = document.getElementById('tx-karton-readonly');
-    if (!valPalet || isNaN(valPalet)) {
-        txtKarton.value = "";
-        return;
-    }
-    // Asumsi standar operasional: 1 Palet = 77 Karton (bisa Bos ubah pengalinya sesuai standar WH-2)
-    const factorKonversi = 77; 
-    txtKarton.value = parseInt(valPalet) * factorKonversi;
-}
-
-// 4. ACTION UTILITY BUTTONS
-window.exportRekapBlokPDF = function() {
-    miuiAlert("Memproses Export File PDF untuk Rekapitulasi Data Blok... Selesai!");
-}
 
 
 // ==========================================================================

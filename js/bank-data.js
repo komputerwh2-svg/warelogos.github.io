@@ -5,7 +5,7 @@
 const BD_FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
 
 // URL Web App Google Apps Script untuk sinkronisasi 2 arah ke Spreadsheet (Sheet KODE - 7 Kolom)
-const SPREADSHEET_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbw7t9pv3LXVP1GSGCua98RNIpvCWWeWcp5V_GFAX93tkyu9E1XhtwnUVDm2lf09SihwWA/exec";
+const SPREADSHEET_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyrop5-Mn4uSKd3P9r1XyQG3F-0G6EJnxYwncH3UKKywKgwIO3OJuPtH2wt8fFsPUCGAA/exec";
 
 // Fungsi ganti switch mode bank data (Kode, Driver, Tujuan) dengan efek geser slider MIUI v5
 function gantiSwitchModeBankData(mode) {
@@ -288,19 +288,38 @@ function simpanDataMasterBD() {
  * Mengubah Status Aktif Barang secara realtime saat Slider MIUI v5 digeser
  */
 function ubahStatusAktifBarangBD(nodeKey, statusCentang) {
+    // 1. Update ke Firebase (agar Web App langsung sinkron)
     fetch(`${BD_FIREBASE_URL}master_barang/${nodeKey}/IS_ACTIVE.json`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(statusCentang)
     })
     .then(res => {
-        if (!res.ok) throw new Error("Gagal memperbarui status aktif.");
-        console.log(`Status item ${nodeKey} berhasil diubah menjadi: ${statusCentang}`);
+        if (!res.ok) throw new Error("Gagal update Firebase");
+        console.log(`Firebase updated: ${nodeKey} = ${statusCentang}`);
+        
+        // 2. Jika sukses, segera kirim data ke Webhook App Script (Spreadsheet)
+        if (typeof SPREADSHEET_WEBHOOK_URL !== 'undefined') {
+            return fetch(SPREADSHEET_WEBHOOK_URL, {
+                method: "POST",
+                mode: "no-cors", // Penting untuk menghindari masalah CORS dengan Apps Script
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    KODE_BARANG: nodeKey, // Mengirim Key sebagai referensi
+                    IS_ACTIVE: statusCentang
+                })
+            });
+        }
+    })
+    .then(() => {
+        console.log("Spreadsheet berhasil disinkronisasi.");
     })
     .catch(err => {
-        console.error(err);
-        miuiAlert("Gagal merubah status item. Hubungkan kembali koneksi internet!");
-        document.getElementById(`toggle-${nodeKey}`).checked = !statusCentang;
+        console.error("Sinkronisasi gagal:", err);
+        // Rollback slider jika koneksi gagal
+        const toggle = document.getElementById(`toggle-${nodeKey}`);
+        if (toggle) toggle.checked = !statusCentang;
+        alert("Gagal memperbarui status ke database utama. Cek koneksi internet.");
     });
 }
 
