@@ -126,8 +126,13 @@
                     </div>
 
                     <div class="pt-1 flex gap-1.5">
-                        <button onclick="resetFormTransaksi()" class="px-2.5 py-1.5 bg-white text-slate-600 font-bold text-[10px] rounded-lg border border-slate-300 shadow-sm active:bg-slate-100 transition-all">BATAL</button>
-                        <button id="btn-simpan-transaksi" onclick="simpanTransaksiBlok()" class="flex-1 py-1.5 bg-gradient-to-b from-[#10b981] to-[#059669] text-white font-bold text-[10px] rounded-lg shadow-md border border-emerald-600 tracking-wide text-center uppercase">
+                        <button onclick="resetFormTransaksi()" 
+                            class="px-2.5 py-1.5 bg-white text-slate-600 font-bold text-[10px] rounded-lg border border-slate-300 shadow-sm active:bg-slate-100 active:scale-[0.98] transition-all">
+                            BATAL
+                        </button>
+                        
+                        <button id="btn-simpan-transaksi" onclick="simpanTransaksiBlok()" 
+                            class="flex-1 py-1.5 bg-gradient-to-b from-[#10b981] to-[#059669] text-white font-bold text-[10px] rounded-lg shadow-md border border-emerald-600 tracking-wide text-center uppercase active:scale-[0.98] transition-all">
                             SIMPAN IN
                         </button>
                     </div>
@@ -151,10 +156,76 @@
                                 <th class="py-1 px-1 text-center">KARTON</th>
                                 <th class="py-1 px-1 text-center">PALET</th>
                                 <th class="py-1 px-1 text-center">EXPIRED</th>
+                                <th class="py-1 px-1 text-center">AKSI</th>
                             </tr>
                         </thead>
                         <tbody id="table-riwayat-blok" class="divide-y divide-slate-100 font-medium text-slate-700"></tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="modal-edit-transaksi" class="fixed inset-0 bg-black bg-opacity-40 hidden z-[9999] flex items-center justify-center p-3">
+            <div class="bg-white rounded-[12px] w-full max-w-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] overflow-hidden">
+                <div class="w-full h-14 bg-gradient-to-b from-[#3c3c3c] to-[#2a2a2a] flex items-center justify-between px-3 shadow-md border-b border-[#1a1a1a]">
+                    <h3 class="text-white font-semibold text-sm ml-3 tracking-wide drop-shadow-md uppercase">Edit Transaksi</h3>
+                    <button onclick="tutupModalEdit()" class="text-orange-400 shadow-inner">✕</button>
+                </div>
+                
+                <input type="hidden" id="edit-id-transaksi">
+                
+                <div class="p-4 space-y-3">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-[9px] font-bold text-gray-400 uppercase">Tanggal</label>
+                            <select id="edit-tanggal" class="w-full mt-1 border border-gray-200 rounded-[6px] px-2 py-1.5 text-[11px] font-bold text-gray-800 bg-white outline-none focus:border-orange-500">
+                                </select>
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-bold text-gray-400 uppercase">Tipe</label>
+                            <select id="edit-tipe" class="w-full mt-1 border border-gray-200 rounded-[6px] px-2 py-1.5 text-[11px] font-bold text-gray-800 bg-white outline-none focus:border-orange-500">
+                                <option value="MASUK">MASUK</option>
+                                <option value="KELUAR">KELUAR</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="text-[9px] font-bold text-gray-400 uppercase">Kode Barang</label>
+                        <input type="text" id="edit-kode" class="w-full mt-1 border border-gray-200 rounded-[6px] px-2 py-1.5 text-[11px] font-bold text-gray-500 bg-gray-50" readonly>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-[9px] font-bold text-gray-400 uppercase">Palet</label>
+                            <input type="number" id="edit-palet" 
+                                oninput="hitungKonversiKartonEdit(this.value)" 
+                                class="w-full mt-1 border border-gray-200 rounded-[6px] px-2 py-1.5 text-[11px] font-bold text-gray-800 outline-none focus:border-orange-500">
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-bold text-gray-400 uppercase">Karton</label>
+                            <input type="number" id="edit-karton" class="w-full mt-1 border border-gray-200 rounded-[6px] px-2 py-1.5 text-[11px] font-bold text-gray-800 outline-none focus:border-orange-500" readonly>
+                        </div>
+
+                        <input type="hidden" id="edit-kode-asli">
+                    </div>
+
+                    <div>
+                        <label class="text-[9px] font-bold text-gray-400 uppercase">Expired</label>
+                        <input type="text" id="edit-expired" class="w-full mt-1 border border-gray-200 rounded-[6px] px-2 py-1.5 text-[11px] font-bold text-gray-800 outline-none focus:border-orange-500">
+                    </div>
+                </div>
+
+                <div class="px-4 py-3 bg-gray-50 flex gap-2">
+                    <button onclick="simpanEditTransaksi()" 
+                        class="flex-1 py-2 text-white font-black text-[11px] rounded-[6px] shadow-sm active:scale-[0.98] transition-all uppercase tracking-widest" 
+                        style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #ea580c;">
+                        Update Data
+                    </button>
+                    <button onclick="tutupModalEdit()" 
+                        class="flex-1 py-2 bg-[#666666] hover:bg-[#555555] text-white font-black text-[11px] rounded-[6px] shadow-sm border border-[#444444] active:scale-[0.98] transition-all uppercase tracking-widest">
+                        BATAL
+                    </button>
                 </div>
             </div>
         </div>
