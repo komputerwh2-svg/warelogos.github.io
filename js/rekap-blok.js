@@ -188,93 +188,99 @@ window.populateKodeBarangOut = async function(namaBlok) {
     }
 };
 
-// Pastikan ID 'tx-kode' sesuai dengan dropdown barang Anda
-const dropdownBarang = document.getElementById('tx-kode');
 
-if (dropdownBarang) {
-    dropdownBarang.addEventListener('change', function() {
-        const kodeBarang = this.value;
-        const namaBlok = window.selectedBlok; // Mengambil blok yang sedang aktif
 
-        if (kodeBarang && namaBlok) {
-            // Panggil fungsi untuk mengambil data expired secara FIFO
-            window.populateExpiredFIFO(namaBlok, kodeBarang);
-            // Tambahkan ini agar saat tanggal expired diganti, qty langsung tervalidasi ulang
-            const dropdownExp = document.getElementById('expired-barang-out');
-            if (dropdownExp) {
-                dropdownExp.addEventListener('change', function() {
-                    const inputQty = document.getElementById('tx-qty-plt-out');
-                    if (inputQty && inputQty.value) {
-                        // Trigger ulang event input agar fungsi validasi di atas berjalan lagi
-                        inputQty.dispatchEvent(new Event('input')); 
-                    }
-                });
-            }
-        } else {
-            // Bersihkan dropdown expired jika tidak ada barang yang dipilih
-            const dropdownExp = document.getElementById('expired-barang-out');
-            if (dropdownExp) dropdownExp.innerHTML = '<option value="">Pilih Expired...</option>';
-        }
-    });
-}
-
+// 1. FUNGSI LOGIKA (Hanya mengambil data dan mengisi dropdown)
 window.populateExpiredFIFO = async function(namaBlok, kodeBarang) {
-    const dropdownExp = document.getElementById('expired-barang-out');
+    const dropdownExpired = document.getElementById('tx-expired');
+    if (!dropdownExpired) return;
+
+    dropdownExpired.innerHTML = '<option value="">Memuat...</option>';
     const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
 
     try {
         const response = await fetch(`${FIREBASE_URL}stok_blok/${namaBlok.trim()}/${kodeBarang}.json`);
         const expData = await response.json();
 
-        dropdownExp.innerHTML = '<option value="">Pilih Expired...</option>';
-        
+        dropdownExpired.innerHTML = '<option value="">Pilih Expired...</option>';
+
         if (expData) {
-            // Sort berdasarkan tanggal (FIFO)
-            const sorted = Object.entries(expData).sort((a, b) => {
-                return new Date(`01-${a[0]}-2026`) - new Date(`01-${b[0]}-2026`);
+            const listExpired = Object.entries(expData).map(([exp, val]) => ({
+                exp: exp,
+                plt: parseInt(val.plt) || 0
+            })).filter(item => item.plt > 0);
+
+            listExpired.sort((a, b) => {
+                const dateA = new Date(`01-${a.exp.replace('-', '-')}-20${a.exp.split('-')[0]}`);
+                const dateB = new Date(`01-${b.exp.replace('-', '-')}-20${b.exp.split('-')[0]}`);
+                return dateA - dateB;
             });
 
-            sorted.forEach(([exp, val]) => {
-                if (parseInt(val.plt) > 0) {
-                    dropdownExp.innerHTML += `<option value="${exp}" data-plt="${val.plt}">${exp} (Sisa: ${val.plt} PLT)</option>`;
-                }
+            listExpired.forEach(item => {
+                dropdownExpired.innerHTML += `<option value="${item.exp}" data-plt="${item.plt}">${item.exp} (SISA ${item.plt} PLT)</option>`;
             });
 
-            // OTOMATIS PILIH STOK TERLAMA
-            if (dropdownExp.options.length > 1) {
-                dropdownExp.selectedIndex = 1; // Pilih opsi pertama setelah "Pilih Expired..."
-                dropdownExp.dispatchEvent(new Event('change')); // Trigger event agar aplikasi tahu ada perubahan
+            if (listExpired.length > 0) {
+                dropdownExpired.selectedIndex = 1;
+                dropdownExpired.dispatchEvent(new Event('change'));
             }
+        } else {
+            dropdownExpired.innerHTML = '<option value="">Stok Kosong</option>';
         }
-    } catch (e) {
-        console.error("Gagal load expired:", e);
+    } catch (error) {
+        console.error("Gagal load data expired:", error);
     }
 };
 
-// Tambahkan ini di bagian inisialisasi aplikasi Anda
-const inputQtyPlt = document.getElementById('tx-qty-plt-out'); // Sesuaikan ID dengan input Anda
+// 2. FUNGSI INISIALISASI (Jalankan ini SATU KALI SAJA saat halaman dimuat)
+// Fungsi ini menangani semua "pendengar" tombol/input
+window.initOutEventListeners = function() {
+    const dropdownBarang = document.getElementById('tx-kode');
+    const inputQtyPlt = document.getElementById('tx-palet'); // <--- ID SUDAH DISINKRONKAN
 
-if (inputQtyPlt) {
-    inputQtyPlt.addEventListener('input', function() {
-        const dropdownExp = document.getElementById('expired-barang-out');
-        const selectedOption = dropdownExp.options[dropdownExp.selectedIndex];
-        
-        if (!selectedOption || !selectedOption.dataset.plt) return;
+    // A. Listener saat barang dipilih (Memicu pengambilan data Expired)
+    if (dropdownBarang) {
+        dropdownBarang.addEventListener('change', function() {
+            window.populateExpiredFIFO(window.selectedBlok, this.value);
+        });
+    }
 
-        const stokTersedia = parseInt(selectedOption.dataset.plt);
-        const qtyDiminta = parseInt(this.value) || 0;
+    // B. Listener saat qty diinput (Validasi stok)
+    if (inputQtyPlt) {
+        inputQtyPlt.addEventListener('input', function() {
+            const dropdownExp = document.getElementById('tx-expired');
+            if (!dropdownExp) return;
 
-        if (qtyDiminta > stokTersedia) {
-            // Panggil miuiAlert (sesuaikan dengan fungsi alert Anda)
-            if (typeof miuiAlert === 'function') {
-                miuiAlert("Peringatan", `Stok tidak mencukupi! Stok tersedia: ${stokTersedia} PLT.`);
-            } else {
-                alert(`Stok tidak mencukupi! Hanya tersedia ${stokTersedia} PLT.`);
+            const selectedOption = dropdownExp.options[dropdownExp.selectedIndex];
+            
+            if (!selectedOption || !selectedOption.dataset.plt) return;
+
+            const stokTersedia = parseInt(selectedOption.dataset.plt);
+            const qtyDiminta = parseInt(this.value) || 0;
+
+            if (qtyDiminta > stokTersedia) {
+                const msg = `Stok tidak mencukupi! Stok Tersedia: ${stokTersedia} PLT.`;
+                
+                if (typeof miuiAlert === 'function') {
+                    miuiAlert("Peringatan: " + msg); 
+                } else {
+                    alert(msg);
+                }
+                
+                // 1. Reset nilai input PLT ke stok maksimal
+                this.value = stokTersedia;
+
+                // 2. TRIGGER KONVERSI OTOMATIS
+                // Panggil fungsi konversi Anda dengan nilai maksimal tersebut
+                // agar input Karton di layar ikut berubah
+                if (typeof hitungKonversiKartonOtomatis === 'function') {
+                    hitungKonversiKartonOtomatis(stokTersedia);
+                }
             }
-            this.value = stokTersedia; // Reset ke batas maksimal stok
-        }
-    });
-}
+        });
+    }
+};
+
 
 // WAJIB ADA: Mengikat fungsi ke window agar bisa diakses main.js
 window.initRekapBlok = initRekapBlok;
@@ -346,22 +352,17 @@ window.toggleEngineTransaksi = function(isOut) {
     if (isOut) {
         if (blokTerpilih) {
             window.populateKodeBarangOut(blokTerpilih);
-
+            window.populateExpiredFIFO(blokTerpilih, "");
+            window.initOutEventListeners(); // Pastikan event listener untuk mode OUT diinisialisasi
         } else {
             if (select) select.innerHTML = '<option value="">Pilih Blok Dahulu!</option>';
         }
     } else {
         // Mode MASUK
         window.loadDropdownBarang("IN", window.selectedBlok);
-        
-        // Panggil dengan jeda singkat untuk memastikan elemen sudah dirender
-        setTimeout(() => {
-            if (typeof window.generateExpiredList === 'function') {
-                window.generateExpiredList();
-            } else {
-                console.error("Fungsi generateExpiredList tidak ditemukan!");
-            }
-        }, 100);
+        if (typeof window.generateExpiredList === 'function') {
+            window.generateExpiredList();
+        }
     }
     
     if (typeof resetFormTransaksi === 'function') resetFormTransaksi();
@@ -378,7 +379,7 @@ window.resetFormTransaksi = function() {
     document.getElementById('tx-expired').value = "";
 };
 
-window.selectedBlok = ""; // Pastikan inisialisasi awal sesuai dengan kebutuhan Anda. Bisa juga kosong jika ingin memaksa pilih blok terlebih dahulu.
+window.selectedBlok = "RETUR"; // Pastikan inisialisasi awal sesuai dengan kebutuhan Anda. Bisa juga kosong jika ingin memaksa pilih blok terlebih dahulu.
 window.pilihBlokGudang = function(namaBlok) {
     // 1. Simpan ke variabel global
     window.selectedBlok = namaBlok;
@@ -402,9 +403,13 @@ window.pilihBlokGudang = function(namaBlok) {
     if (isOut) {
         // Jika mode KELUAR, pakai fungsi khusus stok
         window.populateKodeBarangOut(namaBlok);
+        window.populateExpiredFIFO(namaBlok, ""); // Pastikan ini dipanggil setelah dropdown barang terisi
+        window.toggleEngineTransaksi(true); // Pastikan mode OUT aktif agar event listener dan UI sesuai
+        window.initOutEventListeners(); // Pastikan event listener untuk mode OUT diinisialisasi
     } else {
         // Jika mode MASUK, pakai fungsi master barang
         window.loadDropdownBarang("IN", namaBlok);
+        window.toggleEngineTransaksi(false); // Pastikan mode IN aktif agar event listener dan UI sesuai
         if (typeof window.generateExpiredList === 'function') {
             window.generateExpiredList();
         }
@@ -416,6 +421,8 @@ window.pilihBlokGudang = function(namaBlok) {
     if (typeof renderRiwayatBlok === 'function') renderRiwayatBlok(namaBlok);
     if (typeof updateTotalStokBlok === 'function') updateTotalStokBlok(namaBlok);
     if (typeof updateInfoTransaksi === 'function') updateInfoTransaksi(namaBlok);
+    if (typeof toggleEngineTransaksi === 'function') toggleEngineTransaksi(isOut); // Pastikan mode transaksi sesuai dengan status switch saat blok dipilih 
+    if (typeof initOutEventListeners === 'function') initOutEventListeners(); // Pastikan event listener untuk mode OUT diinisialisasi jika mode OUT aktif  
 };
 
 window.hitungKonversiKartonOtomatis = function(valPalet) {
@@ -555,21 +562,18 @@ window.renderRiwayatBlok = async function(namaBlok) {
     const data = await resLog.json();
     const masterBarang = await resMaster.json();
     
-    // Perbaikan Logika: Pastikan data bukan null DAN bukan objek kosong
     if (!data || Object.keys(data).length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-2 text-slate-400">Belum ada transaksi</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-2 text-slate-400">Belum ada transaksi</td></tr>`;
         return;
     }
 
-    // Filter dan Sort
     const riwayatArray = Object.entries(data)
         .map(([id, val]) => ({ id, ...val }))
         .filter(item => item.blok === targetBlok)
         .sort((a, b) => b.id.localeCompare(a.id)); 
 
-    // PERBAIKAN KRITIS: Cek apakah setelah filter array-nya kosong
     if (riwayatArray.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-2 text-slate-400">Belum ada transaksi untuk blok ini</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-2 text-slate-400">Belum ada transaksi untuk blok ini</td></tr>`;
         return;
     }
 
@@ -587,7 +591,7 @@ window.renderRiwayatBlok = async function(namaBlok) {
         
         return `
             <tr class="hover:bg-slate-50 border-b border-slate-50">
-                <td class="py-1 px-2 text-slate-400 text-[9px] whitespace-nowrap">${tglDisplay}</td>
+                <td class="py-1 px-2 text-slate-400 text-[9px] w-[55px] truncate">${tglDisplay}</td>
                 <td class="py-1 px-1 text-center">
                     <span class="${isOut ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'} text-[8px] px-1 rounded font-bold">
                         ${isOut ? 'OUT' : 'IN'}
@@ -597,9 +601,267 @@ window.renderRiwayatBlok = async function(namaBlok) {
                 <td class="py-1 px-1 text-center text-[10px] text-slate-600">${item.qtyKarton || 0}</td>
                 <td class="py-1 px-1 text-center font-bold text-[10px]">${item.qtyPalet || 0}</td>
                 <td class="py-1 px-1 text-center text-[9px] text-slate-500 font-medium">${item.expired || '-'}</td>
+                <td class="py-1 px-2 flex justify-center gap-1">
+                    <button onclick="editTransaksi('${item.id}')" class="text-blue-500 hover:text-blue-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                    </button>
+                    <button onclick="hapusTransaksi('${item.id}')" class="text-red-500 hover:text-red-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                </td>
             </tr>
         `;
     }).join('');
+};
+
+// Fungsi untuk menghapus transaksi dan menyesuaikan stok
+window.hapusTransaksi = function(idTransaksi) {
+    miuiConfirm("Yakin ingin menghapus transaksi ini? Stok akan disesuaikan kembali.", async function() {
+        
+        const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
+
+        try {
+            const res = await fetch(`${FIREBASE_URL}log_transaksi/${idTransaksi}.json`);
+            const trans = await res.json();
+            
+            if (!trans) {
+                miuiAlert("Data transaksi tidak ditemukan!");
+                return;
+            }
+
+            const isOut = trans.tipe === "KELUAR";
+            const pathStok = `${FIREBASE_URL}stok_blok/${trans.blok}/${trans.kodeBarang}/${trans.expired}.json`;
+            
+            // 1. AMBIL DATA STOK TERKINI DULU
+            const resStok = await fetch(pathStok);
+            const dataStok = await resStok.json() || { plt: 0, krt: 0 }; 
+
+            // 2. HITUNG PENYESUAIAN
+            // Kita gunakan (trans.qtyPalet || 0) untuk mencegah nilai undefined
+            const penyesuaianPlt = isOut ? parseInt(trans.qtyPalet || 0) : -parseInt(trans.qtyPalet || 0);
+            const penyesuaianKrt = isOut ? parseInt(trans.qtyKarton || 0) : -parseInt(trans.qtyKarton || 0);
+            
+            const newQtyPlt = parseInt(dataStok.plt || 0) + penyesuaianPlt;
+            const newQtyKrt = parseInt(dataStok.krt || 0) + penyesuaianKrt;
+
+            // 3. KIRIM KEDUANYA AGAR TIDAK HILANG
+            // Kita paksa kirim plt dan krt agar struktur objek di Firebase tetap utuh
+            await fetch(pathStok, { 
+                method: 'PATCH', 
+                body: JSON.stringify({ 
+                    plt: newQtyPlt,
+                    krt: newQtyKrt 
+                }) 
+            });
+            
+            await fetch(`${FIREBASE_URL}log_transaksi/${idTransaksi}.json`, { method: 'DELETE' });
+
+            miuiAlert("Transaksi berhasil dihapus dan stok telah disesuaikan!");
+            
+            // Refresh UI
+            window.renderRiwayatBlok(window.selectedBlok);
+            if (typeof window.renderRekapStok === 'function') window.renderRekapStok(trans.blok);
+            if (typeof window.updateTotalStokBlok === 'function') window.updateTotalStokBlok(trans.blok);
+
+        } catch (error) {
+            console.error("Error:", error);
+            miuiAlert("Terjadi kesalahan saat menghapus data.");
+        }
+    });
+};
+
+// Fungsi untuk mengedit transaksi (Anda harus membuat form/modal untuk ini)
+window.editTransaksi = async function(idTransaksi) {
+    const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
+    
+    // 1. Ambil data dengan loading state (optional: tambahkan indikator loading jika perlu)
+    const [resLog, resMaster] = await Promise.all([
+        fetch(`${FIREBASE_URL}log_transaksi/${idTransaksi}.json`),
+        fetch(`${FIREBASE_URL}master_barang.json`)
+    ]);
+
+    const data = await resLog.json();
+    const masterBarang = await resMaster.json();
+
+    if (!data) return miuiAlert("Data transaksi tidak ditemukan!");
+
+    // Simpan data master ke global agar bisa diakses oleh fungsi konversi
+    window.dataMasterBarang = masterBarang;
+
+    // 2. Generate Dropdown Tanggal
+    const tglSelect = document.getElementById('edit-tanggal');
+    if (tglSelect) {
+        tglSelect.innerHTML = "";
+        for (let i = 0; i <= 10; i++) {
+            let d = new Date();
+            d.setDate(d.getDate() - i);
+            let dd = String(d.getDate()).padStart(2, '0');
+            let mm = String(d.getMonth() + 1).padStart(2, '0');
+            let yyyy = d.getFullYear();
+            let val = `${yyyy}-${mm}-${dd}`;
+            let text = `${dd}/${mm}/${yyyy}`;
+            
+            let opt = document.createElement("option");
+            opt.value = val;
+            opt.textContent = text;
+            tglSelect.appendChild(opt);
+        }
+
+        if (tglSelect.querySelector(`option[value="${data.tanggal}"]`)) {
+            tglSelect.value = data.tanggal;
+        } else {
+            let optExtra = document.createElement("option");
+            optExtra.value = data.tanggal;
+            optExtra.textContent = data.tanggal;
+            tglSelect.appendChild(optExtra);
+            tglSelect.value = data.tanggal;
+        }
+    }
+
+    // 3. Set data lainnya ke elemen form
+    const infoBarang = masterBarang ? masterBarang[data.kodeBarang] : null;
+    const displayKode = infoBarang ? infoBarang.INISIAL : data.kodeBarang;
+
+    const mapping = {
+        'edit-id-transaksi': idTransaksi,
+        'edit-tipe': data.tipe,
+        'edit-kode': displayKode,
+        'edit-palet': data.qtyPalet,
+        'edit-kode-asli': data.kodeBarang,
+        'edit-expired': data.expired
+    };
+
+    for (const [id, value] of Object.entries(mapping)) {
+        const el = document.getElementById(id);
+        if (el) el.value = value;
+    }
+
+    // 4. Trigger hitung konversi (Pastikan ini dijalankan setelah input terisi)
+    if (typeof window.hitungKonversiKartonEdit === 'function') {
+        // Kita panggil fungsi ini dengan delay 0 (setTimeout) 
+        // untuk memastikan DOM benar-benar selesai update nilai
+        setTimeout(() => {
+            window.hitungKonversiKartonEdit(data.qtyPalet);
+        }, 50);
+    }
+
+    // 5. Tampilkan Modal
+    const modal = document.getElementById('modal-edit-transaksi');
+    if (modal) {
+        modal.classList.remove('hidden');
+    }
+};
+
+window.simpanEditTransaksi = async function() {
+    const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
+    const idTransaksi = document.getElementById('edit-id-transaksi').value;
+
+    miuiConfirm("Yakin ingin menyimpan perubahan? Stok akan disesuaikan secara otomatis.", async function() {
+        try {
+            // 1. Ambil data transaksi lama
+            const res = await fetch(`${FIREBASE_URL}log_transaksi/${idTransaksi}.json`);
+            const transLama = await res.json();
+            
+            if (!transLama) return miuiAlert("Data transaksi asli tidak ditemukan!");
+
+            // 2. REVERT STOK LAMA (Batalkan dampak transaksi lama)
+            const isOutLama = transLama.tipe === "KELUAR";
+            const pathStokLama = `${FIREBASE_URL}stok_blok/${transLama.blok}/${transLama.kodeBarang}/${transLama.expired}.json`;
+            const resStokLama = await fetch(pathStokLama);
+            const dataStokLama = await resStokLama.json() || { plt: 0, krt: 0 };
+
+            // Jika dulu KELUAR, stok ditambah kembali. Jika dulu MASUK, stok dikurangi.
+            const revertPlt = isOutLama ? parseInt(transLama.qtyPalet || 0) : -parseInt(transLama.qtyPalet || 0);
+            const revertKrt = isOutLama ? parseInt(transLama.qtyKarton || 0) : -parseInt(transLama.qtyKarton || 0);
+            
+            await fetch(pathStokLama, { 
+                method: 'PATCH', 
+                body: JSON.stringify({ 
+                    plt: parseInt(dataStokLama.plt || 0) + revertPlt,
+                    krt: parseInt(dataStokLama.krt || 0) + revertKrt 
+                }) 
+            });
+
+            // 3. SIAPKAN DATA BARU
+            const dataBaru = {
+                tanggal: document.getElementById('edit-tanggal').value,
+                tipe: document.getElementById('edit-tipe').value,
+                kodeBarang: document.getElementById('edit-kode-asli').value,
+                qtyPalet: parseInt(document.getElementById('edit-palet').value || 0),
+                qtyKarton: parseInt(document.getElementById('edit-karton').value || 0),
+                expired: document.getElementById('edit-expired').value,
+                blok: transLama.blok // Blok tidak berubah
+            };
+
+            // 4. TERAPKAN STOK BARU
+            const pathStokBaru = `${FIREBASE_URL}stok_blok/${dataBaru.blok}/${dataBaru.kodeBarang}/${dataBaru.expired}.json`;
+            const resStokBaru = await fetch(pathStokBaru);
+            const dataStokBaru = await resStokBaru.json() || { plt: 0, krt: 0 };
+
+            const isOutBaru = dataBaru.tipe === "KELUAR";
+            const updatePlt = isOutBaru ? -dataBaru.qtyPalet : dataBaru.qtyPalet;
+            const updateKrt = isOutBaru ? -dataBaru.qtyKarton : dataBaru.qtyKarton;
+
+            await fetch(pathStokBaru, { 
+                method: 'PATCH', 
+                body: JSON.stringify({ 
+                    plt: parseInt(dataStokBaru.plt || 0) + updatePlt,
+                    krt: parseInt(dataStokBaru.krt || 0) + updateKrt 
+                }) 
+            });
+
+            // 5. UPDATE LOG TRANSAKSI
+            await fetch(`${FIREBASE_URL}log_transaksi/${idTransaksi}.json`, { 
+                method: 'PATCH', 
+                body: JSON.stringify(dataBaru) 
+            });
+
+            miuiAlert("Data berhasil diupdate dan stok telah disesuaikan!");
+            tutupModalEdit();
+
+            // Refresh UI
+            window.renderRiwayatBlok(dataBaru.blok);
+            if (typeof window.renderRekapStok === 'function') window.renderRekapStok(dataBaru.blok);
+            if (typeof window.updateTotalStokBlok === 'function') window.updateTotalStokBlok(dataBaru.blok);
+
+        } catch (error) {
+            console.error("Error:", error);
+            miuiAlert("Terjadi kesalahan saat mengupdate data.");
+        }
+    });
+};
+
+window.tutupModalEdit = () => document.getElementById('modal-edit-transaksi').classList.add('hidden');
+
+window.hitungKonversiKartonEdit = function(valPalet) {
+    const txtKarton = document.getElementById('edit-karton');
+    const elKodeAsli = document.getElementById('edit-kode-asli');
+    
+    // Safety check: Jika elemen tidak ada, jangan paksa eksekusi
+    if (!txtKarton || !elKodeAsli) {
+        console.warn("Konversi Karton: Elemen edit-karton/edit-kode-asli belum siap di DOM.");
+        return;
+    }
+
+    const kodeAsli = elKodeAsli.value;
+    const valP = parseInt(valPalet) || 0;
+
+    // Jika kode barang atau palet kosong, reset karton ke 0
+    if (!kodeAsli || valP === 0) {
+        txtKarton.value = "0";
+        return;
+    }
+
+    // Ambil data master
+    const dataBarang = window.dataMasterBarang || {};
+    const barangDitemukan = dataBarang[kodeAsli];
+
+    if (barangDitemukan && barangDitemukan.QTY) {
+        const pengali = parseInt(barangDitemukan.QTY);
+        txtKarton.value = valP * pengali;
+    } else {
+        txtKarton.value = "0";
+    }
 };
 
 // Fungsi untuk menghitung total stok blok dan update di header
@@ -765,6 +1027,56 @@ window.renderRekapStok = async function(namaBlok) {
 };
 
 
+
 window.exportRekapBlokPDF = function() {
     miuiAlert("Memproses Export File PDF...");
 };
+
+// =========================================================================
+// SYSTEM COMPONENT: CUSTOM NOTIF miuiAlert ENGINE (MIUI V5 SPEC)
+// =========================================================================
+function miuiAlert(pesan) {
+    const box = document.getElementById('miui-global-miuiAlert');
+    const teks = document.getElementById('miui-miuiAlert-message');
+    const contOk = document.getElementById('miui-container-ok');
+    const contConfirm = document.getElementById('miui-container-confirm');
+
+    teks.innerText = pesan;
+    contOk.classList.remove('hidden');    // Tampilkan OK
+    contConfirm.classList.add('hidden'); // Sembunyikan Ya/Batal
+    box.classList.remove('hidden');
+}
+
+function tutupmiuiAlert() {
+    document.getElementById('miui-global-miuiAlert').classList.add('hidden');
+}
+
+// =========================================================================
+// SYSTEM COMPONENT: CUSTOM CONFIRM ENGINE (MIUI V5 SPEC)
+// =========================================================================
+function miuiConfirm(pesan, onConfirm) {
+    const box = document.getElementById('miui-global-miuiAlert');
+    const teks = document.getElementById('miui-miuiAlert-message');
+    const contOk = document.getElementById('miui-container-ok');
+    const contConfirm = document.getElementById('miui-container-confirm');
+    const btnYa = document.getElementById('miui-btn-ya');
+    const btnTidak = document.getElementById('miui-btn-tidak');
+
+    teks.innerText = pesan;
+    contOk.classList.add('hidden');       // Sembunyikan OK
+    contConfirm.classList.remove('hidden'); // Tampilkan Ya/Batal
+    box.classList.remove('hidden');
+
+    btnYa.onclick = function() {
+        box.classList.add('hidden');
+        if (onConfirm) onConfirm();
+    };
+
+    btnTidak.onclick = function() {
+        box.classList.add('hidden');
+    };
+}
+
+window.tutupmiuiAlert = tutupmiuiAlert;
+window.miuiAlert = miuiAlert;
+window.miuiConfirm = miuiConfirm;
