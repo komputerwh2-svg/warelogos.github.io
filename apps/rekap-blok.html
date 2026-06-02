@@ -8,7 +8,7 @@
             <h1 class="text-white font-semibold text-sm ml-3 tracking-wide drop-shadow-md">Rekap Stok & Manajemen Blok</h1>
         </div>
         <div class="flex items-center gap-1.5">
-            <button onclick="exportRekapBlokPDF()" class="bg-gradient-to-b from-[#2a67e0] to-[#1a4eb8] text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-md active:scale-95 transition-all flex items-center gap-1 border border-blue-700">
+            <button id="btn-export-pdf" class="bg-gradient-to-b from-[#2a67e0] to-[#1a4eb8] text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-md active:scale-95 transition-all flex items-center gap-1 border border-blue-700">
                 <i class="fa-solid fa-file-pdf text-[10px]"></i> Export PDF
             </button>
             <button onclick="cetakCeklistBlokModular()" class="bg-gradient-to-b from-[#ff8b00] to-[#f36c00] text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-md active:scale-95 transition-all flex items-center gap-1 border border-orange-600">
@@ -21,34 +21,44 @@
         
         <div class="grid grid-cols-12 gap-3">
             <div class="col-span-7 bg-white rounded-xl p-2.5 border border-[#dcdcdc] shadow-sm flex flex-col justify-between">
-                <span class="text-[10px] font-bold text-slate-500 block mb-1.5 tracking-wider uppercase">PILIH GUDANG / BLOK:</span>
-                <div class="grid grid-cols-4 gap-1.5">
+                <div class="flex justify-between items-center mb-1.5">
+                    <span class="text-[10px] font-bold text-slate-500 tracking-wider uppercase">PILIH GUDANG / BLOK:</span>
+                    <div class="flex items-center gap-2">
+                        <span id="lbl-status-gudang" class="text-[9px] font-bold text-red-500 bg-red-100/80 px-1.5 py-0.5 rounded uppercase tracking-wider">GUDANG NONAKTIF</span>
+                        <label class="miui-switch transform scale-90 origin-right">
+                            <input type="checkbox" id="toggle-tipe-gudang" onchange="toggleLockGudang(this.checked)">
+                            <span class="miui-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="container-pilih-gudang" class="grid grid-cols-4 gap-1.5 opacity-50 pointer-events-none transition-all duration-300">
                     <label class="cursor-pointer">
-                        <input type="radio" name="pilih_blok" value="RETUR" class="hidden peer" checked onchange="pilihBlokGudang(this.value)">
+                        <input type="radio" name="pilih_blok" value="RETUR" class="hidden peer" onchange="pilihBlokGudang(this.value)" disabled>
                         <div class="py-1 text-center text-[10px] font-bold border border-[#c8c8c8] rounded-md text-slate-700 bg-[#f9f9f9] peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-600 transition-all active:scale-95">RETUR</div>
                     </label>
                     <label class="cursor-pointer">
-                        <input type="radio" name="pilih_blok" value="TEKOMAS" class="hidden peer" onchange="pilihBlokGudang(this.value)">
+                        <input type="radio" name="pilih_blok" value="TEKOMAS" class="hidden peer" onchange="pilihBlokGudang(this.value)" disabled>
                         <div class="py-1 text-center text-[10px] font-bold border border-[#c8c8c8] rounded-md text-slate-700 bg-[#f9f9f9] peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-600 transition-all active:scale-95">TEKOMAS</div>
                     </label>
                     <label class="cursor-pointer col-span-2">
-                        <input type="radio" name="pilih_blok" value="PROMOSI" class="hidden peer" onchange="pilihBlokGudang(this.value)">
+                        <input type="radio" name="pilih_blok" value="PROMOSI" class="hidden peer" onchange="pilihBlokGudang(this.value)" disabled>
                         <div class="py-1 text-center text-[10px] font-bold border border-[#c8c8c8] rounded-md text-slate-700 bg-[#f9f9f9] peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-600 transition-all active:scale-95">PROMOSI</div>
                     </label>
                     <label class="cursor-pointer">
-                        <input type="radio" name="pilih_blok" value="BLOK 18CD" class="hidden peer" onchange="pilihBlokGudang(this.value)">
+                        <input type="radio" name="pilih_blok" value="BLOK 18CD" class="hidden peer" onchange="pilihBlokGudang(this.value)" disabled>
                         <div class="py-1 text-center text-[10px] font-bold border border-[#c8c8c8] rounded-md text-slate-700 bg-[#f9f9f9] peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-600 transition-all active:scale-95">BLOK 18CD</div>
                     </label>
                     <label class="cursor-pointer">
-                        <input type="radio" name="pilih_blok" value="BLOK 18E" class="hidden peer" onchange="pilihBlokGudang(this.value)">
+                        <input type="radio" name="pilih_blok" value="BLOK 18E" class="hidden peer" onchange="pilihBlokGudang(this.value)" disabled>
                         <div class="py-1 text-center text-[10px] font-bold border border-[#c8c8c8] rounded-md text-slate-700 bg-[#f9f9f9] peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-600 transition-all active:scale-95">BLOK 18E</div>
                     </label>
                     <label class="cursor-pointer">
-                        <input type="radio" name="pilih_blok" value="BLOK 18F" class="hidden peer" onchange="pilihBlokGudang(this.value)">
+                        <input type="radio" name="pilih_blok" value="BLOK 18F" class="hidden peer" onchange="pilihBlokGudang(this.value)" disabled>
                         <div class="py-1 text-center text-[10px] font-bold border border-[#c8c8c8] rounded-md text-slate-700 bg-[#f9f9f9] peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-600 transition-all active:scale-95">BLOK 18F</div>
                     </label>
                     <label class="cursor-pointer">
-                        <input type="radio" name="pilih_blok" value="BLOK H" class="hidden peer" onchange="pilihBlokGudang(this.value)">
+                        <input type="radio" name="pilih_blok" value="BLOK H" class="hidden peer" onchange="pilihBlokGudang(this.value)" disabled>
                         <div class="py-1 text-center text-[10px] font-bold border border-[#c8c8c8] rounded-md text-slate-700 bg-[#f9f9f9] peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-600 transition-all active:scale-95">BLOK H</div>
                     </label>
                 </div>
@@ -60,8 +70,13 @@
                     <span id="info-stok-blok" class="text-[10px] font-black text-slate-800 tracking-wide">0 <span class="text-[8px] font-normal text-slate-400">PLT</span></span>
                 </div>
                 <div class="bg-gradient-to-r from-white to-orange-50 border border-orange-200 rounded-lg px-2 py-1 flex justify-between items-center shadow-sm">
-                    <span class="text-[10px] font-bold text-orange-700 uppercase tracking-tight">KAPASITAS MAX</span>
-                    <span id="info-kapasitas-blok" class="text-[10px] font-black text-slate-800 tracking-wide">0 <span class="text-[8px] font-normal text-slate-400">MAX</span></span>
+                    <span class="text-[10px] font-bold text-orange-700 uppercase tracking-tight">KAPASITAS MAX->
+                        <button onclick="bukaModalKapasitas()" class="text-orange-500 hover:text-orange-700 transition-colors">
+                            <i class="fa-solid fa-pen-to-square text-[10px]"></i>
+                        </button>
+                    </span>
+                    <span id="info-kapasitas-blok" class="text-[10px] font-black text-slate-800 tracking-wide">0 <span class="text-[8px] font-normal text-slate-400">MAX</span>
+                    </span>
                 </div>
                 <div class="bg-gradient-to-r from-white to-blue-50 border border-blue-200 rounded-lg px-2 py-1 flex justify-between items-center shadow-sm">
                     <span class="text-[10px] font-bold text-blue-700 uppercase tracking-tight">SISA KAPASITAS</span>
@@ -139,7 +154,39 @@
                 </div>
             </div>
 
-            <div class="col-span-5 bg-white rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col">
+            <div id="modal-kapasitas" class="fixed inset-0 bg-black bg-opacity-40 hidden z-[9999] flex items-center justify-center p-3">
+                <div class="bg-white rounded-[12px] w-full max-w-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] overflow-hidden">
+                    <div class="w-full h-14 bg-gradient-to-b from-[#3c3c3c] to-[#2a2a2a] flex items-center justify-between px-3 shadow-md border-b border-[#1a1a1a]">
+                        <h3 class="text-white font-semibold text-sm ml-3 tracking-wide drop-shadow-md uppercase">Pengaturan Kapasitas</h3>
+                        <button onclick="tutupModalKapasitas()" class="text-orange-400 text-lg">✕</button>
+                    </div>
+                    
+                    <div class="p-4 space-y-4">
+                        <div>
+                            <label class="text-[9px] font-bold text-gray-400 uppercase">Kapasitas Stok (PLT)</label>
+                            <input type="number" id="input-kap-lama" class="w-full mt-1 border border-gray-200 rounded-[6px] px-2 py-1.5 text-[11px] font-bold text-gray-800 outline-none focus:border-orange-500">
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-bold text-gray-400 uppercase">Kapasitas Laporan (PLT)</label>
+                            <input type="number" id="input-kap-baru" class="w-full mt-1 border border-gray-200 rounded-[6px] px-2 py-1.5 text-[11px] font-bold text-gray-800 outline-none focus:border-orange-500">
+                        </div>
+                    </div>
+
+                    <div class="px-4 py-3 bg-gray-50 flex gap-2">
+                        <button onclick="tutupModalKapasitas()" 
+                            class="flex-1 py-2 bg-[#666666] hover:bg-[#555555] text-white font-black text-[11px] rounded-[6px] shadow-sm border border-[#444444] active:scale-[0.98] transition-all uppercase tracking-widest">
+                            BATAL
+                        </button>
+                        <button onclick="simpanKapasitas()" 
+                            class="flex-1 py-2 text-white font-black text-[11px] rounded-[6px] shadow-sm active:scale-[0.98] transition-all uppercase tracking-widest" 
+                            style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #ea580c;">
+                            SIMPAN
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="wrapper-riwayat-transaksi" class="col-span-5 bg-white rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col">
                 <div class="bg-slate-50 px-3 h-11 border-b border-[#e5e5e5] flex flex-col justify-center">
                     <div class="flex items-center justify-between">
                         <span id="lbl-title-riwayat" class="text-[10px] font-bold text-slate-700 tracking-wider uppercase">RIWAYAT TRANSAKSI</span>
@@ -217,40 +264,66 @@
                 </div>
 
                 <div class="px-4 py-3 bg-gray-50 flex gap-2">
+                    <button onclick="tutupModalEdit()" 
+                        class="flex-1 py-2 bg-[#666666] hover:bg-[#555555] text-white font-black text-[11px] rounded-[6px] shadow-sm border border-[#444444] active:scale-[0.98] transition-all uppercase tracking-widest">
+                        BATAL
+                    </button>
                     <button onclick="simpanEditTransaksi()" 
                         class="flex-1 py-2 text-white font-black text-[11px] rounded-[6px] shadow-sm active:scale-[0.98] transition-all uppercase tracking-widest" 
                         style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #ea580c;">
                         Update Data
                     </button>
-                    <button onclick="tutupModalEdit()" 
-                        class="flex-1 py-2 bg-[#666666] hover:bg-[#555555] text-white font-black text-[11px] rounded-[6px] shadow-sm border border-[#444444] active:scale-[0.98] transition-all uppercase tracking-widest">
-                        BATAL
-                    </button>
                 </div>
             </div>
         </div>
 
-        <div class="bg-white rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden">
-            <div class="bg-gradient-to-b from-slate-50 to-slate-100 px-3 py-2 border-b border-[#e5e5e5] flex justify-between items-center">
-                <span class="text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                    REKAP DETAIL STOK BARANG</span>
-                </span>
-                <span id="lbl-nama-blok-badge" class="text-[10px] bg-orange-50 px-2 py-0.5 rounded font-black text-orange-600 border-orange-200 tracking-wide">
-                    NAMA BLOK
-                </span>
+        <div class="grid grid-cols-12 gap-3 mt-4">
+    
+            <div id="wrapper-rekap-detail" class="col-span-7 bg-white rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col">
+                <div class="bg-gradient-to-b from-slate-50 to-slate-100 px-3 py-2 border-b border-[#e5e5e5] flex justify-between items-center">
+                    <span class="text-[10px] font-bold text-slate-700 uppercase tracking-wider">REKAP DETAIL STOK BARANG</span>
+                    <span id="lbl-nama-blok-badge" class="text-[10px] bg-orange-50 px-2 py-0.5 rounded font-black text-orange-600 border-orange-200 tracking-wide">
+                        NAMA BLOK
+                    </span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-[11px] border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 text-[9px] font-bold uppercase tracking-wider">
+                                <th class="py-1.5 px-4">KODE BARANG</th>
+                                <th class="py-1.5 px-4 text-center">KARTON</th>
+                                <th class="py-1.5 px-4 text-center">PALET</th>
+                                <th class="py-1.5 px-4 text-center">RINCIAN EXPIRED DATE</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-rekap-stok-item" class="w-full text-left divide-y divide-slate-100 font-medium text-slate-800"></tbody>
+                    </table>
+                </div>
             </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-[11px] border-collapse">
-                    <thead>
-                        <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 text-[9px] font-bold uppercase tracking-wider">
-                            <th class="py-1.5 px-4">KODE BARANG</th>
-                            <th class="py-1.5 px-4 text-center">KARTON</th>
-                            <th class="py-1.5 px-4 text-center">PALET</th>
-                            <th class="py-1.5 px-4 text-center">RINCIAN EXPIRED DATE</th>
-                        </tr>
-                    </thead>
-                    <tbody id="table-rekap-stok-item" class="w-full table-fixed text-left divide-y divide-slate-100 font-medium text-slate-800"></tbody>
-                </table>
+
+            <div id="wrapper-pencarian-data" class="col-span-5 bg-white rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col">
+                <div class="bg-gradient-to-b from-slate-50 to-slate-100 px-3 py-2 border-b border-[#e5e5e5] flex items-center justify-between gap-3">
+                    <span class="text-[10px] font-bold text-slate-700 uppercase tracking-wider whitespace-nowrap">CARI KODE BARANG</span>
+                    <select id="dropdown-cari-kode" 
+                            class="flex-1 text-[10px] text-slate-800 border border-slate-300 rounded px-2 py-1 outline-none focus:border-orange-500 bg-white cursor-pointer">
+                        <option value="">Pilih Kode Barang...</option>
+                    </select>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-[11px] border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 text-[9px] font-bold uppercase tracking-wider">
+                                <th class="py-1.5 px-3">LOKASI</th>
+                                <th class="py-1.5 px-3 text-center">KARTON</th>
+                                <th class="py-1.5 px-3 text-center">PALET</th>
+                                <th class="py-1.5 px-3 text-center">EXPIRED</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-pencarian-data" class="divide-y divide-slate-100 font-medium text-slate-800">
+                            </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
