@@ -613,6 +613,9 @@ window.simpanTransaksiBlok = async function() {
         if (typeof updateTotalStokBlok === 'function') updateTotalStokBlok(data.blok); 
         if (typeof updateInfoTransaksi === 'function') updateInfoTransaksi(data.blok); 
         if (typeof renderRekapStok === 'function') renderRekapStok(data.blok); // Panggil fungsi rekap Anda
+        if (typeof toggleEngineTransaksi === 'function') toggleEngineTransaksi(data.tipe === "KELUAR"); // Pastikan mode transaksi sesuai dengan tipe yang baru saja disimpan
+        if (typeof initOutEventListeners === 'function') initOutEventListeners(); // Pastikan event listener untuk mode OUT diinisialisasi jika mode OUT aktif
+        if (typeof populateKodeBarangOut === 'function') populateKodeBarangOut(data.blok); // Refresh dropdown barang keluar jika mode OUT aktif
 
     } catch (e) {
         console.error("Gagal simpan:", e);
