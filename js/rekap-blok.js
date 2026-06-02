@@ -1,5 +1,3 @@
-// REKAP-BLOK.JS
-// HAPUS URL LAMA ANDA, GANTI DENGAN INI:
 import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
 
 // --- 1. INISIALISASI ---
@@ -30,7 +28,14 @@ window.initRekapBlok = async function() {
     
     // 2. Panggil fungsi data
     await loadDropdownBarang();
-    window.loadDropdownKode(); // Panggil di sini agar data sudah tersedia  
+    window.loadDropdownKode(); // Panggil di sini agar data sudah tersedia 
+
+    const btn = document.getElementById('btn-export-pdf');
+    if (btn) {
+        btn.addEventListener('click', exportAllToPDF);
+    } else {
+        console.warn("Tombol #btn-export-pdf tidak ditemukan di DOM");
+    }
 
     // 3. Pastikan blok valid
     if (window.selectedBlok && window.selectedBlok !== "undefined") {
@@ -61,13 +66,6 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         console.warn("Dropdown belum ditemukan, mungkin dimuat secara dinamis.");
     }
-
-    const btn = document.getElementById('btn-export-pdf');
-    if (btn) {
-        btn.addEventListener('click', exportAllToPDF);
-    } else {
-        console.warn("Tombol #btn-export-pdf tidak ditemukan di DOM");
-    }
 }); 
 
 
@@ -79,7 +77,7 @@ window.generateExpiredList = function() {
         return;
     }
     
-    dropdown.innerHTML = '<option value="">Pilih Expired</option>';
+    dropdown.innerHTML = '<option value="">Pilih Expired...</option>';
     let date = new Date();
     date.setMonth(date.getMonth() + 24);
     
@@ -1329,39 +1327,40 @@ document.addEventListener('change', function(e) {
 // Di file rekap-blok.js (sebagai module):
 
 export async function exportAllToPDF() {
-    // 1. Cek library global
-    if (typeof window.jspdf === 'undefined') {
-        miuiAlert("Sistem PDF tidak ditemukan.");
-        return;
-    }
-
     try {
+        // --- 1. PASTIKAN LIBRARY TERMUAT (Dynamic Injection) ---
+        // Kita cek apakah autoTable ada, jika tidak, kita inject secara manual
         miuiAlert("Sedang menyusun laporan PDF...");
+        if (typeof window.jspdf === 'undefined' || typeof window.jspdf.autoTable === 'undefined') {
+            console.log("Library tidak ditemukan, mencoba memuat manual...");
+            
+            // Inject jspdf core
+            await new Promise((resolve) => {
+                const s = document.createElement('script');
+                s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+                s.onload = resolve;
+                document.head.appendChild(s);
+            });
+
+            // Inject autotable
+            await new Promise((resolve) => {
+                const s = document.createElement('script');
+                s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js";
+                s.onload = resolve;
+                document.head.appendChild(s);
+            });
+        }
+        // --------------------------------------------------------
 
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'pt', 'a4');
         
-        // --- FIX: Sambungkan autoTable secara manual ke instance doc ---
-        // Jika autoTable sudah dimuat via <script> tag di index.html, 
-        // ia akan menempel pada window.jspdf.
+        // Sekarang dijamin doc.autoTable ada
         if (typeof window.jspdf.autoTable === 'function') {
-            window.jspdf.autoTable(doc, {
-                startY: currentY,
-                head: [['KODE BARANG', 'KRT', 'PLT', 'Rincian Expired (PLT)']],
-                body: tableData,
-                theme: 'grid',
-                headStyles: { fillColor: [70, 130, 180] },
-                styles: { fontSize: 9 },
-                margin: { left: 40, right: 40 },
-                didDrawPage: (data) => {
-                    currentY = data.cursor.y + 30;
-                }
-            });
-        } else {
-            throw new Error("Library autoTable tidak terdeteksi!");
+            doc.autoTable = window.jspdf.autoTable;
         }
-        // --------------------------------------------------------------
 
+        // --- FETCH DATA ---
         const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
         const [resStok, resMaster] = await Promise.all([
             fetch(`${FIREBASE_URL}stok_blok.json`).then(r => r.json()),
@@ -1374,7 +1373,7 @@ export async function exportAllToPDF() {
         }
 
         doc.setFontSize(16);
-        doc.text("LAPORAN STOK BARANG PER BLOK", 40, 40);
+        doc.text("LAPORAN EXPIRED DATE ALL BLOK", 40, 40);
         doc.setFontSize(10);
         doc.text(`Dicetak pada: ${new Date().toLocaleString()}`, 40, 55);
 
@@ -1393,10 +1392,43 @@ export async function exportAllToPDF() {
                 currentY = 40;
             }
 
-            doc.setFontSize(12);
+            const blokData = resStok[namaBlok];
+            const blokData = resStok[namaBlok];
+            const kapasitasInfo = parseInt(resMaster[namaBlok]?.laporan) || 0;
+
+            // Hitung total stok dan siapkan data tabel dalam satu jalan agar efisien
+            let totalStokBlok = 0;
+
+            const tableData = Object.keys(blokData).map(kode => {
+                const expData = blokData[kode];
+                let totalKrt = 0;
+                let totalPlt = 0;
+                
+                // Hitung total per barang
+                for (const exp in expData) {
+                    totalKrt += parseInt(expData[exp].krt) || 0;
+                    totalPlt += parseInt(expData[exp].plt) || 0;
+                }
+                
+                // Tambahkan ke total gudang
+                totalStokBlok += totalPlt;
+                
+                let row = [kode, totalKrt, totalPlt];
+                sortedDates.forEach(date => row.push(expData[date]?.plt || "-"));
+                return row;
+            });
+
+            const sisaKapasitas = kapasitasInfo - totalStokBlok;
+
+            // Tampilkan Header Gudang yang baru
+            doc.setFontSize(11);
             doc.setFont("helvetica", "bold");
-            doc.text(`BLOK: ${namaBlok} | Kapasitas: ${kapasitasInfo}`, 40, currentY);
-            currentY += 15;
+            doc.text(
+                `GUDANG: ${namaBlok} | Kapasitas: ${kapasitasInfo} | Total Stok: ${totalStokBlok} | Sisa Kapasitas: ${sisaKapasitas}`, 
+                40, 
+                currentY
+            );
+            currentY += 20;
 
             const tableData = Object.keys(blokData).map(kode => {
                 const expData = blokData[kode];
@@ -1412,7 +1444,7 @@ export async function exportAllToPDF() {
                 return [kode, totalKrt, totalPlt, expDetails.join(' | ')];
             });
 
-            // Gunakan doc.autoTable setelah dipastikan terhubung
+            // Sekarang doc.autoTable dijamin ada karena kita sudah "paksa" di atas
             doc.autoTable({
                 startY: currentY,
                 head: [['KODE BARANG', 'KRT', 'PLT', 'Rincian Expired (PLT)']],
@@ -1420,10 +1452,7 @@ export async function exportAllToPDF() {
                 theme: 'grid',
                 headStyles: { fillColor: [70, 130, 180] },
                 styles: { fontSize: 9 },
-                margin: { left: 40, right: 40 },
-                didDrawPage: (data) => {
-                    currentY = data.cursor.y + 30;
-                }
+                margin: { left: 40, right: 40 }
             });
             
             currentY = doc.lastAutoTable.finalY + 30;
@@ -1434,7 +1463,7 @@ export async function exportAllToPDF() {
 
     } catch (error) {
         console.error("Error Export PDF:", error);
-        miuiAlert("Gagal membuat laporan: " + error.message);
+        miuiAlert("Gagal: " + error.message);
     }
 }
 
