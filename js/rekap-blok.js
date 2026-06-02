@@ -29,7 +29,8 @@ window.initRekapBlok = async function() {
     }
     
     // 2. Panggil fungsi data
-    await loadDropdownBarang(); 
+    await loadDropdownBarang();
+    window.loadDropdownKode(); // Panggil di sini agar data sudah tersedia  
 
     // 3. Pastikan blok valid
     if (window.selectedBlok && window.selectedBlok !== "undefined") {
@@ -50,6 +51,25 @@ window.initRekapBlok = async function() {
         if (rekapBody) rekapBody.innerHTML = `<tr><td colspan="4" class="text-center py-6 text-[10px] text-slate-500 italic">Silakan pilih gudang/blok terlebih dahulu</td></tr>`;
     }
 };
+
+document.addEventListener('DOMContentLoaded', function() {
+    const dropdown = document.getElementById('dropdown-cari-kode');
+    if (dropdown) {
+        dropdown.addEventListener('change', function() {
+            window.cariKodeBarang(this.value);
+        });
+    } else {
+        console.warn("Dropdown belum ditemukan, mungkin dimuat secara dinamis.");
+    }
+
+    const btn = document.getElementById('btn-export-pdf');
+    if (btn) {
+        btn.addEventListener('click', exportAllToPDF);
+    } else {
+        console.warn("Tombol #btn-export-pdf tidak ditemukan di DOM");
+    }
+}); 
+
 
 // Letakkan di bagian atas file JavaScript Anda
 window.generateExpiredList = function() {
@@ -192,6 +212,11 @@ window.populateKodeBarangOut = async function(namaBlok) {
 
 // 1. FUNGSI LOGIKA (Hanya mengambil data dan mengisi dropdown)
 window.populateExpiredFIFO = async function(namaBlok, kodeBarang) {
+    // TAMBAHAN: Safety Guard - Berhenti jika mode saat ini adalah MASUK (IN)
+    // Asumsi: elemen checkbox atau status toggle memiliki id 'mode-toggle'
+    const isOutMode = document.getElementById('toggle-tipe-transaksi')?.checked;
+    if (isOutMode === false) return; 
+
     const dropdownExpired = document.getElementById('tx-expired');
     if (!dropdownExpired) return;
 
@@ -286,11 +311,61 @@ window.initOutEventListeners = function() {
 window.initRekapBlok = initRekapBlok;
 window.generateExpiredList = generateExpiredList;
 window.loadDropdownBarang = loadDropdownBarang;
-
 // Tambahkan log untuk debug
 console.log("Modul Rekap Blok telah dimuat dan init terpasang.");
 
-// --- 3. HANDLER TRANSAKSI ---
+// --- HANDLER GUDANG ---
+window.toggleLockGudang = function(isUnlocked) {
+    const container = document.getElementById('container-pilih-gudang');
+    const radioButtons = container ? container.querySelectorAll('input[type="radio"]') : [];
+    const lblSwitch = document.getElementById('lbl-status-gudang');
+    
+    // Elemen tambahan yang perlu dikunci/dibuka
+    const boxInput = document.getElementById('box-workspace-input');
+    const wrapperRiwayat = document.getElementById('wrapper-riwayat-transaksi');
+    const wrapperRekap = document.getElementById('wrapper-rekap-detail');
+
+    if (isUnlocked) {
+        // --- MODE TERBUKA (ON) ---
+        if (container) container.classList.remove('opacity-50', 'pointer-events-none');
+        radioButtons.forEach(rb => rb.disabled = false);
+        
+        //if (boxInput) boxInput.classList.remove('opacity-50', 'pointer-events-none');
+        if (wrapperRiwayat) wrapperRiwayat.classList.remove('opacity-50', 'pointer-events-none');
+        if (wrapperRekap) wrapperRekap.classList.remove('opacity-50', 'pointer-events-none');
+
+        if (lblSwitch) {
+            lblSwitch.innerText = "GUDANG AKTIF";
+            lblSwitch.className = "text-[9px] font-bold text-emerald-600 bg-emerald-100/80 px-1.5 py-0.5 rounded uppercase tracking-wider";
+        }
+
+    } else {
+        // --- MODE TERKUNCI (OFF) ---
+        if (container) container.classList.add('opacity-50', 'pointer-events-none');
+        radioButtons.forEach(rb => {
+            rb.disabled = true;
+            rb.checked = false;
+        });
+
+        // Kunci semua area
+        if (boxInput) boxInput.classList.add('opacity-50', 'pointer-events-none');
+        if (wrapperRiwayat) wrapperRiwayat.classList.add('opacity-50', 'pointer-events-none');
+        if (wrapperRekap) wrapperRekap.classList.add('opacity-50', 'pointer-events-none');
+
+        window.selectedBlok = ""; // Reset variabel blok global
+        if (typeof window.initRekapBlok === 'function') window.initRekapBlok(); 
+        
+        if (lblSwitch) {
+            lblSwitch.innerText = "GUDANG NONAKTIF";
+            lblSwitch.className = "text-[9px] font-bold text-red-500 bg-red-100/80 px-1.5 py-0.5 rounded uppercase tracking-wider";
+        }
+        
+        // Reset form jika ada
+        if (typeof resetFormTransaksi === 'function') resetFormTransaksi();
+    }
+};
+
+// --- HANDLER TRANSAKSI ---
 window.toggleEngineTransaksi = function(isOut) {
     const boxWorkspace = document.getElementById('box-workspace-input');
     const titleSide = document.getElementById('title-transaksi-side');
@@ -305,11 +380,17 @@ window.toggleEngineTransaksi = function(isOut) {
     const wrapperExpired = document.getElementById('wrapper-expired-input');
     const inputKarton = document.getElementById('tx-karton-readonly');
 
-    // Gunakan variabel yang ada secara konsisten
-    const mode = isOut ? "OUT" : "IN";
-    
-    // Perbaikan: Gunakan window.selectedBlok sebagai sumber kebenaran utama
     const blokTerpilih = window.selectedBlok; 
+
+    // --- PEMBERSIHAN EVENT LISTENER ---
+    // Mengganti elemen tx-kode dengan clone-nya untuk menghapus semua event listener lama
+    const select = document.getElementById('tx-kode');
+    if (select) {
+        const newSelect = select.cloneNode(true);
+        select.parentNode.replaceChild(newSelect, select);
+    }
+    const freshSelect = document.getElementById('tx-kode');
+    freshSelect.innerHTML = '<option value="">Memuat data...</option>';
 
     // Logic UI
     if (isOut) {
@@ -328,6 +409,14 @@ window.toggleEngineTransaksi = function(isOut) {
         wrapperExpired.style.display = "block";
         btnSimpan.className = "flex-1 py-1.5 bg-gradient-to-b from-[#f43f5e] to-[#e11d48] text-white font-bold text-[10px] rounded-lg shadow-md border border-rose-600 tracking-wide text-center uppercase";
         btnSimpan.innerText = "SIMPAN OUT";
+
+        if (blokTerpilih) {
+            window.populateKodeBarangOut(blokTerpilih);
+            window.populateExpiredFIFO(blokTerpilih, "");
+            window.initOutEventListeners(); 
+        } else {
+            if (freshSelect) freshSelect.innerHTML = '<option value="">Pilih Blok Dahulu!</option>';
+        }
     } else {
         boxWorkspace.className = "col-span-7 bg-emerald-50/60 rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col transition-colors duration-200";
         titleSide.innerText = "Input Barang Masuk";
@@ -344,22 +433,9 @@ window.toggleEngineTransaksi = function(isOut) {
         wrapperExpired.style.display = "block";
         btnSimpan.className = "flex-1 py-1.5 bg-gradient-to-b from-[#10b981] to-[#059669] text-white font-bold text-[10px] rounded-lg shadow-md border border-emerald-600 tracking-wide text-center uppercase";
         btnSimpan.innerText = "SIMPAN IN";
-    }
 
-    const select = document.getElementById('tx-kode');
-    if (select) select.innerHTML = '<option value="">Memuat data...</option>';
-
-    if (isOut) {
-        if (blokTerpilih) {
-            window.populateKodeBarangOut(blokTerpilih);
-            window.populateExpiredFIFO(blokTerpilih, "");
-            window.initOutEventListeners(); // Pastikan event listener untuk mode OUT diinisialisasi
-        } else {
-            if (select) select.innerHTML = '<option value="">Pilih Blok Dahulu!</option>';
-        }
-    } else {
         // Mode MASUK
-        window.loadDropdownBarang("IN", window.selectedBlok);
+        window.loadDropdownBarang(blokTerpilih);
         if (typeof window.generateExpiredList === 'function') {
             window.generateExpiredList();
         }
@@ -573,7 +649,7 @@ window.renderRiwayatBlok = async function(namaBlok) {
         .sort((a, b) => b.id.localeCompare(a.id)); 
 
     if (riwayatArray.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-2 text-slate-400">Belum ada transaksi untuk blok ini</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-slate-400">Belum ada transaksi untuk blok ini</td></tr>`;
         return;
     }
 
@@ -864,45 +940,130 @@ window.hitungKonversiKartonEdit = function(valPalet) {
     }
 };
 
-// Fungsi untuk menghitung total stok blok dan update di header
 window.updateTotalStokBlok = async function(namaBlok) {
     const infoStokEl = document.getElementById('info-stok-blok');
+    const infoKapasitasEl = document.getElementById('info-kapasitas-blok');
+    const infoSisaEl = document.getElementById('info-sisa-blok');
     const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
 
     try {
-        // Ambil data stok blok untuk blok tertentu
-        const response = await fetch(`${FIREBASE_URL}stok_blok/${namaBlok.trim()}.json`);
-        const stokData = await response.json(); 
-        
+        // 1. Ambil Data Stok & Data Kapasitas (Struktur: {stok: X, laporan: Y})
+        const [stokRes, kapasitasRes] = await Promise.all([
+            fetch(`${FIREBASE_URL}stok_blok/${namaBlok.trim()}.json`),
+            fetch(`${FIREBASE_URL}master_blok/${namaBlok.trim()}/kapasitas.json`)
+        ]);
+
+        const stokData = await stokRes.json();
+        const kapData = await kapasitasRes.json() || { stok: 0, laporan: 0 }; 
+
+        // 2. Hitung Total Stok Palet
         let totalPalet = 0;
-        
         if (stokData) {
-            // 1. Loop setiap KODE barang
             Object.values(stokData).forEach(expData => {
-                // 2. Loop setiap tanggal expired di dalam kode barang tersebut
-                // expData adalah objek: { "28-APR": { plt: 8, krt: 760 }, "28-MEI": { ... } }
-                const stokPerBarang = Object.values(expData).reduce((acc, item) => {
-                    // Ambil nilai plt, pastikan menjadi integer
+                totalPalet += Object.values(expData).reduce((acc, item) => {
                     return acc + (parseInt(item.plt) || 0);
                 }, 0);
-                
-                totalPalet += stokPerBarang;
             });
         }
 
-        // Update UI
+        // 3. Gunakan 'stok' untuk perhitungan sisa kapasitas (sesuai permintaan)
+        const kapStok = parseInt(kapData.stok) || 0;
+        const sisaKapasitas = Math.max(0, kapStok - totalPalet);
+
+        // 4. Update UI
         if (infoStokEl) {
             infoStokEl.innerHTML = `${totalPalet} <span class="text-[8px] font-normal text-slate-400">PLT</span>`;
         }
         
-    } catch (e) {
-        console.error("Gagal ambil total stok:", e);
-        if (infoStokEl) {
-            infoStokEl.innerHTML = `0 <span class="text-[8px] font-normal text-slate-400">PLT</span>`;
+        // Menampilkan kapasitas stok di header (dengan tombol edit yang sudah dibuat)
+        if (infoKapasitasEl) {
+            infoKapasitasEl.innerHTML = `${kapStok} <span class="text-[8px] font-normal text-slate-400">MAX</span>`;
         }
+
+        if (infoSisaEl) {
+            infoSisaEl.innerHTML = `${sisaKapasitas} <span class="text-[8px] font-normal text-slate-400">PLT</span>`;
+            
+            // Efek visual jika sisa kapasitas habis
+            infoSisaEl.className = sisaKapasitas <= 0 
+                ? "text-[10px] font-black text-red-600 tracking-wide" 
+                : "text-[10px] font-black text-slate-800 tracking-wide";
+        }
+        
+    } catch (e) {
+        console.error("Gagal update data blok:", e);
+        if (infoStokEl) infoStokEl.innerHTML = `0 <span class="text-[8px] font-normal text-slate-400">PLT</span>`;
+        if (infoSisaEl) infoSisaEl.innerHTML = `0 <span class="text-[8px] font-normal text-slate-400">PLT</span>`;
     }
 };
 
+// Fungsi untuk membuka modal kapasitas dan mengisi data jika sudah ada
+window.bukaModalKapasitas = async function() {
+    const modal = document.getElementById('modal-kapasitas');
+    const namaBlok = window.selectedBlok;
+    
+    // Reset/Kosongkan input sebelum diisi data baru
+    document.getElementById('input-kap-lama').value = "";
+    document.getElementById('input-kap-baru').value = "";
+    
+    if (!namaBlok) {
+        miuiAlert("Pilih blok terlebih dahulu!");
+        return;
+    }
+
+    modal.classList.remove('hidden');
+
+    // Ambil data dari Firebase untuk mengisi input (pre-fill)
+    const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
+    try {
+        const response = await fetch(`${FIREBASE_URL}master_blok/${namaBlok.trim()}/kapasitas.json`);
+        const data = await response.json();
+        
+        // Jika data ada, isi dengan nilai dari Firebase
+        if (data) {
+            document.getElementById('input-kap-lama').value = data.stok || "";
+            document.getElementById('input-kap-baru').value = data.laporan || "";
+        }
+    } catch (e) {
+        console.error("Gagal memuat data kapasitas:", e);
+        // Tetap biarkan kosong jika gagal ambil data
+    }
+};
+
+window.tutupModalKapasitas = function() {
+    document.getElementById('modal-kapasitas').classList.add('hidden');
+};
+
+window.simpanKapasitas = async function() {
+    const namaBlok = window.selectedBlok;
+    if (!namaBlok) return miuiAlert("Pilih blok terlebih dahulu!");
+    
+    const kapStok = document.getElementById('input-kap-lama').value;
+    const kapLap = document.getElementById('input-kap-baru').value;
+    
+    const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
+    
+    try {
+        // Menyimpan dengan key 'stok' dan 'laporan' sesuai kesepakatan kita
+        await fetch(`${FIREBASE_URL}master_blok/${namaBlok.trim()}/kapasitas.json`, {
+            method: 'PATCH',
+            body: JSON.stringify({ 
+                stok: kapStok, 
+                laporan: kapLap 
+            })
+        });
+        
+        miuiAlert("Kapasitas berhasil disimpan!");
+        tutupModalKapasitas();
+        
+        // Update tampilan utama
+        window.updateTotalStokBlok(namaBlok);
+    } catch (e) {
+        console.error("Gagal simpan kapasitas", e);
+        miuiAlert("Gagal simpan kapasitas");
+    }
+};
+
+// Fungsi untuk mengambil info transaksi terakhir (MASUK/KELUAR) per blok dan menampilkannya di header  
 window.updateInfoTransaksi = async function(namaBlok) {
     const container = document.getElementById('container-info-transaksi');
     const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
@@ -1027,10 +1188,254 @@ window.renderRekapStok = async function(namaBlok) {
 };
 
 
+// 1. Fungsi untuk mengisi dropdown kode barang dari seluruh blok
+window.loadDropdownKode = async function() {
+    const dropdown = document.getElementById('dropdown-cari-kode');
+    if (!dropdown) return;
 
-window.exportRekapBlokPDF = function() {
-    miuiAlert("Memproses Export File PDF...");
+    const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
+
+    try {
+        // Ambil stok dan master secara bersamaan untuk memastikan data tersedia
+        const [resStok, resMaster] = await Promise.all([
+            fetch(`${FIREBASE_URL}stok_blok.json`),
+            // Jika Anda punya URL master, pastikan fetch-nya di sini
+            // Untuk sementara, kita pakai window.dataMasterBarang
+        ]);
+        
+        const data = await resStok.json();
+        const master = window.dataMasterBarang || {};
+
+        if (!data) {
+            console.warn("Data stok_blok kosong di Firebase!");
+            return;
+        }
+
+        const kodeSet = new Set();
+        Object.values(data).forEach(blok => {
+            if (typeof blok === 'object') {
+                Object.keys(blok).forEach(kode => kodeSet.add(kode));
+            }
+        });
+
+        let listKode = Array.from(kodeSet).map(kode => {
+            // Memastikan INISIAL ada, jika tidak pakai kode aslinya
+            const infoBarang = master[kode] || { INISIAL: kode };
+            return {
+                kode: kode,
+                inisial: infoBarang.INISIAL || kode 
+            };
+        });
+
+        listKode.sort((a, b) => {
+            return String(a.inisial).localeCompare(String(b.inisial), undefined, { 
+                numeric: true, 
+                sensitivity: 'base' 
+            });
+        });
+
+        dropdown.innerHTML = '<option value="">Pilih Kode Barang...</option>';
+        listKode.forEach(item => {
+            const opt = document.createElement('option');
+            opt.value = item.kode;
+            opt.textContent = item.inisial;
+            dropdown.appendChild(opt);
+        });
+        
+        console.log("Dropdown berhasil diisi dengan", listKode.length, "item.");
+
+    } catch (e) {
+        console.error("Gagal memuat dropdown:", e);
+    }
 };
+
+// 2. Fungsi untuk mencari dan menampilkan data berdasarkan kode yang dipilih
+window.cariKodeBarang = async function(kodeTerpilih) {
+    const tbody = document.getElementById('table-pencarian-data');
+    tbody.innerHTML = "";
+    
+    if (!kodeTerpilih) return;
+
+    const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
+    const master = window.dataMasterBarang || {};
+
+    try {
+        const response = await fetch(`${FIREBASE_URL}stok_blok.json`);
+        const allData = await response.json();
+        
+        if (!allData) return;
+
+        const inisialDicari = master[kodeTerpilih]?.INISIAL || kodeTerpilih;
+
+        Object.keys(allData).forEach(namaBlok => {
+            const blokData = allData[namaBlok];
+            
+            Object.keys(blokData).forEach(kode => {
+                const infoBarang = master[kode] || { INISIAL: kode };
+                
+                if (infoBarang.INISIAL === inisialDicari) {
+                    const expData = blokData[kode];
+                    
+                    // Hitung total KRT dan PLT serta gabungkan string EXPIRED
+                    let totalKrt = 0;
+                    let totalPlt = 0;
+                    let arrExpired = [];
+
+                    Object.keys(expData).forEach(exp => {
+                        const item = expData[exp];
+                        const krt = parseInt(item.krt) || 0;
+                        const plt = parseInt(item.plt) || 0;
+                        
+                        totalKrt += krt;
+                        totalPlt += plt;
+                        arrExpired.push(`${exp} : ${plt} PLT`);
+                    });
+
+                    // Gabungkan semua expired dengan pemisah |
+                    const rincianExpired = arrExpired.join(' | ');
+
+                    // Render ke baris tabel
+                    const row = document.createElement('tr');
+                    row.className = "hover:bg-slate-50 border-b border-slate-100";
+                    row.innerHTML = `
+                        <td class="py-2 px-3 font-black w-[20%] text-orange-600">${namaBlok}</td>
+                        <td class="py-2 px-3 text-center w-[10%] text-slate-700">${totalKrt}</td>
+                        <td class="py-2 px-3 text-center w-[10%] text-slate-700">${totalPlt}</td>
+                        <td class="py-2 px-3 text-left text-[10px] text-slate-600 truncate w-[60%]" title="${rincianExpired}">${rincianExpired}</td>
+                    `;
+                    tbody.appendChild(row);
+                }
+            });
+        });
+    } catch (e) {
+        console.error("Gagal melakukan pencarian:", e);
+    }
+};
+
+// 3. Event Listener untuk dropdown
+// Pasang di level dokumen, dia akan mendengarkan perubahan pada elemen dropdown
+document.addEventListener('change', function(e) {
+    if (e.target && e.target.id === 'dropdown-cari-kode') {
+        window.cariKodeBarang(e.target.value);
+    }
+});
+
+
+// Fungsi untuk mengekspor semua data stok per blok ke PDF  
+// Pastikan tombol export Anda di index.html memiliki id="btn-export-pdf"
+// Di file rekap-blok.js (sebagai module):
+
+export async function exportAllToPDF() {
+    // 1. Cek library global
+    if (typeof window.jspdf === 'undefined') {
+        miuiAlert("Sistem PDF tidak ditemukan.");
+        return;
+    }
+
+    try {
+        miuiAlert("Sedang menyusun laporan PDF...");
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'pt', 'a4');
+        
+        // --- FIX: Sambungkan autoTable secara manual ke instance doc ---
+        // Jika autoTable sudah dimuat via <script> tag di index.html, 
+        // ia akan menempel pada window.jspdf.
+        if (typeof window.jspdf.autoTable === 'function') {
+            window.jspdf.autoTable(doc, {
+                startY: currentY,
+                head: [['KODE BARANG', 'KRT', 'PLT', 'Rincian Expired (PLT)']],
+                body: tableData,
+                theme: 'grid',
+                headStyles: { fillColor: [70, 130, 180] },
+                styles: { fontSize: 9 },
+                margin: { left: 40, right: 40 },
+                didDrawPage: (data) => {
+                    currentY = data.cursor.y + 30;
+                }
+            });
+        } else {
+            throw new Error("Library autoTable tidak terdeteksi!");
+        }
+        // --------------------------------------------------------------
+
+        const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
+        const [resStok, resMaster] = await Promise.all([
+            fetch(`${FIREBASE_URL}stok_blok.json`).then(r => r.json()),
+            fetch(`${FIREBASE_URL}master_blok.json`).then(r => r.json())
+        ]);
+
+        if (!resStok) {
+            miuiAlert("Data stok tidak tersedia.");
+            return;
+        }
+
+        doc.setFontSize(16);
+        doc.text("LAPORAN STOK BARANG PER BLOK", 40, 40);
+        doc.setFontSize(10);
+        doc.text(`Dicetak pada: ${new Date().toLocaleString()}`, 40, 55);
+
+        let currentY = 80;
+        const pageHeight = doc.internal.pageSize.height;
+
+        for (const namaBlok in resStok) {
+            const blokData = resStok[namaBlok];
+            const kapasitasInfo = resMaster[namaBlok]?.laporan || "0";
+            
+            const rowCount = Object.keys(blokData).length;
+            const estimatedTableHeight = 60 + (rowCount * 20);
+
+            if (currentY + estimatedTableHeight > pageHeight - 40) {
+                doc.addPage();
+                currentY = 40;
+            }
+
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text(`BLOK: ${namaBlok} | Kapasitas: ${kapasitasInfo}`, 40, currentY);
+            currentY += 15;
+
+            const tableData = Object.keys(blokData).map(kode => {
+                const expData = blokData[kode];
+                let totalKrt = 0;
+                let totalPlt = 0;
+                let expDetails = [];
+
+                for (const exp in expData) {
+                    totalKrt += parseInt(expData[exp].krt) || 0;
+                    totalPlt += parseInt(expData[exp].plt) || 0;
+                    expDetails.push(`${exp} (${expData[exp].plt})`);
+                }
+                return [kode, totalKrt, totalPlt, expDetails.join(' | ')];
+            });
+
+            // Gunakan doc.autoTable setelah dipastikan terhubung
+            doc.autoTable({
+                startY: currentY,
+                head: [['KODE BARANG', 'KRT', 'PLT', 'Rincian Expired (PLT)']],
+                body: tableData,
+                theme: 'grid',
+                headStyles: { fillColor: [70, 130, 180] },
+                styles: { fontSize: 9 },
+                margin: { left: 40, right: 40 },
+                didDrawPage: (data) => {
+                    currentY = data.cursor.y + 30;
+                }
+            });
+            
+            currentY = doc.lastAutoTable.finalY + 30;
+        }
+
+        doc.save("Laporan_Stok_Per_Blok.pdf");
+        miuiAlert("Berhasil! Laporan PDF telah diunduh.");
+
+    } catch (error) {
+        console.error("Error Export PDF:", error);
+        miuiAlert("Gagal membuat laporan: " + error.message);
+    }
+}
+
+
 
 // =========================================================================
 // SYSTEM COMPONENT: CUSTOM NOTIF miuiAlert ENGINE (MIUI V5 SPEC)

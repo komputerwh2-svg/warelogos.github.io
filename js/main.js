@@ -376,6 +376,7 @@ function bukaSubPageRekapBlok() {
         return;
     }
 
+
     // Ambil data langsung dari file apps/rekap-blok.html
     fetch('apps/rekap-blok.html')
         .then(response => {
@@ -400,6 +401,15 @@ function bukaSubPageRekapBlok() {
                     if (typeof window.initRekapBlok === 'function') {
                         window.initRekapBlok();
                         window.selectedBlok = null; // Pastikan null saat aplikasi baru jalan
+
+                        // 1. KUNCI KEMBALI semua bagian UI
+                        const boxInput = document.getElementById('box-workspace-input');
+                        const wrapperRiwayat = document.getElementById('wrapper-riwayat-transaksi');
+                        const wrapperRekap = document.getElementById('wrapper-rekap-detail');
+
+                        if (boxInput) boxInput.classList.add('opacity-50', 'pointer-events-none');
+                        if (wrapperRiwayat) wrapperRiwayat.classList.add('opacity-50', 'pointer-events-none');
+                        if (wrapperRekap) wrapperRekap.classList.add('opacity-50', 'pointer-events-none');
                     }
                 }
             };
@@ -418,16 +428,33 @@ function tutupSubPageRekapBlok() {
         subpage.classList.add('translate-x-full');
     }
 
-    // 1. KUNCI KEMBALI UI form input
+    // 1. KUNCI KEMBALI semua bagian UI
     const boxInput = document.getElementById('box-workspace-input');
-    if (boxInput) {
-        boxInput.classList.add('opacity-50', 'pointer-events-none');
+    const wrapperRiwayat = document.getElementById('wrapper-riwayat-transaksi');
+    const wrapperRekap = document.getElementById('wrapper-rekap-detail');
+
+    if (boxInput) boxInput.classList.add('opacity-50', 'pointer-events-none');
+    if (wrapperRiwayat) wrapperRiwayat.classList.add('opacity-50', 'pointer-events-none');
+    if (wrapperRekap) wrapperRekap.classList.add('opacity-50', 'pointer-events-none');
+
+    // 2. RESET SLIDER KE POSISI OFF
+    const toggle = document.getElementById('toggle-tipe-gudang');
+    if (toggle) {
+        toggle.checked = false;
+        
+        // Panggil fungsi kunci agar UI Gudang kembali terkunci dan ter-reset
+        // Fungsi ini akan menangani radio button dan label status
+        if (typeof window.toggleLockGudang === 'function') {
+            window.toggleLockGudang(false);
+        }
     }
 
-    // 2. Opsional: Reset form agar saat dibuka kembali data lama sudah hilang
+    // 3. Reset form agar saat dibuka kembali data lama sudah hilang
     if (typeof resetFormTransaksi === 'function') {
         resetFormTransaksi();
     }
+    
+    console.log("Subpage ditutup, semua area UI telah dikunci dan di-reset.");
 }
 
 // -------------------------------------------------------------------------
