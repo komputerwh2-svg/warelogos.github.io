@@ -1327,22 +1327,17 @@ document.addEventListener('change', function(e) {
 // Di file rekap-blok.js (sebagai module):
 
 export async function exportAllToPDF() {
+    miuiAlert("Sedang menyusun laporan PDF...");
+
     try {
-        // --- 1. PASTIKAN LIBRARY TERMUAT (Dynamic Injection) ---
-        // Kita cek apakah autoTable ada, jika tidak, kita inject secara manual
-        miuiAlert("Sedang menyusun laporan PDF...");
+        // --- 1. SETUP LIBRARY ---
         if (typeof window.jspdf === 'undefined' || typeof window.jspdf.autoTable === 'undefined') {
-            console.log("Library tidak ditemukan, mencoba memuat manual...");
-            
-            // Inject jspdf core
             await new Promise((resolve) => {
                 const s = document.createElement('script');
                 s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
                 s.onload = resolve;
                 document.head.appendChild(s);
             });
-
-            // Inject autotable
             await new Promise((resolve) => {
                 const s = document.createElement('script');
                 s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js";
@@ -1350,117 +1345,137 @@ export async function exportAllToPDF() {
                 document.head.appendChild(s);
             });
         }
-        // --------------------------------------------------------
-
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'pt', 'a4');
+        if (typeof window.jspdf.autoTable === 'function') { doc.autoTable = window.jspdf.autoTable; }
         
-        // Sekarang dijamin doc.autoTable ada
-        if (typeof window.jspdf.autoTable === 'function') {
-            doc.autoTable = window.jspdf.autoTable;
-        }
-
-        // --- FETCH DATA ---
+        // --- 2. FETCH DATA ---
         const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
         const [resStok, resMaster] = await Promise.all([
             fetch(`${FIREBASE_URL}stok_blok.json`).then(r => r.json()),
             fetch(`${FIREBASE_URL}master_blok.json`).then(r => r.json())
         ]);
+        if (!resStok) { miuiAlert("Data stok tidak tersedia."); return; }
 
-        if (!resStok) {
-            miuiAlert("Data stok tidak tersedia.");
-            return;
-        }
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+        const dateStr = new Date().toLocaleString('id-ID', options);
+        const formattedDate = dateStr.replace(',', '').replace(' pukul', '');
 
+        // --- 3. PROSES DATA ---
         doc.setFontSize(16);
-        doc.text("LAPORAN EXPIRED DATE ALL BLOK", 40, 40);
-        doc.setFontSize(10);
-        doc.text(`Dicetak pada: ${new Date().toLocaleString()}`, 40, 55);
+        doc.text("LAPORAN EXPIRED DATE ALL BLOK", 297.6, 40, { align: 'center' });
+        doc.setFontSize(8);
+        doc.text(`Dicetak PDF pada: ${formattedDate}`, 40, 55);
 
         let currentY = 80;
         const pageHeight = doc.internal.pageSize.height;
+        const rekapData = [];
+        let totalKartonAll = 0, totalPaletAll = 0, totalSisaAll = 0;
 
         for (const namaBlok in resStok) {
             const blokData = resStok[namaBlok];
-            const kapasitasInfo = resMaster[namaBlok]?.laporan || "0";
+            const masterInfo = resMaster[namaBlok] || {};
+            const kapasitas = parseInt(masterInfo.kapasitas?.laporan) || 0;
             
-            const rowCount = Object.keys(blokData).length;
-            const estimatedTableHeight = 60 + (rowCount * 20);
-
-            if (currentY + estimatedTableHeight > pageHeight - 40) {
-                doc.addPage();
-                currentY = 40;
-            }
-
-            const blokData = resStok[namaBlok];
-            const blokData = resStok[namaBlok];
-            const kapasitasInfo = parseInt(resMaster[namaBlok]?.laporan) || 0;
-
-            // Hitung total stok dan siapkan data tabel dalam satu jalan agar efisien
-            let totalStokBlok = 0;
-
+            let totalStokBlok = 0, totalKrtBlok = 0;
             const tableData = Object.keys(blokData).map(kode => {
                 const expData = blokData[kode];
-                let totalKrt = 0;
-                let totalPlt = 0;
-                
-                // Hitung total per barang
-                for (const exp in expData) {
-                    totalKrt += parseInt(expData[exp].krt) || 0;
-                    totalPlt += parseInt(expData[exp].plt) || 0;
-                }
-                
-                // Tambahkan ke total gudang
-                totalStokBlok += totalPlt;
-                
-                let row = [kode, totalKrt, totalPlt];
-                sortedDates.forEach(date => row.push(expData[date]?.plt || "-"));
-                return row;
-            });
-
-            const sisaKapasitas = kapasitasInfo - totalStokBlok;
-
-            // Tampilkan Header Gudang yang baru
-            doc.setFontSize(11);
-            doc.setFont("helvetica", "bold");
-            doc.text(
-                `GUDANG: ${namaBlok} | Kapasitas: ${kapasitasInfo} | Total Stok: ${totalStokBlok} | Sisa Kapasitas: ${sisaKapasitas}`, 
-                40, 
-                currentY
-            );
-            currentY += 20;
-
-            const tableData = Object.keys(blokData).map(kode => {
-                const expData = blokData[kode];
-                let totalKrt = 0;
-                let totalPlt = 0;
+                let totalKrt = 0, totalPlt = 0;
                 let expDetails = [];
-
                 for (const exp in expData) {
                     totalKrt += parseInt(expData[exp].krt) || 0;
                     totalPlt += parseInt(expData[exp].plt) || 0;
                     expDetails.push(`${exp} (${expData[exp].plt})`);
                 }
+                totalStokBlok += totalPlt;
+                totalKrtBlok += totalKrt;
                 return [kode, totalKrt, totalPlt, expDetails.join(' | ')];
             });
 
-            // Sekarang doc.autoTable dijamin ada karena kita sudah "paksa" di atas
+            const sisaPlt = kapasitas - totalStokBlok;
+            const displaySisa = sisaPlt <= 0 ? "FULL" : sisaPlt;
+
+            rekapData.push([namaBlok, totalKrtBlok, totalStokBlok, displaySisa]);
+            totalKartonAll += totalKrtBlok;
+            totalPaletAll += totalStokBlok;
+            totalSisaAll += (sisaPlt > 0 ? sisaPlt : 0);
+
+            tableData.push([{ content: 'TOTAL', colSpan: 1, styles: { fontStyle: 'bold' } }, 
+                            { content: totalKrtBlok, styles: { fontStyle: 'bold', halign: 'center' } }, 
+                            { content: totalStokBlok, styles: { fontStyle: 'bold', halign: 'center' } }, 
+                            '']);
+
+            // --- REVISI: Logika Keamanan (Prevent Break) ---
+            // 1. Definisikan tinggi blok (Header Teks ~25pt + Tabel ~ (baris * 20pt) + margin)
+            const estimatedHeight = 50 + (tableData.length * 20);
+
+            // 2. Jika tidak cukup ruang, pindah halaman SEBELUM cetak header
+            if (currentY + estimatedHeight > pageHeight - 50) {
+                doc.addPage();
+                currentY = 40;
+            }
+
+            // 3. Cetak Header Blok
+            doc.setFontSize(11);
+            doc.setFont("helvetica", "bold");
+            doc.text(`GUDANG: ${namaBlok} | Kapasitas: ${kapasitas} PLT | Total Stok: ${totalStokBlok} PLT | Sisa Kapasitas: ${displaySisa} PLT`, 40, currentY);
+            currentY += 15;
+
+            // 4. Cetak Tabel
             doc.autoTable({
                 startY: currentY,
                 head: [['KODE BARANG', 'KRT', 'PLT', 'Rincian Expired (PLT)']],
                 body: tableData,
                 theme: 'grid',
-                headStyles: { fillColor: [70, 130, 180] },
+                headStyles: { fillColor: [70, 130, 180], halign: 'center' },
                 styles: { fontSize: 9 },
-                margin: { left: 40, right: 40 }
+                columnStyles: { 1: { halign: 'center' }, 2: { halign: 'center' } },
+                didParseCell: (data) => { if (data.row.index === data.table.body.length - 1) { data.cell.styles.fillColor = [230, 230, 230]; } },
+                margin: { left: 40, right: 40 },
+                // Paksa tabel untuk tidak memotong baris internal
+                pageBreak: 'avoid'
             });
             
+            // Update posisi Y berdasarkan hasil akhir tabel
             currentY = doc.lastAutoTable.finalY + 30;
         }
 
-        doc.save("Laporan_Stok_Per_Blok.pdf");
-        miuiAlert("Berhasil! Laporan PDF telah diunduh.");
+        // --- 4. HALAMAN REKAP ---
+        doc.addPage();
+        doc.setFontSize(14);
+        doc.text("REKAP STOK GUDANG WH-1 & WH-2", 297.6, 40, { align: 'center' });
+        rekapData.push(["TOTAL ALL BLOK", totalKartonAll, totalPaletAll, totalSisaAll]);
 
+        doc.autoTable({
+            startY: 60,
+            head: [['NAMA BLOK', 'KARTON', 'PALET', 'SISA PLT']],
+            body: rekapData,
+            theme: 'grid',
+            headStyles: { fillColor: [50, 50, 50], halign: 'center' },
+            columnStyles: { 1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'center' } },
+            // TAMBAHKAN LOGIKA INI:
+            didParseCell: (data) => {
+                // 1. Warna Abu-abu untuk Baris Total (Baris Terakhir)
+                if (data.row.index === data.table.body.length - 1) {
+                    data.cell.styles.fillColor = [230, 230, 230];
+                    data.cell.styles.fontStyle = 'bold';
+                }
+
+                // 2. Warna Merah HANYA jika kolom SISA PLT (indeks 3) berisi "FULL"
+                // Pastikan data.cell.raw adalah string "FULL"
+                if (data.column.index === 3 && data.cell.raw === "FULL") {
+                    data.cell.styles.textColor = [255, 0, 0];
+                    data.cell.styles.fontStyle = 'bold';
+                }
+            },
+            margin: { left: 40, right: 40 }
+        });
+
+        const now = new Date();
+        const f = (n) => String(n).padStart(2, '0');
+        const fileName = `LAPORAN_EXP_BLOK_${f(now.getDate())}${f(now.getMonth()+1)}${now.getFullYear()}_${f(now.getHours())}${f(now.getMinutes())}${f(now.getSeconds())}.pdf`;
+        doc.save(fileName);
+        miuiAlert("Berhasil! Laporan PDF telah diunduh.");
     } catch (error) {
         console.error("Error Export PDF:", error);
         miuiAlert("Gagal: " + error.message);
