@@ -465,6 +465,62 @@ window.tutupSubPageRekapBlok = tutupSubPageRekapBlok;
 
 
 
+
+// =========================================================================
+// ENGINE SUB-PAGE DYNAMIC LOADING: ONGKIR
+// =========================================================================
+
+function bukaSubPageOngkir() {
+    const container = document.getElementById('subpage-ongkir-container');
+    const subpage = document.getElementById('subpage-ongkir');
+
+    if (subpage) {
+        subpage.classList.remove('translate-x-full');
+        if (typeof window.initOngkir === 'function') window.initOngkir();
+        return;
+    }
+
+    // Jika belum ada, lakukan fetch
+    fetch('apps/ongkir.html')
+        .then(response => response.text())
+        .then(htmlContent => {
+            container.innerHTML = htmlContent;
+
+            // Gunakan import() dinamis daripada appendChild script
+            import('../js/ongkir.js').then((module) => {
+                // Sekarang initOngkir sudah tersedia di window karena kita set di ongkir.js
+                const elemenBaru = document.getElementById('subpage-ongkir');
+                if (elemenBaru) {
+                    elemenBaru.classList.remove('translate-x-full');
+                    if (typeof window.initOngkir === 'function') {
+                        window.initOngkir();
+                    }
+                }
+            });
+        })
+        .catch(err => console.error("Gagal:", err));
+}
+
+function tutupSubPageOngkir() {
+    const subpage = document.getElementById('subpage-ongkir');
+    if (subpage) {
+        subpage.classList.add('translate-x-full');
+    }
+    
+    // Reset form jika fungsi reset tersedia
+    if (typeof window.resetFormOngkir === 'function') {
+        window.resetFormOngkir();
+    }
+    
+    console.log("Subpage Ongkir ditutup.");
+}
+
+// Ikat fungsi ke Window
+window.bukaSubPageOngkir = bukaSubPageOngkir;
+window.tutupSubPageOngkir = tutupSubPageOngkir;
+
+
+
 // ==========================================================================
 // REGISTRASI NAVIGASI UTAMA LAUNCHER SUB-PAGE SETELAN
 // ==========================================================================
