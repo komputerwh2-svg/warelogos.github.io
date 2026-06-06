@@ -392,3 +392,16 @@ input[type=number] {
         margin: 0 !important; /* Margin dinolkan karena sudah diganti dengan padding aman di komponen .print-page-wrapper */
     }
 }
+
+/* C. KONDISI UMUM (Berlaku di Semua Kondisi, Baik Layar maupun Cetak) */
+@media print {
+    /* Sembunyikan elemen yang tidak perlu saat cetak */
+    .no-print, #btn-simpan-ongkir, #btn-batal-ongkir, #btn-print-ongkir, .sidebar, header {
+        display: none !important;
+    }
+    /* Pastikan formulir terlihat penuh */
+    body {
+        padding: 0;
+        margin: 0;
+    }
+}
