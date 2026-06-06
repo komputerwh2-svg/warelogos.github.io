@@ -111,7 +111,8 @@
                 <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Tanda Terima</span>
             </div>
 
-            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="miuiAlert('Membuka TT Ongkir')">
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" 
+                onclick="bukaSubPageOngkir()">
                 <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
                     <img src="img/ongkir.png" alt="TT Ongkir" class="w-full h-full object-cover">
                 </div>
@@ -307,6 +308,7 @@
 
     <div id="print-area-rak-kosong"></div>
     <div id="subpage-rekap-blok-container"></div>
+    <div id="subpage-ongkir-container"></div>
     <div id="bank-data-container"></div>
 
     <div id="subpage-setelan" class="hidden fixed inset-0 bg-[#f4f4f4] flex flex-col z-50 select-none font-sans">
@@ -473,6 +475,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 
     <script type="module" src="js/rekap-blok.js"></script>
+
+    <script type="module" src="js/ongkir.js"></script>
     
     <script>
         if ('serviceWorker' in navigator) {
