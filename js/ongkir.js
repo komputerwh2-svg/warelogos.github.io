@@ -1,6 +1,6 @@
 // --- PASTIKAN INI ADALAH BARIS PALING ATAS ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-import { getDatabase, ref, push, set, get, child } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+import { getDatabase, ref, push, set, remove, get, child, update } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
 
 // Tentukan konstanta di sini
 const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
@@ -32,7 +32,6 @@ export function initOngkir() {
     // 1.2 Listener Tombol
     document.getElementById('btn-simpan-ongkir').addEventListener('click', simpanTransaksi);
     document.getElementById('btn-batal-ongkir').addEventListener('click', resetForm);
-    document.getElementById('btn-print-ongkir').addEventListener('click', cetakTransaksi);
 
     // 1.3 Tambahkan listener filter
     document.getElementById('filter-bulan-ongkir').addEventListener('change', () => {
@@ -212,7 +211,7 @@ export async function loadDriverData() {
 
         // 3. Render SEMUA Plat ke dropdown ongkir-plat (Urutkan unik)
         const semuaPlat = [...new Set(listDriver.map(d => d.PLAT).filter(p => p))].sort();
-        selectPlat.innerHTML = '<option value="">Pilih Plat...</option>';
+        selectPlat.innerHTML = '<option value="">Pilih Ekspedisi - Plat...</option>';
         semuaPlat.forEach(plat => {
             let opt = document.createElement("option");
             opt.value = plat;
@@ -418,12 +417,27 @@ export function updateDetailTransaksi() {
 async function simpanTransaksi() {
     const driverVal = document.getElementById('ongkir-driver').value;
     const tanggalVal = document.getElementById('ongkir-tanggal').value;
-    
-    // 1. Buat ID Kustom (Contoh: 2026-06-06_AAN)
-    // Gunakan replace agar karakter tidak valid seperti spasi/titik tidak merusak ID
+    const tujuanVal = document.getElementById('ongkir-tujuan').value.toLowerCase(); // Diubah ke lowercase agar mudah dicek
+
+    // 1. Logika penentuan keterangan & kategori otomatis
+    let ketOtomatis = "";
+    let kategoriTotal = ""; // Field baru untuk rekap di spreadsheet
+
+    if (tujuanVal.includes("ambil") && tujuanVal.includes("langsir")) {
+        ketOtomatis = "BIAYA AMBIL & LANGSIR BARANG JADI MARIMAS";
+        kategoriTotal = "TOTAL AMBIL & LANGSIR";
+    } else if (tujuanVal.includes("ambil")) {
+        ketOtomatis = "BIAYA AMBIL BARANG JADI MARIMAS";
+        kategoriTotal = "TOTAL AMBIL";
+    } else if (tujuanVal.includes("langsir")) {
+        ketOtomatis = "BIAYA LANGSIR BARANG JADI MARIMAS";
+        kategoriTotal = "TOTAL LANGSIR";
+    }
+
     const customID = `${tanggalVal}_${driverVal}`.replace(/[\.\s]/g, '_');
 
     const data = {
+        id: customID, // TAMBAHKAN BARIS INI: Agar Apps Script tahu ID-nya
         tanggal: tanggalVal,
         driver: driverVal,
         plat: document.getElementById('ongkir-plat').value,
@@ -432,6 +446,8 @@ async function simpanTransaksi() {
         nominal: document.getElementById('ongkir-nominal').value,
         terbilang: document.getElementById('ongkir-terbilang').value,
         palet: document.getElementById('ongkir-palet').value,
+        keterangan_cetak: ketOtomatis,
+        kategori_total: kategoriTotal,
         timestamp: Date.now()
     };
 
@@ -441,13 +457,28 @@ async function simpanTransaksi() {
     }
 
     try {
-        // 2. Gunakan 'set' untuk menentukan path dengan ID kustom
+        // 1. Simpan ke Firebase
         const transaksiRef = ref(db, `transaksi_ongkir/${customID}`);
         await set(transaksiRef, data);
         
         miuiAlert("Data berhasil disimpan");
+
+        // Panggil fungsi cetak otomatis untuk data yang baru disimpan
+        google.script.run.cetakPerData(customID);
+
         resetForm();
         loadDataTransaksi();
+
+        // 2. JIKA Anda ingin sinkronisasi instan (kirim ke Spreadsheet tanpa nunggu 10 menit),
+        // gunakan kode ini. Jika tidak, abaikan bagian ini.
+        
+        await fetch("https://script.google.com/macros/s/AKfycbwJmCtDsQyv7APYeoi0met9bG4oKG6No9lLtEX9VF45LT876fxe_1Bi0FoyKhNBkVWysA/exec", {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data) // 'data' sekarang sudah termasuk 'id'
+        });
+        
     } catch (e) {
         console.error("Error simpan:", e);
         miuiAlert("Gagal menyimpan data.");
@@ -480,12 +511,6 @@ function resetForm() {
     
     // Reset nominal/palet agar hilang dari layar
     updateDetailTransaksi();
-}
-
-function cetakTransaksi() {
-    // Menggunakan window.print()
-    // Pastikan Anda nanti menambahkan CSS @media print untuk menyembunyikan tombol
-    window.print();
 }
 
 export async function loadDataTransaksi() {
@@ -656,37 +681,54 @@ window.simpanEditTransaksi = async () => {
 };
 
 window.hapusTransaksi = async (key) => {
-    if (miuiConfirm("Yakin ingin menghapus data ini?")) {
+    // 1. Pastikan key bersih
+    const targetKey = key.trim();
+    const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
+
+    // 2. Gunakan miuiConfirm sebagai pembungkus
+    miuiConfirm("Yakin ingin menghapus data dengan ID: " + targetKey + "?", async function() {
         try {
-            await set(ref(db, `transaksi_ongkir/${key}`), null);
-            miuiAlert("Data berhasil dihapus");
-            loadDataTransaksi(); // Refresh tabel
+            // 3. Gunakan fetch dengan method DELETE (REST API)
+            // Ini adalah cara paling "telanjang" dan pasti berhasil
+            const response = await fetch(`${FIREBASE_URL}transaksi_ongkir/${targetKey}.json`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                miuiAlert("Data berhasil dihapus");
+                
+                // 4. Refresh data
+                if (typeof loadDataTransaksi === 'function') {
+                    loadDataTransaksi();
+                }
+            } else {
+                throw new Error("Server merespons dengan status: " + response.status);
+            }
         } catch (e) {
-            miuiAlert("Gagal menghapus data");
+            console.error("Error saat menghapus:", e);
+            miuiAlert("Gagal menghapus: " + e.message);
         }
-    }
+    });
 };
 
-window.cetakPerData = async (key) => {
-    try {
-        const snapshot = await get(child(ref(db), `transaksi_ongkir/${key}`));
-        if (snapshot.exists()) {
-            const data = snapshot.val();
-            // Buka jendela baru untuk format cetak
-            const printWindow = window.open('', '_blank', 'width=800,height=600');
-            printWindow.document.write(`
-                <html><head><title>Cetak Ongkir</title></head><body>
-                <h2>Detail Transaksi</h2>
-                <p>Tanggal: ${data.tanggal}</p>
-                <p>Driver: ${data.driver} (${data.plat})</p>
-                <p>Tujuan: ${data.tujuan}</p>
-                <p>Nominal: ${data.nominal}</p>
-                <p>Palet: ${data.palet}</p>
-                <script>window.print(); window.close();</script>
-                </body></html>
-            `);
-        }
-    } catch (e) {
-        miuiAlert("Gagal memuat data untuk dicetak");
+window.cetakPerData = (idFirebase) => {
+    // Cek apakah kode berjalan di dalam lingkungan Google
+    if (typeof google !== 'undefined' && google.script) {
+        miuiAlert("Sedang memuat data ke template cetak...");
+
+        google.script.run
+            .withSuccessHandler(() => {
+                miuiAlert("Data berhasil dimuat!");
+                const spreadsheetURL = "https://docs.google.com/spreadsheets/d/1XDPOkhoES72Y3_gYoUZJdbzMSzk4HzeACkRwzJzWlAE/edit#gid=635878249";
+                window.open(spreadsheetURL, "_blank");
+            })
+            .withFailureHandler((err) => {
+                miuiAlert("Gagal: " + err.message);
+            })
+            .cetakPerData(idFirebase);
+    } else {
+        // Pesan jika dijalankan di luar lingkungan Google
+        console.warn("Fungsi cetak hanya tersedia jika aplikasi dijalankan melalui server Google Apps Script.");
+        miuiAlert("Fungsi cetak tidak tersedia di mode lokal.");
     }
 };
