@@ -679,10 +679,10 @@ window.renderRiwayatBlok = async function(namaBlok) {
                 <td class="py-1 px-1 text-center font-bold text-[10px]">${item.qtyPalet || 0}</td>
                 <td class="py-1 px-1 text-center text-[9px] text-slate-500 font-medium">${item.expired || '-'}</td>
                 <td class="py-1 px-2 flex justify-center gap-1">
-                    <button onclick="editTransaksi('${item.id}')" class="text-blue-500 hover:text-blue-700">
+                    <button onclick="editTransaksiBlok('${item.id}')" class="text-blue-500 hover:text-blue-700">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                     </button>
-                    <button onclick="hapusTransaksi('${item.id}')" class="text-red-500 hover:text-red-700">
+                    <button onclick="hapusTransaksiBlok('${item.id}')" class="text-red-500 hover:text-red-700">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                     </button>
                 </td>
@@ -692,7 +692,8 @@ window.renderRiwayatBlok = async function(namaBlok) {
 };
 
 // Fungsi untuk menghapus transaksi dan menyesuaikan stok
-window.hapusTransaksi = function(idTransaksi) {
+window.hapusTransaksiBlok = function(idTransaksi) {
+    console.log("Tombol hapus diklik untuk ID:", idTransaksi); // Tambahkan ini
     miuiConfirm("Yakin ingin menghapus transaksi ini? Stok akan disesuaikan kembali.", async function() {
         
         const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
@@ -748,7 +749,9 @@ window.hapusTransaksi = function(idTransaksi) {
 };
 
 // Fungsi untuk mengedit transaksi (Anda harus membuat form/modal untuk ini)
-window.editTransaksi = async function(idTransaksi) {
+window.editTransaksiBlok = async function(idTransaksi) {
+    // Tambahkan ini untuk debug
+    console.log("Mencoba mengedit ID:", idTransaksi);
     const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
     
     // 1. Ambil data dengan loading state (optional: tambahkan indikator loading jika perlu)
@@ -800,7 +803,7 @@ window.editTransaksi = async function(idTransaksi) {
     const displayKode = infoBarang ? infoBarang.INISIAL : data.kodeBarang;
 
     const mapping = {
-        'edit-id-transaksi': idTransaksi,
+        'edit-id-transaksi-blok': idTransaksi,
         'edit-tipe': data.tipe,
         'edit-kode': displayKode,
         'edit-palet': data.qtyPalet,
@@ -823,15 +826,15 @@ window.editTransaksi = async function(idTransaksi) {
     }
 
     // 5. Tampilkan Modal
-    const modal = document.getElementById('modal-edit-transaksi');
+    const modal = document.getElementById('modal-edit-transaksi-blok');
     if (modal) {
         modal.classList.remove('hidden');
     }
 };
 
-window.simpanEditTransaksi = async function() {
+window.simpanEditTransaksiBlok = async function() {
     const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
-    const idTransaksi = document.getElementById('edit-id-transaksi').value;
+    const idTransaksi = document.getElementById('edit-id-transaksi-blok').value;
 
     miuiConfirm("Yakin ingin menyimpan perubahan? Stok akan disesuaikan secara otomatis.", async function() {
         try {
@@ -894,7 +897,7 @@ window.simpanEditTransaksi = async function() {
             });
 
             miuiAlert("Data berhasil diupdate dan stok telah disesuaikan!");
-            tutupModalEdit();
+            tutupModalEditBlok();
 
             // Refresh UI
             window.renderRiwayatBlok(dataBaru.blok);
@@ -908,7 +911,7 @@ window.simpanEditTransaksi = async function() {
     });
 };
 
-window.tutupModalEdit = () => document.getElementById('modal-edit-transaksi').classList.add('hidden');
+window.tutupModalEditBlok = () => document.getElementById('modal-edit-transaksi-blok').classList.add('hidden');
 
 window.hitungKonversiKartonEdit = function(valPalet) {
     const txtKarton = document.getElementById('edit-karton');

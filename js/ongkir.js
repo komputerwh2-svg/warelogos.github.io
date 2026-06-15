@@ -573,12 +573,12 @@ export async function loadDataTransaksi() {
                     </td>
                     <td class="py-2 px-2">
                         <div class="flex justify-center items-center gap-3">
-                            <button onclick="editTransaksi('${key}')" class="text-blue-600 hover:text-blue-800 transition-all active:scale-90" title="Edit">
+                            <button onclick="editTransaksiOngkir('${key}')" class="text-blue-600 hover:text-blue-800 transition-all active:scale-90" title="Edit">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                 </svg>
                             </button>
-                            <button onclick="hapusTransaksi('${key}')" class="text-red-600 hover:text-red-800 transition-all active:scale-90" title="Hapus">
+                            <button onclick="hapusTransaksiOngkir('${key}')" class="text-red-600 hover:text-red-800 transition-all active:scale-90" title="Hapus">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
@@ -620,7 +620,7 @@ export async function loadDataTransaksi() {
 }
 
 // Tambahkan ke window agar bisa dipanggil dari atribut onclick HTML
-window.editTransaksi = async (key) => {
+window.editTransaksiOngkir = async (key) => {
     try {
         // Isi dropdown tanggal terlebih dahulu
         isiDropdownTanggalEdit();
@@ -631,7 +631,7 @@ window.editTransaksi = async (key) => {
             // Debugging: Cek di console apakah data.banyaknya ada
             console.log("Data dari Firebase:", data);
 
-            document.getElementById('edit-id-transaksi').value = key;
+            document.getElementById('edit-id-transaksi-ongkir').value = key;
             document.getElementById('edit-tanggal-select').value = data.tanggal;
             document.getElementById('edit-driver').value = data.driver;
             document.getElementById('edit-plat').value = data.plat;
@@ -651,12 +651,12 @@ window.editTransaksi = async (key) => {
     }
 };
 
-window.tutupModalEdit = () => {
+window.tutupModalEditOngkir = () => {
     document.getElementById('modal-edit-ongkir').classList.add('hidden');
 };
 
-window.simpanEditTransaksi = async () => {
-    const key = document.getElementById('edit-id-transaksi').value;
+window.simpanEditTransaksiOngkir = async () => {
+    const key = document.getElementById('edit-id-transaksi-ongkir').value;
     const updatedData = {
         tanggal: document.getElementById('edit-tanggal-select').value,
         driver: document.getElementById('edit-driver').value,
@@ -673,14 +673,14 @@ window.simpanEditTransaksi = async () => {
     try {
         await set(ref(db, `transaksi_ongkir/${key}`), updatedData);
         miuiAlert("Data berhasil diperbarui!");
-        tutupModalEdit();
+        tutupModalEditOngkir();
         loadDataTransaksi(); 
     } catch (e) {
         miuiAlert("Gagal memperbarui data!");
     }
 };
 
-window.hapusTransaksi = async (key) => {
+window.hapusTransaksiOngkir = async (key) => {
     // 1. Pastikan key bersih
     const targetKey = key.trim();
     const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
