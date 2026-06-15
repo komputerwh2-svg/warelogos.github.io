@@ -212,14 +212,14 @@
             </div>
         </div>
 
-        <div id="modal-edit-transaksi" class="fixed inset-0 bg-black bg-opacity-40 hidden z-[9999] flex items-center justify-center p-3">
+        <div id="modal-edit-transaksi-blok" class="fixed inset-0 bg-black bg-opacity-40 hidden z-[9999] flex items-center justify-center p-3">
             <div class="bg-white rounded-[12px] w-full max-w-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] overflow-hidden">
                 <div class="w-full h-14 bg-gradient-to-b from-[#3c3c3c] to-[#2a2a2a] flex items-center justify-between px-3 shadow-md border-b border-[#1a1a1a]">
-                    <h3 class="text-white font-semibold text-sm ml-3 tracking-wide drop-shadow-md uppercase">Edit Transaksi</h3>
-                    <button onclick="tutupModalEdit()" class="text-orange-400 shadow-inner">✕</button>
+                    <h3 class="text-white font-semibold text-sm ml-3 tracking-wide drop-shadow-md uppercase">Edit Transaksi Blok</h3>
+                    <button onclick="tutupModalEditBlok()" class="text-orange-400 shadow-inner">✕</button>
                 </div>
                 
-                <input type="hidden" id="edit-id-transaksi">
+                <input type="hidden" id="edit-id-transaksi-blok">
                 
                 <div class="p-4 space-y-3">
                     <div class="grid grid-cols-2 gap-3">
@@ -264,11 +264,11 @@
                 </div>
 
                 <div class="px-4 py-3 bg-gray-50 flex gap-2">
-                    <button onclick="tutupModalEdit()" 
+                    <button onclick="tutupModalEditBlok()" 
                         class="flex-1 py-2 bg-[#666666] hover:bg-[#555555] text-white font-black text-[11px] rounded-[6px] shadow-sm border border-[#444444] active:scale-[0.98] transition-all uppercase tracking-widest">
                         BATAL
                     </button>
-                    <button onclick="simpanEditTransaksi()" 
+                    <button onclick="simpanEditTransaksiBlok()" 
                         class="flex-1 py-2 text-white font-black text-[11px] rounded-[6px] shadow-sm active:scale-[0.98] transition-all uppercase tracking-widest" 
                         style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #ea580c;">
                         Update Data

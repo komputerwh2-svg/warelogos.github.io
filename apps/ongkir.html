@@ -205,10 +205,10 @@
         <div class="bg-white rounded-[12px] w-full max-w-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] overflow-hidden">
             <div class="w-full h-14 bg-gradient-to-b from-[#3c3c3c] to-[#2a2a2a] flex items-center justify-between px-3 shadow-md border-b border-[#1a1a1a]">
                 <h3 class="text-white font-semibold text-sm ml-3 tracking-wide drop-shadow-md uppercase">Edit Transaksi Manual</h3>
-                <button onclick="tutupModalEdit()" class="text-orange-400 font-bold px-2">✕</button>
+                <button onclick="tutupModalEditOngkir()" class="text-orange-400 font-bold px-2">✕</button>
             </div>
             
-            <input type="hidden" id="edit-id-transaksi">
+            <input type="hidden" id="edit-id-transaksi-ongkir">
             
             <div class="p-4 space-y-3">
                 <div class="grid grid-cols-2 gap-3">
@@ -260,8 +260,8 @@
             
 
             <div class="px-4 py-3 bg-gray-50 flex gap-2">
-                <button onclick="tutupModalEdit()" class="flex-1 py-2 bg-[#666666] hover:bg-[#555555] text-white font-black text-[11px] rounded-[6px] shadow-sm uppercase tracking-widest transition-all">BATAL</button>
-                <button onclick="simpanEditTransaksi()" class="flex-1 py-2 text-white font-black text-[11px] rounded-[6px] shadow-sm uppercase tracking-widest transition-all" style="background: linear-gradient(to bottom, #ff8b00, #f36c00);">Update Data</button>
+                <button onclick="tutupModalEditOngkir()" class="flex-1 py-2 bg-[#666666] hover:bg-[#555555] text-white font-black text-[11px] rounded-[6px] shadow-sm uppercase tracking-widest transition-all">BATAL</button>
+                <button onclick="simpanEditTransaksiOngkir()" class="flex-1 py-2 text-white font-black text-[11px] rounded-[6px] shadow-sm uppercase tracking-widest transition-all" style="background: linear-gradient(to bottom, #ff8b00, #f36c00);">Update Data</button>
             </div>
         </div>
     </div>
