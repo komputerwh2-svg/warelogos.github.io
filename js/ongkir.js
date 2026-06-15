@@ -463,21 +463,21 @@ async function simpanTransaksi() {
         
         miuiAlert("Data berhasil disimpan");
 
-        // Panggil fungsi cetak otomatis untuk data yang baru disimpan
-        google.script.run.cetakPerData(customID);
-
         resetForm();
         loadDataTransaksi();
 
-        // 2. JIKA Anda ingin sinkronisasi instan (kirim ke Spreadsheet tanpa nunggu 10 menit),
-        // gunakan kode ini. Jika tidak, abaikan bagian ini.
-        
-        await fetch("https://script.google.com/macros/s/AKfycbwJmCtDsQyv7APYeoi0met9bG4oKG6No9lLtEX9VF45LT876fxe_1Bi0FoyKhNBkVWysA/exec", {
+        // 2. Kirim ke Spreadsheet via Web App
+        const response = await fetch("https://script.google.com/macros/s/AKfycbwJmCtDsQyv7APYeoi0met9bG4oKG6No9lLtEX9VF45LT876fxe_1Bi0FoyKhNBkVWysA/exec", {
             method: 'POST',
             mode: 'no-cors',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data) // 'data' sekarang sudah termasuk 'id'
+            body: JSON.stringify(data)
         });
+        
+        // Beritahu user bahwa cetak bisa dilakukan
+        // Karena kita tidak bisa memanggil fungsi server secara langsung, 
+        // kita beri link ke spreadsheet atau beri notifikasi
+        console.log("Data dikirim ke Spreadsheet");
         
     } catch (e) {
         console.error("Error simpan:", e);
@@ -711,24 +711,30 @@ window.hapusTransaksiOngkir = async (key) => {
     });
 };
 
-window.cetakPerData = (idFirebase) => {
-    // Cek apakah kode berjalan di dalam lingkungan Google
-    if (typeof google !== 'undefined' && google.script) {
-        miuiAlert("Sedang memuat data ke template cetak...");
+window.cetakPerData = async (idFirebase) => {
+    // 1. Ambil data dari Firebase
+    const res = await fetch(`https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/transaksi_ongkir/${idFirebase}.json`);
+    const data = await res.json();
+    
+    if (!data) return miuiAlert("Data tidak ditemukan!");
 
-        google.script.run
-            .withSuccessHandler(() => {
-                miuiAlert("Data berhasil dimuat!");
-                const spreadsheetURL = "https://docs.google.com/spreadsheets/d/1XDPOkhoES72Y3_gYoUZJdbzMSzk4HzeACkRwzJzWlAE/edit#gid=635878249";
-                window.open(spreadsheetURL, "_blank");
-            })
-            .withFailureHandler((err) => {
-                miuiAlert("Gagal: " + err.message);
-            })
-            .cetakPerData(idFirebase);
-    } else {
-        // Pesan jika dijalankan di luar lingkungan Google
-        console.warn("Fungsi cetak hanya tersedia jika aplikasi dijalankan melalui server Google Apps Script.");
-        miuiAlert("Fungsi cetak tidak tersedia di mode lokal.");
+    // 2. Kirim ke Web App Google Script untuk diisi ke template
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwJmCtDsQyv7APYeoi0met9bG4oKG6No9lLtEX9VF45LT876fxe_1Bi0FoyKhNBkVWysA/exec";
+    
+    miuiAlert("Sedang menyiapkan template cetak...");
+
+    try {
+        await fetch(WEB_APP_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: JSON.stringify(data)
+        });
+
+        // 3. Setelah data dikirim, buka spreadsheet agar bisa dicetak user
+        const spreadsheetURL = "https://docs.google.com/spreadsheets/d/1XDPOkhoES72Y3_gYoUZJdbzMSzk4HzeACkRwzJzWlAE/edit#gid=635878249";
+        window.open(spreadsheetURL, "_blank");
+        
+    } catch (err) {
+        miuiAlert("Gagal mengirim data ke cetakan: " + err.message);
     }
 };
