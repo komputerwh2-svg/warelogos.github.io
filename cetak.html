@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Print Engine</title>
+            <style id="base-style">
+                /* Margin kertas F4 agar konten pas di tengah */
+                @page { 
+                    size: F4 portrait; 
+                    margin: 15mm 10mm 15mm 10mm; /* Top, Right, Bottom, Left */
+                }
+                
+                body { 
+                    font-family: 'Trebuchet MS', sans-serif; 
+                    font-size: 11pt; 
+                    color: #000; 
+                    margin: 0;
+                    padding: 0;
+                }
+                
+                .sisi-kertas { 
+                    height: 135mm; 
+                    border: 1px solid #000; 
+                    padding: 10mm; /* Ruang dalam kertas agar tidak mepet garis */
+                    display: flex; 
+                    flex-direction: column; 
+                    box-sizing: border-box; 
+                }
+                
+                /* Header Kop */
+                .header-kop { 
+                    text-align: center; 
+                    font-weight: bold; 
+                    font-size: 16pt; 
+                    position: relative; 
+                    padding-bottom: 5px; 
+                }
+                
+                .logo-kop { 
+                    width: 70px; 
+                    position: absolute; 
+                    left: 0; 
+                    top: -5px; 
+                }
+                
+                .judul-garis { 
+                    display: inline-block; 
+                    border-bottom: 2px solid #000; 
+                    padding-bottom: 2px; 
+                    margin-bottom: 10px;
+                }
+                
+                .status-badge { 
+                    position: absolute;
+                    right: 0;
+                    top: 0;
+                    font-size: 15pt; 
+                    font-weight: 900; /* Segoe UI Black memiliki weight sangat tebal (900) */
+                    font-family: 'Segoe UI Black', 'Segoe UI', sans-serif; /* Menggunakan font tersebut dengan fallback */
+                    color: #e1e1e1; 
+                }
+
+                /* Kelas untuk membuat garis bawah yang panjang penuh */
+                .garis-bawah {
+                    border-bottom: 1px solid #000;
+                }
+
+                /* Tabel Presisi */
+                table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+                td { padding: 4px 5px; vertical-align: top; }
+                .label { width: 45mm; }
+
+                /* Atur agar paragraf tidak memiliki jarak bawah yang berlebihan */
+                .footer-sign p {
+                    margin: 0; 
+                    padding: 0;
+                }
+                
+                /* Footer & Tanda Tangan */
+                .footer-sign { margin-top: auto; padding-top: 5px; }
+                .sign-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    table-layout: fixed; /* Memaksa setiap kolom memiliki lebar yang sama */
+                    margin-top: 4mm;
+                }
+                
+                .sign-table td {
+                    text-align: center;
+                    vertical-align: top;
+                    width: 25%; /* Membagi meja menjadi 4 bagian sama besar */
+                    padding: 0 2px;
+                }
+
+                .nama-bawah {
+                    border-bottom: 1px solid #000; /* Garis bawah untuk tanda tangan */
+                    display: inline-block;
+                    min-width: 80px;
+                    padding-bottom: 2px;
+                }
+                .garis-lipat { 
+                    border-top: 0.5px dashed #000; 
+                    margin: 40px 0; 
+                }
+            </style>
+    <style id="app-style"></style>
+</head>
+<body>
+    <div id="print-area"></div>
+    <script>
+    const data = JSON.parse(localStorage.getItem('printData'));
+    if (data) {
+        document.getElementById('app-style').innerHTML = data.css;
+        document.getElementById('print-area').innerHTML = data.html;
+        
+        // Gunakan event 'afterprint' untuk menutup jendela
+        window.onafterprint = () => {
+            window.close();
+        };
+
+        // Tunggu sebentar untuk render, lalu panggil print
+        setTimeout(() => {
+            window.print();
+        }, 800); // Waktu jeda 800ms cukup aman untuk browser melakukan rendering
+    }
+</script>
+</body>
+</html>
