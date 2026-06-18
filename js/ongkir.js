@@ -583,7 +583,7 @@ export async function loadDataTransaksi() {
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
                             </button>
-                            <button onclick="cetakPerData('${key}')" class="text-orange-500 hover:text-orange-700 transition-all active:scale-90" title="Cetak">
+                            <button onclick="cetakPresisi('${key}')" class="text-orange-500 hover:text-orange-700 transition-all active:scale-90" title="Cetak">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                                 </svg>
@@ -737,4 +737,69 @@ window.cetakPerData = async (idFirebase) => {
     } catch (err) {
         miuiAlert("Gagal mengirim data ke cetakan: " + err.message);
     }
+};
+
+window.cetakPresisi = async (idFirebase) => {
+    const res = await fetch(`https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/transaksi_ongkir/${idFirebase}.json`);
+    const data = await res.json();
+    if (!data) return;
+
+    // Fungsi helper format tanggal
+    const formatTgl = (tgl) => {
+        const d = new Date(tgl);
+        const bulan = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+        return `${d.getDate()} ${bulan[d.getMonth()]} ${d.getFullYear()}`;
+    };
+
+    const contentHtml = `
+        ${['ASLI', 'COPY'].map(type => `
+            <div class="sisi-kertas">
+                <div class="header-kop">
+                    <img src="uth logo TR.png" class="logo-kop">
+                    <div class="judul-garis">TANDA TERIMA</div>
+                    <div class="status-badge">${type}</div>
+                </div>
+                
+                <table>
+                    <tr><td class="label">TELAH TERIMA DARI</td><td colspan="2" class="garis-bawah">: <strong>PT. Ulam Tiba Halim</strong></td></tr>
+                    <tr><td class="label">KEPADA</td><td colspan="2" class="garis-bawah">: ${data.driver || '-'} <span style="margin-left: 10px;">| ${data.plat || ''}</span></td></tr>
+                    <tr><td class="label">JUMLAH</td><td colspan="2" class="garis-bawah">: Rp ${(data.nominal || 0).toLocaleString()} <span style="margin-left: 10px;">| ( ${data.terbilang || '-'} )</span></td></tr>
+                    
+                    <tr><td class="label">KETERANGAN</td><td colspan="2" class="garis-bawah">: ${data.keterangan_cetak || '-'}</td></tr>
+                    <tr><td></td><td colspan="2" style="padding-left: 13px;" class="garis-bawah">${data.tujuan || ''}</td></tr>
+                    <tr><td></td><td colspan="2" style="padding-left: 13px;" class="garis-bawah">${data.banyaknya || ''}</td></tr>
+                    <tr><td></td><td colspan="2" style="padding-left: 13px;" class="garis-bawah">${data.kategori_total || ''} ${data.palet || '0'} PALET</td></tr>
+                </table>
+
+                <div class="footer-sign">
+                    <p>Semarang, ${formatTgl(data.tanggal)}</p>
+                    <table class="sign-table">
+                        <tr>
+                            <td>Yang Menyerahkan</td>
+                            <td>Mengetahui</td>
+                            <td>Menyetujui</td>
+                            <td>Penerima</td>
+                        </tr>
+                        <tr>
+                            <td style="height: 18mm;"></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                            <td><span class="nama-bawah">FARIN A.</span></td>
+                            <td><span class="nama-bawah">ANTONIUS H.</span></td>
+                            <td><span class="nama-bawah">DIMAS W.J</span></td>
+                            <td><span class="nama-bawah">${data.driver || '-'}</span></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            ${type === 'ASLI' ? '<div class="garis-lipat"></div>' : ''}
+        `).join('')}
+    `;
+
+    // Kirim ke engine cetak
+    localStorage.setItem('printData', JSON.stringify({ html: contentHtml, css: '' }));
+    window.open('cetak.html', '_blank', 'width=800,height=600');
 };
