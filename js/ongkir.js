@@ -800,8 +800,8 @@ window.cetakPresisi = async (idFirebase) => {
     `;
 
     // 1. Logika asli tetap ada (Cetak Lokal)
-    localStorage.setItem('printData', JSON.stringify({ html: contentHtml, css: '' }));
-    window.open('cetak.html', '_blank', 'width=800,height=600');
+    //localStorage.setItem('printData', JSON.stringify({ html: contentHtml, css: '' }));
+    //window.open('cetak.html', '_blank', 'width=800,height=600');
 
     // 2. Tambahan: Kirim ke Firebase untuk Print Server Kantor
     try {
