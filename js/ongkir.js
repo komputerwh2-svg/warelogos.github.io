@@ -799,7 +799,22 @@ window.cetakPresisi = async (idFirebase) => {
         `).join('')}
     `;
 
-    // Kirim ke engine cetak
+    // 1. Logika asli tetap ada (Cetak Lokal)
     localStorage.setItem('printData', JSON.stringify({ html: contentHtml, css: '' }));
     window.open('cetak.html', '_blank', 'width=800,height=600');
+
+    // 2. Tambahan: Kirim ke Firebase untuk Print Server Kantor
+    try {
+        await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs.json', {
+            method: 'POST',
+            body: JSON.stringify({
+                html: contentHtml,
+                timestamp: Date.now()
+            }),
+            headers: { 'Content-Type': 'application/json' }
+        });
+        console.log("Perintah cetak dikirim ke server kantor.");
+    } catch (error) {
+        console.error("Gagal mengirim ke server kantor:", error);
+    }
 };
