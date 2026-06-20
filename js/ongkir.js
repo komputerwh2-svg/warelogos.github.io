@@ -91,7 +91,7 @@ function isiDropdownTanggal() {
         "Juli", "Agustus", "September", "Oktober", "November", "Desember"
     ];
 
-    for (let i = 0; i <= 31; i++) {
+    for (let i = 0; i <= 30; i++) { 
         let d = new Date();
         d.setDate(d.getDate() - i);
         
@@ -125,7 +125,7 @@ function isiDropdownTanggalEdit() {
         "Juli", "Agustus", "September", "Oktober", "November", "Desember"
     ];
 
-    for (let i = 0; i <= 10; i++) {
+    for (let i = 0; i <= 30; i++) {
         let d = new Date();
         d.setDate(d.getDate() - i);
         
@@ -158,7 +158,7 @@ export function initDropdownPeriode() {
     select.innerHTML = "";
 
     // Loop untuk 8 bulan terakhir
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 10; i++) {
         let d = new Date(sekarang.getFullYear(), sekarang.getMonth() - i, 1);
         let bulan = bulanNama[d.getMonth()];
         let tahun = d.getFullYear();
@@ -880,5 +880,149 @@ window.cetakPresisi = async (idFirebase) => {
         });
     } catch (error) {
         console.error("Gagal mengirim ke server:", error);
+    }
+};
+
+window.cetakLaporanOngkir = async () => {
+    // 1. Ambil nilai dari select secara langsung di dalam fungsi
+    const selectElement = document.getElementById('filter-bulan-ongkir');
+    const periodeRaw = selectElement ? selectElement.value : '';
+
+    // Validasi agar tidak cetak jika periode kosong
+    if (!periodeRaw) {
+        alert("Silakan pilih bulan/periode terlebih dahulu!");
+        return;
+    }
+
+    // Fungsi pembantu untuk format tanggal
+    const formatBulan = (val) => {
+        const [thn, bln] = val.split('-');
+        const namaBulan = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"];
+        return `${namaBulan[parseInt(bln) - 1]} ${thn}`;
+    };
+
+    const formatTgl = (tgl) => {
+        if (!tgl) return '-';
+        const d = new Date(tgl);
+        const bulan = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+        return `${d.getDate()} ${bulan[d.getMonth()]} ${d.getFullYear()}`;
+    };
+
+    // 1. Ambil seluruh data transaksi
+    const res = await fetch(`https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/transaksi_ongkir.json`);
+    const data = await res.json();
+    if (!data) return;
+
+    // Filter berdasarkan periode yang dikirim dari select
+    const dataArray = Object.values(data).filter(item => item.tanggal && item.tanggal.includes(periodeRaw));
+    
+    if (dataArray.length === 0) {
+        alert("Tidak ada data transaksi untuk periode: " + formatBulan(periodeRaw));
+        return;
+    }
+    
+    // CSS khusus untuk laporan ongkir (F4 Landscape)
+    const styleCss = `
+        <style>
+            @page { size: 330mm 210mm; margin: 5mm; } /* Margin diperkecil */
+            body { font-family: 'Arial', sans-serif; font-size: 8.5pt; }
+            h2 { text-align: center; margin-bottom: 10px; }
+            
+            table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+            th, td { border: 1px solid #000; padding: 4px; word-wrap: break-word; }
+            th { background-color: #f2f2f2; text-align: center; }
+            
+            /* Proporsi lebar kolom */
+            th:nth-child(1) { width: 2%; }  /* No */
+            th:nth-child(2) { width: 8%; } /* Tanggal */
+            th:nth-child(3) { width: 10%; } /* Driver */
+            th:nth-child(4) { width: 13%; } /* Plat */
+            th:nth-child(5) { width: 32%; } /* Tujuan */
+            th:nth-child(6) { width: 35%; } /* Banyaknya */
+            th:nth-child(7) { width: 8%; } /* Nominal */
+            th:nth-child(8) { width: 5%; }  /* Palet */
+
+            .total-row { font-weight: bold; background-color: #eee; }
+            
+            /* Footer Halaman */
+            .page-footer {
+                position: fixed;
+                bottom: 0;
+                width: 100%;
+                text-align: center;
+                font-size: 8pt;
+            }
+            @media print {
+                .page-footer:after {
+                    content: "Halaman " counter(page);
+                }
+            }
+
+            tr { page-break-inside: avoid; }
+            thead { display: table-header-group; }
+        </style>`;
+
+    // 2. Bangun isi tabel
+    let rows = '';
+    let totalNominal = 0;
+    let totalPalet = 0;
+
+    dataArray.forEach((item, index) => {
+        // 1. Bersihkan tanda titik dari nominal agar bisa dihitung (45.000 -> 45000)
+        const nominalStr = (item.nominal || "0").toString().replace(/\./g, '');
+        const nominal = Number(nominalStr) || 0;
+        
+        // 2. Ambil nilai palet (pastikan data tersedia)
+        const palet = Number(item.palet) || 0;
+        
+        totalNominal += nominal;
+        totalPalet += palet;
+        rows += `<tr>
+            <td style="text-align: center;">${index + 1}</td>
+            <td>${formatTgl(item.tanggal) || '-'}</td>
+            <td>${item.driver || '-'}</td>
+            <td>${item.plat || '-'}</td>
+            <td>${item.tujuan || '-'}</td>
+            <td>${item.banyaknya || '-'}</td>
+            <td style="text-align: center;">Rp ${nominal.toLocaleString()}</td>
+            <td style="text-align: center;">${palet}</td>
+        </tr>`;
+    });
+
+    const bodyHtml = `
+    <body class="is-landscape">
+        <h2>LAPORAN KEUANGAN LANGSIR WH-2 PERIODE ${formatBulan(periodeRaw)}</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>NO</th><th>TANGGAL</th><th>DRIVER</th><th>PLAT</th>
+                    <th>TUJUAN</th><th>BANYAKNYA</th><th>NOMINAL</th><th>PALET</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rows}
+                <tr class="total-row">
+                    <td colspan="6" style="text-align: right;">TOTAL PENGELUARAN PERIODE ${formatBulan(periodeRaw)}</td>
+                    <td style="text-align: center;">Rp ${totalNominal.toLocaleString('id-ID')}</td>
+                    <td style="text-align: center;">${totalPalet} PLT</td>
+                </tr>
+            </tbody>
+        </table>
+        <div class="page-footer"></div>
+    </body>
+    `;
+
+    const finalHtml = `<!DOCTYPE html><html><head>${styleCss}</head><body>${bodyHtml}</body></html>`;
+
+    // 3. Kirim ke Firebase Print Server
+    try {
+        await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs.json', {
+            method: 'POST',
+            body: JSON.stringify({ html: finalHtml, timestamp: Date.now() }),
+            headers: { 'Content-Type': 'application/json' }
+        });
+        miuiAlert("Laporan dikirim ke printer!");
+    } catch (error) {
+        console.error("Gagal cetak laporan:", error);
     }
 };
