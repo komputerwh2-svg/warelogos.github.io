@@ -91,7 +91,7 @@ function isiDropdownTanggal() {
         "Juli", "Agustus", "September", "Oktober", "November", "Desember"
     ];
 
-    for (let i = 0; i <= 10; i++) {
+    for (let i = 0; i <= 31; i++) {
         let d = new Date();
         d.setDate(d.getDate() - i);
         
