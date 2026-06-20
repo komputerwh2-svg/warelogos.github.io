@@ -890,7 +890,7 @@ window.cetakPresisi = async (idFirebase) => {
 
     // 1. Logika Cetak Lokal
     localStorage.setItem('printData', JSON.stringify({ html: finalHtml }));
-    window.open('cetak.html', '_blank', 'width=800,height=600');
+    //window.open('cetak.html', '_blank', 'width=800,height=600');
 
     // 2. Kirim ke Firebase untuk Print Server
     try {
