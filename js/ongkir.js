@@ -744,14 +744,103 @@ window.cetakPresisi = async (idFirebase) => {
     const data = await res.json();
     if (!data) return;
 
-    // Fungsi helper format tanggal
     const formatTgl = (tgl) => {
         const d = new Date(tgl);
         const bulan = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
         return `${d.getDate()} ${bulan[d.getMonth()]} ${d.getFullYear()}`;
     };
 
-    const contentHtml = `
+    // Kita masukkan CSS langsung di sini agar terbawa saat dikirim ke Firebase/PDF
+    const styleCss = `
+    <style>
+        @page { size: 210mm 330mm portrait; margin: 8mm; }
+        body { font-family: 'Trebuchet MS', sans-serif; font-size: 11pt; color: #000; margin: 0; padding: 0; }
+        
+        .sisi-kertas { 
+                    height: 135mm; 
+                    border: 1px solid #000; 
+                    padding: 10mm; /* Ruang dalam kertas agar tidak mepet garis */
+                    display: flex; 
+                    flex-direction: column; 
+                    box-sizing: border-box; 
+                }
+
+        /* Header Kop */
+                .header-kop { 
+                    text-align: center; 
+                    font-weight: bold; 
+                    font-size: 16pt; 
+                    position: relative; 
+                    padding-bottom: 5px; 
+                }
+        .logo-kop { 
+                    width: 70px; 
+                    position: absolute; 
+                    left: 0; 
+                    top: -5px; 
+                }
+        .judul-garis { 
+                    display: inline-block; 
+                    border-bottom: 2px solid #000; 
+                    padding-bottom: 2px; 
+                    margin-bottom: 10px;
+                }
+        .status-badge { 
+                    position: absolute;
+                    right: 0;
+                    top: 0;
+                    font-size: 15pt; 
+                    font-weight: 900; /* Segoe UI Black memiliki weight sangat tebal (900) */
+                    font-family: 'Segoe UI Black', 'Segoe UI', sans-serif; /* Menggunakan font tersebut dengan fallback */
+                    color: #e1e1e1; 
+                }
+        
+        /* Tabel Presisi */
+                table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+                td { padding: 4px 5px; vertical-align: top; }
+                .label { width: 45mm; }
+
+        /* Kelas untuk membuat garis bawah yang panjang penuh */
+                .garis-bawah {
+                    border-bottom: 1px solid #000;
+                }
+
+        /* Footer fix: Paksa ke bawah menggunakan absolute positioning */
+        /* Atur agar paragraf tidak memiliki jarak bawah yang berlebihan */
+                .footer-sign p {
+                    margin: 0; 
+                    padding: 0;
+                }
+        
+        /* Footer & Tanda Tangan */
+                .footer-sign { margin-top: auto; padding-top: 5px; }
+                .sign-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    table-layout: fixed; /* Memaksa setiap kolom memiliki lebar yang sama */
+                    margin-top: 4mm;
+                }
+                
+                .sign-table td {
+                    text-align: center;
+                    vertical-align: top;
+                    width: 25%; /* Membagi meja menjadi 4 bagian sama besar */
+                    padding: 0 2px;
+                }
+
+                .nama-bawah {
+                    border-bottom: 1px solid #000; /* Garis bawah untuk tanda tangan */
+                    display: inline-block;
+                    min-width: 80px;
+                    padding-bottom: 2px;
+                }
+                .garis-lipat { 
+                    border-top: 0.5px dashed #000; 
+                    margin: 40px 0; 
+                }
+    </style>`;
+
+    const bodyHtml = `
         ${['ASLI', 'COPY'].map(type => `
             <div class="sisi-kertas">
                 <div class="header-kop">
@@ -759,33 +848,20 @@ window.cetakPresisi = async (idFirebase) => {
                     <div class="judul-garis">TANDA TERIMA</div>
                     <div class="status-badge">${type}</div>
                 </div>
-                
                 <table>
                     <tr><td class="label">TELAH TERIMA DARI</td><td colspan="2" class="garis-bawah">: <strong>PT. Ulam Tiba Halim</strong></td></tr>
                     <tr><td class="label">KEPADA</td><td colspan="2" class="garis-bawah">: ${data.driver || '-'} <span style="margin-left: 10px;">| ${data.plat || ''}</span></td></tr>
                     <tr><td class="label">JUMLAH</td><td colspan="2" class="garis-bawah">: Rp ${(data.nominal || 0).toLocaleString()} <span style="margin-left: 10px;">| ( ${data.terbilang || '-'} )</span></td></tr>
-                    
                     <tr><td class="label">KETERANGAN</td><td colspan="2" class="garis-bawah">: ${data.keterangan_cetak || '-'}</td></tr>
                     <tr><td></td><td colspan="2" style="padding-left: 13px;" class="garis-bawah">${data.tujuan || ''}</td></tr>
                     <tr><td></td><td colspan="2" style="padding-left: 13px;" class="garis-bawah">${data.banyaknya || ''}</td></tr>
                     <tr><td></td><td colspan="2" style="padding-left: 13px;" class="garis-bawah">${data.kategori_total || ''} ${data.palet || '0'} PALET</td></tr>
                 </table>
-
                 <div class="footer-sign">
                     <p>Semarang, ${formatTgl(data.tanggal)}</p>
                     <table class="sign-table">
-                        <tr>
-                            <td>Yang Menyerahkan</td>
-                            <td>Mengetahui</td>
-                            <td>Menyetujui</td>
-                            <td>Penerima</td>
-                        </tr>
-                        <tr>
-                            <td style="height: 18mm;"></td>
-                            <td></td>
-                            <td></td>
-                            <td></td>
-                        </tr>
+                        <tr><td>Yang Menyerahkan</td><td>Mengetahui</td><td>Menyetujui</td><td>Penerima</td></tr>
+                        <tr><td style="height: 18mm;"></td><td></td><td></td><td></td></tr>
                         <tr>
                             <td><span class="nama-bawah">FARIN A.</span></td>
                             <td><span class="nama-bawah">ANTONIUS H.</span></td>
@@ -796,25 +872,34 @@ window.cetakPresisi = async (idFirebase) => {
                 </div>
             </div>
             ${type === 'ASLI' ? '<div class="garis-lipat"></div>' : ''}
-        `).join('')}
+        `).join('')}`;
+
+    // Gabungkan CSS dan HTML menjadi satu kesatuan
+    const finalHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            ${styleCss}
+        </head>
+        <body>
+            ${bodyHtml}
+        </body>
+        </html>
     `;
 
-    // 1. Logika asli tetap ada (Cetak Lokal)
-    //localStorage.setItem('printData', JSON.stringify({ html: contentHtml, css: '' }));
-    //window.open('cetak.html', '_blank', 'width=800,height=600');
+    // 1. Logika Cetak Lokal
+    localStorage.setItem('printData', JSON.stringify({ html: finalHtml }));
+    window.open('cetak.html', '_blank', 'width=800,height=600');
 
-    // 2. Tambahan: Kirim ke Firebase untuk Print Server Kantor
+    // 2. Kirim ke Firebase untuk Print Server
     try {
         await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs.json', {
             method: 'POST',
-            body: JSON.stringify({
-                html: contentHtml,
-                timestamp: Date.now()
-            }),
+            body: JSON.stringify({ html: finalHtml, timestamp: Date.now() }),
             headers: { 'Content-Type': 'application/json' }
         });
-        console.log("Perintah cetak dikirim ke server kantor.");
     } catch (error) {
-        console.error("Gagal mengirim ke server kantor:", error);
+        console.error("Gagal mengirim ke server:", error);
     }
 };
