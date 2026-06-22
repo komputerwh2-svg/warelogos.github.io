@@ -610,3 +610,127 @@ function tutupSubPageBankData() {
 window.bukaSubPageBankData = bukaSubPageBankData;
 window.tutupSubPageBankData = tutupSubPageBankData;
 window.sinkronisasiSemuaDataMaster = sinkronisasiSemuaDataMaster;
+
+
+// Membuka modal dengan mengirim ID spesifik
+window.openPktModal = async (modalId, selectId) => {
+    const res = await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/master_tujuan.json');
+    const data = await res.json();
+    const select = document.getElementById(selectId);
+    
+    // Reset select dengan opsi default
+    select.innerHTML = '<option value="-">- Pilih Tujuan -</option>';
+    
+    if (data) {
+        Object.values(data).forEach(item => {
+            if(item.TUJUAN) {
+                select.innerHTML += `<option value="${item.TUJUAN}">${item.TUJUAN}</option>`;
+            }
+        });
+    }
+    document.getElementById(modalId).classList.remove('hidden');
+};
+
+// Menutup modal universal
+window.closeModal = (modalId, selectId, qtyId) => {
+    document.getElementById(modalId).classList.add('hidden');
+    document.getElementById(selectId).value = "-";
+    document.getElementById(qtyId).value = "-";
+};
+
+// Fungsi Simpan Universal
+window.simpanDataPkt = async (jenisLabel, selectTujuanId, selectQtyId, modalId) => {
+    const tujuanRaw = document.getElementById(selectTujuanId).value;
+    const qty = document.getElementById(selectQtyId).value;
+    
+    // 1. Validasi
+    if (tujuanRaw === "-" || qty === "-") {
+        return miuiAlert("Mohon pilih Tujuan dan QTY dengan benar!");
+    }
+
+    // 2. Pembuatan ID Unik
+    const tujuanFormatted = tujuanRaw.replace(/\s+/g, '_').toUpperCase();
+    const now = new Date();
+    const tgl = now.toISOString().split('T')[0].replace(/-/g, '');
+    const timeId = now.getHours().toString().padStart(2, '0') + 
+                   now.getMinutes().toString().padStart(2, '0') + 
+                   now.getSeconds().toString().padStart(2, '0');
+    
+    // ID Unik sekarang menyertakan jenisLabel agar tidak bentrok
+    const uniqueId = `${jenisLabel}_${tujuanFormatted}_${tgl}_${timeId}`;
+
+    const data = {
+        jenis: jenisLabel, // Akan berisi PR-PKT40, PR-PKT59, atau PR-PKT82
+        tujuan: tujuanRaw,
+        qty: qty,
+        timestamp: now.getTime()
+    };
+
+    // 3. Simpan ke Firebase
+    try {
+        await fetch(`https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/label_history/${uniqueId}.json`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        miuiAlert("Data berhasil disimpan!");
+        
+        // Reset form setelah sukses
+        document.getElementById(selectTujuanId).value = "-";
+        document.getElementById(selectQtyId).value = "-";
+        //document.getElementById(modalId).classList.add('hidden');
+        
+    } catch (e) {
+        miuiAlert("Gagal menyimpan: " + e.message);
+    }
+};
+
+window.cetakLabelHariIni = async (jenisLabel) => {
+    // 1. Ambil data dari Firebase
+    const res = await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/label_history.json');
+    const allData = await res.json();
+    
+    // Filter data berdasarkan tanggal hari ini dan jenis yang dikirim (parameter)
+    const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    const dataHariIni = Object.values(allData || {}).filter(item => {
+        const itemDate = new Date(item.timestamp).toISOString().split('T')[0].replace(/-/g, '');
+        return itemDate === today && item.jenis === jenisLabel;
+    });
+
+    if (dataHariIni.length === 0) return miuiAlert(`Tidak ada data ${jenisLabel} untuk dicetak hari ini.`);
+
+    // 2. Format HTML untuk F4 Portrait
+    let pagesHtml = "";
+    const itemsPerPage = 4; 
+
+    for (let i = 0; i < dataHariIni.length; i += itemsPerPage) {
+        let chunk = dataHariIni.slice(i, i + itemsPerPage);
+        
+        pagesHtml += `
+        <div class="page" style="page-break-after: always; width: 210mm; height: 330mm; padding: 5mm 2mm; box-sizing: border-box; display: grid; grid-template-rows: repeat(4, 1fr); gap: 62px;">`;
+        
+        chunk.forEach(item => {
+            pagesHtml += `
+            <div style="border: 2px solid #000; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; height: 70mm; width: 200mm;">
+                <div style="font-size: 57pt; font-family: Edo; line-height: 1;">${item.tujuan.toUpperCase()}</div>
+                <div style="border-top: 2px dashed #000; width: 95%; margin: 12px 0;"></div>
+                <div style="font-size: 49pt; font-family: Edo; line-height: 1;">${item.jenis} . ${item.qty} . PAKET</div>
+            </div>`;
+        });
+        
+        pagesHtml += `</div>`; 
+    }
+
+    // 3. Kirim ke Print Server
+    try {
+        await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs.json', {
+            method: 'POST',
+            body: JSON.stringify({ html: pagesHtml, timestamp: Date.now() }),
+            headers: { 'Content-Type': 'application/json' }
+        });
+        miuiAlert(`Proses Mencetak ${dataHariIni.length} Label ${jenisLabel}.`);
+    } catch (e) {
+        miuiAlert("Gagal mengirim perintah cetak: " + e.message);
+    }
+};
