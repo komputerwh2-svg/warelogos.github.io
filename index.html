@@ -133,21 +133,21 @@
                 <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Rak Kosong</span>
             </div>
 
-            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="miuiAlert('Membuka Label PKT-40')">
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="openPktModal('pktModal40', 'tujuanSelect40')">
                 <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
                     <img src="img/pkt40.png" alt="PKT-40" class="w-full h-full object-cover">
                 </div>
                 <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">PKT-40</span>
             </div>
 
-            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="miuiAlert('Membuka Label PKT-59')">
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="openPktModal('pktModal59', 'tujuanSelect59')">
                 <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
                     <img src="img/pkt59.png" alt="PKT-59" class="w-full h-full object-cover">
                 </div>
                 <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">PKT-59</span>
             </div>
 
-            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="miuiAlert('Membuka Label PKT-82')">
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="openPktModal('pktModal82', 'tujuanSelect82')">
                 <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
                     <img src="img/pkt82.png" alt="PKT-82" class="w-full h-full object-cover">
                 </div>
@@ -464,6 +464,114 @@
             <div class="mt-6 flex gap-2">
                 <button onclick="cekLoginAdmin()" class="flex-1 py-2 bg-orange-500 text-white font-bold rounded-lg text-xs">BUKA AKSES</button>
                 <button onclick="closeModalAdmin()" class="px-4 py-2 bg-gray-200 text-slate-600 font-bold rounded-lg text-xs">BATAL</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="pktModal40" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6 select-none animate-fade-in">
+        <div class="bg-[#e4e4e4] w-full max-w-[320px] rounded-[14px] overflow-hidden shadow-2xl border border-[#b2b2b2] flex flex-col font-sans text-slate-800 relative">
+            
+            <div class="bg-gradient-to-b from-[#323232] to-[#202020] px-4 py-3 flex items-center justify-between border-b border-[#151515]">
+                <h3 class="text-white font-medium text-sm tracking-wide flex items-center gap-2">
+                    <i class="fa-solid fa-tags text-orange-400 text-xs"></i> Cetak Label PR-PKT40
+                </h3>
+                <button onclick="closeModal('pktModal40', 'tujuanSelect40', 'qtySelect40')" class="text-white hover:text-red-400 font-bold text-lg">✕</button>
+            </div>
+
+            <div class="p-4 flex flex-col gap-3">
+                <div class="text-left">
+                    <label class="text-[11px] font-bold text-slate-500 block mb-0.5 uppercase">Tujuan:</label>
+                    <select id="tujuanSelect40" class="w-full bg-white border border-[#c8c8c8] rounded-[6px] py-2 px-2 text-sm font-bold text-slate-900 focus:outline-none focus:border-orange-500">
+                        <option value="-">- Pilih Tujuan -</option>    
+                    </select>
+                </div>
+                <div class="text-left">
+                    <label class="text-[11px] font-bold text-slate-600 block mb-0.5 uppercase">QTY (PKT):</label>
+                    <select id="qtySelect40" class="w-full bg-white border border-[#c8c8c8] rounded-[6px] py-2 px-2 text-sm font-bold text-slate-900 focus:outline-none focus:border-orange-500">
+                        <option value="-">-</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 border-t border-[#d0d0d0] bg-[#dbdbdb]">
+                <button onclick="simpanDataPkt('PR-PKT40', 'tujuanSelect40', 'qtySelect40', 'pktModal40')" class="py-3 text-[13px] font-bold text-white bg-gradient-to-b from-[#ff8b00] to-[#f36c00] transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]">Simpan</button>
+                <button onclick="cetakLabelHariIni('PR-PKT40')" class="py-3 text-[13px] font-bold text-slate-700 bg-gradient-to-b from-[#f2f2f2] to-[#e0e0e0] border-l border-r border-[#c4c4c4] transition-all hover:bg-slate-200">Cetak</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="pktModal59" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6 select-none animate-fade-in">
+        <div class="bg-[#e4e4e4] w-full max-w-[320px] rounded-[14px] overflow-hidden shadow-2xl border border-[#b2b2b2] flex flex-col font-sans text-slate-800 relative">
+            
+            <div class="bg-gradient-to-b from-[#323232] to-[#202020] px-4 py-3 flex items-center justify-between border-b border-[#151515]">
+                <h3 class="text-white font-medium text-sm tracking-wide flex items-center gap-2">
+                    <i class="fa-solid fa-tags text-orange-400 text-xs"></i> Cetak Label PR-PKT59
+                </h3>
+                <button onclick="closeModal('pktModal59', 'tujuanSelect59', 'qtySelect59')" class="text-white hover:text-red-400 font-bold text-lg">✕</button>
+            </div>
+
+            <div class="p-4 flex flex-col gap-3">
+                <div class="text-left">
+                    <label class="text-[11px] font-bold text-slate-500 block mb-0.5 uppercase">Tujuan:</label>
+                    <select id="tujuanSelect59" class="w-full bg-white border border-[#c8c8c8] rounded-[6px] py-2 px-2 text-sm font-bold text-slate-900 focus:outline-none focus:border-orange-500">
+                        <option value="-">- Pilih Tujuan -</option>    
+                    </select>
+                </div>
+                <div class="text-left">
+                    <label class="text-[11px] font-bold text-slate-600 block mb-0.5 uppercase">QTY (PKT):</label>
+                    <select id="qtySelect59" class="w-full bg-white border border-[#c8c8c8] rounded-[6px] py-2 px-2 text-sm font-bold text-slate-900 focus:outline-none focus:border-orange-500">
+                        <option value="-">-</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 border-t border-[#d0d0d0] bg-[#dbdbdb]">
+                <button onclick="simpanDataPkt('PR-PKT59', 'tujuanSelect59', 'qtySelect59', 'pktModal59')" class="py-3 text-[13px] font-bold text-white bg-gradient-to-b from-[#ff8b00] to-[#f36c00] transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]">Simpan</button>
+                <button onclick="cetakLabelHariIni('PR-PKT59')" class="py-3 text-[13px] font-bold text-slate-700 bg-gradient-to-b from-[#f2f2f2] to-[#e0e0e0] border-l border-r border-[#c4c4c4] transition-all hover:bg-slate-200">Cetak</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="pktModal82" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6 select-none animate-fade-in">
+        <div class="bg-[#e4e4e4] w-full max-w-[320px] rounded-[14px] overflow-hidden shadow-2xl border border-[#b2b2b2] flex flex-col font-sans text-slate-800 relative">
+            
+            <div class="bg-gradient-to-b from-[#323232] to-[#202020] px-4 py-3 flex items-center justify-between border-b border-[#151515]">
+                <h3 class="text-white font-medium text-sm tracking-wide flex items-center gap-2">
+                    <i class="fa-solid fa-tags text-orange-400 text-xs"></i> Cetak Label PR-PKT82
+                </h3>
+                <button onclick="closeModal('pktModal82', 'tujuanSelect82', 'qtySelect82')" class="text-white hover:text-red-400 font-bold text-lg">✕</button>
+            </div>
+
+            <div class="p-4 flex flex-col gap-3">
+                <div class="text-left">
+                    <label class="text-[11px] font-bold text-slate-500 block mb-0.5 uppercase">Tujuan:</label>
+                    <select id="tujuanSelect82" class="w-full bg-white border border-[#c8c8c8] rounded-[6px] py-2 px-2 text-sm font-bold text-slate-900 focus:outline-none focus:border-orange-500">
+                        <option value="-">- Pilih Tujuan -</option>    
+                    </select>
+                </div>
+                <div class="text-left">
+                    <label class="text-[11px] font-bold text-slate-600 block mb-0.5 uppercase">QTY (PKT):</label>
+                    <select id="qtySelect82" class="w-full bg-white border border-[#c8c8c8] rounded-[6px] py-2 px-2 text-sm font-bold text-slate-900 focus:outline-none focus:border-orange-500">
+                        <option value="-">-</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 border-t border-[#d0d0d0] bg-[#dbdbdb]">
+                <button onclick="simpanDataPkt('PR-PKT82', 'tujuanSelect82', 'qtySelect82', 'pktModal82')" class="py-3 text-[13px] font-bold text-white bg-gradient-to-b from-[#ff8b00] to-[#f36c00] transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]">Simpan</button>
+                <button onclick="cetakLabelHariIni('PR-PKT82')" class="py-3 text-[13px] font-bold text-slate-700 bg-gradient-to-b from-[#f2f2f2] to-[#e0e0e0] border-l border-r border-[#c4c4c4] transition-all hover:bg-slate-200">Cetak</button>
             </div>
         </div>
     </div>
