@@ -154,7 +154,7 @@
                 <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">PKT-82</span>
             </div>
 
-            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="miuiAlert('Membuka Form Klaim')">
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="openKlaimModal()">
                 <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
                     <img src="img/klaim.png" alt="Klaim" class="w-full h-full object-cover">
                 </div>
@@ -572,6 +572,55 @@
             <div class="grid grid-cols-2 border-t border-[#d0d0d0] bg-[#dbdbdb]">
                 <button onclick="simpanDataPkt('PR-PKT82', 'tujuanSelect82', 'qtySelect82', 'pktModal82')" class="py-3 text-[13px] font-bold text-white bg-gradient-to-b from-[#ff8b00] to-[#f36c00] transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]">Simpan</button>
                 <button onclick="cetakLabelHariIni('PR-PKT82')" class="py-3 text-[13px] font-bold text-slate-700 bg-gradient-to-b from-[#f2f2f2] to-[#e0e0e0] border-l border-r border-[#c4c4c4] transition-all hover:bg-slate-200">Cetak</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="klaimModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6 select-none animate-fade-in">
+        <div class="bg-[#e4e4e4] w-full max-w-[360px] rounded-[14px] overflow-hidden shadow-2xl border border-[#b2b2b2] flex flex-col font-sans text-slate-800 relative">
+            
+            <div class="bg-gradient-to-b from-[#323232] to-[#202020] px-4 py-3 flex items-center justify-between border-b border-[#151515]">
+                <h3 class="text-white font-medium text-sm tracking-wide flex items-center gap-2">
+                    <i class="fa-solid fa-file-invoice text-orange-400 text-xs"></i> FORM KLAIM
+                </h3>
+                <button onclick="closeModal('klaimModal', 'tujuanKlaim', 'qtyBall')" class="text-white hover:text-red-400 font-bold text-lg">✕</button>
+            </div>
+
+            <div class="p-4 flex flex-col gap-3">
+                <div>
+                    <label class="text-[10px] font-bold text-slate-500 uppercase">Tujuan:</label>
+                    <select id="tujuanKlaim" onchange="isiAlamatOtomatis()" class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1.5 px-2 text-sm font-bold">
+                        <option value="-">- Pilih Tujuan -</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold text-slate-500 uppercase">kota:</label>
+                    <input type="text" id="alamatKlaim" class="w-full bg-slate-100 border border-[#c8c8c8] rounded-[4px] py-1.5 px-2 text-sm font-bold text-slate-600">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-500 uppercase">Kode Barang/Rasa:</label>
+                        <select id="kodeRasaKlaim" onchange="isiBarangOtomatis()" class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1.5 px-2 text-sm font-bold">
+                            <option value="-">- Pilih Barang -</option>
+                        </select>
+                    </div>
+                    <input type="hidden" id="namaBarangKlaim">
+                    <div class="flex gap-1">
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-500 uppercase">Ball:</label>
+                            <input type="number" id="qtyBall" class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1.5 px-2 text-sm font-bold">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-500 uppercase">Renteng:</label>
+                            <input type="number" id="qtyRenteng" class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1.5 px-2 text-sm font-bold">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 border-t border-[#d0d0d0] bg-[#dbdbdb]">
+                <button onclick="simpanDataKlaim()" class="py-3 text-[13px] font-bold text-white bg-gradient-to-b from-[#ff8b00] to-[#f36c00] transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]">Simpan</button>
+                <button onclick="cetakKlaimHariIni()" class="py-3 text-[13px] font-bold text-slate-700 bg-gradient-to-b from-[#f2f2f2] to-[#e0e0e0] border-l border-r border-[#c4c4c4] transition-all hover:bg-slate-200">Cetak</button>
             </div>
         </div>
     </div>
