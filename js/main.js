@@ -30,6 +30,23 @@ if (view) {
     }, { passive: true });
 }
 
+// Fungsi global untuk getar
+window.triggerVibrate = (duration = 50) => {
+    if ("vibrate" in navigator) {
+        navigator.vibrate(duration);
+    }
+};
+
+// Event Delegation: Menangkap semua klik di dokumen
+document.addEventListener('click', (e) => {
+    // Mencari elemen tombol yang diklik (termasuk jika di dalam tombol ada ikon/span)
+    const target = e.target.closest('button, .cursor-pointer, [onclick]');
+    
+    if (target) {
+        window.triggerVibrate(50); // Getar selama 50ms
+    }
+});
+
 // Menghapus fungsi updateLayoutState() lama karena dot indikator sudah tidak digunakan lagi 
 // dalam sistem grid vertical-scroll. Kode dijamin bersih dari error undefinied dot-1 atau dot-2!
 
