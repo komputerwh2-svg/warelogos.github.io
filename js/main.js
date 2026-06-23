@@ -708,7 +708,7 @@ window.cetakLabelHariIni = async (jenisLabel) => {
         let chunk = dataHariIni.slice(i, i + itemsPerPage);
         
         pagesHtml += `
-        <div class="page" style="page-break-after: always; width: 210mm; height: 330mm; padding: 5mm 2mm; box-sizing: border-box; display: grid; grid-template-rows: repeat(4, 1fr); gap: 62px;">`;
+        <div class="page" style="page-break-after: always; width: 210mm; height: 330mm; padding: 5mm 2mm; box-sizing: border-box; display: grid; grid-template-rows: repeat(4, 1fr); gap: 59px;">`;
         
         chunk.forEach(item => {
             pagesHtml += `
@@ -732,5 +732,202 @@ window.cetakLabelHariIni = async (jenisLabel) => {
         miuiAlert(`Proses Mencetak ${dataHariIni.length} Label ${jenisLabel}.`);
     } catch (e) {
         miuiAlert("Gagal mengirim perintah cetak: " + e.message);
+    }
+};
+
+
+// Variabel untuk simpan data master
+let masterTujuanData = [];
+let masterBarangData = [];
+
+window.openKlaimModal = async () => {
+    // 1. Fetch data tujuan (seperti sebelumnya)
+    const res = await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/master_tujuan.json');
+    const data = await res.json();
+    const select = document.getElementById('tujuanKlaim');
+    
+    // Simpan ke variabel global
+    masterTujuanData = Object.values(data);
+    
+    select.innerHTML = '<option value="-">- Pilih Tujuan -</option>';
+    masterTujuanData.forEach(item => {
+        if(item.TUJUAN) {
+            select.innerHTML += `<option value="${item.TUJUAN}">${item.TUJUAN}</option>`;
+        }
+    });
+
+    // 2. Fetch data barang
+    const resBarang = await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/master_barang.json');
+    const dataBarang = await resBarang.json();
+
+    // Filter hanya yang aktif dan Urutkan berdasarkan INISIAL
+    masterBarangData = Object.values(dataBarang)
+        .filter(item => item.IS_ACTIVE === true)
+        .sort((a, b) => {
+            // Mengubah inisial menjadi string untuk memastikan perbandingan aman
+            const inisialA = (a.INISIAL || "").toString().toLowerCase();
+            const inisialB = (b.INISIAL || "").toString().toLowerCase();
+            return inisialA.localeCompare(inisialB);
+        });
+
+    const selectBarang = document.getElementById('kodeRasaKlaim');
+    selectBarang.innerHTML = '<option value="-">- Pilih Barang -</option>';
+
+    masterBarangData.forEach(item => {
+        if(item.KODE_BARANG) {
+            selectBarang.innerHTML += `<option value="${item.KODE_BARANG}" data-name="${item.NAMA_BARANG}">${item.KODE_BARANG} - ${item.NAMA_BARANG}</option>`;
+        }
+    });
+    
+    document.getElementById('klaimModal').classList.remove('hidden');
+};
+
+// Fungsi pengisi otomatis
+window.isiAlamatOtomatis = () => {
+    const tujuanPilih = document.getElementById('tujuanKlaim').value;
+    const inputAlamat = document.getElementById('alamatKlaim');
+    
+    const ditemukan = masterTujuanData.find(item => item.TUJUAN === tujuanPilih);
+    
+    if (ditemukan) {
+        inputAlamat.value = ditemukan.KOTA || "-";
+    } else {
+        inputAlamat.value = "";
+    }
+};
+
+// Fungsi isi otomatis dan "membersihkan" tampilan
+window.isiBarangOtomatis = () => {
+    const select = document.getElementById('kodeRasaKlaim');
+    const inputNama = document.getElementById('namaBarangKlaim');
+    
+    const selectedOption = select.options[select.selectedIndex];
+    
+    if (select.value !== "-") {
+        inputNama.value = selectedOption.getAttribute('data-name');
+        
+        // TRIK: Kita ganti sementara teks option yang terpilih agar hanya menampilkan KODE
+        // Ini akan membuat dropdown terlihat hanya berisi KODE setelah dipilih
+        select.options[select.selectedIndex].text = select.value;
+    } else {
+        inputNama.value = "";
+    }
+};
+
+window.simpanDataKlaim = async () => {
+    // 1. Ambil data dari form
+    const tujuan = document.getElementById('tujuanKlaim').value;
+    const kodeRasa = document.getElementById('kodeRasaKlaim').value;
+    const alamat = document.getElementById('alamatKlaim').value;
+    const ball = document.getElementById('qtyBall').value || "0";
+    const renteng = document.getElementById('qtyRenteng').value || "0";
+    const namaBarang = document.getElementById('namaBarangKlaim').value; // Mengambil dari hidden input
+
+    // 2. Validasi
+    if (tujuan === "-" || kodeRasa === "-") {
+        return miuiAlert("Mohon pilih Tujuan dan Kode Barang dengan benar!");
+    }
+
+    // 3. Persiapan ID Unik: KLAIM_koderasa_tujuan_tgl_jam
+    const now = new Date();
+    const tgl = now.toISOString().split('T')[0].replace(/-/g, '');
+    const timeId = now.getHours().toString().padStart(2, '0') + 
+                   now.getMinutes().toString().padStart(2, '0') + 
+                   now.getSeconds().toString().padStart(2, '0');
+    
+    // Format tujuan untuk ID (hapus spasi agar rapi)
+    const tujuanFormatted = tujuan.replace(/\s+/g, '_').toUpperCase();
+    const uniqueId = `KLAIM_${kodeRasa}_${tujuanFormatted}_${tgl}_${timeId}`;
+
+    const data = {
+        jenis: "KLAIM",
+        tujuan: tujuan,
+        alamat: alamat,
+        kodeBarang: kodeRasa,
+        namaBarang: namaBarang,
+        ball: ball,
+        renteng: renteng,
+        timestamp: now.getTime()
+    };
+
+    // 4. Simpan ke Firebase
+    try {
+        await fetch(`https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/label_history/${uniqueId}.json`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        miuiAlert("Data Klaim Tersimpan!");
+        
+        // Reset form
+        document.getElementById('tujuanKlaim').value = "-";
+        document.getElementById('alamatKlaim').value = "";
+        document.getElementById('kodeRasaKlaim').value = "-";
+        document.getElementById('qtyBall').value = "0";
+        document.getElementById('qtyRenteng').value = "0";
+        document.getElementById('namaBarangKlaim').value = "";
+
+    } catch (e) {
+        miuiAlert("Gagal menyimpan: " + e.message);
+    }
+};
+
+window.cetakKlaimHariIni = async () => {
+    // 1. Ambil data dari label_history
+    const res = await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/label_history.json');
+    const allData = await res.json();
+    
+    // Filter hanya data KLAIM hari ini
+    const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    const dataKlaim = Object.values(allData || {}).filter(item => {
+        const itemDate = new Date(item.timestamp).toISOString().split('T')[0].replace(/-/g, '');
+        return itemDate === today && item.jenis === "KLAIM";
+    });
+
+    if (dataKlaim.length === 0) return miuiAlert("Tidak ada data Klaim hari ini.");
+
+    let pagesHtml = "";
+    // 4 label per halaman F4
+    for (let i = 0; i < dataKlaim.length; i += 4) {
+        let chunk = dataKlaim.slice(i, i + 4);
+        
+        pagesHtml += `
+        <div class="page" style="page-break-after: always; width: 210mm; height: 330mm; padding: 5mm 5mm; box-sizing: border-box; display: grid; grid-template-rows: repeat(4, 1fr); gap: 62px;">`;
+        
+        chunk.forEach(item => {
+            // LOGIKA 3 KONDISI
+            const b = parseInt(item.ball) || 0;
+            const r = parseInt(item.renteng) || 0;
+            let qtyStr = "";
+            
+            if (b > 0 && r > 0) qtyStr = `${b} BALL . ${r} RTG`;
+            else if (b > 0) qtyStr = `${b} . BALL`;
+            else if (r > 0) qtyStr = `${r} . RTG`;
+
+            pagesHtml += `
+            <div style="border: 2px solid #000; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; height: 75mm; width: 200mm; padding: 5px;">
+                <div style="font-size: 45pt; font-family: Edo; line-height: 1;">${item.tujuan.toUpperCase()}</div>
+                <div style="font-size: 35pt; font-family: Edo; line-height: 1;">${item.alamat.toUpperCase()}</div>
+                <div style="border-top: 2px dashed #000; width: 95%; margin: 8px 0;"></div>
+                <div style="font-size: 45pt; font-family: Edo; line-height: 1;">${item.kodeBarang} . ${qtyStr}</div>
+                <div style="border-top: 1px double #000; width: 95%; margin: 8px 0;"></div>
+                <div style="font-size: 30pt; font-family: Edo; line-height: 1;">${item.namaBarang.toUpperCase()}</div>
+            </div>`;
+        });
+        
+        pagesHtml += `</div>`;
+    }
+
+    // 2. Kirim ke Print Server
+    try {
+        await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs.json', {
+            method: 'POST',
+            body: JSON.stringify({ html: pagesHtml, timestamp: Date.now() }),
+            headers: { 'Content-Type': 'application/json' }
+        });
+        miuiAlert(`Mencetak ${dataKlaim.length} label Klaim.`);
+    } catch (e) {
+        miuiAlert("Gagal cetak: " + e.message);
     }
 };
