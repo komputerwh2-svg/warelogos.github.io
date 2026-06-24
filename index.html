@@ -12,6 +12,7 @@
     
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
     <link rel="stylesheet" href="css/style.css">
@@ -169,6 +170,13 @@
                 <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Rekap Blok</span>
             </div>
 
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="bukaSubPageStokWH()">
+                <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
+                    <img src="img/cvwh3.png" alt="Convert WH-3" class="w-full h-full object-cover">
+                </div>
+                <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Stok WH</span>
+            </div>
+
             <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="miuiAlert('Membuka Menu Mutasi')">
                 <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
                     <img src="img/mutasi.png" alt="Mutasi" class="w-full h-full object-cover">
@@ -199,23 +207,9 @@
 
             <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="miuiAlert('Membuka Data Export')">
                 <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
-                    <img src="img/ekspor.png" alt="Data Export" class="w-full h-full object-cover">
+                    <img src="img/ekspor.png" alt="Barang Export" class="w-full h-full object-cover">
                 </div>
-                <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Data Export</span>
-            </div>
-
-            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="miuiAlert('Membuka Data Convert Stok WH-2')">
-                <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
-                    <img src="img/cvwh2.png" alt="Convert WH-2" class="w-full h-full object-cover">
-                </div>
-                <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Convert WH-2</span>
-            </div>
-
-            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="miuiAlert('Membuka Data Convert Stok WH-3')">
-                <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
-                    <img src="img/cvwh3.png" alt="Convert WH-3" class="w-full h-full object-cover">
-                </div>
-                <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Convert WH-3</span>
+                <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Barang Export</span>
             </div>
 
             <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="miuiAlert('Membuka Fitur Convert DO')">
@@ -308,6 +302,7 @@
 
     <div id="print-area-rak-kosong"></div>
     <div id="subpage-rekap-blok-container"></div>
+    <div id="subpage-stokwh-container"></div>
     <div id="subpage-ongkir-container"></div>
     <div id="bank-data-container"></div>
 
@@ -625,6 +620,34 @@
         </div>
     </div>
 
+    <div id="modalConvertWH2" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6 select-none animate-fade-in">
+        <div class="bg-[#e4e4e4] w-full max-w-[360px] rounded-[14px] overflow-hidden shadow-2xl border border-[#b2b2b2] flex flex-col font-sans text-slate-800 relative">
+            
+            <div class="bg-gradient-to-b from-[#323232] to-[#202020] px-4 py-3 flex items-center justify-between border-b border-[#151515]">
+                <h3 class="text-white font-medium text-sm tracking-wide flex items-center gap-2">
+                    <i class="fa-solid fa-file-import text-orange-400 text-xs"></i> CONVERT WH-2
+                </h3>
+                <button onclick="document.getElementById('modalConvertWH2').classList.add('hidden')" class="text-white hover:text-red-400 font-bold text-lg">✕</button>
+            </div>
+
+            <div class="p-4 flex flex-col gap-3">
+                <div id="dropZone" class="relative group cursor-pointer">
+                    <label class="text-[10px] font-bold text-slate-500 uppercase">Upload File (Pilih File WH2 dan WMS sekaligus):</label>
+                    <div class="mt-1 border-2 border-dashed border-[#b2b2b2] bg-white rounded-[4px] py-6 px-2 text-center hover:border-orange-500 transition-all">
+                        <p id="labelFiles" class="text-xs text-slate-400 font-medium">Klik atau Drag kedua file ke sini</p>
+                        <input type="file" id="fileInput" class="hidden" multiple onchange="handleFiles(this.files)">
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid border-t border-[#d0d0d0] bg-[#dbdbdb]">
+                <button onclick="runConvertWH2()" class="py-3 text-[13px] font-bold text-white bg-gradient-to-b from-[#ff8b00] to-[#f36c00] transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] hover:brightness-110">
+                    Convert Sekarang
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="js/clock.js"></script>
     <script type="module" src="js/main.js"></script>
 
@@ -632,6 +655,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 
     <script type="module" src="js/rekap-blok.js"></script>
+
+    <script type="module" src="js/stokwh.js"></script>
 
     <script type="module" src="js/ongkir.js"></script>
     
