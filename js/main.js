@@ -30,6 +30,7 @@ if (view) {
     }, { passive: true });
 }
 
+
 // Fungsi global untuk getar
 window.triggerVibrate = (duration = 50) => {
     if ("vibrate" in navigator) {
@@ -480,6 +481,66 @@ function tutupSubPageRekapBlok() {
 window.bukaSubPageRekapBlok = bukaSubPageRekapBlok;
 window.tutupSubPageRekapBlok = tutupSubPageRekapBlok;
 
+
+
+function bukaSubPageStokWH() {
+    const container = document.getElementById('subpage-stokwh-container');
+    
+    if (!container) {
+        console.error("Wadah 'subpage-stokwh-container' tidak ditemukan di index.html!");
+        return;
+    }
+
+    const subpage = document.getElementById('subpage-stokwh');
+
+    // Panggil langsung setelah halaman WH2 terbuka
+    setTimeout(() => {
+        loadStokData();
+    }, 100); // delay 100ms agar UI selesai dirender
+
+    // Jika sudah pernah di-fetch, langsung buka
+    if (subpage) {
+        subpage.classList.remove('translate-x-full');
+        return;
+    }
+
+    // Fetch file HTML
+    fetch('apps/stokwh.html') // Pastikan lokasinya benar di folder apps/
+        .then(response => {
+            if (!response.ok) throw new Error("Gagal mengambil file apps/stokwh.html");
+            return response.text();
+        })
+        .then(htmlContent => {
+            container.innerHTML = htmlContent;
+
+            // Suntikkan script JS-nya
+            const script = document.createElement('script');
+            script.src = "js/stokwh.js"; 
+            
+            script.onload = () => {
+                const elemenBaru = document.getElementById('subpage-stokwh');
+                if (elemenBaru) {
+                    void elemenBaru.offsetHeight; // Trigger reflow
+                    elemenBaru.classList.remove('translate-x-full');
+                }
+            };
+            document.body.appendChild(script);
+        })
+        .catch(error => {
+            console.error(error);
+            miuiAlert("Sistem Gagal Memuat Template Stok WH!");
+        });
+}
+
+function tutupSubPageStokWH() {
+    const subpage = document.getElementById('subpage-stokwh');
+    if (subpage) {
+        subpage.classList.add('translate-x-full');
+    }
+}
+
+window.bukaSubPageStokWH = bukaSubPageStokWH;
+window.tutupSubPageStokWH = tutupSubPageStokWH;
 
 
 
@@ -948,3 +1009,146 @@ window.cetakKlaimHariIni = async () => {
         miuiAlert("Gagal cetak: " + e.message);
     }
 };
+
+
+
+// Logika Drag and Drop Utama
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('click', () => fileInput.click());
+
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-orange-500'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-orange-500'));
+dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('border-orange-500');
+    handleFiles(e.dataTransfer.files);
+});
+
+// Variabel global untuk menyimpan file yang di-drop
+let selectedBosnet = null;
+let selectedWMS = null;
+
+function handleFiles(files) {
+    // Reset pemilihan setiap kali user drag file baru
+    selectedBosnet = null;
+    selectedWMS = null;
+
+    if (files.length < 2) {
+        return miuiAlert("Harap drag/pilih minimal 2 file (File Bosnet & File WMS)!");
+    }
+
+    // Iterasi semua file yang di-drop
+    for (let file of files) {
+        const name = file.name.toUpperCase();
+        
+        // Logika Deteksi berdasarkan embel-embel nama
+        if (name.includes("WH2")) {
+            selectedBosnet = file;
+        } else if (name.includes("WMS")) {
+            selectedWMS = file;
+        }
+    }
+
+    // Validasi apakah kedua file sudah terdeteksi
+    if (selectedBosnet && selectedWMS) {
+        document.getElementById('labelFiles').innerHTML = 
+            `<div class="text-left text-[10px] space-y-1">
+                <div class="text-green-600 font-bold">✓ BOSNET: ${selectedBosnet.name}</div>
+                <div class="text-blue-600 font-bold">✓ WMS: ${selectedWMS.name}</div>
+            </div>`;
+    } else {
+        miuiAlert("Gagal mendeteksi format file. Pastikan nama file mengandung 'WH2' (Bosnet) dan 'WMS' (WMS).");
+    }
+}
+
+
+// 1. Fungsi Utama untuk Memulai Proses
+window.runConvertWH2 = async () => {
+    // Menggunakan variabel global hasil drag-and-drop
+    if (!selectedBosnet || !selectedWMS) {
+        return miuiAlert("Mohon drag & drop kedua file terlebih dahulu!");
+    }
+
+    miuiAlert("Sedang mengolah data... mohon tunggu.");
+
+    try {
+        const dataBosnet = await readExcel(selectedBosnet);
+        const dataWMS = await readExcel(selectedWMS);
+
+        // 2. Logika Pembersihan & Penggabungan
+        let processedData = dataBosnet.filter(row => {
+            const kode = String(row['KODE'] || row['__EMPTY_1'] || "").toUpperCase().trim();
+            return kode !== "KODE" && kode !== "NO" && kode !== "";
+        }).map(row => {
+            const kode = String(row['KODE'] || row['__EMPTY_1'] || "").toUpperCase().trim();
+            const wmsMatch = dataWMS.find(w => String(w['KODE'] || w['__EMPTY_0'] || "").toUpperCase().trim() === kode);
+            
+            // Penyesuaian key kolom berdasarkan struktur file Anda
+            const bosnetQty = parseFloat(row['STOCK'] || row['BOSNET'] || 0);
+            const wmsQty = wmsMatch ? parseFloat(wmsMatch['QTY'] || wmsMatch['WMS'] || 0) : 0;
+            
+            return {
+                NO: 0,
+                KODE: kode,
+                BOSNET: bosnetQty,
+                WMS: wmsQty,
+                SELISIH: wmsQty - bosnetQty,
+                KETERANGAN: (wmsQty - bosnetQty) > 0 ? "QTY WMS LEBIH BESAR" : 
+                            ((wmsQty - bosnetQty) < 0 ? "QTY BOSNET LEBIH BESAR" : "SESUAI")
+            };
+        });
+
+        // 3. Sorting & Penomoran
+        processedData.sort((a, b) => getSortScore(a.KODE) - getSortScore(b.KODE));
+        processedData.forEach((row, index) => row.NO = index + 1);
+
+        // 4. Unduh Hasil (Format .xls)
+        downloadExcel(processedData, `LAPORAN_WH2_${new Date().toISOString().slice(0,10)}.xls`);
+        
+        miuiAlert("Selesai! File berhasil diunduh.");
+        document.getElementById('modalConvertWH2').classList.add('hidden');
+        
+    } catch (e) {
+        miuiAlert("Error: " + e.message);
+        console.error(e);
+    }
+};
+
+// 5. Fungsi Helper Download Excel (.xls)
+function downloadExcel(data, filename) {
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Hasil Convert");
+    // Gunakan bookType: 'xls' untuk format Excel 97-2003
+    XLSX.writeFile(workbook, filename, { bookType: 'xls' });
+}
+
+// Helper GetSortScore
+function getSortScore(kode) {
+    const k = kode.toUpperCase();
+    if (k.startsWith("CRR")) return 1;
+    if (k.startsWith("MJR")) return 2;
+    if (k.startsWith("MOR")) return 3;
+    if (k.startsWith("MP")) return 4;
+    if (k.startsWith("MRMR")) return 5;
+    if (k.startsWith("PDR")) return 6;
+    if (k.startsWith("THR")) return 7;
+    if (k.startsWith("MTR")) return 8;
+    if (k.startsWith("LTGR")) return 9;
+    return 99;
+}
+
+// Helper readExcel menggunakan Binary String agar lebih kompatibel dengan .xls lama
+async function readExcel(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const data = e.target.result;
+            const workbook = XLSX.read(data, {type: 'binary'});
+            resolve(XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]));
+        };
+        reader.readAsBinaryString(file);
+    });
+}
