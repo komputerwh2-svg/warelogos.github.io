@@ -55,31 +55,31 @@
                         <p id="display-tanggal-wh2" class="text-[13px] text-slate-800 font-bold uppercase mt-0.5">Pilih Tanggal Stok</p>
                     </div>
                     <div class="flex items-center gap-3">
-                        <select id="select-periode-wh2" 
-                            class="px-3 py-1.5 text-xs font-black text-slate-800 border border-gray-300 rounded-lg bg-white focus:outline-none focus:border-orange-500 shadow-sm">
+                        <div class="flex items-center bg-gray-200 p-1 rounded-xl w-fit">
+                            <label class="relative px-6 py-2 rounded-lg cursor-pointer">
+                                <input type="radio" name="rb-mode-wh2" value="SEBELUM" checked onchange="gantiModeWH2(this.value)" class="sr-only peer">
+                                <span class="text-xs font-black text-gray-500 peer-checked:text-white transition-colors relative z-10 whitespace-nowrap">STOK WH-2 SEBELUM</span>
+                                <div class="absolute inset-0 bg-orange-500 rounded-lg opacity-0 peer-checked:opacity-100 transition-opacity"></div>
+                            </label>
+                            <label class="relative px-6 py-2 rounded-lg cursor-pointer">
+                                <input type="radio" name="rb-mode-wh2" value="SESUDAH" onchange="gantiModeWH2(this.value)" class="sr-only peer">
+                                <span class="text-xs font-black text-gray-500 peer-checked:text-white transition-colors relative z-10 whitespace-nowrap">STOK WH-2 SESUDAH</span>
+                                <div class="absolute inset-0 bg-orange-500 rounded-lg opacity-0 peer-checked:opacity-100 transition-opacity"></div>
+                            </label>
+                        </div>
+
+                        <select id="select-periode-wh2" class="px-3 py-1.5 text-xs font-black text-slate-800 border border-gray-300 rounded-lg bg-white focus:outline-none focus:border-orange-500 shadow-sm">
                             <option value="">Pilih Periode</option>
                         </select>
-                        <select id="select-tanggal-wh2" 
-                            class="px-3 py-1.5 text-xs font-black text-slate-800 border border-gray-300 rounded-lg bg-white focus:outline-none focus:border-orange-500 shadow-sm">
+                        
+                        <select id="select-tanggal-wh2" class="px-3 py-1.5 text-xs font-black text-slate-800 border border-gray-300 rounded-lg bg-white focus:outline-none focus:border-orange-500 shadow-sm">
                             <option value="">Pilih Tanggal</option>
                         </select>
+                        
                         <button onclick="bukaModalUploadWH2()" class="px-4 py-1.5 bg-slate-800 text-white text-xs font-bold rounded-lg shadow-md hover:bg-slate-700 transition-all flex items-center gap-2">
                             <i class="fa-solid fa-file-excel text-green-400"></i> UPLOAD EXCEL STOK
                         </button>
                     </div>
-                </div>
-
-                <div class="flex items-center bg-gray-200 p-1 rounded-xl w-fit">
-                    <label class="relative px-6 py-2 rounded-lg cursor-pointer">
-                        <input type="radio" name="rb-mode-wh2" value="SEBELUM" checked onchange="gantiModeWH2(this.value)" class="sr-only peer">
-                        <span class="text-xs font-black text-gray-500 peer-checked:text-white transition-colors relative z-10">STOK WH-2 SEBELUM</span>
-                        <div class="absolute inset-0 bg-orange-500 rounded-lg opacity-0 peer-checked:opacity-100 transition-opacity"></div>
-                    </label>
-                    <label class="relative px-6 py-2 rounded-lg cursor-pointer">
-                        <input type="radio" name="rb-mode-wh2" value="SESUDAH" onchange="gantiModeWH2(this.value)" class="sr-only peer">
-                        <span class="text-xs font-black text-gray-500 peer-checked:text-white transition-colors relative z-10">STOK WH-2 SESUDAH</span>
-                        <div class="absolute inset-0 bg-orange-500 rounded-lg opacity-0 peer-checked:opacity-100 transition-opacity"></div>
-                    </label>
                 </div>
 
                 <div class="w-full bg-white rounded-xl border border-gray-300 shadow-sm overflow-hidden">
@@ -99,7 +99,7 @@
                                     <th class="py-3 px-3" id="header-aksi">Aksi</th> </tr>
                             </thead>
                             <tbody id="tabel-body-wh2" class="divide-y divide-gray-500 text-[15px] text-slate-800">
-                                <tr><td colspan="6" class="text-center py-10 text-slate-400">Belum ada data stok tanggal ${displayTanggal}</td></tr>
+                                <tr><td colspan="6" class="text-center py-10 text-slate-400">Belum ada data diperiode ini</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -139,6 +139,46 @@
                 <button onclick="prosesUploadWH2()" class="w-full py-3 bg-orange-500 text-white font-black text-sm rounded-lg hover:bg-orange-600 transition-all shadow-lg">
                     PROSES UPLOAD
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-admin-stok" class="fixed inset-0 bg-black bg-opacity-50 hidden z-[9999] flex items-center justify-center p-3">
+        <div class="bg-white rounded-[12px] w-full max-w-xs p-4 space-y-4">
+            <h3 class="text-sm font-bold text-gray-800 uppercase">Otentikasi Admin</h3>
+            <input type="password" id="admin-pass" placeholder="Masukkan Password" class="w-full border rounded text-gray-800 p-2 text-sm">
+            <div class="flex gap-2">
+                <button onclick="tutupModalAdmin()" class="flex-1 py-2 bg-gray-400 text-white rounded">Batal</button>
+                <button onclick="cekAdmin()" class="flex-1 py-2 bg-orange-500 text-white rounded">Masuk</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-adjust-stok" class="fixed inset-0 bg-black bg-opacity-40 hidden z-[9999] flex items-center justify-center p-3">
+        <div class="bg-white rounded-[12px] w-full max-w-sm overflow-hidden">
+            <div class="w-full h-14 bg-gradient-to-b from-[#3c3c3c] to-[#2a2a2a] flex items-center justify-between px-4">
+                <h3 class="text-white font-bold text-sm uppercase">Adjustment Stok</h3>
+                <button onclick="tutupModalAdjust()" class="text-orange-400 font-bold">✕</button>
+            </div>
+            <div class="p-4 space-y-3">
+                <input type="hidden" id="adj-kode">
+                <div>
+                    <label class="text-[15px] font-bold text-gray-800 uppercase">Kode Produk</label>
+                    <input type="text" id="adj-kode-display" class="w-full mt-1 border rounded px-2 py-1.5 text-[13px] text-gray-800 font-bold bg-gray-100">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-[15px] font-bold text-gray-800 uppercase">Stok Bosnet</label>
+                        <input type="number" id="adj-bosnet" class="w-full mt-1 border rounded px-2 py-1.5 text-[13px] text-gray-800 font-bold">
+                    </div>
+                    <div>
+                        <label class="text-[15px] font-bold text-gray-800 uppercase">Stok WMS</label>
+                        <input type="number" id="adj-wms" class="w-full mt-1 border rounded px-2 py-1.5 text-[13px] text-gray-800 font-bold">
+                    </div>
+                </div>
+            </div>
+            <div class="px-4 py-3 bg-gray-50 flex gap-2">
+                <button onclick="simpanAdjustStok()" class="w-full py-3 bg-orange-500 text-white font-black text-sm rounded-lg hover:bg-orange-600 transition-all shadow-lg">UPDATE DATA</button>
             </div>
         </div>
     </div>
