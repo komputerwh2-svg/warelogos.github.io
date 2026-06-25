@@ -1,23 +1,4 @@
-// Tambahkan ini agar saat halaman siap, tanggal diisi hari ini dan data dimuat
-document.addEventListener('DOMContentLoaded', () => {
-    const dateInput = document.getElementById('select-tanggal-wh2');
-    
-    // Set tanggal hari ini jika kosong
-    if (dateInput && !dateInput.value) {
-        const today = new Date().toISOString().split('T')[0];
-        dateInput.value = today;
-    }
 
-    // Listener untuk perubahan tanggal
-    if (dateInput) {
-        dateInput.addEventListener('change', () => {
-            loadStokData();
-        });
-    }
-
-    // PENTING: Inisialisasi data sekali saja di sini
-    loadStokData(); 
-});
 
 // Fungsi ganti switch mode Stok WH (REKAP, WH-2, WH-3, LEBIH) dengan efek geser slider
 window.gantiModulStokWH = function(mode) {
@@ -28,7 +9,12 @@ window.gantiModulStokWH = function(mode) {
         slider.style.transform = 'translateX(0%)';
     } else if (mode === 'WH2') {
         slider.style.transform = 'translateX(-25%)';
-        loadStokData();
+        // Panggil hanya saat user pindah ke tab WH2
+        // initDropdowns sudah memiliki proteksi 'isDropdownInitialized' 
+        // sehingga ini hanya akan berjalan 1 kali saja.
+        if (typeof initDropdowns === 'function') {
+            initDropdowns();
+        }
     } else if (mode === 'WH3') {
         slider.style.transform = 'translateX(-50%)';
     } else if (mode === 'LEBIH') {
@@ -38,14 +24,50 @@ window.gantiModulStokWH = function(mode) {
     console.log("Stok Warehouse mode berpindah ke:", mode);
 };
 
-// Fungsi untuk memformat tanggal ke (Hari, dd mmmm yyyy)
-function updateDisplayTanggal(tanggalString) {
-    if (!tanggalString) return;
+// Fungsi untuk memformat tanggal ke (Hari, dd MMMM yyyy)
+function updateDisplayTanggal(tanggalString, isDataKosong = false) {
+    const displayEl = document.getElementById('display-tanggal-wh2');
+    if (!displayEl) return;
 
-    // Memecah string YYYY-MM-DD dengan aman
-    const [year, month, day] = tanggalString.split('-').map(Number);
-    // Menggunakan constructor tanggal lokal (menghindari timezone shift)
-    const date = new Date(year, month - 1, day); 
+    // Jika dipanggil dengan status data kosong
+    if (isDataKosong) {
+        displayEl.innerText = "BELUM ADA DATA STOK";
+        return;
+    }
+
+    if (!tanggalString) {
+        displayEl.innerText = "PILIH TANGGAL STOK";
+        return;
+    }
+
+    let date;
+
+    // 1. Cek format YYYY-MM-DD
+    if (tanggalString.includes('-')) {
+        const [year, month, day] = tanggalString.split('-').map(Number);
+        date = new Date(year, month - 1, day);
+    } 
+    // 2. Cek format DD/MM/YYYY
+    else if (tanggalString.includes('/')) {
+        const [day, month, year] = tanggalString.split('/').map(Number);
+        date = new Date(year, month - 1, day);
+    }
+    // 3. Cek format YYYYMMDD
+    else if (tanggalString.length === 8 && !isNaN(tanggalString)) {
+        const year = parseInt(tanggalString.substring(0, 4));
+        const month = parseInt(tanggalString.substring(4, 6)) - 1;
+        const day = parseInt(tanggalString.substring(6, 8));
+        date = new Date(year, month, day);
+    } 
+    else {
+        displayEl.innerText = "TANGGAL TIDAK VALID";
+        return;
+    }
+
+    if (isNaN(date.getTime())) {
+        displayEl.innerText = "TANGGAL TIDAK VALID";
+        return;
+    }
 
     const options = { 
         weekday: 'long', 
@@ -55,25 +77,121 @@ function updateDisplayTanggal(tanggalString) {
     };
     
     const formattedDate = date.toLocaleDateString('id-ID', options);
-    const displayEl = document.getElementById('display-tanggal-wh2');
-    if (displayEl) {
-        displayEl.innerText = formattedDate.toUpperCase();
-    }
+    displayEl.innerText = formattedDate.toUpperCase();
 }
 
 let isDropdownInitialized = false;
 
-function initDropdowns() {
+// 1. Fungsi Utama: Ambil dan Update Tanggal
+async function updateTanggalDropdown() {
     const selPeriode = document.getElementById('select-periode-wh2');
     const selTanggal = document.getElementById('select-tanggal-wh2');
     
     if (!selPeriode || !selTanggal) return;
-    if (isDropdownInitialized) return;
+
+    if (!selPeriode.value) {
+        selTanggal.innerHTML = '<option value="">Pilih Tanggal</option>';
+        handleDataKosong(true); // true = reset tampilan ke default
+        return;
+    }
+
+    selTanggal.innerHTML = '<option value="">Memuat...</option>';
+
+    try {
+        const response = await fetch(`${DB_FIREBASE_URL}stok_wh.json`);
+        const allData = await response.json();
+        
+        if (!allData) {
+            handleDataKosong(false);
+            return;
+        }
+
+        const [targetTahun, targetBulan] = selPeriode.value.split('-').map(Number);
+        let availableDates = [];
+
+        Object.keys(allData).forEach(key => {
+            if (key.includes('stokwh2wms_')) {
+                const rawDate = key.split('_')[1]; 
+                const tahun = parseInt(rawDate.substring(0, 4));
+                const bulan = parseInt(rawDate.substring(4, 6)) - 1; 
+                const hari = rawDate.substring(6, 8);
+
+                if (tahun === targetTahun && bulan === targetBulan) {
+                    availableDates.push({
+                        val: rawDate, 
+                        label: `${hari}/${rawDate.substring(4, 6)}/${tahun}`
+                    });
+                }
+            }
+        });
+
+        availableDates.sort((a, b) => b.val.localeCompare(a.val));
+
+        selTanggal.innerHTML = '<option value="">Pilih Tanggal</option>';
+        availableDates.forEach(date => {
+            selTanggal.add(new Option(date.label, date.val));
+        });
+
+        if (availableDates.length > 0) {
+            selTanggal.value = availableDates[0].val;
+            triggerUpdateTampilan(selTanggal.value);
+        } else {
+            handleDataKosong(false);
+        }
+    } catch (e) {
+        console.error("Gagal sinkronisasi tanggal:", e);
+        selTanggal.innerHTML = '<option value="">Gagal Memuat</option>';
+    }
+}
+
+// 2. Fungsi Pemicu Terpadu
+async function triggerUpdateTampilan(val) {
+    if (typeof window.updateDisplayTanggal === 'function') {
+        window.updateDisplayTanggal(val, false); // false = data ditemukan
+    }
+    if (typeof window.loadStokData === 'function') {
+        await window.loadStokData();
+    }
+}
+
+// 3. Helper untuk Data Kosong
+function handleDataKosong(isReset) {
+    const selTanggal = document.getElementById('select-tanggal-wh2');
+    selTanggal.innerHTML = '<option value="">Data Kosong</option>';
+    
+    // Update label display ke "BELUM ADA DATA STOK"
+    if (typeof window.updateDisplayTanggal === 'function') {
+        window.updateDisplayTanggal('', true); // true = tampilkan status kosong
+    }
+    // Update tabel
+    if (typeof window.tampilkanKosong === 'function') {
+        window.tampilkanKosong('');
+    }
+}
+
+// 4. Event Listeners
+document.getElementById('select-periode-wh2').addEventListener('change', updateTanggalDropdown);
+
+document.getElementById('select-tanggal-wh2').addEventListener('change', (e) => {
+    if (e.target.value) {
+        triggerUpdateTampilan(e.target.value);
+    } else {
+        handleDataKosong(false);
+    }
+});
+
+// 2. Fungsi init yang memanggil fungsi di atas
+async function initDropdowns() {
+    //if (isDropdownInitialized) return;
+    
+    const selPeriode = document.getElementById('select-periode-wh2');
+    const selTanggal = document.getElementById('select-tanggal-wh2');
+    
+    if (!selPeriode || !selTanggal) return;
 
     const now = new Date();
+    selPeriode.innerHTML = '<option value="">Pilih Periode</option>';
     
-    // 1. Inisialisasi Dropdown Periode
-    selPeriode.innerHTML = '';
     for (let i = 0; i < 12; i++) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
         const value = `${d.getFullYear()}-${d.getMonth()}`;
@@ -81,61 +199,23 @@ function initDropdowns() {
         selPeriode.add(new Option(label, value));
     }
 
-    // 2. Fungsi untuk mengisi tanggal berdasarkan periode yang dipilih
-    function updateTanggalDropdown() {
-        const [tahun, bulan] = selPeriode.value.split('-').map(Number);
-        const hariDalamBulan = new Date(tahun, bulan + 1, 0).getDate();
-        
-        selTanggal.innerHTML = '';
-        
-        for (let i = 1; i <= hariDalamBulan; i++) {
-            const d = new Date(tahun, bulan, i);
-            
-            // Cek apakah hari ini adalah hari Minggu (0 = Minggu)
-            if (d.getDay() !== 0) {
-                const val = `${tahun}-${String(bulan + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-                const label = `${String(i).padStart(2, '0')}/${String(bulan + 1).padStart(2, '0')}/${tahun}`;
-                selTanggal.add(new Option(label, val));
-            }
-        }
+    selPeriode.value = `${now.getFullYear()}-${now.getMonth()}`;
 
-        // Jika hari ini adalah Minggu, saat membuka periode tersebut 
-        // kita perlu menentukan hari aktif terdekat (biasanya hari Senin)
-        if (selTanggal.options.length > 0) {
-            const today = new Date();
-            const todayStr = today.toISOString().split('T')[0];
-            
-            // Jika tanggal hari ini ada di opsi, pilih hari ini. Jika tidak, pilih opsi pertama
-            if (tahun === today.getFullYear() && bulan === today.getMonth() && today.getDay() !== 0) {
-                selTanggal.value = todayStr;
-            } else {
-                selTanggal.selectedIndex = 0;
-            }
-        }
-        
-        updateDisplayTanggal(selTanggal.value);
-        loadStokData(); 
-    }
-
-    // --- PERBAIKAN EVENT LISTENER ---
-    
-    // Saat periode berubah, update list tanggal, lalu otomatis load data
+    // Pasang Event Listeners
+    selPeriode.removeEventListener('change', updateTanggalDropdown);
     selPeriode.addEventListener('change', updateTanggalDropdown);
+    
+    selTanggal.removeEventListener('change', window.loadStokData);
+    selTanggal.addEventListener('change', window.loadStokData);
 
-    // Saat tanggal berubah, update display dan LOAD DATA (Penting!)
-    selTanggal.addEventListener('change', (e) => {
-        updateDisplayTanggal(e.target.value);
-        loadStokData(); // Tambahkan ini agar saat tanggal dipilih, data di-fetch ulang
-    });
-
-    // Jalankan pertama kali
-    updateTanggalDropdown();
+    // EKSEKUSI PERTAMA
     isDropdownInitialized = true;
-    console.log("Dropdown periode & tanggal diinisialisasi.");
+    await updateTanggalDropdown();
 }
 
-// Panggil inisialisasi
-initDropdowns();
+// 3. Panggil saat DOM benar-benar siap
+document.addEventListener('DOMContentLoaded', initDropdowns);
+
 
 
 function bukaModalUploadWH2() {
@@ -275,7 +355,14 @@ async function eksekusiUpload(fileWh2, fileWms, url, isUpdate) {
             miuiAlert(message);
             tutupModalUploadWH2();
             resetFileInput();
-            loadStokData();
+
+            // LAKUKAN INI:
+            // 1. Reset flag agar dropdown bisa memuat ulang daftar tanggal dari Firebase
+            isDropdownInitialized = false; 
+            
+            // 2. Panggil ulang inisialisasi dropdown untuk mengambil daftar tanggal terbaru
+            // Dan di dalam initDropdowns nanti, ia akan otomatis memanggil loadStokData()
+            await initDropdowns(); 
         } else {
             miuiAlert("Gagal menyimpan ke server.");
         }
@@ -327,6 +414,31 @@ function gantiModeWH2(mode) {
     loadStokData(); 
 }
 
+// Helper untuk pesan kosong
+function tampilkanKosong(infoTambahan = '') {
+    const selPeriode = document.getElementById('select-periode-wh2');
+    let displayInfo = 'di periode ini';
+
+    // Jika ada elemen periode, ambil label dari option yang terpilih
+    if (selPeriode && selPeriode.options[selPeriode.selectedIndex]) {
+        const labelPeriode = selPeriode.options[selPeriode.selectedIndex].text;
+        displayInfo = `untuk periode ${labelPeriode}`;
+    }
+
+    // Jika infoTambahan disediakan (misal: "di bulan ini"), gabungkan
+    if (infoTambahan) {
+        displayInfo = `${infoTambahan} ${displayInfo.replace('di periode ini', '')}`;
+    }
+
+    const tbody = document.getElementById('tabel-body-wh2');
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="6" class="text-center py-10 text-slate-800">
+                Belum ada data stok ${displayInfo}
+            </td>
+        </tr>`;
+}
+
 
 async function loadStokData() {
     const dateInput = document.getElementById('select-tanggal-wh2');
@@ -346,6 +458,7 @@ async function loadStokData() {
     try {
         const response = await fetch(`${DB_FIREBASE_URL}stok_wh.json`);
         const allData = await response.json();
+        window.currentStokData = allData;
         
         if (!allData) {
             tampilkanKosong(tanggal);
@@ -365,22 +478,6 @@ async function loadStokData() {
     } catch (error) {
         console.error("Gagal load data:", error);
     }
-}
-
-// Helper untuk pesan kosong
-function tampilkanKosong(tanggal) {
-    let displayTanggal = 'yang dipilih';
-
-    // Jika tanggal tersedia (format YYYY-MM-DD), ubah ke dd/mm/yyyy
-    if (tanggal && tanggal.includes('-')) {
-        const parts = tanggal.split('-'); // ["2026", "06", "24"]
-        if (parts.length === 3) {
-            displayTanggal = `${parts[2]}/${parts[1]}/${parts[0]}`; // "24/06/2026"
-        }
-    }
-
-    const tbody = document.getElementById('tabel-body-wh2');
-    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-10 text-slate-800">Belum ada data stok tanggal ${displayTanggal}</td></tr>`;
 }
 
 function renderTabel(dataStok, mode, key) {
@@ -422,10 +519,11 @@ function renderTabel(dataStok, mode, key) {
 
         const aksiContent = (mode === "SESUDAH") 
             ? `<td class="py-2 px-3">
-                 <button onclick="bukaModalAdjustment('${key}', '${kode}')" class="bg-orange-500 text-white px-2 py-1 rounded text-[10px] hover:bg-orange-600">
+                <button onclick="bukaModalAdmin('${key}', '${kode}', ${stokBosnet}, ${stokWms})" 
+                        class="bg-orange-500 text-white px-2 py-1 rounded text-[10px] hover:bg-orange-600">
                     Adjust Stok
-                 </button>
-               </td>` 
+                </button>
+            </td>` 
             : '';
 
         tbody.innerHTML += `
@@ -457,4 +555,84 @@ function renderTabel(dataStok, mode, key) {
             ${totalAksiCol}
         </tr>
     `;
+}
+
+
+// Buka Modal Admin
+function bukaModalAdmin(key, kode, bosnet, wms) {
+    // Simpan data langsung dari parameter tombol
+    window.tempAdjustData = { 
+        key: key, 
+        kode: kode, 
+        bosnet: bosnet, 
+        wms: wms 
+    };
+
+    // Buka modal admin
+    document.getElementById('modal-admin-stok').classList.remove('hidden');
+}
+
+function tutupModalAdmin() {
+    document.getElementById('modal-admin-stok').classList.add('hidden');
+    document.getElementById('admin-pass').value = '';
+}
+
+// Cek Password (Ganti 'adminwh2' dengan password Anda)
+function cekAdmin() {
+    const pass = document.getElementById('admin-pass').value;
+    if (pass === "adminwh2") {
+        document.getElementById('modal-admin-stok').classList.add('hidden');
+        document.getElementById('admin-pass').value = '';
+        bukaModalAdjust(window.tempAdjustData);
+    } else {
+        miuiAlertlert("Password Salah! Anda tidak dizinkan mengakses menu ini!");
+        document.getElementById('admin-pass').value = ''; // Reset input agar tidak bisa ditebak
+    }
+}
+
+// Buka Modal Adjust
+function bukaModalAdjust(data) {
+    document.getElementById('modal-adjust-stok').classList.remove('hidden');
+    document.getElementById('adj-kode').value = data.kode;
+    document.getElementById('adj-kode-display').value = data.kode;
+    document.getElementById('adj-bosnet').value = data.bosnet;
+    document.getElementById('adj-wms').value = data.wms;
+}
+
+function tutupModalAdjust() {
+    document.getElementById('modal-adjust-stok').classList.add('hidden');
+}
+
+// Simpan ke Firebase
+async function simpanAdjustStok() {
+    const tanggal = document.getElementById('select-tanggal-wh2').value;
+    const kode = document.getElementById('adj-kode').value;
+    
+    const bosnet = parseInt(document.getElementById('adj-bosnet').value) || 0;
+    const wms = parseInt(document.getElementById('adj-wms').value) || 0;
+
+    // Pastikan object hanya berisi 2 field ini
+    const updateData = {
+        stokwh2_sesudah: bosnet,
+        stokwms_sesudah: wms
+    };
+
+    try {
+        const response = await fetch(`${DB_FIREBASE_URL}stok_wh/stokwh2wms_${tanggal}/${kode}.json`, {
+            method: "PATCH", // PATCH sangat aman untuk update parsial
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updateData)
+        });
+
+        if (!response.ok) throw new Error("Gagal menyimpan");
+
+        miuiAlert("Stok berhasil diupdate!");
+        tutupModalAdjust();
+        
+        // Pastikan setelah loadStokData, tabel dirender ulang dengan data yang benar
+        await loadStokData(); 
+    } catch (e) {
+        console.error("Error:", e);
+        miuiAlert("Gagal update stok");
+    }
 }
