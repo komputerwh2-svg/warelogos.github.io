@@ -38,6 +38,9 @@
                         <span id="status-net-download">45.8 KB/s</span>
                         <span class="text-blue-500 text-[8px]">▼</span>
                     </div>
+                    <div id="print-status-bar" class="hidden fixed top-0 left-0 w-full flex flex-col bg-blue-600 text-white text-center py-3 text-[18px] font-bold z-[100] shadow-md transition-all duration-300">
+                        <span id="print-status-text">Memproses dokumen...</span>
+                    </div>
                 </div>
                 
                 <i class="fa-solid fa-wifi text-slate-600/80"></i>
@@ -649,14 +652,17 @@
     </div>
 
     <script src="js/clock.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
     <script type="module" src="js/main.js"></script>
+
+    <script type="module" src="js/stokwh.js"></script>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 
     <script type="module" src="js/rekap-blok.js"></script>
-
-    <script type="module" src="js/stokwh.js"></script>
 
     <script type="module" src="js/ongkir.js"></script>
     
