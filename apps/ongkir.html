@@ -255,12 +255,8 @@
                         <input type="number" id="edit-palet" class="w-full mt-1 border border-gray-200 rounded-[6px] px-2 py-1.5 text-[11px] font-bold text-gray-800 outline-none focus:border-orange-500">
                     </div>
                 </div>
-
-                    
-                    
-                </div>
+            </div>
             
-
             <div class="px-4 py-3 bg-gray-50 flex gap-2">
                 <button onclick="tutupModalEditOngkir()" class="flex-1 py-2 bg-[#666666] hover:bg-[#555555] text-white font-black text-[11px] rounded-[6px] shadow-sm uppercase tracking-widest transition-all">BATAL</button>
                 <button onclick="simpanEditTransaksiOngkir()" class="flex-1 py-2 text-white font-black text-[11px] rounded-[6px] shadow-sm uppercase tracking-widest transition-all" style="background: linear-gradient(to bottom, #ff8b00, #f36c00);">Update Data</button>
@@ -268,37 +264,3 @@
         </div>
     </div>
 </div>
-
-<div id="print-area" class="hidden print:block">
-    <div id="content-to-print"></div>
-</div>
-
-<style>
-    @media print {
-        @page { size: F4 portrait; margin: 1cm; }
-        
-        /* Sembunyikan semua elemen di halaman */
-        body > *:not(#print-area) { 
-            display: none !important; 
-        }
-
-        /* Paksa tampilkan area cetak */
-        #print-area { 
-            display: block !important; 
-            visibility: visible !important; 
-            position: absolute; 
-            left: 0; 
-            top: 0; 
-            width: 100%; 
-        }
-        
-        .cetak-page { 
-            height: 48vh; 
-            border: 1px dashed #000; 
-            padding: 20px; 
-            box-sizing: border-box; 
-            display: flex;
-            flex-direction: column;
-        }
-    }
-</style>
