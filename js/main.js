@@ -132,7 +132,7 @@ function tutupSetelan() {
 // =========================================================================
 // 5. FUNCTION LOGIC FOR MODAL RAK KOSONG PRINT SYSTEM (LOKAL & CLOUD)
 // =========================================================================
-import { dbPrinter, ref, push, serverTimestamp, query, orderByChild, equalTo, onChildAdded, update } from "./firebase-printer-config.js";
+import { dbPrinter, ref, push, serverTimestamp, query, orderByChild, equalTo, onChildAdded, update, onValue } from "./firebase-printer-config.js";
 
 function bukaModalRakKosong() {
     const modal = document.getElementById('modal-rak-kosong');
@@ -1010,145 +1010,59 @@ window.cetakKlaimHariIni = async () => {
     }
 };
 
+// Logika Pemantauan
+const printJobsRef = ref(dbPrinter, 'print_jobs');
+let printTimeout = null;
 
+onValue(printJobsRef, (snapshot) => {
+    const data = snapshot.val();
+    const statusBar = document.getElementById('print-status-bar');
+    const statusText = document.getElementById('print-status-text');
 
-// Logika Drag and Drop Utama
-const dropZone = document.getElementById('dropZone');
-const fileInput = document.getElementById('fileInput');
+    // 1. CEK: Apakah ada antrean?
+    if (data && Object.keys(data).length > 0) {
+        // ADA ANTRIAN: Tampilkan Status Biru
+        statusBar.classList.remove('hidden', 'bg-red-600', 'bg-green-600');
+        statusBar.classList.add('bg-blue-600');
+        statusText.innerText = "SISTEM: Sedang memproses antrean cetak...";
 
-dropZone.addEventListener('click', () => fileInput.click());
-
-dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-orange-500'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-orange-500'));
-dropZone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    dropZone.classList.remove('border-orange-500');
-    handleFiles(e.dataTransfer.files);
-});
-
-// Variabel global untuk menyimpan file yang di-drop
-let selectedBosnet = null;
-let selectedWMS = null;
-
-function handleFiles(files) {
-    // Reset pemilihan setiap kali user drag file baru
-    selectedBosnet = null;
-    selectedWMS = null;
-
-    if (files.length < 2) {
-        return miuiAlert("Harap drag/pilih minimal 2 file (File Bosnet & File WMS)!");
-    }
-
-    // Iterasi semua file yang di-drop
-    for (let file of files) {
-        const name = file.name.toUpperCase();
+        // Reset timer
+        if (printTimeout) clearTimeout(printTimeout);
         
-        // Logika Deteksi berdasarkan embel-embel nama
-        if (name.includes("WH2")) {
-            selectedBosnet = file;
-        } else if (name.includes("WMS")) {
-            selectedWMS = file;
+        // Timeout 10 detik untuk deteksi macet
+        printTimeout = setTimeout(() => {
+            if (statusBar.classList.contains('bg-blue-600')) {
+                statusBar.classList.remove('bg-blue-600');
+                statusBar.classList.add('bg-red-600');
+                statusText.innerText = "PERINGATAN: Proses cetak mengalami masalah (antrian macet)!";
+            }
+        }, 10000); 
+
+    } else {
+        // 2. ANTRIAN KOSONG
+        if (printTimeout) clearTimeout(printTimeout);
+        
+        // PENTING: Hanya tampilkan hijau (selesai) jika sebelumnya memang ada antrian
+        // Kita menggunakan sessionStorage untuk mengingat apakah tadi sempat mencetak
+        const wasPrinting = sessionStorage.getItem('wasPrinting');
+
+        if (wasPrinting === 'true') {
+            statusBar.classList.remove('hidden', 'bg-blue-600', 'bg-red-600');
+            statusBar.classList.add('bg-green-600');
+            statusText.innerText = "SISTEM: Cetak dokumen selesai.";
+            
+            sessionStorage.setItem('wasPrinting', 'false'); // Reset status
+            
+            setTimeout(() => {
+                statusBar.classList.add('hidden');
+            }, 5000);
+        } else {
+            statusBar.classList.add('hidden');
         }
     }
 
-    // Validasi apakah kedua file sudah terdeteksi
-    if (selectedBosnet && selectedWMS) {
-        document.getElementById('labelFiles').innerHTML = 
-            `<div class="text-left text-[10px] space-y-1">
-                <div class="text-green-600 font-bold">✓ BOSNET: ${selectedBosnet.name}</div>
-                <div class="text-blue-600 font-bold">✓ WMS: ${selectedWMS.name}</div>
-            </div>`;
-    } else {
-        miuiAlert("Gagal mendeteksi format file. Pastikan nama file mengandung 'WH2' (Bosnet) dan 'WMS' (WMS).");
+    // 3. Update status jika ada data (untuk keperluan sesi refresh)
+    if (data && Object.keys(data).length > 0) {
+        sessionStorage.setItem('wasPrinting', 'true');
     }
-}
-
-
-// 1. Fungsi Utama untuk Memulai Proses
-window.runConvertWH2 = async () => {
-    // Menggunakan variabel global hasil drag-and-drop
-    if (!selectedBosnet || !selectedWMS) {
-        return miuiAlert("Mohon drag & drop kedua file terlebih dahulu!");
-    }
-
-    miuiAlert("Sedang mengolah data... mohon tunggu.");
-
-    try {
-        const dataBosnet = await readExcel(selectedBosnet);
-        const dataWMS = await readExcel(selectedWMS);
-
-        // 2. Logika Pembersihan & Penggabungan
-        let processedData = dataBosnet.filter(row => {
-            const kode = String(row['KODE'] || row['__EMPTY_1'] || "").toUpperCase().trim();
-            return kode !== "KODE" && kode !== "NO" && kode !== "";
-        }).map(row => {
-            const kode = String(row['KODE'] || row['__EMPTY_1'] || "").toUpperCase().trim();
-            const wmsMatch = dataWMS.find(w => String(w['KODE'] || w['__EMPTY_0'] || "").toUpperCase().trim() === kode);
-            
-            // Penyesuaian key kolom berdasarkan struktur file Anda
-            const bosnetQty = parseFloat(row['STOCK'] || row['BOSNET'] || 0);
-            const wmsQty = wmsMatch ? parseFloat(wmsMatch['QTY'] || wmsMatch['WMS'] || 0) : 0;
-            
-            return {
-                NO: 0,
-                KODE: kode,
-                BOSNET: bosnetQty,
-                WMS: wmsQty,
-                SELISIH: wmsQty - bosnetQty,
-                KETERANGAN: (wmsQty - bosnetQty) > 0 ? "QTY WMS LEBIH BESAR" : 
-                            ((wmsQty - bosnetQty) < 0 ? "QTY BOSNET LEBIH BESAR" : "SESUAI")
-            };
-        });
-
-        // 3. Sorting & Penomoran
-        processedData.sort((a, b) => getSortScore(a.KODE) - getSortScore(b.KODE));
-        processedData.forEach((row, index) => row.NO = index + 1);
-
-        // 4. Unduh Hasil (Format .xls)
-        downloadExcel(processedData, `LAPORAN_WH2_${new Date().toISOString().slice(0,10)}.xls`);
-        
-        miuiAlert("Selesai! File berhasil diunduh.");
-        document.getElementById('modalConvertWH2').classList.add('hidden');
-        
-    } catch (e) {
-        miuiAlert("Error: " + e.message);
-        console.error(e);
-    }
-};
-
-// 5. Fungsi Helper Download Excel (.xls)
-function downloadExcel(data, filename) {
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Hasil Convert");
-    // Gunakan bookType: 'xls' untuk format Excel 97-2003
-    XLSX.writeFile(workbook, filename, { bookType: 'xls' });
-}
-
-// Helper GetSortScore
-function getSortScore(kode) {
-    const k = kode.toUpperCase();
-    if (k.startsWith("CRR")) return 1;
-    if (k.startsWith("MJR")) return 2;
-    if (k.startsWith("MOR")) return 3;
-    if (k.startsWith("MP")) return 4;
-    if (k.startsWith("MRMR")) return 5;
-    if (k.startsWith("PDR")) return 6;
-    if (k.startsWith("THR")) return 7;
-    if (k.startsWith("MTR")) return 8;
-    if (k.startsWith("LTGR")) return 9;
-    return 99;
-}
-
-// Helper readExcel menggunakan Binary String agar lebih kompatibel dengan .xls lama
-async function readExcel(file) {
-    return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const data = e.target.result;
-            const workbook = XLSX.read(data, {type: 'binary'});
-            resolve(XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]));
-        };
-        reader.readAsBinaryString(file);
-    });
-}
+});

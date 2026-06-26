@@ -2,7 +2,7 @@
 // FIREBASE REALTIME DATABASE PRINTER CLOUD CONFIGURATION (WH-2 ENGINE)
 // =========================================================================
 import { initializeApp, getApp, getApps } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getDatabase, ref, push, serverTimestamp, query, orderByChild, equalTo, onChildAdded, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+import { getDatabase, ref, push, serverTimestamp, query, orderByChild, equalTo, onChildAdded, update, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
 // Konfigurasi endpoint Realtime Database printer-cloud-wh2
 const firebaseConfigPrinter = {
@@ -23,7 +23,8 @@ export {
     orderByChild,
     equalTo,
     onChildAdded,
-    update
+    update,
+    onValue
 };
 
 console.log("Firebase Printer Config Berhasil Diekspor dalam Mode Modul Server GitHub.");
