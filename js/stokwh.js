@@ -106,7 +106,7 @@ async function updateTanggalDropdown() {
     selTanggal.innerHTML = '<option value="">Memuat...</option>';
 
     try {
-        const response = await fetch(`${DB_FIREBASE_URL}stok_wh.json`);
+        const response = await fetch(`${DB_FIREBASE_URL}stok_wh2.json`);
         const allData = await response.json();
         
         if (!allData) {
@@ -220,7 +220,7 @@ async function initDropdowns() {
 document.addEventListener('DOMContentLoaded', initDropdowns);
 
 
-
+// FUNGSI UNTUK MEMBUKA MODAL UPLOAD
 function bukaModalUploadWH2() {
     document.getElementById('modal-upload-wh2').classList.remove('hidden');
 }
@@ -230,13 +230,39 @@ function tutupModalUploadWH2() {
     resetFileInput();
 }
 
-// Menangani daftar file yang dipilih
-// GANTI KODE ANDA DENGAN INI (JANGAN HAPUS HTML-NYA)
-const fileInputWh2 = document.getElementById('file-input-wh2');
+function bukaModalUploadWH3() {
+    document.getElementById('modal-upload-wh3').classList.remove('hidden');
+}
 
+function tutupModalUploadWH3() {
+    document.getElementById('modal-upload-wh3').classList.add('hidden');
+    resetFileInputwh3();
+}
+
+// Menangani daftar file yang dipilih
+//untuk daftar wh2
+const fileInputWh2 = document.getElementById('file-input-wh2');
 if (fileInputWh2) {
     fileInputWh2.addEventListener('change', function(e) {
         const list = document.getElementById('file-list-wh2');
+        if (!list) return; // Mengamankan jika list tidak ditemukan
+        
+        list.innerHTML = '';
+        
+        Array.from(this.files).forEach(file => {
+            const div = document.createElement('div');
+            div.className = "flex items-center gap-2 p-2 bg-slate-50 rounded border";
+            div.innerHTML = `<i class="fa-solid fa-file-excel text-green-600"></i> <span>${file.name}</span>`;
+            list.appendChild(div);
+        });
+    });
+}
+
+//untuk daftar wh3
+const fileInputWh3 = document.getElementById('file-input-wh3');
+if (fileInputWh3) {
+    fileInputWh3.addEventListener('change', function(e) {
+        const list = document.getElementById('file-list-wh3');
         if (!list) return; // Mengamankan jika list tidak ditemukan
         
         list.innerHTML = '';
@@ -284,7 +310,7 @@ async function prosesUploadWH2() {
 
     // 1. Cek keberadaan data untuk konfirmasi update
     const uniqueId = `stokwh2wms_${tglWh2}`;
-    const url = `${DB_FIREBASE_URL}stok_wh/${uniqueId}.json`;
+    const url = `${DB_FIREBASE_URL}stok_wh2/${uniqueId}.json`;
     
     try {
         const checkResponse = await fetch(url);
@@ -307,6 +333,55 @@ async function prosesUploadWH2() {
         } else {
             // Jika data baru, langsung eksekusi
             eksekusiUpload(fileWh2, fileWms, url, false);
+        }
+
+    } catch (error) {
+        console.error("Error pengecekan:", error);
+        miuiAlert("Gagal mengecek data server.");
+    }
+}
+
+async function prosesUploadWH3() {
+    console.log("Tombol upload WH-3 ditekan!"); 
+    const fileInput = document.getElementById('file-input-wh3');
+    const files = fileInput.files;
+    
+    if (files.length === 0) {
+        miuiAlert("Harap pilih file Excel (Bosnet)!");
+        return;
+    }
+
+    const fileBosnet = files[0];
+    
+    // Ambil tanggal dari nama file, contoh: "Stock_20260627"
+    const getTanggalFromFilename = (filename) => {
+        const match = filename.match(/Stock_(\d{8})/i);
+        return match ? match[1] : null;
+    };
+
+    const tgl = getTanggalFromFilename(fileBosnet.name);
+    if (!tgl) {
+        miuiAlert("Format nama file harus mengandung 'Stock_YYYYMMDD'!");
+        return;
+    }
+
+    // URL Firebase untuk WH-3
+    const uniqueId = `stokwh3_${tgl}`;
+    const url = `${DB_FIREBASE_URL}stok_wh3/${uniqueId}.json`;
+    
+    try {
+        const checkResponse = await fetch(url);
+        const existingData = await checkResponse.json();
+        const isUpdate = existingData !== null;
+
+        if (isUpdate) {
+            miuiConfirm(
+                "Data audit untuk tanggal tersebut sudah ada. Apakah Anda ingin meng-UPDATE data?",
+                () => eksekusiUploadWH3(fileBosnet, url, true),
+                () => console.log("Upload wh3 dibatalkan.")
+            );
+        } else {
+            eksekusiUploadWH3(fileBosnet, url, false);
         }
 
     } catch (error) {
@@ -376,7 +451,7 @@ async function eksekusiUpload(fileWh2, fileWms, url, isUpdate) {
 
         // Validasi jika setelah filter tidak ada data
         if (Object.keys(stokGabungan).length === 0) {
-            miuiAlert("Tidak ada data stok yang valid untuk ditampilkan!");
+            miuiAlert("Tidak ada data stok wh-2 yang valid untuk ditampilkan!");
             return;
         }
 
@@ -388,18 +463,67 @@ async function eksekusiUpload(fileWh2, fileWms, url, isUpdate) {
         });
 
         if (response.ok) {
-            miuiAlert(isUpdate ? "Data berhasil di-UPDATE!" : "Data berhasil disimpan!");
+            miuiAlert(isUpdate ? "Data WH-2 berhasil di-UPDATE!" : "Data WH-2 berhasil disimpan!");
             tutupModalUploadWH2();
             resetFileInput();
             isDropdownInitialized = false; 
             await initDropdowns(); 
         } else {
-            miuiAlert("Gagal menyimpan ke server.");
+            miuiAlert("Gagal menyimpan data WH-2 ke server.");
         }
 
     } catch (error) {
         console.error("Terjadi error detail:", error);
-        miuiAlert("Terjadi kesalahan saat memproses data: " + error.message);
+        miuiAlert("Terjadi kesalahan saat memproses data WH-2: " + error.message);
+    }
+}
+
+async function eksekusiUploadWH3(fileBosnet, url, isUpdate) {
+    try {
+        console.log("Memproses data WH-3 dengan konversi unit...");
+        // Asumsi header berada di baris 2 (index 1) berdasarkan screenshot Anda
+        const dataBosnet = await bacaExcelDinamis(fileBosnet, "Produk"); // Sesuaikan keyword header
+
+        let stokAudit = {};
+
+        dataBosnet.forEach(row => {
+            const kode = row[1] ? String(row[1]).trim() : null; // Kolom B
+            if (!kode || kode === "Produk") return;
+
+            // 1. Ambil data dari Excel
+            const blok = row[2] || 0; // Kolom C
+            const bosnet = parseInt(row[9]) || 0; // Kolom J
+            
+            // 2. Parsing format PAK (Contoh: 1|8)
+            // Ini akan kita simpan untuk nanti dikalikan dengan konversi unit
+            const rawPak = row[5] ? String(row[5]) : "0/0/0/0"; 
+            
+            stokAudit[kode] = {
+                kode: kode,
+                blok: blok,
+                bosnet: bosnet,
+                pak_format: rawPak,
+                beceran: 0, // Akan diisi dari data RAK
+                utuhan: 0,  // Akan diisi dari data RAK
+                total: 0,   // (Blok + Beceran + Utuhan)
+                selisih: 0, // (Total - Bosnet)
+                keterangan: "BELUM DIHITUNG"
+            };
+        });
+
+        // 3. Upload ke Firebase (Format ini siap digabung dengan data RAK nanti)
+        await fetch(url, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(stokAudit)
+        });
+
+        miuiAlert("Data WH-3 berhasil disimpan");
+        await initDropdownsWH3();
+
+    } catch (error) {
+        console.error("Error WH-3:", error);
+        miuiAlert("Gagal memproses file WH-3: " + error.message);
     }
 }
 
@@ -416,7 +540,23 @@ function resetFileInput() {
         fileList.innerHTML = ""; 
     }
     
-    console.log("Input file dan tampilan list telah di-reset.");
+    console.log("Input file dan tampilan list wh-2 telah di-reset.");
+}
+
+function resetFileInputwh3() {
+    // 1. Reset elemen input file
+    const fileInput = document.getElementById('file-input-wh3');
+    if (fileInput) {
+        fileInput.value = ""; 
+    }
+
+    // 2. Kosongkan tampilan list file di UI
+    const fileList = document.getElementById('file-list-wh3');
+    if (fileList) {
+        fileList.innerHTML = ""; 
+    }
+    
+    console.log("Input file dan tampilan list wh-3 telah di-reset.");
 }
 
 /**
@@ -465,6 +605,17 @@ function gantiModeWH2(mode) {
     loadStokData(); 
 }
 
+function gantiModeWH3(mode) {
+    // Fungsi ini hanya bertugas memperbarui UI judul saja, 
+    // lalu memicu loadStokData untuk mengupdate isi tabel
+    const title = document.getElementById('txt-table-title-wh3');
+    if (title) {
+        title.innerText = mode === "STOK WH-3" ? "TABEL DATA STOK WH-3" : "TABEL DATA RAK WH-3";
+    }
+    
+    loadStokDatawh3(); 
+}
+
 // Helper untuk pesan kosong
 function tampilkanKosong(infoTambahan = '') {
     const selPeriode = document.getElementById('select-periode-wh2');
@@ -490,6 +641,30 @@ function tampilkanKosong(infoTambahan = '') {
         </tr>`;
 }
 
+function tampilkanKosongwh3(infoTambahan = '') {
+    const selPeriode = document.getElementById('select-periode-wh3');
+    let displayInfo = 'di periode ini';
+
+    // Jika ada elemen periode, ambil label dari option yang terpilih
+    if (selPeriode && selPeriode.options[selPeriode.selectedIndex]) {
+        const labelPeriode = selPeriode.options[selPeriode.selectedIndex].text;
+        displayInfo = `untuk periode ${labelPeriode}`;
+    }
+
+    // Jika infoTambahan disediakan (misal: "di bulan ini"), gabungkan
+    if (infoTambahan) {
+        displayInfo = `${infoTambahan} ${displayInfo.replace('di periode ini', '')}`;
+    }
+
+    const tbody = document.getElementById('tabel-body-wh3');
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="6" class="text-center py-10 text-slate-800">
+                Belum ada data stok ${displayInfo}
+            </td>
+        </tr>`;
+}
+
 
 async function loadStokData() {
     const dateInput = document.getElementById('select-tanggal-wh2');
@@ -507,7 +682,7 @@ async function loadStokData() {
     const formattedDate = tanggal.replace(/-/g, '');
     
     try {
-        const response = await fetch(`${DB_FIREBASE_URL}stok_wh.json`);
+        const response = await fetch(`${DB_FIREBASE_URL}stok_wh2.json`);
         const allData = await response.json();
         window.currentStokData = allData;
         
@@ -517,6 +692,46 @@ async function loadStokData() {
         }
 
         const key = Object.keys(allData).find(k => k.includes(`stokwh2wms_${formattedDate}`));
+        
+        if (!key) {
+            tampilkanKosong(tanggal);
+            return;
+        }
+
+        // 2. Render langsung dengan mode yang sudah didapat
+        renderTabel(allData[key], mode, key);
+        
+    } catch (error) {
+        console.error("Gagal load data:", error);
+    }
+}
+
+async function loadStokDatawh3() {
+    const dateInput = document.getElementById('select-tanggal-wh3');
+    const tanggal = dateInput ? dateInput.value : null;
+
+    if (!tanggal) return;
+
+    // 1. Tentukan mode secara paksa dari DOM
+    // Mencari radio yang dicentang, jika tidak ada, default ke SEBELUM
+    const radioChecked = document.querySelector('input[name="rb-mode-wh3"]:checked');
+    const mode = radioChecked ? radioChecked.value : "STOK WH-3";
+    
+    console.log("Memuat data mode:", mode, "untuk tanggal:", tanggal);
+
+    const formattedDate = tanggal.replace(/-/g, '');
+    
+    try {
+        const response = await fetch(`${DB_FIREBASE_URL}stok_wh3.json`);
+        const allData = await response.json();
+        window.currentStokData = allData;
+        
+        if (!allData) {
+            tampilkanKosong(tanggal);
+            return;
+        }
+
+        const key = Object.keys(allData).find(k => k.includes(`stokwh3_${formattedDate}`));
         
         if (!key) {
             tampilkanKosong(tanggal);
@@ -571,7 +786,7 @@ function renderTabel(dataStok, mode, key) {
         const aksiContent = (mode === "SESUDAH") 
             ? `<td class="py-2 px-3">
                 <button onclick="bukaModalAdmin('${key}', '${kode}', ${stokBosnet}, ${stokWms})" 
-                        class="bg-orange-500 text-white px-2 py-1 rounded text-[10px] hover:bg-orange-600">
+                        class="bg-orange-500 text-white px-2 py-1 rounded text-[15px] hover:bg-orange-600">
                     Adjust Stok
                 </button>
             </td>` 
@@ -601,9 +816,87 @@ function renderTabel(dataStok, mode, key) {
             <td class="py-3 px-3">${totalWms.toLocaleString()}</td>
             <td class="py-3 px-3 ${warnaTotal}">${totalSelisih === 0 ? "-" : totalSelisih.toLocaleString()}</td>
             <td colspan="${mode === "SESUDAH" ? 1 : 2}" class="py-3 px-3 ${warnaTotal}">
-                ${totalSelisih === 0 ? "SEMUA SESUAI" : "SELISIH DITEMUKAN"}
+                ${totalSelisih === 0 ? "SEMUA STOK SESUAI" : "DITEMUKAN SELISIH STOK"}
             </td>
             ${totalAksiCol}
+        </tr>
+    `;
+
+    // Logika Status
+    const statusEl = document.getElementById('status-tabel-wh2');
+    if (statusEl) {
+        if (totalSelisih === 0) {
+            statusEl.innerText = "[ SEMUA STOK SESUAI ]";
+            statusEl.className = "ml-4 text-[15px] font-black text-green-600 uppercase tracking-wider";
+        } else {
+            statusEl.innerText = "[ TERDAPAT SELISIH STOK ]";
+            statusEl.className = "ml-4 text-[15px] font-black text-red-600 uppercase tracking-wider";
+        }
+    }
+}
+
+function renderTabelwh3(dataStok, mode, key) {
+    const tbody = document.getElementById('tabel-body-wh3');
+    if (!tbody) return;
+
+    tbody.innerHTML = "";
+    let no = 1;
+    let totalBosnet = 0;
+    let totalFisik = 0;
+    let totalSelisih = 0;
+
+    Object.entries(dataStok).forEach(([kode, item]) => {
+        // Logika Audit: Total = Blok + Beceran + Utuhan
+        const bosnet = parseInt(item.bosnet) || 0;
+        const totalFisikItem = (parseInt(item.blok) || 0) + 
+                               (parseInt(item.beceran) || 0) + 
+                               (parseInt(item.utuhan) || 0);
+        
+        const selisih = totalFisikItem - bosnet;
+        
+        // Akumulasi
+        totalBosnet += bosnet;
+        totalFisik += totalFisikItem;
+        totalSelisih += selisih;
+        
+        // Penentuan Keterangan
+        let keterangan = "SESUAI";
+        let warna = "text-green-600";
+        if (selisih > 0) {
+            keterangan = "LEBIH";
+            warna = "text-blue-600 font-bold";
+        } else if (selisih < 0) {
+            keterangan = "KURANG";
+            warna = "text-red-600 font-bold";
+        }
+
+        tbody.innerHTML += `
+            <tr class="hover:bg-gray-50 border-b border-gray-100 text-[12px]">
+                <td class="py-2 px-3">${no++}</td>
+                <td class="py-2 px-3 font-bold">${kode}</td>
+                <td class="py-2 px-3">${bosnet.toLocaleString()}</td>
+                <td class="py-2 px-3">${totalFisikItem.toLocaleString()}</td>
+                <td class="py-2 px-3 ${selisih === 0 ? '' : 'font-black'}">${selisih === 0 ? "-" : selisih.toLocaleString()}</td>
+                <td class="py-2 px-3 ${warna}">${keterangan}</td>
+                <td class="py-2 px-3">
+                    <button onclick="editStokFisik('${kode}')" class="text-orange-500 hover:text-orange-700">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+
+    // Baris Total
+    tbody.innerHTML += `
+        <tr class="bg-slate-100 font-black border-t-2 border-slate-300">
+            <td colspan="2" class="py-3 px-3 text-center uppercase">TOTAL AUDIT</td>
+            <td class="py-3 px-3">${totalBosnet.toLocaleString()}</td>
+            <td class="py-3 px-3">${totalFisik.toLocaleString()}</td>
+            <td class="py-3 px-3 ${totalSelisih === 0 ? '' : 'text-red-600'}">${totalSelisih.toLocaleString()}</td>
+            <td colspan="2" class="py-3 px-3 ${totalSelisih === 0 ? 'text-green-600' : 'text-red-600'}">
+                ${totalSelisih === 0 ? "STOK AMAN" : "PERLU PENYESUAIAN"}
+            </td>
         </tr>
     `;
 }
@@ -669,7 +962,7 @@ async function simpanAdjustStok() {
     };
 
     try {
-        const response = await fetch(`${DB_FIREBASE_URL}stok_wh/stokwh2wms_${tanggal}/${kode}.json`, {
+        const response = await fetch(`${DB_FIREBASE_URL}stok_wh2/stokwh2wms_${tanggal}/${kode}.json`, {
             method: "PATCH", // PATCH sangat aman untuk update parsial
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(updateData)
@@ -707,6 +1000,7 @@ function exportTabelKeExcel() {
     // 4. Trigger download
     XLSX.writeFile(wb, fileName);
 }
+
 
 
 
