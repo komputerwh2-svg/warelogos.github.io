@@ -22,6 +22,9 @@ window.gantiModulStokWH = function(mode) {
         }
     } else if (mode === 'WH3') {
         slider.style.transform = 'translateX(-50%)';
+        if (typeof initDropdowns === 'function') {
+            initDropdownsWH3;
+        }
     } else if (mode === 'LEBIH') {
         slider.style.transform = 'translateX(-75%)';
     }
@@ -174,17 +177,6 @@ function handleDataKosong(isReset) {
     }
 }
 
-// 4. Event Listeners
-document.getElementById('select-periode-wh2').addEventListener('change', updateTanggalDropdown);
-
-document.getElementById('select-tanggal-wh2').addEventListener('change', (e) => {
-    if (e.target.value) {
-        triggerUpdateTampilan(e.target.value);
-    } else {
-        handleDataKosong(false);
-    }
-});
-
 // 2. Fungsi init yang memanggil fungsi di atas
 async function initDropdowns() {
     //if (isDropdownInitialized) return;
@@ -210,8 +202,14 @@ async function initDropdowns() {
     selPeriode.removeEventListener('change', updateTanggalDropdown);
     selPeriode.addEventListener('change', updateTanggalDropdown);
     
-    selTanggal.removeEventListener('change', window.loadStokData);
-    selTanggal.addEventListener('change', window.loadStokData);
+    selTanggal.removeEventListener('change', triggerUpdateTampilan); // Gunakan fungsi trigger
+    selTanggal.addEventListener('change', (e) => {
+        if (e.target.value) {
+            triggerUpdateTampilan(e.target.value);
+        } else {
+            handleDataKosong(false);
+        }
+    });
 
     // EKSEKUSI PERTAMA
     isDropdownInitialized = true;
@@ -233,17 +231,24 @@ function tutupModalUploadWH2() {
 }
 
 // Menangani daftar file yang dipilih
-document.getElementById('file-input-wh2').addEventListener('change', function(e) {
-    const list = document.getElementById('file-list-wh2');
-    list.innerHTML = '';
-    
-    Array.from(this.files).forEach(file => {
-        const div = document.createElement('div');
-        div.className = "flex items-center gap-2 p-2 bg-slate-50 rounded border";
-        div.innerHTML = `<i class="fa-solid fa-file-excel text-green-600"></i> <span>${file.name}</span>`;
-        list.appendChild(div);
+// GANTI KODE ANDA DENGAN INI (JANGAN HAPUS HTML-NYA)
+const fileInputWh2 = document.getElementById('file-input-wh2');
+
+if (fileInputWh2) {
+    fileInputWh2.addEventListener('change', function(e) {
+        const list = document.getElementById('file-list-wh2');
+        if (!list) return; // Mengamankan jika list tidak ditemukan
+        
+        list.innerHTML = '';
+        
+        Array.from(this.files).forEach(file => {
+            const div = document.createElement('div');
+            div.className = "flex items-center gap-2 p-2 bg-slate-50 rounded border";
+            div.innerHTML = `<i class="fa-solid fa-file-excel text-green-600"></i> <span>${file.name}</span>`;
+            list.appendChild(div);
+        });
     });
-});
+}
 
 const DB_FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
 
@@ -310,45 +315,72 @@ async function prosesUploadWH2() {
     }
 }
 
-// Fungsi terpisah untuk memproses file dan upload ke Firebase
 async function eksekusiUpload(fileWh2, fileWms, url, isUpdate) {
     try {
-        console.log("Membaca file Excel...");
-        const dataWh2 = await bacaExcel(fileWh2, 13);
-        const dataWms = await bacaExcel(fileWms, 12);
+        console.log("Membaca file dengan deteksi header otomatis...");
+        
+        // Menggunakan fungsi dinamis untuk mencari baris header "KODE"
+        const dataWh2 = await bacaExcelDinamis(fileWh2, "Produk");
+        const dataWms = await bacaExcelDinamis(fileWms, "KODE");
 
         let stokGabungan = {};
 
+        // 1. Proses WH2: Produk di index 1, K Akhir di index 9
         dataWh2.forEach(row => {
-            const kode = row[1]; 
-            const rawAkhir = String(row[9] || '0'); 
+            const kode = row[1] ? String(row[1]).trim() : null;
+            if (!kode) return;
+
+            // Mengambil K Akhir (index 9) dan mengambil angka sebelum "/"
+            const rawAkhir = row[9] ? String(row[9]) : "0";
             const kAkhir = parseInt(rawAkhir.split('/')[0]) || 0;
 
-            if (kode && kAkhir > 0) {
-                stokGabungan[kode] = {
-                    stokwh2_sebelum: kAkhir,
-                    stokwh2_sesudah: kAkhir,
-                    stokwms_sebelum: 0,
-                    stokwms_sesudah: 0
-                };
-            }
+            stokGabungan[kode] = {
+                stokwh2_sebelum: kAkhir,
+                stokwh2_sesudah: kAkhir,
+                stokwms_sebelum: 0,
+                stokwms_sesudah: 0
+            };
         });
 
+        // 2. Proses WMS: Produk di index 0, TOTAL KRT di index 10
         dataWms.forEach(row => {
-            const kode = row[0]; 
-            const wmsQty = parseFloat(row[10]) || 0;
+            const kode = row[0] ? String(row[0]).trim() : null;
+            if (!kode) return;
 
-            if (kode && stokGabungan[kode]) {
-                stokGabungan[kode].stokwms_sebelum = wmsQty;
-                stokGabungan[kode].stokwms_sesudah = wmsQty;
+            // Menggunakan index 10 untuk kolom K (TOTAL KRT), membersihkan format angka
+            const rawKrt = row[10]; 
+            const totalKrt = rawKrt ? parseFloat(String(rawKrt).replace(/[^0-9.]/g, '')) || 0 : 0;
+
+            if (!stokGabungan[kode]) {
+                // Jika produk baru ada di WMS, tambahkan
+                stokGabungan[kode] = { 
+                    stokwh2_sebelum: 0, 
+                    stokwh2_sesudah: 0, 
+                    stokwms_sebelum: totalKrt, 
+                    stokwms_sesudah: totalKrt 
+                };
+            } else {
+                // Jika sudah ada (dari WH2), update nilai WMS-nya
+                stokGabungan[kode].stokwms_sebelum = totalKrt;
+                stokGabungan[kode].stokwms_sesudah = totalKrt;
             }
         });
 
+        // 3. FILTER: Hapus produk yang keduanya bernilai 0 (Stok habis/tidak ada data)
+        Object.keys(stokGabungan).forEach(kode => {
+            const item = stokGabungan[kode];
+            if (item.stokwh2_sesudah === 0 && item.stokwms_sesudah === 0) {
+                delete stokGabungan[kode];
+            }
+        });
+
+        // Validasi jika setelah filter tidak ada data
         if (Object.keys(stokGabungan).length === 0) {
-            miuiAlert("Data tidak ditemukan!");
+            miuiAlert("Tidak ada data stok yang valid untuk ditampilkan!");
             return;
         }
 
+        // Upload ke Firebase
         const response = await fetch(url, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
@@ -356,17 +388,10 @@ async function eksekusiUpload(fileWh2, fileWms, url, isUpdate) {
         });
 
         if (response.ok) {
-            const message = isUpdate ? "Data berhasil di-UPDATE ke Firebase!" : "Data berhasil disimpan ke Firebase!";
-            miuiAlert(message);
+            miuiAlert(isUpdate ? "Data berhasil di-UPDATE!" : "Data berhasil disimpan!");
             tutupModalUploadWH2();
             resetFileInput();
-
-            // LAKUKAN INI:
-            // 1. Reset flag agar dropdown bisa memuat ulang daftar tanggal dari Firebase
             isDropdownInitialized = false; 
-            
-            // 2. Panggil ulang inisialisasi dropdown untuk mengambil daftar tanggal terbaru
-            // Dan di dalam initDropdowns nanti, ia akan otomatis memanggil loadStokData()
             await initDropdowns(); 
         } else {
             miuiAlert("Gagal menyimpan ke server.");
@@ -374,7 +399,7 @@ async function eksekusiUpload(fileWh2, fileWms, url, isUpdate) {
 
     } catch (error) {
         console.error("Terjadi error detail:", error);
-        miuiAlert("Terjadi kesalahan: " + error.message);
+        miuiAlert("Terjadi kesalahan saat memproses data: " + error.message);
     }
 }
 
@@ -394,15 +419,36 @@ function resetFileInput() {
     console.log("Input file dan tampilan list telah di-reset.");
 }
 
-// Helper tetap di luar fungsi utama
-function bacaExcel(file, headerRow) {
+/**
+ * Membaca Excel secara dinamis.
+ * Mencari baris yang mengandung keyword header, lalu mengambil data di bawahnya.
+ * @param {File} file - File dari input
+ * @param {string} keyword - Kata kunci untuk mencari baris header (misal: "KODE")
+ */
+function bacaExcelDinamis(file, keyword = "KODE") {
     return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = (e) => {
             const data = new Uint8Array(e.target.result);
             const wb = XLSX.read(data, { type: 'array' });
             const ws = wb.Sheets[wb.SheetNames[0]];
-            resolve(XLSX.utils.sheet_to_json(ws, { header: 1, range: headerRow }));
+            const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+            // PENCARIAN LEBIH TOLERAN:
+            // .includes() mencari kata di dalam sel, trim() membersihkan spasi kiri-kanan
+            let headerIndex = json.findIndex(row => 
+                row.some(cell => cell && String(cell).toUpperCase().trim().includes(keyword.toUpperCase()))
+            );
+            
+            if (headerIndex === -1) {
+                console.error(`Gagal menemukan baris header yang mengandung "${keyword}". Baris ditemukan:`, json.slice(0, 5));
+                resolve([]);
+                return;
+            }
+
+            console.log("Header ditemukan pada baris indeks:", headerIndex);
+            const dataBersih = json.slice(headerIndex + 1);
+            resolve(dataBersih);
         };
         reader.readAsArrayBuffer(file);
     });
@@ -641,3 +687,174 @@ async function simpanAdjustStok() {
         miuiAlert("Gagal update stok");
     }
 }
+
+function exportTabelKeExcel() {
+    // 1. Ambil tabel berdasarkan ID (Sesuaikan ID tabel Anda)
+    const table = document.getElementById('tabel-stok-wh2'); // Pastikan ID tabel Anda benar
+    
+    if (!table) {
+        miuiAlert("Tabel tidak ditemukan!");
+        return;
+    }
+
+    // 2. Konversi tabel HTML ke WorkBook SheetJS
+    const wb = XLSX.utils.table_to_book(table, { sheet: "Laporan Stok" });
+
+    // 3. Buat nama file berdasarkan tanggal
+    const tgl = new Date().toLocaleDateString('id-ID').replace(/\//g, '-');
+    const fileName = `STOKWH2_${tgl}.xlsx`;
+
+    // 4. Trigger download
+    XLSX.writeFile(wb, fileName);
+}
+
+
+
+// Fungsi untuk memformat tanggal (WH-3)
+function updateDisplayTanggalWH3(tanggalString, isDataKosong = false) {
+    const displayEl = document.getElementById('display-tanggal-wh3');
+    if (!displayEl) return;
+
+    if (isDataKosong) {
+        displayEl.innerText = "BELUM ADA DATA STOK";
+        return;
+    }
+
+    if (!tanggalString) {
+        displayEl.innerText = "PILIH TANGGAL STOK";
+        return;
+    }
+
+    let date;
+    // Logika parsing tetap sama untuk semua format
+    if (tanggalString.includes('-')) {
+        const [year, month, day] = tanggalString.split('-').map(Number);
+        date = new Date(year, month - 1, day);
+    } else if (tanggalString.includes('/')) {
+        const [day, month, year] = tanggalString.split('/').map(Number);
+        date = new Date(year, month - 1, day);
+    } else if (tanggalString.length === 8 && !isNaN(tanggalString)) {
+        const year = parseInt(tanggalString.substring(0, 4));
+        const month = parseInt(tanggalString.substring(4, 6)) - 1;
+        const day = parseInt(tanggalString.substring(6, 8));
+        date = new Date(year, month, day);
+    } else {
+        displayEl.innerText = "TANGGAL TIDAK VALID";
+        return;
+    }
+
+    const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+    displayEl.innerText = date.toLocaleDateString('id-ID', options).toUpperCase();
+}
+
+// 1. Fungsi Utama: Ambil dan Update Tanggal (WH-3)
+async function updateTanggalDropdownWH3() {
+    const selPeriode = document.getElementById('select-periode-wh3');
+    const selTanggal = document.getElementById('select-tanggal-wh3');
+    
+    if (!selPeriode || !selTanggal) return;
+
+    if (!selPeriode.value) {
+        selTanggal.innerHTML = '<option value="">Pilih Tanggal</option>';
+        handleDataKosongWH3(true);
+        return;
+    }
+
+    selTanggal.innerHTML = '<option value="">Memuat...</option>';
+
+    try {
+        const response = await fetch(`${DB_FIREBASE_URL}stok_wh3.json`); // Pastikan node Firebase sesuai
+        const allData = await response.json();
+        
+        if (!allData) {
+            handleDataKosongWH3(false);
+            return;
+        }
+
+        const [targetTahun, targetBulan] = selPeriode.value.split('-').map(Number);
+        let availableDates = [];
+
+        Object.keys(allData).forEach(key => {
+            // Sesuaikan prefix jika di Firebase Anda berbeda (misal: stokwh3wms_)
+            if (key.includes('stokwh3wms_')) {
+                const rawDate = key.split('_')[1]; 
+                const tahun = parseInt(rawDate.substring(0, 4));
+                const bulan = parseInt(rawDate.substring(4, 6)) - 1;
+                const hari = rawDate.substring(6, 8);
+
+                if (tahun === targetTahun && bulan === targetBulan) {
+                    availableDates.push({ val: rawDate, label: `${hari}/${rawDate.substring(4, 6)}/${tahun}` });
+                }
+            }
+        });
+
+        availableDates.sort((a, b) => b.val.localeCompare(a.val));
+
+        selTanggal.innerHTML = '<option value="">Pilih Tanggal</option>';
+        availableDates.forEach(date => selTanggal.add(new Option(date.label, date.val)));
+
+        if (availableDates.length > 0) {
+            selTanggal.value = availableDates[0].val;
+            triggerUpdateTampilanWH3(selTanggal.value);
+        } else {
+            handleDataKosongWH3(false);
+        }
+    } catch (e) {
+        console.error("Gagal sinkronisasi tanggal WH-3:", e);
+        selTanggal.innerHTML = '<option value="">Gagal Memuat</option>';
+    }
+}
+
+// 2. Fungsi Pemicu Terpadu (WH-3)
+async function triggerUpdateTampilanWH3(val) {
+    if (typeof window.updateDisplayTanggalWH3 === 'function') {
+        window.updateDisplayTanggalWH3(val, false);
+    }
+    if (typeof window.loadStokDataWH3 === 'function') {
+        await window.loadStokDataWH3();
+    }
+}
+
+// 3. Helper untuk Data Kosong (WH-3)
+function handleDataKosongWH3(isReset) {
+    const selTanggal = document.getElementById('select-tanggal-wh3');
+    selTanggal.innerHTML = '<option value="">Data Kosong</option>';
+    
+    if (typeof window.updateDisplayTanggalWH3 === 'function') {
+        window.updateDisplayTanggalWH3('', true);
+    }
+    if (typeof window.tampilkanKosongWH3 === 'function') {
+        window.tampilkanKosongWH3('');
+    }
+}
+
+// 4. Inisialisasi WH-3
+async function initDropdownsWH3() {
+    const selPeriode = document.getElementById('select-periode-wh3');
+    const selTanggal = document.getElementById('select-tanggal-wh3');
+    
+    if (!selPeriode || !selTanggal) return;
+
+    const now = new Date();
+    selPeriode.innerHTML = '<option value="">Pilih Periode</option>';
+    for (let i = 0; i < 12; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const value = `${d.getFullYear()}-${d.getMonth()}`;
+        const label = d.toLocaleDateString('id-ID', { month: 'short', year: 'numeric' }).toUpperCase();
+        selPeriode.add(new Option(label, value));
+    }
+    selPeriode.value = `${now.getFullYear()}-${now.getMonth()}`;
+
+    selPeriode.removeEventListener('change', updateTanggalDropdownWH3);
+    selPeriode.addEventListener('change', updateTanggalDropdownWH3);
+    
+    selTanggal.removeEventListener('change', triggerUpdateTampilanWH3);
+    selTanggal.addEventListener('change', (e) => {
+        if (e.target.value) triggerUpdateTampilanWH3(e.target.value);
+        else handleDataKosongWH3(false);
+    });
+
+    await updateTanggalDropdownWH3();
+}
+
+document.addEventListener('DOMContentLoaded', initDropdownsWH3);

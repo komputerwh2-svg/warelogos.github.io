@@ -32,7 +32,7 @@ if (view) {
 
 
 // Fungsi global untuk getar
-window.triggerVibrate = (duration = 50) => {
+window.triggerVibrate = (duration = 90) => {
     if ("vibrate" in navigator) {
         navigator.vibrate(duration);
     }
@@ -44,7 +44,7 @@ document.addEventListener('click', (e) => {
     const target = e.target.closest('button, .cursor-pointer, [onclick]');
     
     if (target) {
-        window.triggerVibrate(50); // Getar selama 50ms
+        window.triggerVibrate(90); // Getar selama 50ms
     }
 });
 
