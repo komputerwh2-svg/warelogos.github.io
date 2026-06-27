@@ -1012,57 +1012,58 @@ window.cetakKlaimHariIni = async () => {
 
 // Logika Pemantauan
 const printJobsRef = ref(dbPrinter, 'print_jobs');
+const statusBar = document.getElementById('print-status-bar');
+const statusText = document.getElementById('print-status-text');
+const printIcon = document.getElementById('print-icon');
 let printTimeout = null;
 
+// Gunakan onValue untuk memantau perubahan secara real-time
 onValue(printJobsRef, (snapshot) => {
     const data = snapshot.val();
-    const statusBar = document.getElementById('print-status-bar');
-    const statusText = document.getElementById('print-status-text');
+    
+    // Hitung jumlah job
+    const jobCount = data ? Object.keys(data).length : 0;
+    
+    console.log("Jumlah antrian di Firebase:", jobCount); // Debugging: Cek di Console F12
 
-    // 1. CEK: Apakah ada antrean?
-    if (data && Object.keys(data).length > 0) {
-        // ADA ANTRIAN: Tampilkan Status Biru
-        statusBar.classList.remove('hidden', 'bg-red-600', 'bg-green-600');
-        statusBar.classList.add('bg-blue-600');
-        statusText.innerText = "SISTEM: Sedang memproses antrean cetak...";
+    let countdownInterval = null;
+    let timeLeft = 10; // Durasi dalam detik
 
+    if (jobCount > 0) {
+        // RESET STATUS BAR & TIMER
+        statusBar.classList.remove('hidden');
+        statusBar.className = "flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold bg-blue-500 text-white animate-pulse";
+        printIcon.className = "fa-solid fa-spinner animate-spin";
+        
         // Reset timer
         if (printTimeout) clearTimeout(printTimeout);
+        if (countdownInterval) clearInterval(countdownInterval);
         
-        // Timeout 10 detik untuk deteksi macet
-        printTimeout = setTimeout(() => {
-            if (statusBar.classList.contains('bg-blue-600')) {
-                statusBar.classList.remove('bg-blue-600');
-                statusBar.classList.add('bg-red-600');
-                statusText.innerText = "PERINGATAN: Proses cetak mengalami masalah (antrian macet)!";
+        timeLeft = 10;
+        statusText.innerText = `Sedang mencetak ${jobCount} dokumen (${timeLeft}s)...`;
+
+        // Jalankan countdown setiap 1 detik
+        countdownInterval = setInterval(() => {
+            timeLeft--;
+            if (timeLeft > 0) {
+                statusText.innerText = `Sedang mencetak ${jobCount} dokumen (${timeLeft}s)...`;
+            } else {
+                clearInterval(countdownInterval);
             }
+        }, 1000);
+
+        // Deteksi Masalah (Timeout 10 detik tetap berjalan)
+        printTimeout = setTimeout(() => {
+            clearInterval(countdownInterval); // Hentikan countdown
+            statusBar.className = "flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold bg-red-600 text-white";
+            printIcon.className = "fa-solid fa-circle-exclamation";
+            statusText.innerText = "Antrian cetak mengalami masalah!";
         }, 10000); 
 
     } else {
-        // 2. ANTRIAN KOSONG
+        // ANTRIAN KOSONG: Bersihkan semua
         if (printTimeout) clearTimeout(printTimeout);
-        
-        // PENTING: Hanya tampilkan hijau (selesai) jika sebelumnya memang ada antrian
-        // Kita menggunakan sessionStorage untuk mengingat apakah tadi sempat mencetak
-        const wasPrinting = sessionStorage.getItem('wasPrinting');
-
-        if (wasPrinting === 'true') {
-            statusBar.classList.remove('hidden', 'bg-blue-600', 'bg-red-600');
-            statusBar.classList.add('bg-green-600');
-            statusText.innerText = "SISTEM: Cetak dokumen selesai.";
-            
-            sessionStorage.setItem('wasPrinting', 'false'); // Reset status
-            
-            setTimeout(() => {
-                statusBar.classList.add('hidden');
-            }, 5000);
-        } else {
-            statusBar.classList.add('hidden');
-        }
-    }
-
-    // 3. Update status jika ada data (untuk keperluan sesi refresh)
-    if (data && Object.keys(data).length > 0) {
-        sessionStorage.setItem('wasPrinting', 'true');
+        if (countdownInterval) clearInterval(countdownInterval);
+        statusBar.classList.add('hidden');
     }
 });

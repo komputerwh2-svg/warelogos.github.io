@@ -1,4 +1,7 @@
 import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+import { initPrinterMonitor } from "./printer-monitor.js";
+
+
 
 // --- 1. INISIALISASI ---
 // Gunakan window.app untuk mengakses instance firebase yang sudah ada di main.js
@@ -66,6 +69,7 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         console.warn("Dropdown belum ditemukan, mungkin dimuat secara dinamis.");
     }
+    initPrinterMonitor();
 }); 
 
 

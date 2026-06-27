@@ -2,6 +2,13 @@
 // LOGIKA KHUSUS: MODUL SETELAN BANK DATA & KAMUS BARANG (v2026.05.25.0.0.3 - INTEGRATED WITH CELL)
 // ==========================================================================
 
+import { initPrinterMonitor } from "./printer-monitor.js";
+
+// Panggil fungsi ini tepat setelah halaman siap
+document.addEventListener('DOMContentLoaded', () => {
+    initPrinterMonitor();
+});
+
 const BD_FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
 
 // URL Web App Google Apps Script untuk sinkronisasi 2 arah ke Spreadsheet (Sheet KODE - 7 Kolom)

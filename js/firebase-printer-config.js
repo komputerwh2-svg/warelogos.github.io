@@ -6,7 +6,7 @@ import { getDatabase, ref, push, serverTimestamp, query, orderByChild, equalTo, 
 
 // Konfigurasi endpoint Realtime Database printer-cloud-wh2
 const firebaseConfigPrinter = {
-    databaseURL: "https://printer-cloud-wh2-default-rtdb.asia-southeast1.firebasedatabase.app/"
+    databaseURL: "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/" // GUNAKAN URL INI
 };
 
 // Validasi pencegahan inisialisasi ganda aplikasi Firebase di browser

@@ -1,4 +1,9 @@
-
+// Tambahkan ini di setiap file JS (main.js, stokwh.js, dll) 
+// agar status bar selalu ter-update
+const statusBar = document.getElementById('print-status-bar');
+if (!statusBar) {
+    console.log("Status bar tidak ditemukan, mungkin Anda sedang di halaman lain?");
+}
 
 // Fungsi ganti switch mode Stok WH (REKAP, WH-2, WH-3, LEBIH) dengan efek geser slider
 window.gantiModulStokWH = function(mode) {

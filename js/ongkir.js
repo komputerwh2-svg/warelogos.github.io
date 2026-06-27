@@ -1,6 +1,7 @@
 // --- PASTIKAN INI ADALAH BARIS PALING ATAS ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
 import { getDatabase, ref, push, set, remove, get, child, update } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+import { initPrinterMonitor } from "./printer-monitor.js";
 
 // Tentukan konstanta di sini
 const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
@@ -12,6 +13,11 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 // ---------------------------------------------
+
+// Panggil fungsi ini tepat setelah halaman siap
+document.addEventListener('DOMContentLoaded', () => {
+    initPrinterMonitor();
+});
 
 export function initOngkir() {
     isiDropdownTanggal();
