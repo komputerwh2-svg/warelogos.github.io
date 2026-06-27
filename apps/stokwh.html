@@ -53,7 +53,7 @@
             </div>
 
             <div class="w-1/4 p-3.5 space-y-4" id="slide-wh2">
-                <div class="flex items-center justify-between bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                <div class="flex items-center justify-between bg-emerald-100 p-4 rounded-xl border border-gray-200 shadow-sm">
                     <div class="flex flex-col">
                         <h2 class="text-[16px] font-black text-slate-800 uppercase tracking-widest">Stok WH-2 [Bosnet-WMS]</h2>
                         <p id="display-tanggal-wh2" class="text-[16px] text-orange-500 font-bold uppercase mt-0.5">Pilih Tanggal Stok</p>
@@ -87,18 +87,21 @@
                 </div>
 
                 <div class="w-full bg-white rounded-xl border border-gray-300 shadow-sm overflow-hidden">
-                    <div class="px-4 py-3 bg-slate-50 border-b border-gray-200 flex justify-between items-center">
-                        <span id="txt-table-title-wh2" class="text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                            Tabel Data WH-2 SEBELUM
-                        </span>
+                    <div class="px-4 py-3 bg-emerald-100 border-b border-gray-500 flex justify-between items-center">
+                        <div>
+                            <span id="txt-table-title-wh2" class="text-[15px] font-black text-slate-500 uppercase tracking-wider">
+                                Tabel Data WH-2 SEBELUM
+                            </span>
+                            <span id="status-tabel-wh2" class="ml-4 text-[15px] font-black uppercase tracking-wider"></span>
+                        </div>
                         <button onclick="exportTabelKeExcel()" class="text-[10px] bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700 transition-all font-bold">
                             <i class="fa-solid fa-file-excel mr-1"></i> EXPORT LAPORAN STOK
                         </button>
                     </div>
-                    <div class="overflow-x-auto max-h-[400px]">
+                    <div class="overflow-x-auto max-h-[520px]">
                         <table class="w-full text-left border-collapse">
-                            <thead class="bg-slate-50 sticky top-0 z-10 border-b border-gray-200">
-                                <tr class="text-[10px] text-slate-500 uppercase tracking-wider">
+                            <thead class="bg-slate-100 sticky top-0 z-10 border-b border-gray-200">
+                                <tr class="text-[15px] text-slate-500 uppercase tracking-wider">
                                     <th class="py-3 px-3">No</th>
                                     <th class="py-3 px-3">Kode</th>
                                     <th class="py-3 px-3">Bosnet</th>
@@ -116,7 +119,7 @@
             </div>
 
             <div class="w-1/4 p-3.5 space-y-4" id="slide-wh3">
-                <div class="flex items-center justify-between bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                <div class="flex items-center justify-between bg-orange-100 p-4 rounded-xl border border-gray-200 shadow-sm">
                     <div class="flex flex-col">
                         <h2 class="text-[16px] font-black text-slate-800 uppercase tracking-widest">Stok WH-3 [Bosnet]</h2>
                         <p id="display-tanggal-wh3" class="text-[16px] text-orange-500 font-bold uppercase mt-0.5">Pilih Tanggal Stok</p>
@@ -125,12 +128,12 @@
                         <div class="flex items-center bg-gray-200 p-1 rounded-xl w-fit">
                             <label class="relative px-6 py-2 rounded-lg cursor-pointer">
                                 <input type="radio" name="rb-mode-wh3" value="SEBELUM" checked onchange="gantiModeWH3(this.value)" class="sr-only peer">
-                                <span class="text-xs font-black text-gray-500 peer-checked:text-white transition-colors relative z-10 whitespace-nowrap">STOK WH-3 HITUNG</span>
+                                <span class="text-xs font-black text-gray-500 peer-checked:text-white transition-colors relative z-10 whitespace-nowrap">STOK WH-3</span>
                                 <div class="absolute inset-0 bg-orange-500 rounded-lg opacity-0 peer-checked:opacity-100 transition-opacity"></div>
                             </label>
                             <label class="relative px-6 py-2 rounded-lg cursor-pointer">
                                 <input type="radio" name="rb-mode-wh3" value="SESUDAH" onchange="gantiModeWH3(this.value)" class="sr-only peer">
-                                <span class="text-xs font-black text-gray-500 peer-checked:text-white transition-colors relative z-10 whitespace-nowrap">STOK WH-3 RAK</span>
+                                <span class="text-xs font-black text-gray-500 peer-checked:text-white transition-colors relative z-10 whitespace-nowrap">RAK WH-3</span>
                                 <div class="absolute inset-0 bg-orange-500 rounded-lg opacity-0 peer-checked:opacity-100 transition-opacity"></div>
                             </label>
                         </div>
@@ -150,18 +153,18 @@
                 </div>
 
                 <div class="w-full bg-white rounded-xl border border-gray-300 shadow-sm overflow-hidden">
-                    <div class="px-4 py-3 bg-slate-50 border-b border-gray-200 flex justify-between items-center">
-                        <span id="txt-table-title-wh3" class="text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                            Tabel Data WH-3 SEBELUM
+                    <div class="px-4 py-3 bg-orange-100 border-b border-gray-500 flex justify-between items-center">
+                        <span id="txt-table-title-wh3" class="text-[15px] font-black text-slate-500 uppercase tracking-wider">
+                            Tabel Data Stok WH-3
                         </span>
                         <button onclick="exportTabelKeExcelWH3()" class="text-[10px] bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700 transition-all font-bold">
                             <i class="fa-solid fa-file-excel mr-1"></i> EXPORT LAPORAN STOK
                         </button>
                     </div>
-                    <div class="overflow-x-auto max-h-[400px]">
+                    <div class="overflow-x-auto max-h-[520px]">
                         <table class="w-full text-left border-collapse" id="tabel-stok-wh3">
                             <thead class="bg-slate-50 sticky top-0 z-10 border-b border-gray-200">
-                                <tr class="text-[10px] text-slate-500 uppercase tracking-wider">
+                                <tr class="text-[15px] text-slate-500 uppercase tracking-wider">
                                     <th class="py-3 px-3">No</th>
                                     <th class="py-3 px-3">Kode</th>
                                     <th class="py-3 px-3">Bosnet</th>
@@ -212,13 +215,39 @@
         </div>
     </div>
 
+    <div id="modal-upload-wh3" class="fixed inset-0 bg-slate-900/50 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-xl shadow-2xl p-6 w-[400px] relative">
+            <button onclick="tutupModalUploadWH3()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+
+            <h3 class="text-lg font-black text-slate-800 mb-4">UPLOAD STOK WH-3</h3>
+            
+            <div class="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:border-orange-500 transition-all" 
+                onclick="document.getElementById('file-input-wh3').click()">
+                <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-400 mb-2"></i>
+                <p class="text-xs text-slate-600 font-bold">Pilih File (WH-3 BOSNET)</p>
+            </div>
+
+            <input type="file" id="file-input-wh3" class="hidden" multiple accept=".xlsx, .xls, .ods">
+            
+            <div id="file-list-wh3" class="mt-4 space-y-2 text-xs text-slate-700"></div>
+
+            <div class="mt-6">
+                <button onclick="prosesUploadWH3()" class="w-full py-3 bg-orange-500 text-white font-black text-sm rounded-lg hover:bg-orange-600 transition-all shadow-lg">
+                    PROSES UPLOAD
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-admin-stok" class="fixed inset-0 bg-black bg-opacity-50 hidden z-[9999] flex items-center justify-center p-3">
         <div class="bg-white rounded-[12px] w-full max-w-xs p-4 space-y-4">
-            <h3 class="text-sm font-bold text-gray-800 uppercase">Otentikasi Admin</h3>
+            <h3 class="text-sm font-bold text-gray-800 uppercase">Autentikasi Admin</h3>
             <input type="password" id="admin-pass" placeholder="Masukkan Password" class="w-full border rounded text-gray-800 p-2 text-sm">
             <div class="flex gap-2">
-                <button onclick="tutupModalAdmin()" class="flex-1 py-2 bg-gray-400 text-white rounded">Batal</button>
                 <button onclick="cekAdmin()" class="flex-1 py-2 bg-orange-500 text-white rounded">Masuk</button>
+                <button onclick="tutupModalAdmin()" class="flex-1 py-2 bg-gray-400 text-white rounded">Batal</button>          
             </div>
         </div>
     </div>
