@@ -278,8 +278,9 @@
     </div>
 
     <div id="modal-admin-stok" class="fixed inset-0 bg-black bg-opacity-50 hidden z-[9999] flex items-center justify-center p-3">
-        <div class="bg-white rounded-[12px] w-full max-w-xs p-4 space-y-4">
-            <h3 class="text-sm font-bold text-gray-800 uppercase">Autentikasi Admin</h3>
+        <div class="bg-gray-100 rounded-[12px] w-full max-w-xs p-4 space-y-4">
+            <h3 class="text-sm font-bold text-gray-800 uppercase">Masukkan User ID & Password</h3>
+            <input type="text" id="admin-userid" placeholder="Masukkan User ID" class="w-full border rounded text-gray-800 p-2 text-sm">
             <input type="password" id="admin-pass" placeholder="Masukkan Password" class="w-full border rounded text-gray-800 p-2 text-sm">
             <div class="flex gap-2">
                 <button onclick="cekAdmin()" class="flex-1 py-2 bg-orange-500 text-white rounded">Masuk</button>
@@ -315,5 +316,60 @@
                 <button onclick="simpanAdjustStok()" class="w-full py-3 bg-orange-500 text-white font-black text-sm rounded-lg hover:bg-orange-600 transition-all shadow-lg">UPDATE DATA</button>
             </div>
         </div>
+    </div>
+
+    <div id="modalInputRak" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+        <div class="bg-white text-gray-800 rounded-lg shadow-lg p-6 rounded-lg w-96 shadow-lg">
+            <div class="w-full h-14 bg-white flex items-center justify-between px-4">
+                <!-- Judul hilangkan mb-4 agar tidak mendorong ke bawah -->
+                <h2 id="modalTitle" class="text-lg font-bold text-gray-800 mb-0">Input Rak: -</h2>
+                
+                <!-- Tombol X dengan hover efek dan warna yang lebih kontras -->
+                <button onclick="tutupModalRak()" class="text-red-400 font-bold text-xl">✕</button>
+            </div>
+            
+            <!-- Input Form -->
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs text-gray-800 font-semibold">QTY Beceran</label>
+                    <input type="number" id="inputBeceran" class="w-full border p-2 rounded text-gray-800">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-800 font-semibold">Rak Beceran</label>
+                    <input type="text" id="inputRakBeceran" class="w-full border p-2 rounded text-gray-800 uppercase">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-800 font-semibold">Rak Utuhan</label>
+                    <input type="text" id="inputRakUtuhan" class="w-full border p-2 rounded text-gray-800 uppercase" oninput="hitungKonversi()">
+                </div>
+                <!-- Hasil Konversi (Readonly) -->
+                <div class="bg-gray-100 p-2 rounded">
+                    <label class="block text-xs text-gray-800 font-semibold">Hasil Qty Utuhan</label>
+                    <div id="displayQtyUtuhan" class="font-bold text-lg text-gray-800">-</div>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end gap-2">
+                <button onclick="tutupModalRak()" class="px-4 py-2 bg-gray-300 rounded">Batal</button>
+                <button onclick="simpanRak()" class="px-4 py-2 bg-blue-600 text-white rounded">Simpan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Edit Keterangan -->
+    <div id="modalEditKet" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg w-96 shadow-xl">
+            <h3 class="text-lg font-bold mb-4">Edit Keterangan</h3>
+            <input type="text" id="inputKeterangan" class="w-full border p-2 rounded mb-4 uppercase" placeholder="Masukkan keterangan...">
+            <div class="flex justify-end">
+                <button onclick="document.getElementById('modalEditKet').classList.add('hidden')" class="mr-2 px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Batal</button>
+                <button onclick="simpanKeteranganManual()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Simpan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gunakan w-max agar lebar kotak otomatis menyesuaikan isi teks -->
+    <div id="popupLihatRak" class="hidden absolute z-50 bg-white border border-gray-400 shadow-xl rounded-lg p-3 text-xs w-max whitespace-nowrap">
+        <div id="popupContent"></div>
     </div>
 </div>
