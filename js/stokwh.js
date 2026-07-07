@@ -1393,18 +1393,19 @@ function renderSelisihWH3(allData) {
     });
 
     // --- RENDER HEADER ---
+    // Di dalam function renderSelisihWH3:
     thead.innerHTML = `
-        <th class="py-3 px-3 text-center whitespace-nowrap bg-slate-100">NO</th>
-        <th class="py-3 px-3 text-left whitespace-nowrap bg-slate-100 sticky left-0 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">KODE</th>` + 
+        <th class="py-3 px-3 text-center bg-slate-100 sticky top-0 left-0 z-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">NO</th>
+        <th class="py-3 px-3 text-left bg-slate-100 sticky top-0 left-[48px] z-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] whitespace-nowrap">KODE</th>` + 
         dates.map(d => {
             const dd = d.substring(6,8), mm = d.substring(4,6), yyyy = d.substring(0,4);
-            return `<th class="py-3 px-4 text-center whitespace-nowrap bg-slate-100">${dd}/${mm}/${yyyy}</th>`;
+            return `<th class="py-3 px-4 text-center bg-slate-100 sticky top-0 z-40 whitespace-nowrap">${dd}/${mm}/${yyyy}</th>`;
         }).join('');
 
     // --- RENDER BODY ---
     tbody.innerHTML = "";
     let no = 1;
-    
+        
     Array.from(kodeSelisih).sort((a, b) => {
         const scoreA1 = getSortScore(a), scoreB1 = getSortScore(b);
         if (scoreA1 !== scoreB1) return scoreA1 - scoreB1;
@@ -1412,9 +1413,13 @@ function renderSelisihWH3(allData) {
         if (scoreA2 !== scoreB2) return scoreA2 - scoreB2;
         return getAngkaAkhir(a) - getAngkaAkhir(b);
     }).forEach(kode => {
-        let rowHtml = `<tr class="hover:bg-gray-50 border-b">
-            <td class="py-2 px-3 text-center text-slate-600">${no++}</td>
-            <td class="py-2 px-3 font-bold text-slate-800 whitespace-nowrap sticky left-0 bg-white z-10 border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">${kode}</td>`;
+        let rowHtml = `<tr class="bg-white border-b hover:bg-gray-50">
+            <td class="py-2 px-3 text-center text-slate-600 sticky left-0 z-20 bg-white border-r">
+                ${no++}
+            </td>
+            <td class="py-2 px-3 font-bold text-slate-800 whitespace-nowrap sticky left-12 z-20 bg-white border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                ${kode}
+            </td>`;
         
         dates.forEach(tgl => {
             const val = dataMatriks[kode][tgl] || 0;
@@ -1448,7 +1453,7 @@ async function bukaModalInputRak(kode) {
     }
 
     // 2. Set UI Modal
-    document.getElementById('modalTitle').innerText = `Input Rak: ${kode}`;
+    document.getElementById('modalTitle').innerText = `Input Rak: ${kode} : ${item.selisih || 0} KRT/PKT`;
     
     const detail = item.detail_rak || {};
     document.getElementById('inputBeceran').value = item.beceran || "";
