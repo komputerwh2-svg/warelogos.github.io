@@ -299,7 +299,7 @@ function tutupmiuiAlert() {
 // Konfigurasi Keamanan Lokal
 const APP_CONFIG = {
     ADMIN_USER: "admin",
-    ADMIN_PASS: "adminwh2",
+    ADMIN_PASS: "admin",
     APLIKASI_KUNCI: ["APP_MASTER_DATA", "APP_REKAP_BLOK1"] // List ID aplikasi yang dikunci
 };
 
@@ -494,9 +494,10 @@ function bukaSubPageStokWH() {
     const subpage = document.getElementById('subpage-stokwh');
 
     // Panggil langsung setelah halaman WH2 terbuka
-    setTimeout(() => {
-        loadStokData();
-    }, 100); // delay 100ms agar UI selesai dirender
+    //setTimeout(() => {
+    //    loadStokData();
+    //    loadStokDatawh3();
+    //}, 100); // delay 100ms agar UI selesai dirender
 
     // Jika sudah pernah di-fetch, langsung buka
     if (subpage) {
@@ -520,8 +521,20 @@ function bukaSubPageStokWH() {
             script.onload = () => {
                 const elemenBaru = document.getElementById('subpage-stokwh');
                 if (elemenBaru) {
-                    void elemenBaru.offsetHeight; // Trigger reflow
+                    void elemenBaru.offsetHeight; 
                     elemenBaru.classList.remove('translate-x-full');
+                    
+                    // --- TAMBAHKAN PEMICU INI ---
+                    // Panggil fungsi inisialisasi utama yang kita buat tadi
+                    if (typeof window.initApp === 'function') {
+                        window.initApp(); 
+                    } else {
+                        // Jika belum membuat initApp, panggil manual satu per satu:
+                        console.log("Memulai inisialisasi dropdown...");
+                        if (typeof initDropdowns === 'function') initDropdowns('REKAP');
+                        if (typeof initDropdowns === 'function') initDropdowns('WH2');
+                        if (typeof initDropdownsWH3 === 'function') initDropdownsWH3();
+                    }
                 }
             };
             document.body.appendChild(script);

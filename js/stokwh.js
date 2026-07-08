@@ -5,24 +5,47 @@ if (!statusBar) {
     console.log("Status bar tidak ditemukan, mungkin Anda sedang di halaman lain?");
 }
 
+// URL Database Firebase
+const DB_FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
+
+// Fungsi untuk memperbarui status bar
+document.addEventListener('DOMContentLoaded', () => {
+    initApp();
+});
+
+async function initApp() {
+    console.log("Aplikasi dimuat, menginisialisasi dropdown...");
+    
+    // 1. Inisialisasi Rekap (Default saat buka aplikasi)
+    await initDropdownsRekap();
+    
+    // 2. Inisialisasi lainnya
+    await initDropdowns();
+    await initDropdownsWH3();
+    
+    console.log("Semua dropdown berhasil diinisialisasi.");
+}
+
 // Fungsi ganti switch mode Stok WH (REKAP, WH-2, WH-3, LEBIH) dengan efek geser slider
 window.gantiModulStokWH = function(mode) {
     const slider = document.getElementById('slider-content-stokwh');
     
-    // Logika pergeseran slider untuk 4 kolom (masing-masing 25%)
     if (mode === 'REKAP') {
         slider.style.transform = 'translateX(0%)';
+        // Panggil inisialisasi REKAP yang baru kita buat
+        if (typeof initDropdownsRekap === 'function') {
+            initDropdownsRekap();
+        }
     } else if (mode === 'WH2') {
         slider.style.transform = 'translateX(-25%)';
-        // Panggil hanya saat user pindah ke tab WH2
-        // initDropdowns sudah memiliki proteksi 'isDropdownInitialized' 
-        // sehingga ini hanya akan berjalan 1 kali saja.
+        // Kirim parameter 'WH2'
         if (typeof initDropdowns === 'function') {
             initDropdowns();
         }
     } else if (mode === 'WH3') {
         slider.style.transform = 'translateX(-50%)';
-        if (typeof initDropdowns === 'function') {
+        // Jika Anda punya fungsi khusus WH3
+        if (typeof initDropdownsWH3 === 'function') {
             initDropdownsWH3();
         }
     } else if (mode === 'LEBIH') {
@@ -33,11 +56,10 @@ window.gantiModulStokWH = function(mode) {
 };
 
 // Fungsi untuk memformat tanggal ke (Hari, dd MMMM yyyy)
-function updateDisplayTanggal(tanggalString, isDataKosong = false) {
-    const displayEl = document.getElementById('display-tanggal-wh2');
+function updateDisplayTanggal(tanggalString, isDataKosong = false, elementId = 'display-tanggal-wh2') {
+    const displayEl = document.getElementById(elementId);
     if (!displayEl) return;
 
-    // Jika dipanggil dengan status data kosong
     if (isDataKosong) {
         displayEl.innerText = "BELUM ADA DATA STOK";
         return;
@@ -49,25 +71,19 @@ function updateDisplayTanggal(tanggalString, isDataKosong = false) {
     }
 
     let date;
-
-    // 1. Cek format YYYY-MM-DD
+    // Logika parsing tetap sama
     if (tanggalString.includes('-')) {
         const [year, month, day] = tanggalString.split('-').map(Number);
         date = new Date(year, month - 1, day);
-    } 
-    // 2. Cek format DD/MM/YYYY
-    else if (tanggalString.includes('/')) {
+    } else if (tanggalString.includes('/')) {
         const [day, month, year] = tanggalString.split('/').map(Number);
         date = new Date(year, month - 1, day);
-    }
-    // 3. Cek format YYYYMMDD
-    else if (tanggalString.length === 8 && !isNaN(tanggalString)) {
+    } else if (tanggalString.length === 8 && !isNaN(tanggalString)) {
         const year = parseInt(tanggalString.substring(0, 4));
         const month = parseInt(tanggalString.substring(4, 6)) - 1;
         const day = parseInt(tanggalString.substring(6, 8));
         date = new Date(year, month, day);
-    } 
-    else {
+    } else {
         displayEl.innerText = "TANGGAL TIDAK VALID";
         return;
     }
@@ -77,15 +93,8 @@ function updateDisplayTanggal(tanggalString, isDataKosong = false) {
         return;
     }
 
-    const options = { 
-        weekday: 'long', 
-        day: 'numeric', 
-        month: 'long', 
-        year: 'numeric' 
-    };
-    
-    const formattedDate = date.toLocaleDateString('id-ID', options);
-    displayEl.innerText = formattedDate.toUpperCase();
+    const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+    displayEl.innerText = date.toLocaleDateString('id-ID', options).toUpperCase();
 }
 
 // Fungsi untuk memformat tanggal ke (Hari, dd MMMM yyyy) untuk WH-3
@@ -144,9 +153,101 @@ function updateDisplayTanggalWH3(tanggalString, isDataKosong = false) {
     displayEl.innerText = formattedDate.toUpperCase();
 }
 
+// Status inisialisasi terpisah untuk REKAP
+let isRekapInitialized = false;
+
+// 1. Fungsi Utama: Ambil dan Update Tanggal (REKAP)
+async function updateTanggalDropdownRekap() {
+    // 1. Ambil mode aktif dari UI (misalnya dari tombol radio yang aktif)
+    const modeAktif = document.querySelector('input[name="rb-mode-rekap"]:checked')?.value || 'WH2_SEBELUM';
+    
+    const selPeriode = document.getElementById('select-periode-rekap');
+    const selTanggal = document.getElementById('select-tanggal-rekap');
+    
+    if (!selPeriode || !selTanggal) return;
+
+    // 2. Tentukan URL dan Prefix berdasarkan mode
+    let dbUrl, prefix;
+    if (modeAktif === 'WH2_SEBELUM' || modeAktif === 'WH2_SESUDAH') {
+        dbUrl = `${DB_FIREBASE_URL}stok_wh2.json`;
+        prefix = 'stokwh2wms_';
+    } else {
+        dbUrl = `${DB_FIREBASE_URL}stok_wh3.json`;
+        prefix = 'stokwh3_';
+    }
+
+    if (!selPeriode.value) {
+        selTanggal.innerHTML = '<option value="">Pilih Tanggal</option>';
+        return;
+    }
+
+    selTanggal.innerHTML = '<option value="">Memuat...</option>';
+
+    try {
+        const response = await fetch(dbUrl);
+        const allData = await response.json();
+        
+        if (!allData) {
+            handleDataKosongRekap(false);
+            return;
+        }
+
+        const [targetTahun, targetBulan] = selPeriode.value.split('-').map(Number);
+        let availableDates = [];
+
+        Object.keys(allData).forEach(key => {
+            if (key.includes(prefix)) {
+                const rawDate = key.split('_')[1]; 
+                const tahun = parseInt(rawDate.substring(0, 4));
+                const bulan = parseInt(rawDate.substring(4, 6)) - 1;
+                const hari = rawDate.substring(6, 8);
+
+                if (tahun === targetTahun && bulan === targetBulan) {
+                    availableDates.push({
+                        val: rawDate, 
+                        label: `${hari}/${rawDate.substring(4, 6)}/${tahun}`
+                    });
+                }
+            }
+        });
+
+        availableDates.sort((a, b) => b.val.localeCompare(a.val));
+
+        selTanggal.innerHTML = '<option value="">Pilih Tanggal</option>';
+        availableDates.forEach(date => {
+            selTanggal.add(new Option(date.label, date.val));
+        });
+
+        if (availableDates.length > 0) {
+            selTanggal.value = availableDates[0].val;
+            triggerUpdateTampilanRekap(selTanggal.value);
+        } else {
+            handleDataKosongRekap(false);
+        }
+    } catch (e) {
+        console.error("Gagal sinkronisasi tanggal (REKAP):", e);
+        selTanggal.innerHTML = '<option value="">Gagal Memuat</option>';
+    }
+}
+
+// 2. Fungsi Pemicu Terpadu (REKAP)
+async function triggerUpdateTampilanRekap(val) {
+    // Update Display Tanggal khusus REKAP
+    if (typeof window.updateDisplayTanggal === 'function') {
+        window.updateDisplayTanggal(val, false, 'display-tanggal-rekap'); 
+    }
+
+    // Load Data khusus REKAP
+    if (typeof window.loadDataRekap === 'function') {
+        await window.loadDataRekap();
+    }
+}
+
+
 let isDropdownInitialized = false;
 
 // 1. Fungsi Utama: Ambil dan Update Tanggal
+// Khusus untuk WH-2
 async function updateTanggalDropdown() {
     const selPeriode = document.getElementById('select-periode-wh2');
     const selTanggal = document.getElementById('select-tanggal-wh2');
@@ -155,7 +256,7 @@ async function updateTanggalDropdown() {
 
     if (!selPeriode.value) {
         selTanggal.innerHTML = '<option value="">Pilih Tanggal</option>';
-        handleDataKosong(true); // true = reset tampilan ke default
+        handleDataKosong(true); 
         return;
     }
 
@@ -210,9 +311,12 @@ async function updateTanggalDropdown() {
 
 // 2. Fungsi Pemicu Terpadu
 async function triggerUpdateTampilan(val) {
+    // 1. Update Display Tanggal khusus untuk WH2
     if (typeof window.updateDisplayTanggal === 'function') {
-        window.updateDisplayTanggal(val, false); // false = data ditemukan
+        window.updateDisplayTanggal(val, false, 'display-tanggal-wh2'); 
     }
+
+    // 2. Load Data khusus untuk WH2
     if (typeof window.loadStokData === 'function') {
         await window.loadStokData();
     }
@@ -294,17 +398,31 @@ async function triggerUpdateTampilanWH3(val) {
     }
 }
 
-// 3. Helper untuk Data Kosong
-function handleDataKosong(isReset) {
-    const selTanggal = document.getElementById('select-tanggal-wh2');
+// 3. Helper untuk Data Kosong (Versi Dinamis)
+function handleDataKosong(isReset, modul = 'WH2') {
+    // 1. Tentukan ID elemen berdasarkan modul
+    const idTanggal = (modul === 'REKAP') ? 'select-tanggal-rekap' : 
+                      (modul === 'WH3') ? 'select-tanggal-wh3' : 'select-tanggal-wh2';
+    const displayId = (modul === 'REKAP') ? 'display-tanggal-rekap' : 
+                      (modul === 'WH3') ? 'display-tanggal-wh3' : 'display-tanggal-wh2';
+    
+    const selTanggal = document.getElementById(idTanggal);
+    if (!selTanggal) return;
+
+    // 2. Reset atau set status data kosong
     selTanggal.innerHTML = '<option value="">Data Kosong</option>';
     
-    // Update label display ke "BELUM ADA DATA STOK"
+    // 3. Update label display dengan ID yang dinamis
     if (typeof window.updateDisplayTanggal === 'function') {
-        window.updateDisplayTanggal('', true); // true = tampilkan status kosong
+        window.updateDisplayTanggal('', true, displayId); 
     }
-    // Update tabel
-    if (typeof window.tampilkanKosong === 'function') {
+    
+    // 4. Update tabel (Tentukan fungsi tabel sesuai modul)
+    if (modul === 'REKAP' && typeof window.tampilkanKosongRekap === 'function') {
+        window.tampilkanKosongRekap('');
+    } else if (modul === 'WH3' && typeof window.tampilkanKosongWH3 === 'function') {
+        window.tampilkanKosongWH3('');
+    } else if (typeof window.tampilkanKosong === 'function') {
         window.tampilkanKosong('');
     }
 }
@@ -327,15 +445,17 @@ function handleDataKosongWH3(isReset) {
     }
 }
 
-// 2. Fungsi init yang memanggil fungsi di atas
-async function initDropdowns() {
-    //if (isDropdownInitialized) return;
+
+// 1. Fungsi Utama: Inisialisasi Dropdown REKAP
+async function initDropdownsRekap() {
+    console.log("Inisialisasi Dropdown REKAP...");
     
-    const selPeriode = document.getElementById('select-periode-wh2');
-    const selTanggal = document.getElementById('select-tanggal-wh2');
+    const selPeriode = document.getElementById('select-periode-rekap');
+    const selTanggal = document.getElementById('select-tanggal-rekap');
     
     if (!selPeriode || !selTanggal) return;
 
+    // Isi Periode (12 Bulan terakhir)
     const now = new Date();
     selPeriode.innerHTML = '<option value="">Pilih Periode</option>';
     
@@ -348,27 +468,69 @@ async function initDropdowns() {
 
     selPeriode.value = `${now.getFullYear()}-${now.getMonth()}`;
 
-    // Pasang Event Listeners
-    selPeriode.removeEventListener('change', updateTanggalDropdown);
-    selPeriode.addEventListener('change', updateTanggalDropdown);
+    // Event Listeners: saat ganti periode, update dropdown tanggal
+    selPeriode.onchange = () => updateTanggalDropdownRekap();
     
-    selTanggal.removeEventListener('change', triggerUpdateTampilan); // Gunakan fungsi trigger
-    selTanggal.addEventListener('change', (e) => {
+    // Event Listeners: saat ganti tanggal, muat data tabel
+    selTanggal.onchange = (e) => {
+        if (e.target.value) {
+            triggerUpdateTampilanRekap(e.target.value);
+        } else {
+            handleDataKosongRekap(false);
+        }
+    };
+
+    // Eksekusi pertama kali
+    await updateTanggalDropdownRekap();
+}
+
+// 2. Fungsi Pemicu saat tombol mode diganti
+async function gantiModeRekap(modeValue) {
+    console.log("Mode REKAP berubah ke:", modeValue);
+    // Refresh dropdown tanggal karena prefix-nya mungkin berubah (WH2 vs WH3)
+    await updateTanggalDropdownRekap();
+}
+
+// 2. Fungsi init yang memanggil fungsi di atas
+async function initDropdowns() {
+    console.log("Inisialisasi Dropdown WH2..."); 
+    
+    // 1. Identifikasi elemen WH2
+    const selPeriode = document.getElementById('select-periode-wh2');
+    const selTanggal = document.getElementById('select-tanggal-wh2');
+    
+    if (!selPeriode || !selTanggal) {
+        console.error("Dropdown WH2 tidak ditemukan!");
+        return;
+    }
+
+    // 2. Isi Periode
+    const now = new Date();
+    selPeriode.innerHTML = '<option value="">Pilih Periode</option>';
+    
+    for (let i = 0; i < 12; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const value = `${d.getFullYear()}-${d.getMonth()}`;
+        const label = d.toLocaleDateString('id-ID', { month: 'short', year: 'numeric' }).toUpperCase();
+        selPeriode.add(new Option(label, value));
+    }
+
+    selPeriode.value = `${now.getFullYear()}-${now.getMonth()}`;
+
+    // 3. Pasang Event Listeners (Khusus WH2)
+    selPeriode.onchange = () => updateTanggalDropdown();
+    
+    selTanggal.onchange = (e) => {
         if (e.target.value) {
             triggerUpdateTampilan(e.target.value);
         } else {
             handleDataKosong(false);
         }
-    });
+    };
 
-    // EKSEKUSI PERTAMA
-    isDropdownInitialized = true;
+    // 4. EKSEKUSI PERTAMA
     await updateTanggalDropdown();
 }
-
-// 3. Panggil saat DOM benar-benar siap
-document.addEventListener('DOMContentLoaded', initDropdowns);
-
 
 
 // 2. Fungsi init yang memanggil fungsi di atas untuk WH-3
@@ -411,10 +573,6 @@ async function initDropdownsWH3() {
     isDropdownInitializedWH3 = true;
     await updateTanggalDropdownWH3();
 }
-
-// 3. Panggil saat DOM benar-benar siap
-document.addEventListener('DOMContentLoaded', initDropdownsWH3);
-
 
 // FUNGSI UNTUK MEMBUKA MODAL UPLOAD
 function bukaModalUploadWH2() {
@@ -471,8 +629,6 @@ if (fileInputWh3) {
         });
     });
 }
-
-const DB_FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
 
 async function prosesUploadWH2() {
     console.log("Tombol upload ditekan!"); 
@@ -880,25 +1036,38 @@ async function gantiModeWH3(mode) {
 }
 
 // Helper untuk pesan kosong
-function tampilkanKosong(infoTambahan = '') {
-    const selPeriode = document.getElementById('select-periode-wh2');
+function tampilkanKosong(infoTambahan = '', modul = 'WH2') {
+    // 1. Tentukan target ID berdasarkan modul
+    const idPeriode = (modul === 'REKAP') ? 'select-periode-rekap' : 
+                      (modul === 'WH3') ? 'select-periode-wh3' : 'select-periode-wh2';
+    const idTbody = (modul === 'REKAP') ? 'tabel-body-rekap' : 
+                    (modul === 'WH3') ? 'tabel-body-selisih-wh3' : 'tabel-body-wh2';
+    
+    // 2. Tentukan jumlah kolom (colspan) agar rapi
+    const colspan = (modul === 'WH3') ? 10 : 6; // Sesuaikan dengan jumlah kolom tiap tabel
+
+    const selPeriode = document.getElementById(idPeriode);
+    const tbody = document.getElementById(idTbody);
+    
+    if (!tbody) return;
+
     let displayInfo = 'di periode ini';
 
-    // Jika ada elemen periode, ambil label dari option yang terpilih
+    // 3. Ambil label periode
     if (selPeriode && selPeriode.options[selPeriode.selectedIndex]) {
         const labelPeriode = selPeriode.options[selPeriode.selectedIndex].text;
         displayInfo = `untuk periode ${labelPeriode}`;
     }
 
-    // Jika infoTambahan disediakan (misal: "di bulan ini"), gabungkan
     if (infoTambahan) {
         displayInfo = `${infoTambahan} ${displayInfo.replace('di periode ini', '')}`;
     }
 
-    const tbody = document.getElementById('tabel-body-wh2');
+    // 4. Update Tampilan
     tbody.innerHTML = `
         <tr>
-            <td colspan="6" class="text-center py-10 text-slate-800">
+            <td colspan="${colspan}" class="text-center py-10 text-slate-800 font-bold">
+                <i class="fa-solid fa-box-open mr-2 text-slate-400"></i>
                 Belum ada data stok ${displayInfo}
             </td>
         </tr>`;
@@ -926,6 +1095,63 @@ function tampilkanKosongwh3(infoTambahan = '') {
                 Belum ada data stok ${displayInfo}
             </td>
         </tr>`;
+}
+
+
+async function loadDataRekap() {
+    const dateInput = document.getElementById('select-tanggal-rekap');
+    const tanggal = dateInput ? dateInput.value : null;
+
+    if (!tanggal) return;
+
+    // 1. Ambil mode dari RADIO BUTTON yang aktif
+    const radioAktif = document.querySelector('input[name="rb-mode-rekap"]:checked');
+    const mode = radioAktif ? radioAktif.value : "WH2_SEBELUM";
+    
+    console.log("Memuat data rekap mode:", mode, "untuk tanggal:", tanggal);
+
+    const formattedDate = tanggal.replace(/-/g, '');
+    
+    // 2. Tentukan target Firebase berdasarkan mode
+    // WH-2 Group vs WH-3 Group
+    const isWH2Mode = ['WH2_SEBELUM', 'WH2_SESUDAH', 'BARANG_LEBIH'].includes(mode);
+    const dbUrl = isWH2Mode ? `${DB_FIREBASE_URL}stok_wh2.json` : `${DB_FIREBASE_URL}stok_wh3.json`;
+    const prefix = isWH2Mode ? `stokwh2wms_${formattedDate}` : `stokwh3_${formattedDate}`;
+
+    try {
+        const response = await fetch(dbUrl);
+        const allData = await response.json();
+        
+        if (!allData) {
+            tampilkanKosongRekap(tanggal);
+            return;
+        }
+
+        const key = Object.keys(allData).find(k => k.includes(prefix));
+        if (!key) {
+            tampilkanKosongRekap(tanggal);
+            return;
+        }
+
+        // Jalankan render sesuai mode yang dipilih
+        switch(mode) {
+            case 'WH2_SEBELUM':
+            case 'WH2_SESUDAH':
+                renderTabelRekapWH2(allData[key], mode === 'WH2_SESUDAH' ? 'SESUDAH' : 'SEBELUM', key);
+                break;
+            case 'STOK_WH3':
+                renderTabelRekapWH3(allData[key], 'STOK WH-3', key);
+                break;
+            case 'SELISIH_WH3':
+                renderSelisihWH3(allData); // Menggunakan seluruh data untuk selisih per tanggal
+                break;
+            case 'BARANG_LEBIH':
+                renderTabelBarangLebih(allData[key], 'BARANG LEBIH', key);
+                break;
+        }
+    } catch (error) {
+        console.error("Gagal load data rekap:", error);
+    }
 }
 
 
@@ -1008,6 +1234,61 @@ async function loadStokDatawh3() {
     } catch (error) {
         console.error("Gagal load data:", error);
     }
+}
+
+
+
+function renderTabelRekap(dataStok, mode, key) {
+    const tbody = document.getElementById('tabel-body-rekap');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    // Jika mode adalah SELISIH_WH3, arahkan ke fungsi khusus yang Anda miliki
+    if (mode === 'SELISIH_WH3') {
+        renderSelisihWH3(window.currentStokData);
+        return;
+    }
+
+    let no = 1;
+    let totalBosnet = 0;
+    let totalWms = 0;
+
+    Object.entries(dataStok).forEach(([kode, item]) => {
+        let bosnet = 0, wms = 0;
+
+        // Penentuan data berdasarkan mode aktif
+        if (mode === 'WH2_SEBELUM') {
+            bosnet = parseInt(item.stokwh2_sebelum) || 0;
+            wms = parseInt(item.stokwms_sebelum) || 0;
+        } else if (mode === 'WH2_SESUDAH') {
+            bosnet = parseInt(item.stokwh2_sesudah) || 0;
+            wms = parseInt(item.stokwms_sesudah) || 0;
+        } else if (mode === 'STOK_WH3') {
+            bosnet = parseInt(item.bosnet) || 0;
+            wms = (parseInt(item.blok) || 0) + (parseInt(item.beceran) || 0) + (parseInt(item.utuhan) || 0);
+        } else if (mode === 'BARANG_LEBIH') {
+            bosnet = parseInt(item.stok_lebih) || 0;
+            wms = parseInt(item.stok_tersedia) || 0;
+        }
+
+        const selisih = bosnet - wms;
+        totalBosnet += bosnet;
+        totalWms += wms;
+
+        const displaySelisih = (selisih === 0) ? "-" : selisih.toLocaleString();
+        const warnaSelisih = selisih > 0 ? "text-blue-600 font-bold" : (selisih < 0 ? "text-red-600 font-bold" : "text-green-600");
+
+        tbody.innerHTML += `
+            <tr class="hover:bg-gray-50 border-b text-[15px]">
+                <td class="py-2 px-3">${no++}</td>
+                <td class="py-2 px-3 font-bold">${kode}</td>
+                <td class="py-2 px-3">${bosnet.toLocaleString()}</td>
+                <td class="py-2 px-3">${wms.toLocaleString()}</td>
+                <td class="py-2 px-3 ${warnaSelisih}">${displaySelisih}</td>
+                <td class="py-2 px-3">${item.keterangan || '-'}</td>
+            </tr>
+        `;
+    });
 }
 
 function renderTabel(dataStok, mode, key) {
@@ -1417,8 +1698,8 @@ async function renderSelisihWH3(allData) {
 
     // --- RENDER HEADER ---
     thead.innerHTML = `
-        <th class="py-3 px-3 text-center bg-slate-100 sticky top-0 left-0 z-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">NO</th>
-        <th class="py-3 px-3 text-left bg-slate-100 sticky top-0 left-[48px] z-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] whitespace-nowrap">KODE</th>` + 
+        <th class="sticky-col py-3 px-3 text-center bg-slate-100 top-0 z-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">NO</th>
+        <th class="sticky-col-kode py-3 px-3 text-left bg-slate-100 top-0 z-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] whitespace-nowrap">KODE</th>` + 
         dates.map(d => {
             const dd = d.substring(6,8), mm = d.substring(4,6), yy = d.substring(2,4);
             return `<th class="py-3 px-4 text-center bg-slate-100 sticky top-0 z-40 whitespace-nowrap">${dd}/${mm}/${yy}</th>`;
@@ -1427,6 +1708,7 @@ async function renderSelisihWH3(allData) {
     // --- RENDER BODY ---
     tbody.innerHTML = "";
     let no = 1;
+
     Array.from(kodeSelisih).sort((a, b) => {
         const scoreA1 = getSortScore(a), scoreB1 = getSortScore(b);
         if (scoreA1 !== scoreB1) return scoreA1 - scoreB1;
@@ -1435,8 +1717,9 @@ async function renderSelisihWH3(allData) {
         return getAngkaAkhir(a) - getAngkaAkhir(b);
     }).forEach(kode => {
         let rowHtml = `<tr class="bg-white border-b hover:bg-gray-50">
-            <td class="py-2 px-3 text-center text-slate-600 sticky left-0 z-20 bg-white border-r">${no++}</td>
-            <td class="py-2 px-3 font-bold text-slate-800 whitespace-nowrap sticky left-12 z-20 bg-white border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">${kode}</td>`;
+            <td class="sticky-col py-2 px-3 text-center text-slate-600 bg-white border-r">${no++}</td>
+            <td class="sticky-col-kode py-2 px-3 font-bold text-slate-800 whitespace-nowrap bg-white border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">${kode}</td>`;
+        
         dates.forEach(tgl => {
             const val = dataMatriks[kode][tgl] || 0;
             const warna = val > 0 ? "text-blue-600" : (val < 0 ? "text-red-600" : "text-gray-300");
@@ -1446,19 +1729,18 @@ async function renderSelisihWH3(allData) {
     });
 
     // --- RENDER TOTAL SELISIH GLOBAL ---
-    // Baris ini akan menghitung total dari seluruh selisih per tanggal
     let totalGlobalRow = `<tr class="bg-orange-100 border-t-2 border-orange-500 font-black">
-        <td class="py-2 px-3 text-right text-[20px] sticky left-0 z-20 bg-orange-100 text-red-600 border-r" colspan="2">TOTAL SELISIH :</td>`;
+        <td class="sticky-col-total py-2 px-3 text-right text-[20px] bg-orange-100 text-red-600 border-r" colspan="2">TOTAL SELISIH :</td>`;
     dates.forEach(tgl => {
         const grandTotal = totalPerTgl[tgl] || 0;
         totalGlobalRow += `<td class="py-2 px-4 text-[20px] text-center ${grandTotal !== 0 ? 'text-red-600' : 'text-gray-400'}">${grandTotal === 0 ? "-" : grandTotal}</td>`;
     });
     tbody.innerHTML += totalGlobalRow + `</tr>`;
 
-    // --- RENDER REKAP KELOMPOK (Tampilan disamakan) ---
+    // --- RENDER REKAP KELOMPOK ---
     daftarKelompok.forEach(kel => {
         let kelRow = `<tr class="bg-gray-100 border-b hover:bg-gray-200 font-bold text-slate-700">
-            <td class="py-2 px-3 text-right text-[14px] sticky left-0 z-20 bg-gray-100 border-r" colspan="2">SELISIH ${kel} :</td>`;
+            <td class="sticky-col-total py-2 px-3 text-right text-[14px] bg-gray-100 border-r" colspan="2">SELISIH ${kel} :</td>`;
         dates.forEach(tgl => {
             const val = rekapKelompok[kel] ? (rekapKelompok[kel][tgl] || 0) : 0;
             const warna = val !== 0 ? "text-gray-800" : "text-gray-400";
