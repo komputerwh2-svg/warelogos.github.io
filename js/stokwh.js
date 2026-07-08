@@ -704,30 +704,36 @@ async function eksekusiUploadWH3(fileBosnet, url, isUpdate) {
             const kode = row[1] ? String(row[1]).trim().toUpperCase() : null; 
             if (!kode || kode === "PRODUK") return;
 
-            const nama = row[2] || ""; 
-            const bosnet = parseInt(row[9]) || 0; 
-            const rawData = row[9] ? String(row[9]) : "0/0/0/0"; 
-            if (rawData === "0/0/0/0") return;
+            const rawBosnetValue = row[9] ? String(row[9]).trim() : "0/0/0/0";
+            const parts = rawBosnetValue.split('/').map(p => parseInt(p) || 0);
 
-            // Membentuk format Ball | Rtg
-            const parts = rawData.split('/').map(p => parseInt(p) || 0);
+            const bosnet = parts[0] || 0;
             const ball = parts[1] || 0;
             const rtg = parts[2] || 0;
-            const formattedPak = `${ball > 0 ? ball : "-"} | ${rtg > 0 ? rtg : "-"}`;
 
+            // FILTER YANG DIPERBAIKI:
+            // Baris hanya akan di-skip jika semua komponen stok bernilai 0
+            if (bosnet === 0 && ball === 0 && rtg === 0) return;
+
+            const nama = row[2] || ""; 
+            const formattedPak = `${ball > 0 ? ball : "-"} | ${rtg > 0 ? rtg : "-"}`;
             const dataLamaItem = dataLama[kode] || {};
 
-            // 3. Logika: Ambil blok dari agregat baru, ambil fisik dari data lama
+            const blok = agregatBlok[kode] || 0;
+            const beceran = dataLamaItem.beceran || 0;
+            const utuhan = dataLamaItem.utuhan || 0;
+            const totalFisik = blok + beceran + utuhan;
+
             stokAudit[kode] = {
                 kode: kode,
                 nama: nama,
                 bosnet: bosnet,
                 pak_format: formattedPak,
-                blok: agregatBlok[kode] || 0,
-                beceran: dataLamaItem.beceran || 0, 
-                utuhan: dataLamaItem.utuhan || 0,  
-                total: (agregatBlok[kode] || 0) + (dataLamaItem.beceran || 0) + (dataLamaItem.utuhan || 0),
-                selisih: ((agregatBlok[kode] || 0) + (dataLamaItem.beceran || 0) + (dataLamaItem.utuhan || 0)) - bosnet,
+                blok: blok,
+                beceran: beceran, 
+                utuhan: utuhan,  
+                total: totalFisik,
+                selisih: totalFisik - bosnet,
                 keterangan: dataLamaItem.keterangan || "BELUM DIHITUNG",
                 detail_rak: dataLamaItem.detail_rak || { beceran_rak: "", utuhan_rak: "" }
             };
@@ -740,7 +746,7 @@ async function eksekusiUploadWH3(fileBosnet, url, isUpdate) {
             body: JSON.stringify(stokAudit)
         });
 
-        miuiAlert("Upload sukses: Stok Blok telah dikunci ke tanggal ini");
+        miuiAlert("Data WH-3 berhasil disimpan!");
         tutupModalUploadWH3();
         resetFileInputwh3();
         isDropdownInitializedWH3 = false; 
@@ -1207,8 +1213,8 @@ async function renderTabelwh3(dataStok, mode, key) {
         const beceran = parseInt(item.beceran) || 0;
         const utuhan = parseInt(item.utuhan) || 0;
         
-        // Logika Fisik yang sama dengan di dalam loop tabel
-        let fisik = kode.includes("PR-PKT") ? utuhan : (blok + beceran + utuhan);
+        // PERBAIKAN: Sertakan beceran + utuhan untuk PR-PKT
+        let fisik = kode.includes("PR-PKT") ? (beceran + utuhan) : (blok + beceran + utuhan);
         totalSelisih += (fisik - bosnet);
     });
 
@@ -1238,7 +1244,7 @@ async function renderTabelwh3(dataStok, mode, key) {
         if (!((blok !== 0 || bosnet !== 0 || beceran !== 0 || utuhan !== 0) || pak !== "-")) return;
 
         // Logika Fisik (Sama untuk hitung total dan baris)
-        let totalFisik = kode.includes("PR-PKT") ? utuhan : (blok + beceran + utuhan);
+        let totalFisik = kode.includes("PR-PKT") ? (beceran + utuhan) : (blok + beceran + utuhan);
         const selisih = totalFisik - bosnet;
         
         let kelasWarnaSelisih = selisih > 0 ? "text-blue-600 font-bold" : (selisih < 0 ? "text-red-600 font-bold" : "text-green-600 font-bold");
@@ -1333,13 +1339,15 @@ function renderRakWH3(dataStok) {
     });
 }
 
-function renderSelisihWH3(allData) {
+async function renderSelisihWH3(allData) {
     const thead = document.getElementById('thead-selisih-wh3');
     const tbody = document.getElementById('tabel-body-selisih-wh3');
     if (!thead || !tbody) return;
 
-    // --- FUNGSI SORTIR ---
+    // --- FUNGSI SORTIR & KONFIGURASI ---
     const polaUtama = ["CRR", "CRR EA", "THR EA", "THR", "MRMR", "MRR", "MJR HJ", "MJR", "MOB4A", "MOR2A EA", "MOR2A EB", "MOR2A", "MP", "PDR", "MTR3A", "PR-PKT", "PR-CUP", "MRSR", "LTGR", "MTGR", "MEB", "MOL", "MRL", "MTL", "ISEL"];
+    const daftarKelompok = ["CRR", "MRR", "MOR", "MJR", "MP", "PDR"]; // Kelompok untuk rekap
+
     const getSortScore = (kode) => {
         kode = kode.toUpperCase();
         for (let i = 0; i < polaUtama.length; i++) {
@@ -1376,36 +1384,49 @@ function renderSelisihWH3(allData) {
         .sort();
 
     let kodeSelisih = new Set();
-    let dataMatriks = {}; 
-
+    let dataMatriks = {};
+    let totalPerTgl = {};
+    let rekapKelompok = {};
+    
     dates.forEach(tgl => {
+        totalPerTgl[tgl] = 0;
         const dailyData = allData[`stokwh3_${tgl}`] || {};
         Object.entries(dailyData).forEach(([kode, item]) => {
             const bosnet = parseInt(item.bosnet) || 0;
-            const fisik = kode.includes("PR-PKT") ? (parseInt(item.utuhan)||0) : ((parseInt(item.blok)||0) + (parseInt(item.beceran)||0) + (parseInt(item.utuhan)||0));
+            const blok = parseInt(item.blok) || 0;
+            const beceran = parseInt(item.beceran) || 0;
+            const utuhan = parseInt(item.utuhan) || 0;
+            const fisik = kode.includes("PR-PKT") ? (beceran + utuhan) : (blok + beceran + utuhan);
             const selisih = fisik - bosnet;
+            
             if (selisih !== 0) {
                 kodeSelisih.add(kode);
                 if (!dataMatriks[kode]) dataMatriks[kode] = {};
                 dataMatriks[kode][tgl] = selisih;
+
+                // Akumulasi Total
+                totalPerTgl[tgl] += selisih;
+
+                // Akumulasi Rekap Kelompok
+                const prefix = daftarKelompok.find(k => kode.toUpperCase().startsWith(k)) || "LAIN";
+                if (!rekapKelompok[prefix]) rekapKelompok[prefix] = {};
+                rekapKelompok[prefix][tgl] = (rekapKelompok[prefix][tgl] || 0) + selisih;
             }
         });
     });
 
     // --- RENDER HEADER ---
-    // Di dalam function renderSelisihWH3:
     thead.innerHTML = `
         <th class="py-3 px-3 text-center bg-slate-100 sticky top-0 left-0 z-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">NO</th>
         <th class="py-3 px-3 text-left bg-slate-100 sticky top-0 left-[48px] z-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] whitespace-nowrap">KODE</th>` + 
         dates.map(d => {
-            const dd = d.substring(6,8), mm = d.substring(4,6), yyyy = d.substring(0,4);
-            return `<th class="py-3 px-4 text-center bg-slate-100 sticky top-0 z-40 whitespace-nowrap">${dd}/${mm}/${yyyy}</th>`;
+            const dd = d.substring(6,8), mm = d.substring(4,6), yy = d.substring(2,4);
+            return `<th class="py-3 px-4 text-center bg-slate-100 sticky top-0 z-40 whitespace-nowrap">${dd}/${mm}/${yy}</th>`;
         }).join('');
 
     // --- RENDER BODY ---
     tbody.innerHTML = "";
     let no = 1;
-        
     Array.from(kodeSelisih).sort((a, b) => {
         const scoreA1 = getSortScore(a), scoreB1 = getSortScore(b);
         if (scoreA1 !== scoreB1) return scoreA1 - scoreB1;
@@ -1414,20 +1435,36 @@ function renderSelisihWH3(allData) {
         return getAngkaAkhir(a) - getAngkaAkhir(b);
     }).forEach(kode => {
         let rowHtml = `<tr class="bg-white border-b hover:bg-gray-50">
-            <td class="py-2 px-3 text-center text-slate-600 sticky left-0 z-20 bg-white border-r">
-                ${no++}
-            </td>
-            <td class="py-2 px-3 font-bold text-slate-800 whitespace-nowrap sticky left-12 z-20 bg-white border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
-                ${kode}
-            </td>`;
-        
+            <td class="py-2 px-3 text-center text-slate-600 sticky left-0 z-20 bg-white border-r">${no++}</td>
+            <td class="py-2 px-3 font-bold text-slate-800 whitespace-nowrap sticky left-12 z-20 bg-white border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">${kode}</td>`;
         dates.forEach(tgl => {
             const val = dataMatriks[kode][tgl] || 0;
             const warna = val > 0 ? "text-blue-600" : (val < 0 ? "text-red-600" : "text-gray-300");
             rowHtml += `<td class="py-2 px-4 text-center font-bold ${warna} whitespace-nowrap">${val === 0 ? "-" : val}</td>`;
         });
-        
         tbody.innerHTML += rowHtml + `</tr>`;
+    });
+
+    // --- RENDER TOTAL SELISIH GLOBAL ---
+    // Baris ini akan menghitung total dari seluruh selisih per tanggal
+    let totalGlobalRow = `<tr class="bg-orange-100 border-t-2 border-orange-500 font-black">
+        <td class="py-2 px-3 text-right text-[20px] sticky left-0 z-20 bg-orange-100 text-red-600 border-r" colspan="2">TOTAL SELISIH :</td>`;
+    dates.forEach(tgl => {
+        const grandTotal = totalPerTgl[tgl] || 0;
+        totalGlobalRow += `<td class="py-2 px-4 text-[20px] text-center ${grandTotal !== 0 ? 'text-red-600' : 'text-gray-400'}">${grandTotal === 0 ? "-" : grandTotal}</td>`;
+    });
+    tbody.innerHTML += totalGlobalRow + `</tr>`;
+
+    // --- RENDER REKAP KELOMPOK (Tampilan disamakan) ---
+    daftarKelompok.forEach(kel => {
+        let kelRow = `<tr class="bg-gray-100 border-b hover:bg-gray-200 font-bold text-slate-700">
+            <td class="py-2 px-3 text-right text-[14px] sticky left-0 z-20 bg-gray-100 border-r" colspan="2">SELISIH ${kel} :</td>`;
+        dates.forEach(tgl => {
+            const val = rekapKelompok[kel] ? (rekapKelompok[kel][tgl] || 0) : 0;
+            const warna = val !== 0 ? "text-gray-800" : "text-gray-400";
+            kelRow += `<td class="py-2 px-4 text-center ${warna}">${val === 0 ? "-" : val}</td>`;
+        });
+        tbody.innerHTML += kelRow + `</tr>`;
     });
 }
 
