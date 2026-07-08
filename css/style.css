@@ -393,15 +393,61 @@ input[type=number] {
     }
 }
 
-/* C. KONDISI UMUM (Berlaku di Semua Kondisi, Baik Layar maupun Cetak) */
+/* C. KONDISI UMUM (Berlaku di Semua Kondisi) */
+
 @media print {
-    /* Sembunyikan elemen yang tidak perlu saat cetak */
-    .no-print, #btn-simpan-ongkir, #btn-batal-ongkir, #btn-print-ongkir, .sidebar, header {
+    /* 1. Sembunyikan elemen yang tidak diperlukan */
+    .no-print, 
+    #btn-simpan-ongkir, 
+    #btn-batal-ongkir, 
+    #btn-print-ongkir, 
+    .sidebar, 
+    header,
+    /* Tambahkan selector lain jika masih ada elemen yang muncul di print */
+    nav, footer {
         display: none !important;
     }
-    /* Pastikan formulir terlihat penuh */
-    body {
-        padding: 0;
-        margin: 0;
+
+    /* 2. Pastikan body dan html bisa mencetak */
+    body, html {
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
     }
+
+    /* 3. Pastikan area cetak kita tampil saat print */
+    #print-area {
+        display: block !important;
+        visibility: visible !important;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+    }
+}
+
+
+/* Sticky Column untuk Tabel */
+.sticky-col {
+    position: -webkit-sticky;
+    position: sticky;
+    left: 0;
+    z-index: 20; /* Lebih tinggi dari z-50 di header agar tetap terlihat */
+    background-color: #f1f5f9; /* Sama dengan bg-slate-100 agar menyatu */
+    border-right: 1px solid #e5e7eb;
+}
+
+/* Khusus untuk kolom KODE agar posisinya tepat di samping NO */
+.sticky-col-kode {
+    left: 40px; /* Sesuaikan dengan lebar kolom NO, misal lebar NO adalah 40px */
+    z-index: 20;
+    background-color: #f1f5f9;
+    border-right: 1px solid #e5e7eb;
+}
+
+/* Pastikan header tetap di atas saat di-scroll vertikal */
+thead.sticky-header {
+    position: sticky;
+    top: 0;
+    z-index: 30;
 }
