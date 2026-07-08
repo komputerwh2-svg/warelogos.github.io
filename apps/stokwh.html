@@ -48,8 +48,75 @@
     <div class="flex-1 overflow-x-hidden overflow-y-auto bg-[#f4f4f4]">
         <div id="slider-content-stokwh" class="flex w-[400%] transition-transform duration-500 ease-in-out" style="transform: translateX(0%);">
             
-            <div class="w-1/4 p-3.5" id="slide-rekap">
-                <div class="p-4 bg-white rounded-xl shadow">Konten REKAP Stok</div>
+            <div class="w-1/4 p-3.5 space-y-4" id="slide-rekap">
+                <div class="flex items-center justify-between bg-gray-300 p-4 rounded-xl border border-gray-200 shadow-sm">
+                    <div class="flex flex-col">
+                        <h2 class="text-[16px] font-black text-slate-800 uppercase tracking-widest">Rekap Stok [ WH-2 & WH-3 ]</h2>
+                        <p id="display-tanggal-rekap" class="text-[16px] text-orange-500 font-bold uppercase mt-0.5">Pilih Kategori</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center bg-black/100 p-1 rounded-xl border border-black/30 shadow-inner gap-0.5">
+    
+                            <label class="relative flex items-center justify-center px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all select-none">
+                                <input type="radio" name="rb-mode-rekap" value="WH2_SEBELUM" checked onchange="gantiModeRekap(this.value)" class="sr-only peer">
+                                <span class="z-10 text-gray-400 peer-checked:text-white transition-colors whitespace-nowrap">WH-2 SEBELUM</span>
+                                <div class="absolute inset-0 rounded-lg shadow-sm opacity-0 scale-95 peer-checked:opacity-100 peer-checked:scale-100 transition-all duration-200" style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #d95d00;"></div>
+                            </label>
+
+                            <label class="relative flex items-center justify-center px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all select-none">
+                                <input type="radio" name="rb-mode-rekap" value="WH2_SESUDAH" onchange="gantiModeRekap(this.value)" class="sr-only peer">
+                                <span class="z-10 text-gray-400 peer-checked:text-white transition-colors whitespace-nowrap">WH-2 SESUDAH</span>
+                                <div class="absolute inset-0 rounded-lg shadow-sm opacity-0 scale-95 peer-checked:opacity-100 peer-checked:scale-100 transition-all duration-200" style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #d95d00;"></div>
+                            </label>
+
+                            <label class="relative flex items-center justify-center px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all select-none">
+                                <input type="radio" name="rb-mode-rekap" value="STOK_WH3" onchange="gantiModeRekap(this.value)" class="sr-only peer">
+                                <span class="z-10 text-gray-400 peer-checked:text-white transition-colors whitespace-nowrap">STOK WH-3</span>
+                                <div class="absolute inset-0 rounded-lg shadow-sm opacity-0 scale-95 peer-checked:opacity-100 peer-checked:scale-100 transition-all duration-200" style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #d95d00;"></div>
+                            </label>
+
+                            <label class="relative flex items-center justify-center px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all select-none">
+                                <input type="radio" name="rb-mode-rekap" value="SELISIH_WH3" onchange="gantiModeRekap(this.value)" class="sr-only peer">
+                                <span class="z-10 text-gray-400 peer-checked:text-white transition-colors whitespace-nowrap">SELISIH WH-3</span>
+                                <div class="absolute inset-0 rounded-lg shadow-sm opacity-0 scale-95 peer-checked:opacity-100 peer-checked:scale-100 transition-all duration-200" style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #d95d00;"></div>
+                            </label>
+
+                            <label class="relative flex items-center justify-center px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all select-none">
+                                <input type="radio" name="rb-mode-rekap" value="BARANG_LEBIH" onchange="gantiModeRekap(this.value)" class="sr-only peer">
+                                <span class="z-10 text-gray-400 peer-checked:text-white transition-colors whitespace-nowrap">BARANG LEBIH</span>
+                                <div class="absolute inset-0 rounded-lg shadow-sm opacity-0 scale-95 peer-checked:opacity-100 peer-checked:scale-100 transition-all duration-200" style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #d95d00;"></div>
+                            </label>
+                        </div>
+
+                        <select id="select-periode-rekap" class="px-3 py-1.5 text-xs font-black text-slate-800 border border-gray-300 rounded-lg bg-white focus:outline-none focus:border-orange-500 shadow-sm">
+                            <option value="">Periode</option>
+                        </select>
+                        
+                        <select id="select-tanggal-rekap" class="px-3 py-1.5 text-xs font-black text-slate-800 border border-gray-300 rounded-lg bg-white focus:outline-none focus:border-orange-500 shadow-sm">
+                            <option value="">Tanggal</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="w-full bg-white rounded-xl border border-gray-300 shadow-sm overflow-hidden">
+                    <div class="px-4 py-3 bg-gray-300 border-b border-gray-500 flex justify-between items-center">
+                        <div>
+                            <span id="txt-table-title-rekap" class="text-[15px] font-black text-slate-500 uppercase tracking-wider">Tabel Data Rekap</span>
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-x-auto max-h-[520px]">
+                        <table class="w-full text-left border-collapse" id="tabel-rekap">
+                            <thead class="bg-slate-100 sticky top-0 z-10 border-b border-gray-200">
+                                <tr id="thead-rekap" class="text-[15px] text-slate-500 uppercase tracking-wider">
+                                    </tr>
+                            </thead>
+                            <tbody id="tabel-body-rekap" class="divide-y divide-gray-500 text-[15px] text-slate-800">
+                                <tr><td colspan="5" class="text-center py-10 text-slate-400">Pilih mode dan tanggal untuk melihat data</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
 
             <div class="w-1/4 p-3.5 space-y-4" id="slide-wh2">
@@ -59,7 +126,7 @@
                         <p id="display-tanggal-wh2" class="text-[16px] text-orange-500 font-bold uppercase mt-0.5">Pilih Tanggal Stok</p>
                     </div>
                     <div class="flex items-center gap-3">
-                        <div class="flex items-center bg-gray-200 p-1 rounded-xl w-fit">
+                        <div class="flex items-center bg-black/100 p-1 rounded-xl border border-black/30 shadow-inner gap-0.5">
                             <label class="relative px-6 py-2 rounded-lg cursor-pointer">
                                 <input type="radio" name="rb-mode-wh2" value="SEBELUM" checked onchange="gantiModeWH2(this.value)" class="sr-only peer">
                                 <span class="text-xs font-black text-gray-500 peer-checked:text-white transition-colors relative z-10 whitespace-nowrap">STOK WH-2 SEBELUM</span>
@@ -111,7 +178,7 @@
                                     <th class="py-3 px-3" id="header-aksi">Aksi</th> </tr>
                             </thead>
                             <tbody id="tabel-body-wh2" class="divide-y divide-gray-500 text-[15px] text-slate-800">
-                                <tr><td colspan="6" class="text-center py-10 text-slate-400">Belum ada data diperiode ini</td></tr>
+                                <tr><td colspan="7" class="text-center py-10 text-slate-400">Belum ada data diperiode ini</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -125,7 +192,7 @@
                         <p id="display-tanggal-wh3" class="text-[16px] text-orange-500 font-bold uppercase mt-0.5">Pilih Tanggal Stok</p>
                     </div>
                     <div class="flex items-center gap-3">
-                        <div class="flex items-center bg-gray-200 p-1 rounded-xl w-fit">
+                        <div class="flex items-center bg-black/100 p-1 rounded-xl border border-black/30 shadow-inner gap-0.5">
                             <!-- Tombol Stok WH-3 -->
                             <label class="relative px-6 py-2 rounded-lg cursor-pointer">
                                 <input type="radio" name="rb-mode-wh3" value="STOK WH-3" checked onchange="gantiModeWH3(this.value)" class="sr-only peer">
@@ -192,7 +259,7 @@
                                 </tr>
                             </thead>
                             <tbody id="tabel-body-wh3" class="divide-y divide-gray-500 text-[15px] text-slate-800">
-                                <tr><td colspan="7" class="text-center py-10 text-slate-400">Belum ada data diperiode ini</td></tr>
+                                <tr><td colspan="10" class="text-center py-10 text-slate-400">Belum ada data diperiode ini</td></tr>
                             </tbody>
                         </table>
                     </div>
