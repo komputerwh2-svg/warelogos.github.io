@@ -9,7 +9,7 @@ if (!statusBar) {
 const DB_FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
 
 // Fungsi untuk memperbarui status bar
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     initApp();
 });
 
@@ -36,22 +36,31 @@ window.gantiModulStokWH = function(mode) {
         if (typeof initDropdownsRekap === 'function') {
             initDropdownsRekap();
         }
+        console.log("Inisialisasi mode REKAP dipanggil");
     } else if (mode === 'WH2') {
         slider.style.transform = 'translateX(-25%)';
         // Kirim parameter 'WH2'
         if (typeof initDropdowns === 'function') {
             initDropdowns();
         }
+        console.log("Inisialisasi mode WH-2 dipanggil");
     } else if (mode === 'WH3') {
         slider.style.transform = 'translateX(-50%)';
         // Jika Anda punya fungsi khusus WH3
         if (typeof initDropdownsWH3 === 'function') {
             initDropdownsWH3();
         }
+        console.log("Inisialisasi mode WH-3 dipanggil");
     } else if (mode === 'LEBIH') {
         slider.style.transform = 'translateX(-75%)';
+        // TAMBAHKAN PEMANGGILAN INI:
+        if (!isLebihInitialized) {
+            initBarangLebih();
+            isLebihInitialized = true;
+        }
+        window.bl_renderRiwayat();
+        console.log("Inisialisasi mode LEBIH dipanggil");
     }
-
     console.log("Stok Warehouse mode berpindah ke:", mode);
 };
 
@@ -2166,3 +2175,388 @@ function exportTabelKeExcelWH3() {
     const tgl = new Date().toLocaleDateString('id-ID').replace(/\//g, '-');
     XLSX.writeFile(wb, `STOKWH3_${tgl}.xlsx`);
 }
+
+
+
+let isLebihInitialized = false;
+
+window.initBarangLebih = async function() {
+    console.log("Inisialisasi Barang Lebih dimulai...");
+
+    // 1. Isi Dropdown Tanggal
+    const tglSelect = document.getElementById('bl_tx_tanggal');
+    if (tglSelect) {
+        tglSelect.innerHTML = "";
+        for (let i = 0; i <= 10; i++) {
+            let d = new Date();
+            d.setDate(d.getDate() - i);
+            let dd = String(d.getDate()).padStart(2, '0');
+            let mm = String(d.getMonth() + 1).padStart(2, '0');
+            let yyyy = d.getFullYear();
+            let val = `${yyyy}-${mm}-${dd}`;
+            let text = `${dd}/${mm}/${yyyy}`;
+            let opt = document.createElement("option");
+            opt.value = val;
+            opt.textContent = text;
+            tglSelect.appendChild(opt);
+        }
+    }
+
+    // 2. Panggil fungsi data
+    await window.bl_loadDropdownBarang();
+    window.bl_loadDropdownBarang(); // Panggil di sini agar data sudah tersedia
+
+    // Reset form
+    if (typeof bl_resetForm === 'function') {
+        bl_resetForm();
+    }
+};
+
+/**
+ * Fungsi Load Dropdown Khusus Barang Lebih
+ * Menggunakan ID: 'bl_tx_kode'
+ */
+window.bl_loadDropdownBarang = async function() {
+    const select = document.getElementById('bl_tx_kode');
+    if (!select) return;
+
+    const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
+
+    try {
+        select.innerHTML = '<option value="">Memuat data...</option>';
+        const response = await fetch(`${FIREBASE_URL}master_barang.json`);
+        const dataBarang = await response.json();
+
+        if (!dataBarang) {
+            select.innerHTML = '<option value="">Data Kosong</option>';
+            return;
+        }
+
+        // SIMPAN DATA KE MEMORI GLOBAL untuk akses lain jika dibutuhkan
+        window.dataMasterBarang = dataBarang;
+
+        // 1. Konversi ke Array
+        let listBarang = Object.keys(dataBarang).map(key => ({
+            key: key,
+            ...dataBarang[key]
+        }));
+
+        // 3. SORTING (Berdasarkan Inisial)
+        listBarang.sort((a, b) => {
+            const inisialA = (a.INISIAL || "").toString();
+            const inisialB = (b.INISIAL || "").toString();
+            return inisialA.localeCompare(inisialB, undefined, { numeric: true, sensitivity: 'base' });
+        });
+
+        // 4. RENDERING
+        select.innerHTML = '<option value="">Pilih Barang...</option>';
+        listBarang.forEach(item => {
+            let opt = document.createElement("option");
+            opt.value = item.KODE_BARANG || item.key;
+            // Tampilan: KODE_BARANG - NAMA_BARANG (bisa disesuaikan jika ingin format lain)
+            opt.textContent = `${item.KODE_BARANG || "-"} | ${item.NAMA_BARANG || item.key}`;
+            select.appendChild(opt);
+        });
+
+    } catch (e) {
+        console.error("Gagal load dropdown barang lebih:", e);
+        select.innerHTML = '<option value="">Gagal Memuat</option>';
+    }
+};
+
+/**
+ * Fungsi Populate Kode Barang untuk Transaksi KELUAR (Khusus Barang Lebih)
+ * Membaca dari path: stok_lebih
+ */
+window.bl_populateKodeBarangOut = async function() {
+    const dropdown = document.getElementById('bl_tx_kode'); 
+    if (!dropdown) return;
+
+    const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
+
+    try {
+        // Panggil langsung ke stok_lebih.json
+        const response = await fetch(`${FIREBASE_URL}stok_lebih.json`);
+        const stokData = await response.json();
+
+        dropdown.innerHTML = '<option value="">Pilih Barang...</option>';
+
+        if (stokData) {
+            const master = window.dataMasterBarang || {};
+            
+            // Ubah objek menjadi array
+            let listBarang = Object.entries(stokData).map(([kode, dataStok]) => {
+                const totalQty = parseInt(dataStok.qty) || 0;
+                const infoBarang = master[kode] || { INISIAL: kode };
+                
+                return {
+                    kode: kode,
+                    inisial: infoBarang.INISIAL || kode,
+                    totalQty: totalQty
+                };
+            }).filter(item => item.totalQty > 0);
+
+            // Jika tidak ada barang dengan qty > 0
+            if (listBarang.length === 0) {
+                dropdown.innerHTML = '<option value="">Stok Kosong</option>';
+                return;
+            }
+
+            // Urutkan & Render
+            listBarang.sort((a, b) => a.inisial.localeCompare(b.inisial));
+            
+            listBarang.forEach(item => {
+                let opt = document.createElement("option");
+                opt.value = item.kode;
+                opt.textContent = `${item.inisial} (Qty: ${item.totalQty})`;
+                dropdown.appendChild(opt);
+            });
+        } else {
+            dropdown.innerHTML = '<option value="">Data tidak ditemukan</option>';
+        }
+    } catch (error) {
+        console.error("Gagal memuat barang:", error);
+        dropdown.innerHTML = '<option value="">Error Load</option>';
+    }
+};
+
+// --- Fungsi Switch UI (Hijau/Rose) Khusus Barang Lebih ---
+window.toggleEngineTransaksi_bl = function(isOut) {
+    const boxWorkspace = document.getElementById('box-workspace-bl-input');
+    const titleSide = document.getElementById('bl_title_transaksi_side');
+    const lblSwitch = document.getElementById('bl_lbl_status_switch');
+    const btnSimpanbl = document.getElementById('bl_btn_simpan');
+    
+    // --- PEMBERSIHAN EVENT LISTENER ---
+    const select = document.getElementById('bl_tx_kode');
+    if (select) {
+        const newSelect = select.cloneNode(true);
+        select.parentNode.replaceChild(newSelect, select);
+    }
+    const freshSelect = document.getElementById('bl_tx_kode');
+    freshSelect.innerHTML = '<option value="">Memuat data...</option>';
+
+    // --- LOGIC UI & STYLE ---
+    if (isOut) {
+        // MODE KELUAR
+        boxWorkspace.className = "col-span-7 bg-rose-200/60 rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col transition-colors duration-200";
+        if(titleSide) {
+            titleSide.innerText = "Input Barang Lebih Keluar";
+            titleSide.className = "text-[10px] font-bold text-rose-700 uppercase tracking-wide";
+        }
+        if(lblSwitch) {
+            lblSwitch.innerText = "KELUAR";
+            lblSwitch.className = "text-[9px] font-bold text-rose-600 bg-rose-100/80 px-1.5 py-0.5 rounded uppercase tracking-wider";
+        }
+        btnSimpanbl.className = "flex-1 py-1.5 bg-gradient-to-b from-[#f43f5e] to-[#e11d48] text-white font-bold text-[10px] rounded-lg shadow-md border border-rose-600 tracking-wide text-center uppercase transition-colors";
+        btnSimpanbl.innerText = "SIMPAN OUT";
+
+        // Tambahkan ini: Load data untuk KELUAR
+        window.bl_populateKodeBarangOut();
+
+    } else {
+        // MODE MASUK
+        boxWorkspace.className = "col-span-7 bg-emerald-200/60 rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col transition-colors duration-200";
+        if(titleSide) {
+            titleSide.innerText = "Input Barang Lebih Terbaru";
+            titleSide.className = "text-[10px] font-bold text-emerald-700 uppercase tracking-wide";
+        }
+        if(lblSwitch) {
+            lblSwitch.innerText = "MASUK";
+            lblSwitch.className = "text-[9px] font-bold text-emerald-600 bg-emerald-100/80 px-1.5 py-0.5 rounded uppercase tracking-wider";
+        }
+        btnSimpanbl.className = "flex-1 py-1.5 bg-gradient-to-b from-[#10b981] to-[#059669] text-white font-bold text-[10px] rounded-lg shadow-md border border-emerald-600 tracking-wide text-center uppercase transition-colors";
+        btnSimpanbl.innerText = "SIMPAN IN";
+
+        // Tambahkan ini: Load data untuk MASUK
+        if (typeof window.bl_loadDropdownBarang === 'function') {
+            window.bl_loadDropdownBarang();
+        }
+    }
+};
+
+// --- FUNGSI RESET FORM KHUSUS BARANG LEBIH ---
+window.bl_resetForm = function() {
+    // Reset Tanggal ke hari ini
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('bl_tx_tanggal').value = today;
+    
+    // Reset Dropdown Barang
+    const selectKode = document.getElementById('bl_tx_kode');
+    if (selectKode) selectKode.selectedIndex = 0;
+    
+    // Reset Input Qty dan Expired
+    document.getElementById('bl_tx_qty').value = '';
+    document.getElementById('bl_tx_expired').value = '';
+    
+    console.log("Form Barang Lebih telah di-reset.");
+};
+
+// --- Fungsi Pemformatan Expired (Auto JAN-27) ---
+document.getElementById('bl_tx_expired').addEventListener('blur', function(e) {
+    let val = e.target.value.trim();
+    const months = ["JAN", "FEB", "MAR", "APR", "MEI", "JUN", "JUL", "AGT", "SEP", "OKT", "NOV", "DES"];
+    
+    // Regex untuk memisahkan MM dan YY
+    const match = val.match(/^(\d{1,2})[-/](\d{2})$/);
+    
+    if (match) {
+        const monthIndex = parseInt(match[1]) - 1;
+        const year = match[2];
+        
+        if (monthIndex >= 0 && monthIndex < 12) {
+            e.target.value = `${months[monthIndex]}-${year}`;
+        }
+    }
+});
+
+async function updateStokLebih_bl(data) {
+    const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
+    const path = `${FIREBASE_URL}stok_lebih/${data.kode}.json`;
+
+    try {
+        const response = await fetch(path);
+        let currentData = await response.json() || { qty: 0, exp_baru: "-", exp_lama: "-" };
+
+        let currentQty = parseInt(currentData.qty) || 0;
+        let updatePayload = {
+            last_updated: new Date().toISOString()
+        };
+
+        if (data.tipe === 'IN') {
+            updatePayload.qty = currentQty + parseInt(data.qty);
+            updatePayload.exp_lama = currentData.exp_baru || "-";
+            updatePayload.exp_baru = data.expired;
+        } else {
+            // Pastikan qty tidak minus
+            updatePayload.qty = Math.max(0, currentQty - parseInt(data.qty));
+            updatePayload.exp_lama = currentData.exp_lama || "-";
+            updatePayload.exp_baru = currentData.exp_baru || "-";
+        }
+
+        // Gunakan PATCH agar tidak menghapus field lain
+        await fetch(path, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatePayload)
+        });
+        
+        console.log("Stok berhasil diperbarui:", updatePayload.qty);
+    } catch (e) {
+        console.error("Gagal update stok lebih:", e);
+    }
+}
+
+/**
+ * Fungsi Simpan Transaksi Barang Lebih
+ * Menggunakan ID Unik: kode_tanggal_timestamp untuk sinkronisasi data yang presisi
+ */
+async function simpanTransaksi_bl() {
+    const btnSimpan = document.getElementById('bl_btn_simpan');
+    const isModeOut = btnSimpan.innerText.includes("OUT");
+    
+    const kode = document.getElementById('bl_tx_kode').value;
+    const qtyInput = document.getElementById('bl_tx_qty').value;
+    const expired = document.getElementById('bl_tx_expired').value;
+    const tanggal = document.getElementById('bl_tx_tanggal').value;
+
+    // Validasi dasar
+    if (!kode || !qtyInput || parseInt(qtyInput) <= 0) {
+        miuiAlert("Harap lengkapi kode barang dan jumlah (QTY)!", "error");
+        return;
+    }
+
+    // Membuat ID Unik: kode_tanggal_timestamp
+    const timestamp = new Date().getTime();
+    const idUnik = `${kode}_${tanggal}_${timestamp}`;
+
+    const data = {
+        tanggal: tanggal,
+        tipe: isModeOut ? 'OUT' : 'IN',
+        kode: kode,
+        qty: parseInt(qtyInput),
+        expired: expired,
+        id: idUnik // Menyimpan ID di dalam objek data untuk kemudahan akses
+    };
+
+    try {
+        const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
+        
+        // 1. Simpan ke Riwayat menggunakan PUT dengan ID Unik
+        await fetch(`${FIREBASE_URL}log_barang_lebih/${idUnik}.json`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        // 2. Update stok di folder stok_lebih
+        await updateStokLebih_bl(data);
+        
+        // 3. Update UI
+        await window.bl_renderRiwayat();
+        miuiAlert("Data transaksi berhasil disimpan!", "success");
+        
+        // Reset form & Refresh rekap
+        if (typeof bl_resetForm === 'function') bl_resetForm();
+        if (typeof bl_renderRekap === 'function') bl_renderRekap();
+        
+    } catch (e) {
+        console.error("Gagal menyimpan transaksi:", e);
+        miuiAlert("Terjadi kesalahan sistem saat menyimpan.", "error");
+    }
+}
+
+// Nama fungsi menggunakan prefix bl_ agar unik
+window.bl_renderRiwayat = async function() {
+    const tableBody = document.getElementById('bl_table_riwayat'); 
+    if (!tableBody) return;
+
+    const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
+    
+    try {
+        const response = await fetch(`${FIREBASE_URL}log_barang_lebih.json`);
+        const data = await response.json();
+        
+        if (!data) {
+            tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-slate-400 text-[10px]">Belum ada transaksi</td></tr>`;
+            return;
+        }
+
+        // Konversi ke array dan sort dari yang terbaru
+        const riwayatArray = Object.entries(data)
+            .map(([id, val]) => ({ id, ...val }))
+            .sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+
+        // Render ke tabel dengan class yang konsisten
+        tableBody.innerHTML = riwayatArray.map(item => {
+            const isOut = item.tipe?.toUpperCase() === "OUT";
+            
+            return `
+                <tr class="hover:bg-slate-50 border-b border-slate-50 text-center">
+                    <td class="py-1 px-2 text-slate-400 truncate">${item.tanggal || '-'}</td>
+                    <td class="py-1 px-1">
+                        <span class="${isOut ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'} text-[8px] px-1.5 rounded font-bold uppercase">
+                            ${item.tipe || '-'}
+                        </span>
+                    </td>
+                    <td class="py-1 px-1 font-bold text-slate-900">${item.kode || '-'}</td>
+                    <td class="py-1 px-1">${item.qty || 0}</td>
+                    <td class="py-1 px-1 text-slate-500">${item.expired || '-'}</td>
+                </tr>
+            `;
+        }).join('');
+        
+    } catch (e) {
+        console.error("Gagal memuat riwayat BL:", e);
+    }
+};
+
+// Tambahkan ini di stokwh.js agar error hilang dan tabel bisa tampil
+window.renderTabelBarangLebih = function(data) {
+    const tbody = document.getElementById('bl_table_rekap');
+    if (!tbody) return;
+    
+    tbody.innerHTML = ''; // Bersihkan tabel
+    // Logika untuk menampilkan data ke tabel
+    console.log("Menampilkan data barang lebih...");
+};
