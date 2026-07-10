@@ -59,6 +59,7 @@ window.gantiModulStokWH = function(mode) {
             isLebihInitialized = true;
         }
         window.bl_renderRiwayat();
+        window.renderTabelBarangLebih();
         console.log("Inisialisasi mode LEBIH dipanggil");
     }
     console.log("Stok Warehouse mode berpindah ke:", mode);
@@ -498,6 +499,7 @@ async function gantiModeRekap(modeValue) {
     console.log("Mode REKAP berubah ke:", modeValue);
     // Refresh dropdown tanggal karena prefix-nya mungkin berubah (WH2 vs WH3)
     await updateTanggalDropdownRekap();
+    loadDataRekap();
 }
 
 // 2. Fungsi init yang memanggil fungsi di atas
@@ -989,6 +991,22 @@ function bacaExcelDinamis(file, keyword = "KODE") {
     });
 }
 
+async function gantiModeRekap(mode) {
+    // 1. Fetch Data
+    // Pastikan fungsi fetchData ini ada di file Anda
+    const data = await fetchData(mode); 
+    
+    // 2. Langsung Panggil Render
+    renderTabelRekap(data, mode);
+}
+
+async function fetchData(mode, tgl) {
+    // Sesuaikan URL Firebase Anda
+    const url = `https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/rekap/${mode}/${tgl}.json`;
+    const response = await fetch(url);
+    return await response.json();
+}
+
 function gantiModeWH2(mode) {
     // Fungsi ini hanya bertugas memperbarui UI judul saja, 
     // lalu memicu loadStokData untuk mengupdate isi tabel
@@ -1108,58 +1126,20 @@ function tampilkanKosongwh3(infoTambahan = '') {
 
 
 async function loadDataRekap() {
-    const dateInput = document.getElementById('select-tanggal-rekap');
-    const tanggal = dateInput ? dateInput.value : null;
+    // Ambil nilai dari input/radio button yang aktif di halaman Anda
+    const mode = document.querySelector('input[name="mode"]:checked')?.value || 'WH2_SEBELUM';
+    const tgl = document.getElementById('input-tanggal').value; // Sesuaikan ID-nya
 
-    if (!tanggal) return;
-
-    // 1. Ambil mode dari RADIO BUTTON yang aktif
-    const radioAktif = document.querySelector('input[name="rb-mode-rekap"]:checked');
-    const mode = radioAktif ? radioAktif.value : "WH2_SEBELUM";
-    
-    console.log("Memuat data rekap mode:", mode, "untuk tanggal:", tanggal);
-
-    const formattedDate = tanggal.replace(/-/g, '');
-    
-    // 2. Tentukan target Firebase berdasarkan mode
-    // WH-2 Group vs WH-3 Group
-    const isWH2Mode = ['WH2_SEBELUM', 'WH2_SESUDAH', 'BARANG_LEBIH'].includes(mode);
-    const dbUrl = isWH2Mode ? `${DB_FIREBASE_URL}stok_wh2.json` : `${DB_FIREBASE_URL}stok_wh3.json`;
-    const prefix = isWH2Mode ? `stokwh2wms_${formattedDate}` : `stokwh3_${formattedDate}`;
+    // Tampilkan loading agar user tahu proses sedang berjalan
+    const tbody = document.getElementById('tabel-body-rekap');
+    tbody.innerHTML = '<tr><td colspan="10" class="text-center py-5">Memuat data...</td></tr>';
 
     try {
-        const response = await fetch(dbUrl);
-        const allData = await response.json();
-        
-        if (!allData) {
-            tampilkanKosongRekap(tanggal);
-            return;
-        }
-
-        const key = Object.keys(allData).find(k => k.includes(prefix));
-        if (!key) {
-            tampilkanKosongRekap(tanggal);
-            return;
-        }
-
-        // Jalankan render sesuai mode yang dipilih
-        switch(mode) {
-            case 'WH2_SEBELUM':
-            case 'WH2_SESUDAH':
-                renderTabelRekapWH2(allData[key], mode === 'WH2_SESUDAH' ? 'SESUDAH' : 'SEBELUM', key);
-                break;
-            case 'STOK_WH3':
-                renderTabelRekapWH3(allData[key], 'STOK WH-3', key);
-                break;
-            case 'SELISIH_WH3':
-                renderSelisihWH3(allData); // Menggunakan seluruh data untuk selisih per tanggal
-                break;
-            case 'BARANG_LEBIH':
-                renderTabelBarangLebih(allData[key], 'BARANG LEBIH', key);
-                break;
-        }
+        let data = await fetchData(mode, tgl); // Pastikan fungsi fetchData menerima parameter
+        renderTabelRekap(data, mode);
     } catch (error) {
-        console.error("Gagal load data rekap:", error);
+        console.error("Gagal memuat data:", error);
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center py-5 text-red-500">Gagal mengambil data.</td></tr>';
     }
 }
 
@@ -1247,56 +1227,48 @@ async function loadStokDatawh3() {
 
 
 
-function renderTabelRekap(dataStok, mode, key) {
+// Simpan ini di stokwh.js
+async function renderTabelRekap(dataStok, mode) {
     const tbody = document.getElementById('tabel-body-rekap');
-    if (!tbody) return;
-    tbody.innerHTML = '';
+    const thead = document.getElementById('thead-rekap');
+    if (!tbody || !thead) return;
 
-    // Jika mode adalah SELISIH_WH3, arahkan ke fungsi khusus yang Anda miliki
-    if (mode === 'SELISIH_WH3') {
-        renderSelisihWH3(window.currentStokData);
+    tbody.innerHTML = '';
+    
+    // 1. Header Dinamis
+    const config = {
+        'WH2_SEBELUM': ['NO', 'KODE', 'BOSNET', 'WMS', 'SELISIH', 'KET'],
+        'WH2_SESUDAH': ['NO', 'KODE', 'BOSNET', 'WMS', 'SELISIH', 'KET'],
+        'STOK_WH3': ['NO', 'KODE', 'BLOK', 'BOSNET', 'PAK', 'BECE', 'UTUH', 'TOTAL', 'SELISIH', 'KET'],
+        'SELISIH_WH3': ['NO', 'KODE', 'TOTAL', 'BOSNET', 'SELISIH', 'KET'],
+        'BARANG_LEBIH': ['NO', 'KODE', 'QTY', 'EXP LAMA', 'EXP BARU']
+    };
+
+    thead.innerHTML = config[mode].map(h => `<th class="py-3 px-4 text-left border-b bg-slate-100 uppercase">${h}</th>`).join('');
+
+    // 2. Loop Data
+    if (!dataStok || Object.keys(dataStok).length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${config[mode].length}" class="text-center py-10">Data tidak ditemukan.</td></tr>`;
         return;
     }
 
-    let no = 1;
-    let totalBosnet = 0;
-    let totalWms = 0;
-
+    let i = 1;
     Object.entries(dataStok).forEach(([kode, item]) => {
-        let bosnet = 0, wms = 0;
+        let row = `<tr><td class="py-2 px-3">${i++}</td><td>${kode}</td>`;
 
-        // Penentuan data berdasarkan mode aktif
-        if (mode === 'WH2_SEBELUM') {
-            bosnet = parseInt(item.stokwh2_sebelum) || 0;
-            wms = parseInt(item.stokwms_sebelum) || 0;
-        } else if (mode === 'WH2_SESUDAH') {
-            bosnet = parseInt(item.stokwh2_sesudah) || 0;
-            wms = parseInt(item.stokwms_sesudah) || 0;
-        } else if (mode === 'STOK_WH3') {
-            bosnet = parseInt(item.bosnet) || 0;
-            wms = (parseInt(item.blok) || 0) + (parseInt(item.beceran) || 0) + (parseInt(item.utuhan) || 0);
-        } else if (mode === 'BARANG_LEBIH') {
-            bosnet = parseInt(item.stok_lebih) || 0;
-            wms = parseInt(item.stok_tersedia) || 0;
+        if (mode.includes('WH2')) {
+            let b = mode === 'WH2_SEBELUM' ? (item.stokwh2_sebelum || 0) : (item.stokwh2_sesudah || 0);
+            let w = mode === 'WH2_SEBELUM' ? (item.stokwms_sebelum || 0) : (item.stokwms_sesudah || 0);
+            row += `<td>${b}</td><td>${w}</td><td>${b - w}</td><td>${(b - w) === 0 ? 'SESUAI' : 'SELISIH'}</td>`;
+        } 
+        else if (mode === 'STOK_WH3') {
+            row += `<td>${item.blok||'-'}</td><td>${item.bosnet||0}</td><td>${item.pak||0}</td><td>${item.beceran||0}</td><td>${item.utuhan||0}</td><td>${item.total||0}</td><td>${item.selisih||0}</td><td>${item.keterangan||'-'}</td>`;
+        }
+        else if (mode === 'BARANG_LEBIH') {
+            row += `<td>${item.qty||0}</td><td>${item.exp_lama||'-'}</td><td>${item.exp_baru||'-'}</td>`;
         }
 
-        const selisih = bosnet - wms;
-        totalBosnet += bosnet;
-        totalWms += wms;
-
-        const displaySelisih = (selisih === 0) ? "-" : selisih.toLocaleString();
-        const warnaSelisih = selisih > 0 ? "text-blue-600 font-bold" : (selisih < 0 ? "text-red-600 font-bold" : "text-green-600");
-
-        tbody.innerHTML += `
-            <tr class="hover:bg-gray-50 border-b text-[15px]">
-                <td class="py-2 px-3">${no++}</td>
-                <td class="py-2 px-3 font-bold">${kode}</td>
-                <td class="py-2 px-3">${bosnet.toLocaleString()}</td>
-                <td class="py-2 px-3">${wms.toLocaleString()}</td>
-                <td class="py-2 px-3 ${warnaSelisih}">${displaySelisih}</td>
-                <td class="py-2 px-3">${item.keterangan || '-'}</td>
-            </tr>
-        `;
+        tbody.innerHTML += row + `</tr>`;
     });
 }
 
@@ -1387,6 +1359,13 @@ function renderTabel(dataStok, mode, key) {
             statusEl.innerText = "[ TERDAPAT SELISIH STOK: " + totalSelisih.toLocaleString() + " Karton]";
             statusEl.className = "ml-4 text-[15px] font-black text-red-600 uppercase tracking-wider";
         }
+    }
+}
+
+function tampilkanKosongRekap(tanggal) {
+    const tbody = document.getElementById('tabel-body-rekap');
+    if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-10 text-slate-400">Data untuk tanggal ${tanggal} tidak ditemukan.</td></tr>`;
     }
 }
 
@@ -2308,9 +2287,11 @@ window.bl_populateKodeBarangOut = async function() {
             listBarang.forEach(item => {
                 let opt = document.createElement("option");
                 opt.value = item.kode;
-                opt.textContent = `${item.inisial} (Qty: ${item.totalQty})`;
+                opt.textContent = `${item.kode} (Qty: ${item.totalQty})`;
                 dropdown.appendChild(opt);
             });
+            // Panggil setup autofill expired setelah dropdown terisi
+            setupAutofillExpired_bl();
         } else {
             dropdown.innerHTML = '<option value="">Data tidak ditemukan</option>';
         }
@@ -2319,6 +2300,36 @@ window.bl_populateKodeBarangOut = async function() {
         dropdown.innerHTML = '<option value="">Error Load</option>';
     }
 };
+
+// Fungsi untuk memuat data stok dan meng-autofill input expired
+async function setupAutofillExpired_bl() {
+    const selectKode = document.getElementById('bl_tx_kode'); // ID dropdown kode barang Anda
+    const inputExpired = document.getElementById('bl_tx_expired'); // ID input expired
+
+    if (!selectKode || !inputExpired) return;
+
+    selectKode.addEventListener('change', async () => {
+        const selectedKode = selectKode.value;
+        if (!selectedKode) return;
+
+        const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
+        
+        try {
+            // Ambil data stok barang yang dipilih
+            const response = await fetch(`${FIREBASE_URL}stok_lebih/${selectedKode}.json`);
+            const data = await response.json();
+
+            if (data && data.exp_baru) {
+                // Isi otomatis input expired dengan data dari Firebase
+                inputExpired.value = data.exp_baru;
+            } else {
+                inputExpired.value = "-"; // Default jika tidak ada data
+            }
+        } catch (e) {
+            console.error("Gagal mengambil data untuk autofill:", e);
+        }
+    });
+}
 
 // --- Fungsi Switch UI (Hijau/Rose) Khusus Barang Lebih ---
 window.toggleEngineTransaksi_bl = function(isOut) {
@@ -2410,7 +2421,7 @@ document.getElementById('bl_tx_expired').addEventListener('blur', function(e) {
     }
 });
 
-async function updateStokLebih_bl(data) {
+window.updateStokLebih_bl = async function(data) {
     const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
     const path = `${FIREBASE_URL}stok_lebih/${data.kode}.json`;
 
@@ -2418,34 +2429,42 @@ async function updateStokLebih_bl(data) {
         const response = await fetch(path);
         let currentData = await response.json() || { qty: 0, exp_baru: "-", exp_lama: "-" };
 
-        let currentQty = parseInt(currentData.qty) || 0;
         let updatePayload = {
             last_updated: new Date().toISOString()
         };
 
         if (data.tipe === 'IN') {
-            updatePayload.qty = currentQty + parseInt(data.qty);
-            updatePayload.exp_lama = currentData.exp_baru || "-";
-            updatePayload.exp_baru = data.expired;
+            // LOGIKA ROLLING EXPIRY
+            if (data.expired === currentData.exp_baru) {
+                // Kasus 1: Expired sama, cukup tambah Qty
+                updatePayload.qty = (parseInt(currentData.qty) || 0) + parseInt(data.qty);
+                updatePayload.exp_lama = currentData.exp_lama;
+                updatePayload.exp_baru = currentData.exp_baru;
+            } else {
+                // Kasus 2: Expired berbeda (Rolling), pindahkan exp_baru ke exp_lama
+                updatePayload.qty = parseInt(data.qty); // Qty jadi qty baru
+                updatePayload.exp_lama = currentData.exp_baru || "-";
+                updatePayload.exp_baru = data.expired;
+            }
         } else {
-            // Pastikan qty tidak minus
-            updatePayload.qty = Math.max(0, currentQty - parseInt(data.qty));
-            updatePayload.exp_lama = currentData.exp_lama || "-";
-            updatePayload.exp_baru = currentData.exp_baru || "-";
+            // Mode OUT: Kurangi qty seperti biasa
+            updatePayload.qty = Math.max(0, (parseInt(currentData.qty) || 0) - parseInt(data.qty));
+            updatePayload.exp_lama = currentData.exp_lama;
+            updatePayload.exp_baru = currentData.exp_baru;
         }
 
-        // Gunakan PATCH agar tidak menghapus field lain
+        // Gunakan PATCH agar field yang tidak diupdate tidak hilang
         await fetch(path, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updatePayload)
         });
         
-        console.log("Stok berhasil diperbarui:", updatePayload.qty);
+        console.log("Stok berhasil diperbarui dengan logika rolling:", updatePayload);
     } catch (e) {
         console.error("Gagal update stok lebih:", e);
     }
-}
+};
 
 /**
  * Fungsi Simpan Transaksi Barang Lebih
@@ -2475,8 +2494,7 @@ async function simpanTransaksi_bl() {
         tipe: isModeOut ? 'OUT' : 'IN',
         kode: kode,
         qty: parseInt(qtyInput),
-        expired: expired,
-        id: idUnik // Menyimpan ID di dalam objek data untuk kemudahan akses
+        expired: expired
     };
 
     try {
@@ -2494,6 +2512,7 @@ async function simpanTransaksi_bl() {
         
         // 3. Update UI
         await window.bl_renderRiwayat();
+        await window.renderTabelBarangLebih();
         miuiAlert("Data transaksi berhasil disimpan!", "success");
         
         // Reset form & Refresh rekap
@@ -2517,46 +2536,111 @@ window.bl_renderRiwayat = async function() {
         const response = await fetch(`${FIREBASE_URL}log_barang_lebih.json`);
         const data = await response.json();
         
-        if (!data) {
+        if (!data || Object.keys(data).length === 0) {
             tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-slate-400 text-[10px]">Belum ada transaksi</td></tr>`;
             return;
         }
 
-        // Konversi ke array dan sort dari yang terbaru
-        const riwayatArray = Object.entries(data)
-            .map(([id, val]) => ({ id, ...val }))
-            .sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+        // 1. Konversi ke array
+        const riwayatArray = Object.entries(data).map(([id, val]) => ({
+            id: id,
+            ...val
+        }));
 
-        // Render ke tabel dengan class yang konsisten
+        // 2. Sort menggunakan timestamp (angka terakhir setelah underscore terakhir di ID)
+        riwayatArray.sort((a, b) => {
+            const getTimestamp = (id) => {
+                const parts = id.split('_');
+                return parseInt(parts[parts.length - 1]);
+            };
+            return getTimestamp(b.id) - getTimestamp(a.id); // Terbaru ke terlama
+        });
+
+        // 3. Render ke tabel
         tableBody.innerHTML = riwayatArray.map(item => {
-            const isOut = item.tipe?.toUpperCase() === "OUT";
+            const isOut = item.tipe?.trim().toUpperCase() === "OUT";
+            
+            // Logika format tanggal ke dd-mm-yyyy
+            let tglDisplay = item.tanggal || '-';
+            if (tglDisplay.includes('-') && tglDisplay.split('-')[0].length === 4) {
+                const parts = tglDisplay.split('-');
+                tglDisplay = `${parts[2]}-${parts[1]}-${parts[0]}`;
+            }
             
             return `
                 <tr class="hover:bg-slate-50 border-b border-slate-50 text-center">
-                    <td class="py-1 px-2 text-slate-400 truncate">${item.tanggal || '-'}</td>
+                    <td class="py-1 px-2 text-slate-400 text-[9px] truncate">${tglDisplay}</td>
                     <td class="py-1 px-1">
                         <span class="${isOut ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'} text-[8px] px-1.5 rounded font-bold uppercase">
                             ${item.tipe || '-'}
                         </span>
                     </td>
-                    <td class="py-1 px-1 font-bold text-slate-900">${item.kode || '-'}</td>
-                    <td class="py-1 px-1">${item.qty || 0}</td>
-                    <td class="py-1 px-1 text-slate-500">${item.expired || '-'}</td>
+                    <td class="py-1 px-1 font-bold text-slate-900 text-[10px]">${item.kode || '-'}</td>
+                    <td class="py-1 px-1 text-[10px]">${item.qty || 0}</td>
+                    <td class="py-1 px-1 text-slate-500 text-[10px]">${item.expired || '-'}</td>
                 </tr>
             `;
         }).join('');
         
     } catch (e) {
-        console.error("Gagal memuat riwayat BL:", e);
+        console.error("Gagal memuat riwayat:", e);
+        tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-red-500 text-[10px]">Gagal memuat data</td></tr>`;
     }
 };
 
-// Tambahkan ini di stokwh.js agar error hilang dan tabel bisa tampil
-window.renderTabelBarangLebih = function(data) {
+/**
+ * Fungsi untuk mengambil data dari Firebase dan merender ke tabel
+ * Nama fungsi: renderTabelBarangLebih
+ */
+window.renderTabelBarangLebih = async function() {
+    console.log("Memuat rekap barang lebih...");
     const tbody = document.getElementById('bl_table_rekap');
     if (!tbody) return;
     
-    tbody.innerHTML = ''; // Bersihkan tabel
-    // Logika untuk menampilkan data ke tabel
-    console.log("Menampilkan data barang lebih...");
+    const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
+
+    try {
+        // 1. Ambil data dari Firebase
+        const response = await fetch(`${FIREBASE_URL}stok_lebih.json`);
+        const data = await response.json();
+
+        // 2. Bersihkan tabel
+        tbody.innerHTML = ''; 
+
+        // 3. Validasi jika data kosong
+        if (!data || Object.keys(data).length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-slate-400 text-[10px]">Belum ada data stok barang lebih</td></tr>`;
+            return;
+        }
+
+        // 4. Proses dan filter data (qty > 0)
+        const listBarang = Object.entries(data).map(([kode, val]) => ({
+            kode,
+            ...val
+        })).filter(item => parseInt(item.qty) > 0);
+
+        if (listBarang.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-slate-400 text-[10px]">Stok kosong</td></tr>`;
+            return;
+        }
+
+        // 5. Render ke tabel
+        tbody.innerHTML = listBarang.map((item, index) => {
+            return `
+                <tr class="hover:bg-slate-50 border-b border-slate-50 text-[10px]">
+                    <td class="py-2 px-2 text-center text-slate-500">${index + 1}</td>
+                    <td class="py-2 px-2 font-bold text-slate-900">${item.kode}</td>
+                    <td class="py-2 px-2 text-center font-bold text-blue-600">${item.qty}</td>
+                    <td class="py-2 px-2 text-center text-slate-500">${item.exp_lama || '-'}</td>
+                    <td class="py-2 px-2 text-center font-medium text-emerald-600">${item.exp_baru || '-'}</td>
+                </tr>
+            `;
+        }).join('');
+
+        console.log("Tabel barang lebih berhasil diperbarui.");
+
+    } catch (e) {
+        console.error("Gagal memuat rekap barang lebih:", e);
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-red-500 text-[10px]">Gagal memuat data</td></tr>`;
+    }
 };
