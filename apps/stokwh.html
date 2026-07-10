@@ -52,7 +52,7 @@
                 <div class="flex items-center justify-between bg-gray-300 p-4 rounded-xl border border-gray-200 shadow-sm">
                     <div class="flex flex-col">
                         <h2 class="text-[16px] font-black text-slate-800 uppercase tracking-widest">Rekap Stok [ WH-2 & WH-3 ]</h2>
-                        <p id="display-tanggal-rekap" class="text-[16px] text-orange-500 font-bold uppercase mt-0.5">Pilih Kategori</p>
+                        <p id="display-tanggal-rekap" class="text-[17px] text-orange-600 border-gray-800 font-bold uppercase mt-0.5">Pilih Kategori</p>
                     </div>
                     <div class="flex items-center gap-3">
                         <div class="flex items-center bg-black/100 p-1 rounded-xl border border-black/30 shadow-inner gap-0.5">
@@ -318,8 +318,8 @@
                 </div>
             </div>
 
-            <div class="w-1/4 flex-shrink-0 p-3.5" id="slide-lebih">
-                <div class="grid grid-cols-12 gap-4">
+            <div class="w-1/4 flex-shrink-0 p-3.5 h-screen flex flex-col overflow-hidden" id="slide-lebih">
+                <div class="grid grid-cols-12 gap-4 flex-shrink-0 mb-4">
                     <div id="box-workspace-bl-input" class="col-span-7 bg-emerald-200/60 rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col">
                         <div class="p-3 border-b border-[#eaeaea] bg-slate-50 flex justify-between items-center h-11">
                             <span id="bl_title_transaksi_side" class="text-[10px] font-bold text-emerald-700 uppercase tracking-wide">Input Barang Lebih Terbaru</span>
@@ -331,32 +331,29 @@
                                 </label>
                             </div>
                         </div>
-
                         <div class="p-3 space-y-2.5">
-                            <div class="grid grid-cols-2 gap-2">
-                                <div>
+                            <div class="grid grid-cols-3 gap-2">
+                                <div class="col-span-1">
                                     <label class="text-[9px] font-bold text-slate-500 block mb-0.5">Tanggal</label>
                                     <select id="bl_tx_tanggal" class="w-full bg-white border border-[#c8c8c8] rounded-md py-1 px-1.5 text-[11px] font-bold text-slate-800"></select>
                                 </div>
-                                <div>
+                                <div class="col-span-2">
                                     <label class="text-[9px] font-bold text-slate-500 block mb-0.5">Kode Barang</label>
                                     <select id="bl_tx_kode" class="w-full bg-white border border-[#c8c8c8] rounded-md py-1 px-1 text-[11px] font-bold text-slate-800">
                                         <option value="">Pilih Barang...</option>
                                     </select>
                                 </div>
                             </div>
-
                             <div class="grid grid-cols-3 gap-2">
-                                <div class="col-span-1">
-                                    <label class="text-[9px] font-bold text-slate-500 block mb-0.5">Qty</label>
-                                    <input type="number" id="bl_tx_qty" placeholder="0" class="w-full bg-white border border-[#c8c8c8] rounded-md py-1 px-1.5 text-[11px] font-bold text-slate-800">
-                                </div>
                                 <div class="col-span-2">
                                     <label class="text-[9px] font-bold text-slate-500 block mb-0.5">Expired</label>
                                     <input type="text" id="bl_tx_expired" placeholder="01-27" maxlength="5" class="w-full bg-white border border-[#c8c8c8] rounded-md py-1 px-1.5 text-[11px] font-bold text-slate-800">
                                 </div>
+                                <div class="col-span-1">
+                                    <label class="text-[9px] font-bold text-slate-500 block mb-0.5">Qty</label>
+                                    <input type="number" id="bl_tx_qty" placeholder="0" class="w-full bg-white border border-[#c8c8c8] rounded-md py-1 px-1.5 text-[11px] font-bold text-slate-800">
+                                </div>
                             </div>
-
                             <div class="flex gap-1.5 pt-1">
                                 <button onclick="resetForm()" class="flex-1 py-1.5 bg-slate-50 text-slate-600 font-bold text-[10px] rounded-lg border border-slate-300 hover:bg-slate-100 transition-colors">BATAL</button>
                                 <button id="bl_btn_simpan" onclick="simpanTransaksi_bl()" class="flex-1 py-1.5 bg-emerald-600 text-white font-bold text-[10px] rounded-lg shadow-md uppercase hover:bg-emerald-700 transition-colors">SIMPAN</button>
@@ -366,23 +363,25 @@
 
                     <div id="wrapper-riwayat" class="col-span-5 bg-white rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col">
                         <div class="bg-slate-50 px-3 h-11 border-b flex items-center">
-                            <span class="text-[10px] font-bold text-slate-700 uppercase">Riwayat</span>
+                            <span class="text-[10px] font-bold text-slate-700 uppercase">Riwayat barang lebih</span>
                         </div>
                         <div class="flex-1 overflow-y-auto max-h-[148px]">
                             <table class="w-full text-[10px]">
-                                <thead class="bg-slate-50 text-slate-500">
+                                <thead class="bg-slate-50 text-slate-500 sticky top-0">
                                     <tr><th class="py-1 px-2">TGL</th><th class="py-1">TIPE</th><th class="py-1">KODE</th><th class="py-1">QTY</th><th class="py-1">EXP</th></tr>
                                 </thead>
                                 <tbody id="bl_table_riwayat" class="text-slate-700"></tbody>
                             </table>
                         </div>
                     </div>
+                </div>
 
-                    <div class="col-span-12 bg-white rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden">
-                        <div class="bg-slate-50 p-2 border-b"><span class="text-[10px] font-bold text-slate-700 uppercase">Rekap Detail Stok Barang</span></div>
+                <div class="flex-1 bg-white rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col">
+                    <div class="bg-slate-50 p-2 border-b"><span class="text-[10px] font-bold text-slate-700 uppercase">Rekap Detail Stok Barang</span></div>
+                    <div class="flex-1 overflow-y-auto">
                         <table class="w-full text-[11px]">
-                            <thead class="bg-slate-50 text-slate-500">
-                                <tr><th class="py-1.5 px-4">NO</th><th class="py-1.5 px-4">KODE</th><th class="py-1.5 text-center">QTY</th><th class="py-1.5 px-4">EXP LAMA</th><th class="py-1.5 px-4">EXP BARU</th></tr>
+                            <thead class="bg-slate-50 text-slate-500 sticky top-0">
+                                <tr><th class="py-1.5 px-4 text-left">NO</th><th class="py-1.5 px-4 text-left">KODE</th><th class="py-1.5 text-center">QTY</th><th class="py-1.5 px-4">EXP LAMA</th><th class="py-1.5 px-4">EXP BARU</th></tr>
                             </thead>
                             <tbody id="bl_table_rekap"></tbody>
                         </table>
