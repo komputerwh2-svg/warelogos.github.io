@@ -300,7 +300,7 @@ function tutupmiuiAlert() {
 const APP_CONFIG = {
     ADMIN_USER: "admin",
     ADMIN_PASS: "admin",
-    APLIKASI_KUNCI: ["APP_MASTER_DATA", "APP_REKAP_BLOK1"] // List ID aplikasi yang dikunci
+    APLIKASI_KUNCI: ["APP_MASTER_DATA1", "APP_REKAP_BLOK1"] // List ID aplikasi yang dikunci
 };
 
 let pendingTargetApp = "";
