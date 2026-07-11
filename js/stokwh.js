@@ -36,6 +36,8 @@ window.gantiModulStokWH = function(mode) {
         if (typeof initDropdownsRekap === 'function') {
             initDropdownsRekap();
         }
+        gantiModeRekap(moderekap); // Pastikan mode rekap diatur sesuai
+        window.renderTabelRekap();
         console.log("Inisialisasi mode REKAP dipanggil");
     } else if (mode === 'WH2') {
         slider.style.transform = 'translateX(-25%)';
@@ -492,14 +494,6 @@ async function initDropdownsRekap() {
 
     // Eksekusi pertama kali
     await updateTanggalDropdownRekap();
-}
-
-// 2. Fungsi Pemicu saat tombol mode diganti
-async function gantiModeRekap(modeValue) {
-    console.log("Mode REKAP berubah ke:", modeValue);
-    // Refresh dropdown tanggal karena prefix-nya mungkin berubah (WH2 vs WH3)
-    await updateTanggalDropdownRekap();
-    loadDataRekap();
 }
 
 // 2. Fungsi init yang memanggil fungsi di atas
@@ -991,20 +985,29 @@ function bacaExcelDinamis(file, keyword = "KODE") {
     });
 }
 
-async function gantiModeRekap(mode) {
-    // 1. Fetch Data
-    // Pastikan fungsi fetchData ini ada di file Anda
-    const data = await fetchData(mode); 
-    
-    // 2. Langsung Panggil Render
-    renderTabelRekap(data, mode);
-}
+async function gantiModeRekap(moderekap) {
+    console.log("Mode yang dipilih:", moderekap);
 
-async function fetchData(mode, tgl) {
-    // Sesuaikan URL Firebase Anda
-    const url = `https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/rekap/${mode}/${tgl}.json`;
-    const response = await fetch(url);
-    return await response.json();
+    const titlerekap = document.getElementById('txt-table-title-rekap');
+    
+    // 1. Definisikan pemetaan mode ke judul di sini
+    const titleMap = {
+        "WH2_SEBELUM": "TABEL DATA WH-2 SEBELUM",
+        "WH2_SESUDAH": "TABEL DATA WH-2 SESUDAH",
+        "STOK_WH3": "TABEL DATA STOK WH-3",
+        "SELISIH_WH3": "TABEL DATA SELISIH WH-3",
+        "BARANG_LEBIH": "TABEL DATA BARANG LEBIH"
+    };
+
+    // 2. Terapkan judul dengan akses yang aman
+    if (titlerekap) {
+        titlerekap.innerText = titleMap[moderekap] || "TABEL DATA REKAP";
+    }   
+
+    // Ganti nama fungsi di bawah ini agar sesuai dengan nama fungsi yang Anda miliki:
+    loadDataRekap(); 
+
+    renderTabelRekap(null, moderekap); // Pastikan parameter render sesuai
 }
 
 function gantiModeWH2(mode) {
@@ -1012,8 +1015,8 @@ function gantiModeWH2(mode) {
     // lalu memicu loadStokData untuk mengupdate isi tabel
     const title = document.getElementById('txt-table-title-wh2');
     if (title) {
-        title.innerText = mode === "SEBELUM" ? "TABEL DATA WH-2 SEBELUM" : "TABEL DATA WH-2 SESUDAH";
-    }   
+        title.innerText = mode === "WH2_SEBELUM" ? "TABEL DATA WH-2 SEBELUM" : "TABEL DATA WH-2 SESUDAH";
+    }
     loadStokData(); 
 }
 
@@ -1126,20 +1129,45 @@ function tampilkanKosongwh3(infoTambahan = '') {
 
 
 async function loadDataRekap() {
-    // Ambil nilai dari input/radio button yang aktif di halaman Anda
-    const mode = document.querySelector('input[name="mode"]:checked')?.value || 'WH2_SEBELUM';
-    const tgl = document.getElementById('input-tanggal').value; // Sesuaikan ID-nya
+    const inputTglrekap = document.getElementById('select-tanggal-rekap');
+    const tanggalrekap = inputTglrekap ? inputTglrekap.value : null;
+    if (!tanggalrekap) return; 
 
-    // Tampilkan loading agar user tahu proses sedang berjalan
-    const tbody = document.getElementById('tabel-body-rekap');
-    tbody.innerHTML = '<tr><td colspan="10" class="text-center py-5">Memuat data...</td></tr>';
+    const radioCheckedrekap = document.querySelector('input[name="rb-mode-rekap"]:checked');
+    const moderekap = radioCheckedrekap ? radioCheckedrekap.value : "WH2_SEBELUM";
+
+    // 1. Tentukan file source
+    let sourceFile = moderekap.includes('WH3') ? 'stok_wh3.json' : 
+                     (moderekap === 'BARANG_LEBIH' ? 'stok_lebih.json' : 'stok_wh2.json');
+    let keyPrefix = moderekap.includes('WH3') ? 'stokwh3_' : 'stokwh2wms_';
 
     try {
-        let data = await fetchData(mode, tgl); // Pastikan fungsi fetchData menerima parameter
-        renderTabelRekap(data, mode);
+        const responserekap = await fetch(`${DB_FIREBASE_URL}${sourceFile}`);
+        const allDatarekap = await responserekap.json();
+
+        // A. Handling untuk Barang Lebih
+        if (moderekap === 'BARANG_LEBIH') {
+            await window.renderTabelBarangLebih(); // Panggil fungsi khusus
+            return; // PENTING: Berhenti di sini agar tidak memanggil renderTabelRekap
+        }
+
+        // B. Handling untuk Selisih WH3
+        if (moderekap === 'SELISIH_WH3') {
+            await renderSelisihWH3(allDatarekap); // Panggil fungsi khusus
+            return; // PENTING: Berhenti di sini
+        }
+
+        // C. Handling untuk Stok Harian (WH2/WH3)
+        const formattedDaterekap = tanggalrekap.replace(/-/g, '');
+        const keyrekap = Object.keys(allDatarekap || {}).find(k => k.includes(`${keyPrefix}${formattedDaterekap}`));
+        
+        if (keyrekap) {
+            renderTabelRekap(allDatarekap[keyrekap], moderekap);
+        } else {
+            tampilkanKosongRekap(tanggalrekap);
+        }
     } catch (error) {
         console.error("Gagal memuat data:", error);
-        tbody.innerHTML = '<tr><td colspan="10" class="text-center py-5 text-red-500">Gagal mengambil data.</td></tr>';
     }
 }
 
@@ -1227,7 +1255,6 @@ async function loadStokDatawh3() {
 
 
 
-// Simpan ini di stokwh.js
 async function renderTabelRekap(dataStok, mode) {
     const tbody = document.getElementById('tabel-body-rekap');
     const thead = document.getElementById('thead-rekap');
@@ -1235,18 +1262,17 @@ async function renderTabelRekap(dataStok, mode) {
 
     tbody.innerHTML = '';
     
-    // 1. Header Dinamis
+    // Konfigurasi hanya untuk data stok harian
     const config = {
-        'WH2_SEBELUM': ['NO', 'KODE', 'BOSNET', 'WMS', 'SELISIH', 'KET'],
-        'WH2_SESUDAH': ['NO', 'KODE', 'BOSNET', 'WMS', 'SELISIH', 'KET'],
-        'STOK_WH3': ['NO', 'KODE', 'BLOK', 'BOSNET', 'PAK', 'BECE', 'UTUH', 'TOTAL', 'SELISIH', 'KET'],
-        'SELISIH_WH3': ['NO', 'KODE', 'TOTAL', 'BOSNET', 'SELISIH', 'KET'],
-        'BARANG_LEBIH': ['NO', 'KODE', 'QTY', 'EXP LAMA', 'EXP BARU']
+        'WH2_SEBELUM': ['NO', 'KODE', 'BOSNET', 'WMS', 'SELISIH', 'KETERANGAN'],
+        'WH2_SESUDAH': ['NO', 'KODE', 'BOSNET', 'WMS', 'SELISIH', 'KETERANGAN'],
+        'STOK_WH3': ['NO', 'KODE', 'BLOK', 'BOSNET', 'PAK', 'BECERAN', 'UTUHAN', 'TOTAL', 'SELISIH', 'KETERANGAN']
     };
 
-    thead.innerHTML = config[mode].map(h => `<th class="py-3 px-4 text-left border-b bg-slate-100 uppercase">${h}</th>`).join('');
+    if (!config[mode]) return; // Jika mode bukan stok harian, hentikan proses
 
-    // 2. Loop Data
+    thead.innerHTML = `<tr>${config[mode].map(h => `<th class="py-3 px-4 text-left border-b bg-slate-100 uppercase">${h}</th>`).join('')}</tr>`;
+
     if (!dataStok || Object.keys(dataStok).length === 0) {
         tbody.innerHTML = `<tr><td colspan="${config[mode].length}" class="text-center py-10">Data tidak ditemukan.</td></tr>`;
         return;
@@ -1260,12 +1286,8 @@ async function renderTabelRekap(dataStok, mode) {
             let b = mode === 'WH2_SEBELUM' ? (item.stokwh2_sebelum || 0) : (item.stokwh2_sesudah || 0);
             let w = mode === 'WH2_SEBELUM' ? (item.stokwms_sebelum || 0) : (item.stokwms_sesudah || 0);
             row += `<td>${b}</td><td>${w}</td><td>${b - w}</td><td>${(b - w) === 0 ? 'SESUAI' : 'SELISIH'}</td>`;
-        } 
-        else if (mode === 'STOK_WH3') {
+        } else if (mode === 'STOK_WH3') {
             row += `<td>${item.blok||'-'}</td><td>${item.bosnet||0}</td><td>${item.pak||0}</td><td>${item.beceran||0}</td><td>${item.utuhan||0}</td><td>${item.total||0}</td><td>${item.selisih||0}</td><td>${item.keterangan||'-'}</td>`;
-        }
-        else if (mode === 'BARANG_LEBIH') {
-            row += `<td>${item.qty||0}</td><td>${item.exp_lama||'-'}</td><td>${item.exp_baru||'-'}</td>`;
         }
 
         tbody.innerHTML += row + `</tr>`;
@@ -2353,13 +2375,13 @@ window.toggleEngineTransaksi_bl = function(isOut) {
         boxWorkspace.className = "col-span-7 bg-rose-200/60 rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col transition-colors duration-200";
         if(titleSide) {
             titleSide.innerText = "Input Barang Lebih Keluar";
-            titleSide.className = "text-[10px] font-bold text-rose-700 uppercase tracking-wide";
+            titleSide.className = "text-[15px] font-bold text-rose-700 uppercase";
         }
         if(lblSwitch) {
             lblSwitch.innerText = "KELUAR";
-            lblSwitch.className = "text-[9px] font-bold text-rose-600 bg-rose-100/80 px-1.5 py-0.5 rounded uppercase tracking-wider";
+            lblSwitch.className = "text-[12px] font-bold text-rose-600 bg-rose-100/80 px-1.5 py-0.5 rounded uppercase tracking-wider";
         }
-        btnSimpanbl.className = "flex-1 py-1.5 bg-gradient-to-b from-[#f43f5e] to-[#e11d48] text-white font-bold text-[10px] rounded-lg shadow-md border border-rose-600 tracking-wide text-center uppercase transition-colors";
+        btnSimpanbl.className = "flex-1 py-1.5 bg-gradient-to-b from-[#f43f5e] to-[#e11d48] text-white font-bold text-[15px] rounded-lg shadow-md border border-rose-600 tracking-wide text-center uppercase transition-colors";
         btnSimpanbl.innerText = "SIMPAN OUT";
 
         // Tambahkan ini: Load data untuk KELUAR
@@ -2370,13 +2392,13 @@ window.toggleEngineTransaksi_bl = function(isOut) {
         boxWorkspace.className = "col-span-7 bg-emerald-200/60 rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col transition-colors duration-200";
         if(titleSide) {
             titleSide.innerText = "Input Barang Lebih Terbaru";
-            titleSide.className = "text-[10px] font-bold text-emerald-700 uppercase tracking-wide";
+            titleSide.className = "text-[15px] font-bold text-emerald-700 uppercase";
         }
         if(lblSwitch) {
             lblSwitch.innerText = "MASUK";
-            lblSwitch.className = "text-[9px] font-bold text-emerald-600 bg-emerald-100/80 px-1.5 py-0.5 rounded uppercase tracking-wider";
+            lblSwitch.className = "text-[12px] font-bold text-emerald-600 bg-emerald-100/80 px-1.5 py-0.5 rounded uppercase tracking-wider";
         }
-        btnSimpanbl.className = "flex-1 py-1.5 bg-gradient-to-b from-[#10b981] to-[#059669] text-white font-bold text-[10px] rounded-lg shadow-md border border-emerald-600 tracking-wide text-center uppercase transition-colors";
+        btnSimpanbl.className = "flex-1 py-1.5 bg-gradient-to-b from-[#10b981] to-[#059669] text-white font-bold text-[15px] rounded-lg shadow-md border border-emerald-600 tracking-wide text-center uppercase transition-colors";
         btnSimpanbl.innerText = "SIMPAN IN";
 
         // Tambahkan ini: Load data untuk MASUK
@@ -2537,7 +2559,7 @@ window.bl_renderRiwayat = async function() {
         const data = await response.json();
         
         if (!data || Object.keys(data).length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-slate-400 text-[10px]">Belum ada transaksi</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-slate-400 text-[12px]">Belum ada transaksi</td></tr>`;
             return;
         }
 
@@ -2569,22 +2591,22 @@ window.bl_renderRiwayat = async function() {
             
             return `
                 <tr class="hover:bg-slate-50 border-b border-slate-50 text-center">
-                    <td class="py-1 px-2 text-slate-400 text-[9px] truncate">${tglDisplay}</td>
+                    <td class="py-1 px-2 text-slate-400 text-[12px] truncate">${tglDisplay}</td>
                     <td class="py-1 px-1">
-                        <span class="${isOut ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'} text-[8px] px-1.5 rounded font-bold uppercase">
+                        <span class="${isOut ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'} text-[12px] px-1.5 rounded font-bold uppercase">
                             ${item.tipe || '-'}
                         </span>
                     </td>
-                    <td class="py-1 px-1 font-bold text-slate-900 text-[10px]">${item.kode || '-'}</td>
-                    <td class="py-1 px-1 text-[10px]">${item.qty || 0}</td>
-                    <td class="py-1 px-1 text-slate-500 text-[10px]">${item.expired || '-'}</td>
+                    <td class="py-1 px-1 font-bold text-slate-900 text-[12px]">${item.kode || '-'}</td>
+                    <td class="py-1 px-1 text-[12px]">${item.qty || 0}</td>
+                    <td class="py-1 px-1 text-slate-800 text-[12px]">${item.expired || '-'}</td>
                 </tr>
             `;
         }).join('');
         
     } catch (e) {
         console.error("Gagal memuat riwayat:", e);
-        tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-red-500 text-[10px]">Gagal memuat data</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-red-500 text-[12px]">Gagal memuat data</td></tr>`;
     }
 };
 
@@ -2609,7 +2631,7 @@ window.renderTabelBarangLebih = async function() {
 
         // 3. Validasi jika data kosong
         if (!data || Object.keys(data).length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-slate-400 text-[10px]">Belum ada data stok barang lebih</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-slate-400 text-[15px]">Belum ada data stok barang lebih</td></tr>`;
             return;
         }
 
@@ -2620,14 +2642,14 @@ window.renderTabelBarangLebih = async function() {
         })).filter(item => parseInt(item.qty) > 0);
 
         if (listBarang.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-slate-400 text-[10px]">Stok kosong</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-slate-400 text-[15px]">Stok kosong</td></tr>`;
             return;
         }
 
         // 5. Render ke tabel
         tbody.innerHTML = listBarang.map((item, index) => {
             return `
-                <tr class="hover:bg-slate-50 border-b border-slate-50 text-[10px]">
+                <tr class="hover:bg-slate-50 border-b border-slate-50 text-[15px]">
                     <td class="py-2 px-2 text-center text-slate-500">${index + 1}</td>
                     <td class="py-2 px-2 font-bold text-slate-900">${item.kode}</td>
                     <td class="py-2 px-2 text-center font-bold text-blue-600">${item.qty}</td>
@@ -2641,6 +2663,6 @@ window.renderTabelBarangLebih = async function() {
 
     } catch (e) {
         console.error("Gagal memuat rekap barang lebih:", e);
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-red-500 text-[10px]">Gagal memuat data</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-red-500 text-[15px]">Gagal memuat data</td></tr>`;
     }
 };
