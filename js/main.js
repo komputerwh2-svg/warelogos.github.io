@@ -531,7 +531,7 @@ function bukaSubPageStokWH() {
                     } else {
                         // Jika belum membuat initApp, panggil manual satu per satu:
                         console.log("Memulai inisialisasi dropdown...");
-                        if (typeof initDropdowns === 'function') initDropdowns('REKAP');
+                        if (typeof initDropdownsRekap === 'function') initDropdownsRekap('REKAP');
                         if (typeof initDropdowns === 'function') initDropdowns('WH2');
                         if (typeof initDropdownsWH3 === 'function') initDropdownsWH3();
                     }
@@ -554,6 +554,70 @@ function tutupSubPageStokWH() {
 
 window.bukaSubPageStokWH = bukaSubPageStokWH;
 window.tutupSubPageStokWH = tutupSubPageStokWH;
+
+
+// Fungsi untuk membuka subpage Muat WH-3
+function bukaSubPageMuatWH3() {
+    // 1. Tentukan kontenernya (pastikan ada <div id="subpage-muat-wh3-container"></div> di index.html Anda)
+    const container = document.getElementById('subpage-muat-wh3-container'); 
+    
+    if (!container) {
+        console.error("Wadah 'subpage-muat-wh3-container' tidak ditemukan di index.html!");
+        return;
+    }
+
+    const subpage = document.getElementById('subpage-muat-wh3');
+
+    // Jika sudah ada (sudah pernah di-fetch), langsung buka
+    if (subpage) {
+        subpage.classList.remove('translate-x-full');
+        return;
+    }
+
+    // 2. Fetch file HTML subpage
+    fetch('apps/muatwh3.html') 
+        .then(response => {
+            if (!response.ok) throw new Error("Gagal mengambil file apps/muatwh3.html");
+            return response.text();
+        })
+        .then(htmlContent => {
+            container.innerHTML = htmlContent;
+
+            // 3. Suntikkan script JS-nya
+            const script = document.createElement('script');
+            script.src = "js/muatwh3.js"; 
+            
+            script.onload = () => {
+                // Panggil fungsi inisialisasi yang baru kita buat
+                if (typeof window.initMuatWH3 === 'function') {
+                    window.initMuatWH3();
+                }
+                
+                const elemenBaru = document.getElementById('subpage-muat-wh3');
+                if (elemenBaru) {
+                    elemenBaru.classList.remove('translate-x-full');
+                }
+            };
+            document.body.appendChild(script);
+        })
+        .catch(error => {
+            console.error(error);
+            alert("Sistem Gagal Memuat Template Muat WH-3!");
+        });
+}
+
+// Fungsi untuk menutup subpage Muat WH-3
+window.tutupSubPageMuatWH3 = function() {
+    const subpage = document.getElementById('subpage-muat-wh3');
+    if (subpage) {
+        subpage.classList.add('translate-x-full');
+    }
+};
+
+console.log("Modul Muat WH-3 dimuat.");
+
+window.bukaSubPageMuatWH3 = bukaSubPageMuatWH3;
+window.tutupSubPageMuatWH3 = tutupSubPageMuatWH3;
 
 
 
