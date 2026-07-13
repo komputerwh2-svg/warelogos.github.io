@@ -186,18 +186,18 @@
                 <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Stok WH</span>
             </div>
 
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="window.bukaSubPageMuatWH3()">
+                <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
+                    <img src="img/muatwh3.png" alt="Muat WH-3" class="w-full h-full object-cover">
+                </div>
+                <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Muat WH-3</span>
+            </div>
+
             <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="miuiAlert('Membuka Menu Mutasi')">
                 <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
                     <img src="img/mutasi.png" alt="Mutasi" class="w-full h-full object-cover">
                 </div>
                 <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Mutasi</span>
-            </div>
-
-            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="miuiAlert('Membuka Muat WH-3')">
-                <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
-                    <img src="img/muatwh3.png" alt="Muat WH-3" class="w-full h-full object-cover">
-                </div>
-                <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Muat WH-3</span>
             </div>
 
             <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="miuiAlert('Membuka Trobel DO')">
@@ -313,6 +313,7 @@
     <div id="subpage-rekap-blok-container"></div>
     <div id="subpage-stokwh-container"></div>
     <div id="subpage-ongkir-container"></div>
+    <div id="subpage-muat-wh3-container"></div>
     <div id="bank-data-container"></div>
 
     <div id="subpage-setelan" class="hidden fixed inset-0 bg-[#f4f4f4] flex flex-col z-50 select-none font-sans">
@@ -671,6 +672,8 @@
     <script type="module" src="js/ongkir.js"></script>
 
     <script type="module" src="js/stokwh.js"></script>
+
+    <script type="module" src="js/muatwh3.js"></script>
     
     <script>
         if ('serviceWorker' in navigator) {
