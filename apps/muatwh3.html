@@ -5,32 +5,66 @@
     <div class="w-full h-auto min-h-[60px] flex items-center justify-between px-3 shadow-md relative z-10" 
         style="background: linear-gradient(to bottom, #3c3c3c, #2a2a2a); border-bottom: 1px solid #1a1a1a;">
             
-        <div class="flex items-center py-2">
-            <button onclick="tutupSubPageMuatWH3()" class="miui-btn-back flex items-center justify-center gap-1 px-3 py-1.5 rounded text-xs font-bold text-orange-400 shadow-inner">
-                <i class="fa-solid fa-chevron-left text-sm"></i>
-                <span>Kembali</span>
-            </button>
-            <!-- Tambahkan ID display-waktu-wh3 -->
-            <h1 class="text-white font-bold text-[14px] ml-3 tracking-wide drop-shadow-md">
-                Muat WH-3 
-                <span id="display-waktu-wh3" class="text-orange-500 font-bold text-[14px] ml-3 tracking-wide drop-shadow-md"></span>
-            </h1>
+        <!-- Kontainer Utama Header -->
+        <div class="flex flex-wrap items-center gap-4 py-2 background: linear-gradient(to bottom, #3c3c3c, #2a2a2a); border-bottom: 1px solid #1a1a1a; px-3 rounded-lg">
+            
+            <!-- Bagian Kiri: Tombol Kembali & Judul -->
+            <div class="flex items-center gap-4">
+                <button onclick="tutupSubPageMuatWH3()" class="miui-btn-back flex items-center justify-center gap-1 px-3 py-1.5 rounded text-xs font-bold text-orange-400 shadow-inner">
+                    <i class="fa-solid fa-chevron-left text-sm"></i>
+                    <span>Kembali</span>
+                </button>
+
+                <div class="h-8 w-[1px] bg-white/10 mx-1"></div>
+
+                <h1 class="text-white font-bold text-[14px] ml-3 tracking-wide drop-shadow-md">
+                    FORM MUAT WH-3 
+                    <span id="display-waktu-wh3" class="text-orange-500 font-bold text-[14px] ml-3 tracking-wide drop-shadow-md"></span>
+                </h1>
+            </div>
         </div>
 
-        <div class="flex items-center bg-black/35 p-1 rounded-xl border border-black/30 shadow-inner gap-0.5">
-            <!-- Tab 1: Input Data -->
-            <label class="relative flex items-center justify-center px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider cursor-pointer transition-all">
-                <input type="radio" name="rb-muat-wh3" value="KONFIRMASI" checked onchange="gantiModulMuatWH3(this.value)" class="sr-only peer">
-                <span class="z-10 text-gray-400 peer-checked:text-white transition-colors">KONFIRMASI BOSNET</span>
-                <div class="absolute inset-0 rounded-lg shadow-sm opacity-0 scale-95 peer-checked:opacity-100 peer-checked:scale-100 transition-all duration-200" style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #d95d00;"></div>
-            </label>
+        <div class="flex items-center background: linear-gradient(to bottom, #3c3c3c, #2a2a2a); border-bottom: 1px solid #1a1a1a; p-2 rounded-xl border border-black/10 shadow-inner gap-4">
+    
+            <!-- Grup Dropdown: Dibuat lebih ringkas -->
+            <div class="flex items-center gap-3">
+                <!-- Dropdown Periode -->
+                <div class="flex flex-col">
+                    <label class="text-[10px] font-black text-slate-100 uppercase tracking-wider mb-0.5">Periode Bulan</label>
+                    <select id="select-periode-muat" onchange="updateTanggalDropdownMuatWH3()"
+                        class="px-2 py-1 text-xs text-gray-800 font-bold bg-white border border-orange-200 rounded-md focus:border-orange-500 outline-none transition-all">
+                    </select>
+                </div>
 
-            <!-- Tab 2: Manajemen Rak & Blok -->
-            <label class="relative flex items-center justify-center px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider cursor-pointer transition-all">
-                <input type="radio" name="rb-muat-wh3" value="RAK" onchange="gantiModulMuatWH3(this.value)" class="sr-only peer">
-                <span class="z-10 text-gray-400 peer-checked:text-white transition-colors">RAK & BLOK</span>
-                <div class="absolute inset-0 rounded-lg shadow-sm opacity-0 scale-95 peer-checked:opacity-100 peer-checked:scale-100 transition-all duration-200" style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #d95d00;"></div>
-            </label>
+                <!-- Dropdown Tanggal -->
+                <div class="flex flex-col">
+                    <label class="text-[10px] font-black text-slate-100 uppercase tracking-wider mb-0.5">Tanggal Muat</label>
+                    <select id="select-tanggal-muat" onchange="renderTabelGabungan()"
+                        class="px-2 py-1 text-xs text-gray-800 font-bold bg-white border border-orange-200 rounded-md focus:border-orange-500 outline-none transition-all">
+                        <option value="">Pilih Tgl</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Garis Pemisah Tipis -->
+            <div class="h-8 w-[1px] bg-white/10 mx-1"></div>
+
+            <!-- Grup Tombol Tab: Menggunakan flex-1 agar lebih fleksibel atau tetap di kanan -->
+            <div class="flex items-center gap-1 ml-auto">
+                <!-- Tab 1 -->
+                <label class="relative flex items-center justify-center px-4 py-2 rounded-lg text-[11px] font-black uppercase cursor-pointer transition-all">
+                    <input type="radio" name="rb-muat-wh3" value="KONFIRMASI" checked onchange="gantiModulMuatWH3(this.value)" class="sr-only peer">
+                    <span class="z-10 text-gray-300 peer-checked:text-white transition-colors">KONFIRMASI BOSNET</span>
+                    <div class="absolute inset-0 rounded-lg shadow-md opacity-0 scale-95 peer-checked:opacity-100 peer-checked:scale-100 transition-all duration-200" style="background: linear-gradient(to bottom, #ff8b00, #f36c00);"></div>
+                </label>
+
+                <!-- Tab 2 -->
+                <label class="relative flex items-center justify-center px-4 py-2 rounded-lg text-[11px] font-black uppercase cursor-pointer transition-all">
+                    <input type="radio" name="rb-muat-wh3" value="RAK" onchange="gantiModulMuatWH3(this.value)" class="sr-only peer">
+                    <span class="z-10 text-gray-300 peer-checked:text-white transition-colors">AMBIL RAK & BLOK</span>
+                    <div class="absolute inset-0 rounded-lg shadow-md opacity-0 scale-95 peer-checked:opacity-100 peer-checked:scale-100 transition-all duration-200" style="background: linear-gradient(to bottom, #ff8b00, #f36c00);"></div>
+                </label>
+            </div>
         </div>
     </div>
 
@@ -43,93 +77,92 @@
             <!-- Konten Input Bosnet (Slide 1) -->
             <div class="w-1/2 flex-shrink-0 p-4 space-y-4">
                 <!-- Card Utama Input -->
-                <div class="bg-gray-100 p-5 rounded-2xl shadow-sm border border-orange-200">
-                   <!-- Area Kontrol Input -->
-                        <!-- Kontainer Utama -->
-                        <div class="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4">
-                            
-                            <!-- Grup Input (Kode + Nama) -->
-                            <!-- Di layar sedang ke atas (md), dia mengambil 8 kolom. Di layar kecil, 1 kolom penuh -->
-                            <div class="col-span-1 md:col-span-12 flex gap-4">
-                                <!-- Kode -->
-                                <div class="w-1/4 md:w-1/6">
-                                    <label class="text-[15px] font-black text-slate-600 uppercase">Kode Tujuan</label>
-                                    <input type="text" id="input-kode-tujuan" placeholder="Cth: LPG..."
-                                        class="w-full px-3 py-2 mt-1 text-xs text-gray-800 font-bold bg-white border border-orange-200 rounded-lg focus:border-orange-500 focus:ring-0 outline-none uppercase transition-all">
-                                </div>
-                                <!-- Nama -->
-                                <div class="w-3/4 md:w-5/6">
-                                    <label class="text-[15px] font-black text-slate-600 uppercase">Nama Lengkap Tujuan</label>
-                                    <input type="text" id="input-nama-tujuan" placeholder="Nama alamat tujuan..."
-                                        class="w-full px-3 py-2 mt-1 text-xs text-gray-800 font-bold bg-white border border-orange-200 rounded-lg focus:border-orange-500 focus:ring-0 outline-none transition-all">
-                                </div>
-                                <!-- Dropdown Periode -->
-                                <div class="w-full md:w-1/6">
-                                    <label class="text-[15px] font-black text-slate-600 uppercase">Periode Muat</label>
-                                    <select id="select-periode-muat" onchange="updateTanggalDropdownMuatWH3()"
-                                        class="w-full px-3 py-2 mt-1 text-xs text-gray-800 font-bold bg-white border border-orange-200 rounded-lg focus:border-orange-500 focus:ring-0 outline-none transition-all">
-                                    </select>
-                                </div>
-
-                                <!-- Dropdown Tanggal -->
-                                <div class="w-full md:w-1/6">
-                                    <label class="text-[15px] font-black text-slate-600 uppercase">Tanggal Muat</label>
-                                    <select id="select-tanggal-muat" 
-                                        class="w-full px-3 py-2 mt-1 text-xs text-gray-800 font-bold bg-white border border-orange-200 rounded-lg focus:border-orange-500 focus:ring-0 outline-none transition-all">
-                                        <option value="">Pilih Tanggal</option>
-                                    </select>
-                                </div>
-                            </div>
-
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-orange-200">
+                    <!-- Area Kontrol Input -->
+                    <div class="space-y-4">
+                        <!-- Textarea Modern -->
+                        <div>
+                            <label class="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1.5 block">Pastekan data bosnet kesini:</label>
+                            <textarea id="ta-bosnet-input" 
+                                class="w-full h-36 p-4 bg-slate-50 border border-orange-200 rounded-xl text-xs font-medium text-slate-700 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all resize-none shadow-inner"
+                                placeholder="Paste data dari Bosnet di sini..."></textarea>
                         </div>
-                    
-                    <!-- Textarea Modern -->
-                    <textarea id="ta-bosnet-input" 
-                        class="w-full h-40 p-4 bg-slate-50 border-2 border-orange-100 rounded-xl text-xs font-medium text-slate-700 focus:border-orange-500 focus:ring-0 transition-all resize-none"
-                        placeholder="Paste data dari Bosnet di sini..."></textarea>
 
-                    <div class="mt-4 flex gap-2">
+                        <!-- Grup Input (Kode + Nama) -->
+                        <div class="flex gap-3">
+                            <!-- Kode Tujuan -->
+                            <div class="w-1/4 md:w-1/5">
+                                <label class="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1.5 block">Kode Tujuan</label>
+                                <input type="text" id="input-kode-tujuan" placeholder="Cth: LPG..."
+                                    class="w-full px-4 py-2.5 text-xs text-gray-800 font-bold bg-white border border-orange-200 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none uppercase transition-all">
+                            </div>
+                            <!-- Nama Tujuan -->
+                            <div class="flex-1">
+                                <label class="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1.5 block">Nama Lengkap Tujuan</label>
+                                <input type="text" id="input-nama-tujuan" placeholder="Nama alamat tujuan..."
+                                    class="w-full px-4 py-2.5 text-xs text-gray-800 font-bold bg-white border border-orange-200 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tombol Aksi -->
+                    <div class="mt-6 flex gap-2">
+                        <!-- Tombol Utama (Convert) - Mengambil porsi terbesar -->
                         <button onclick="prosesDataBosnet()" 
-                            class="flex-1 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-black text-xs rounded-xl shadow-lg shadow-orange-500/30 transition-all active:scale-95">
-                            <i class="fa-solid fa-bolt mr-2"></i> CONVERT DATA
+                            class="flex-[3] py-3.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-black text-[11px] rounded-xl shadow-lg shadow-orange-500/20 transition-all active:scale-[0.98] uppercase tracking-widest">
+                            <i class="fa-solid fa-bolt mr-2"></i> Convert Data Bosnet/Mutasi
                         </button>
-                        <button onclick="clearBosnetInput()" 
-                            class="px-5 py-3 bg-rose-100 hover:bg-rose-200 text-rose-600 font-bold text-xs rounded-xl transition-all active:scale-95">
-                            <i class="fa-solid fa-trash-can"></i>
+
+                        <!-- Tombol Mutasi - Mengambil porsi menengah -->
+                        <!-- Tombol Mutasi -->
+                        <button onclick="bukaFileMutasi()" 
+                            class="flex-[2] py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] rounded-xl shadow-lg shadow-emerald-500/20 transition-all active:scale-[0.98] uppercase tracking-widest">
+                            <i class="fa-solid fa-file-excel mr-2"></i> Mutasi DEPO/SP
+                        </button>
+
+                        <!-- Hidden Input -->
+                        <input type="file" id="input-file-mutasi" accept=".xls,.xlsx" class="hidden" onchange="prosesFileMutasi(event)">
+
+                        <!-- Tombol Reset - Mengambil porsi terkecil -->
+                        <button onclick="resetFormulir()" 
+                            class="flex-[0.5] py-3.5 bg-rose-100 hover:bg-red-200 text-rose-500 hover:text-rose-600 border border-red-500 font-black text-xs rounded-xl transition-all active:scale-[0.98] uppercase tracking-widest">
+                            <i class="fa-solid fa-trash-can mr-2"></i> Batal
                         </button>
                     </div>
                 </div>
 
                 <!-- Statistik Singkat -->
                 <div class="grid grid-cols-2 gap-4">
+                    <!-- Total Tujuan -->
                     <div class="bg-white p-4 rounded-xl border border-orange-200 shadow-sm flex flex-col">
-                        <span class="text-[10px] font-black text-slate-400 uppercase">Total Baris</span>
-                        <span id="txt-total-baris" class="text-xl font-black text-slate-800">0</span>
+                        <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Tujuan</span>
+                        <span id="txt-total-tujuan" class="text-2xl font-black text-slate-800">0</span>
                     </div>
+                    <!-- Total No DO -->
                     <div class="bg-white p-4 rounded-xl border border-orange-200 shadow-sm flex flex-col">
-                        <span class="text-[10px] font-black text-slate-400 uppercase">Status Muat</span>
-                        <span id="txt-status-muat" class="text-xl font-black text-emerald-600">IDLE</span>
+                        <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Nomor DO</span>
+                        <span id="txt-total-nodo" class="text-2xl font-black text-orange-600">0</span>
                     </div>
                 </div>
 
                 <!-- Tabel Data Tersimpan -->
-                <div class="mt-6 bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-[10px] text-slate-700 border-collapse">
-                            <thead>
-                                <tr class="bg-slate-100 uppercase text-[9px] text-slate-500">
-                                    <th class="p-2 border border-slate-200">Kode</th>
-                                    <!-- Kolom DO akan digenerate dinamis -->
-                                    <th id="header-do" class="p-2 border border-slate-200">Semua DO</th>
-                                    <th class="p-2 border border-slate-200">Total</th>
-                                    <th class="p-2 border border-slate-200">Rincian</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tabel-matriks-body" class="divide-y divide-slate-100">
-                                <!-- Data masuk di sini -->
-                            </tbody>
-                        </table>
-                    </div>
+                <div class="overflow-x-auto bg-white rounded-2xl shadow-sm border border-orange-200 p-4">
+                    <table class="w-full text-left border-collapse">
+                        <!-- Header 2 Baris -->
+                        <thead id="tabel-matriks-head" class="text-[11px] uppercase font-black text-slate-800 border-b-2 border-blue-200 bg-orange-100">
+                            <!-- Akan diisi otomatis oleh JS dengan 2 baris <tr> -->
+                        </thead>
+                        
+                        <!-- Body Data -->
+                        <tbody id="tabel-matriks-body" class="text-[11px] font-bold text-slate-800">
+                            <!-- Data akan diisi oleh JavaScript -->
+                        </tbody>
+                        
+                        <!-- Opsional: Footer untuk Total per Kolom -->
+                        <tfoot id="tabel-matriks-foot" class="border-t-2 border-slate-200 text-[11px] font-black text-slate-800 bg-slate-50">
+                            <!-- Total per NO DO bisa diisi di sini -->
+                        </tfoot>
+                    </table>
                 </div>
             </div>
 
