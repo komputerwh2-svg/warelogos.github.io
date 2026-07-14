@@ -15,6 +15,14 @@ window.getDB = function() {
     return null;
 };
 
+// Fungsi load master barang
+let cacheMasterBarang = {};
+async function loadMasterBarang() {
+    const snap = await fetch(`${DB_FIREBASE_URL}master_barang.json`);
+    cacheMasterBarang = await snap.json();
+    console.log("Master Barang berhasil dimuat:", cacheMasterBarang);
+}
+
 // Fungsi Inisialisasi utama
 window.initMuatWH3 = async function() {
     console.log("Inisialisasi modul Muat WH-3...");
@@ -221,12 +229,16 @@ window.prosesDataBosnet = function() {
     if (rawText.startsWith('{') || rawText.startsWith('[')) {
         try {
             const parsed = JSON.parse(rawText);
-            // Jika formatnya { "-MUTASI": { ... } }
-            if (parsed["-MUTASI"]) {
-                dataTerproses = parsed; // Langsung gunakan karena sudah sesuai format
-            }
+            
+            // PERBAIKAN: Mutasi sekarang tidak lagi menggunakan key "-MUTASI", 
+            // melainkan key berupa nomor DO (seperti "13726").
+            // Kita langsung ambil data tersebut karena struktur di dalamnya sudah disiapkan 
+            // untuk langsung diproses oleh simpanKeFirebase.
+            dataTerproses = parsed; 
         } catch (e) {
-            console.error("Gagal proses data Mutasi:", e);
+            console.error("Gagal proses data JSON:", e);
+            window.miuiAlert("Format JSON tidak valid!");
+            return;
         }
     } else {
         // 2. Jika bukan JSON, proses sebagai data Bosnet biasa
@@ -280,63 +292,58 @@ async function prosesFileMutasi(event) {
     const file = event.target.files[0];
     if (!file) return;
 
+    // --- LOGIKA EKSTRAKSI TANGGAL DARI NAMA FILE ---
+    // Nama file contoh: "Form Mutasi 2026 07-13 Senin 15.31.20.xls"
+    const fileName = file.name;
+    const parts = fileName.split(" "); // ["Form", "Mutasi", "2026", "07-13", ...]
+    const tglParts = parts[3].split("-"); // ["07", "13"]
+    const tahun = parts[2].slice(-2); // "26"
+    
+    // Hasil: "13726" (Tanggal + Bulan + digit terakhir Tahun)
+    const noDOMutasi = `${parseInt(tglParts[1])}${parseInt(tglParts[0])}${tahun}`;
+
     const reader = new FileReader();
     reader.onload = function(e) {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
         
-        // Membaca sheet 'RAK'
         const worksheet = workbook.Sheets['RAK'];
-        
-        // FIX: Gunakan range: 2 agar pembacaan dimulai dari baris ke-3 (indeks 2)
-        // Baris 1: Kosong/Judul Besar
-        // Baris 2: Tanggal
-        // Baris 3: Header (NO, Kode, Rak, dst) -> Indeks 2
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { range: 2 });
 
-        // Filter: Sekarang kolom 'Rak' akan terbaca dengan benar
         const dataWh3 = jsonData.filter(row => 
             row['Rak'] && row['Rak'].toString().includes('WH-3')
         );
 
         // Transformasi ke format JSON
         const formattedData = {};
+        
+        // Menggunakan noDOMutasi sebagai kunci dinamis
+        formattedData[noDOMutasi] = {
+            tujuan: "zMUTASI", // Tetap konsisten dengan nama tujuan
+            data: {}
+        };
+
         dataWh3.forEach((item) => {
-            const noDO = "-MUTASI";
-            if (!formattedData[noDO]) {
-                formattedData[noDO] = {
-                    tujuan: "zMUTASI",
-                    data: {}
-                };
-            }
-            
-            // Mengambil data berdasarkan header yang sudah terbaca benar
-            formattedData[noDO].data[item['Kode']] = {
+            formattedData[noDOMutasi].data[item['Kode']] = {
                 kodeBarang: item['Kode'],
                 qtyUtama: parseInt(item['Ambil'] || 0),
                 gudang: item['Rak']
             };
         });
 
-        // 1. Tampilkan ke Textarea agar bisa direview
+        // 1. Tampilkan ke Textarea
         const ta = document.getElementById('ta-bosnet-input');
         ta.value = JSON.stringify(formattedData, null, 2);
 
         // 2. ISI OTOMATIS INPUT TUJUAN
-        // Karena ini mutasi, kita set otomatis ke "MUTASI"
         const inputKodeTujuan = document.getElementById('input-kode-tujuan');
-        const inputNamaTujuan = document.getElementById('input-nama-tujuan'); // Pastikan ID ini sesuai di HTML Anda
+        const inputNamaTujuan = document.getElementById('input-nama-tujuan');
 
-        if (inputKodeTujuan) {
-            inputKodeTujuan.value = "zMUTASI";
-        }
-        
-        if (inputNamaTujuan) {
-            inputNamaTujuan.value = "MUTASI GUDANG WH-2"; // Atau teks lain yang Anda inginkan
-        }
+        if (inputKodeTujuan) inputKodeTujuan.value = "zMUTASI";
+        if (inputNamaTujuan) inputNamaTujuan.value = `MUTASI GUDANG WH-2 (${noDOMutasi})`;
 
-        // 3. Berikan notifikasi
-        window.miuiAlert(`Berhasil memuat ${dataWh3.length} baris data WH-3.`);
+        // 3. Notifikasi
+        window.miuiAlert(`Berhasil memuat ${dataWh3.length} baris data Mutasi (${noDOMutasi}).`);
     };
     reader.readAsArrayBuffer(file);
 }
@@ -363,11 +370,12 @@ window.simpanKeFirebase = async function(parsedData, kodeTujuan) {
     const tglId = targetDate.toISOString().split('T')[0].replace(/-/g, '');
     const kodeClean = (kodeTujuan || "UNKNOWN").toUpperCase();
     
-    // PENYESUAIAN: Jika MUTASI, ID-nya lebih spesifik agar tidak tertimpa
-    const uniqueId = kodeClean === "MUTASI" ? `MUTASI_${tglId}` : `${kodeClean}_${tglId}`;
+    // Perubahan: Hilangkan logika spesifik MUTASI pada uniqueId agar struktur seragam
+    // Ini akan membuat folder: MUTASI_20260714
+    const folderId = `${kodeClean}_${tglId}`;
     
     // 2. URL Path
-    const baseUrl = `${DB_FIREBASE_URL}muat_wh3/${tglId}/${uniqueId}`;
+    const baseUrl = `${DB_FIREBASE_URL}muat_wh3/${tglId}/${folderId}`;
 
     try {
         // 3. Simpan Metadata
@@ -378,23 +386,24 @@ window.simpanKeFirebase = async function(parsedData, kodeTujuan) {
                 tujuan: kodeClean,
                 tanggal_kirim: tglId,
                 status: "DRAFT",
-                tipe: kodeClean === "MUTASI" ? "MUTASI" : "BOSNET" // Menandai tipe data
+                tipe: kodeClean === "MUTASI" ? "MUTASI" : "BOSNET"
             })
         });
 
-        // 4. Simpan Data
+        // 4. Simpan Data (Sekarang Mutasi & Bosnet perlakuannya sama)
+        // noDO sekarang sudah berisi nomor unik (misal: 13726 untuk mutasi)
         for (const noDO in parsedData) {
             if (parsedData.hasOwnProperty(noDO)) {
-                // Untuk Mutasi, noDO sudah diset "-MUTASI" dari fungsi prosesFileMutasi
+                // Path menjadi .../muat_wh3/20260714/MUTASI_20260714/data/13726/
                 await fetch(`${baseUrl}/data/${noDO}.json`, {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(parsedData[noDO])
+                    body: JSON.stringify(parsedData[noDO].data) 
                 });
             }
         }
         
-        console.log("Data berhasil disimpan via PATCH:", uniqueId);
+        console.log("Data berhasil disimpan:", folderId);
         window.miuiAlert("Data Berhasil Disimpan!");
         
         // 5. Reset dan Refresh UI
@@ -415,58 +424,6 @@ window.resetFormulir = function() {
     document.getElementById('input-nama-tujuan').value = "";
     document.getElementById('ta-bosnet-input').value = "";
 };
-
-
-let cacheMasterBarang = {};
-async function loadMasterBarang() {
-    const snap = await fetch(`${DB_FIREBASE_URL}master_barang.json`);
-    cacheMasterBarang = await snap.json();
-    console.log("Master Barang berhasil dimuat:", cacheMasterBarang);
-}
-
-window.renderDataGabungan = function(dataFirebase) {
-    let gabungan = {};
-
-    // Iterasi setiap noDO
-    Object.keys(dataFirebase).forEach(noDO => {
-        const barangList = dataFirebase[noDO];
-
-        Object.keys(barangList).forEach(kodeBarang => {
-            const item = barangList[kodeBarang];
-
-            // Jika kodeBarang belum ada di 'gabungan', buat entry baru
-            if (!gabungan[kodeBarang]) {
-                gabungan[kodeBarang] = {
-                    kodeBarang: kodeBarang,
-                    noDOs: [noDO.slice(-2)], // Simpan 2 digit terakhir DO
-                    qtyUtama: 0,
-                    qtyDetail: [0, 0, 0]
-                };
-            } else {
-                // Jika sudah ada, tambahkan noDO (jika belum ada) dan jumlahkan qty
-                if (!gabungan[kodeBarang].noDOs.includes(noDO.slice(-2))) {
-                    gabungan[kodeBarang].noDOs.push(noDO.slice(-2));
-                }
-            }
-
-            // Jumlahkan Qty
-            gabungan[kodeBarang].qtyUtama += parseInt(item.qtyUtama);
-            item.qtyDetail.forEach((val, i) => {
-                gabungan[kodeBarang].qtyDetail[i] += parseInt(val);
-            });
-        });
-    });
-
-    // Tampilkan 'gabungan' ke tabel
-    renderKeTabel(gabungan);
-};
-
-// Fungsi pembantu untuk membuat string noDO gabungan
-function formatNoDOGabung(noDOs) {
-    // noDOs adalah array, misal ['61', '60']
-    // Kita ambil DO utuh yang pertama, lalu tambahkan 2 digit sisanya
-    return noDOs.join(','); 
-}
 
 window.renderTabelGabungan = async function() {
     const tglId = document.getElementById('select-tanggal-muat').value;
@@ -525,7 +482,7 @@ window.renderTabelGabungan = async function() {
             return match ? (parseInt(match.join('').slice(-4)) || 999) : 999;
         };
 
-        // --- 2. PROSES DATA (DIPERBAIKI) ---
+        // --- 2. PROSES DATA (DIPERBAIKI UNTUK STRUKTUR BARU) ---
         let daftarBarangSet = new Set();
         let groupTujuan = {}; 
         let totalNoDO = 0;
@@ -535,24 +492,37 @@ window.renderTabelGabungan = async function() {
             if (!itemTujuan || !itemTujuan.data) return;
 
             const namaTujuan = itemTujuan.tujuan || keyTujuan;
+            
+            // --- PERBAIKAN: Deteksi Mutasi berdasarkan property 'tujuan' ---
+            const isMutasi = itemTujuan.tujuan === "zMUTASI";
 
-            // Cek apakah data ini adalah tipe MUTASI
-            if (itemTujuan.data.hasOwnProperty("-MUTASI")) {
-                // STRUKTUR MUTASI
-                const dataBarang = itemTujuan.data["-MUTASI"].data;
-                groupTujuan[namaTujuan] = { label: "MUTASI", data: {} };
+            if (isMutasi) {
+                // STRUKTUR MUTASI (Langsung baca dari .data)
+                if (!groupTujuan[namaTujuan]) {
+                    groupTujuan[namaTujuan] = { label: "zMUTASI", data: {} };
+                }
                 
-                Object.keys(dataBarang).forEach(kode => {
-                    daftarBarangSet.add(kode);
-                    groupTujuan[namaTujuan].data[kode] = parseInt(dataBarang[kode].qtyUtama || 0);
+                const dataBarang = itemTujuan.data; // Sekarang langsung .data (noDO adalah key-nya)
+                
+                Object.keys(dataBarang).forEach(noDO => {
+                    totalNoDO += 1;
+                    Object.keys(dataBarang[noDO]).forEach(kode => {
+                        daftarBarangSet.add(kode);
+                        groupTujuan[namaTujuan].data[kode] = (groupTujuan[namaTujuan].data[kode] || 0) + 
+                            parseInt(dataBarang[noDO][kode].qtyUtama || 0);
+                    });
                 });
-                totalNoDO += 1;
             } else {
                 // STRUKTUR BOSNET (Standar)
                 const listNoDO = Object.keys(itemTujuan.data);
                 totalNoDO += listNoDO.length;
 
-                let labelNoDO = listNoDO.map(id => id.slice(-2)).join(",");
+                let labelNoDO = "";
+                if (listNoDO.length === 1) {
+                    labelNoDO = listNoDO[0];
+                } else {
+                    labelNoDO = listNoDO[0] + "," + listNoDO.slice(1).map(id => id.slice(-2)).join(",");
+                }
 
                 if (!groupTujuan[namaTujuan]) {
                     groupTujuan[namaTujuan] = { label: labelNoDO, data: {} };
