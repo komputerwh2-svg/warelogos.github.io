@@ -1,3 +1,50 @@
+// main.js - Bagian Inisialisasi Firebase
+const firebaseConfig = {
+    apiKey: "AIzaSyDisM9v8_Zbsl-jTx7TMEzishoM9yddwGE",
+    authDomain: "bank-data-cbd97.firebaseapp.com",
+    databaseURL: "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "bank-data-cbd97",
+    storageBucket: "bank-data-cbd97.firebasestorage.app",
+    messagingSenderId: "774423649215",
+    appId: "1:774423649215:web:876e0a08cc74338008df0a"
+};
+
+// Inisialisasi hanya sekali
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+
+// Ekspor ke window agar bisa diakses modul lain tanpa import modular
+window.db = firebase.firestore();
+window.rtdb = firebase.database();
+
+// Tambahkan fungsi helper untuk akses yang lebih aman
+window.getRTDB = function() {
+    return window.rtdb || (typeof firebase !== 'undefined' ? firebase.database() : null);
+};
+
+window.getFirestore = function() {
+    return window.db || (typeof firebase !== 'undefined' ? firebase.firestore() : null);
+};
+
+console.log("Firebase (RTDB & Firestore) berhasil diinisialisasi secara global.");
+
+
+window.kembaliKeHalamanUtama = function() {
+    // 1. Logika untuk menutup semua modal yang terbuka
+    // Sesuaikan selector dengan class/ID modal Anda
+    const modals = document.querySelectorAll('.modal-terbuka'); 
+    modals.forEach(modal => {
+        modal.style.display = 'none';
+        modal.classList.remove('modal-terbuka');
+    });
+
+    // 2. Beri jeda sedikit agar user melihat modal tertutup
+    setTimeout(() => {
+        window.location.reload();
+    }, 300);
+};
+
 // =========================================================================
 // 1. CONTROL LAUNCHER VIEWPORT DRAGGING & WHEEL OVERFLOW SYSTEM (RESPONSIVE)
 // =========================================================================
@@ -365,12 +412,12 @@ window.cekLoginAdmin = cekLoginAdmin;
 window.closeModalAdmin = closeModalAdmin;
 
 // RUNNING ROBOT CLOUD PRINTER PADA LAYAR PC UTAMA KANTOR
-document.addEventListener("DOMContentLoaded", () => {
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    if (!isMobile) {
-        aktifkanCloudPrintEngine();
-    }
-});
+//document.addEventListener("DOMContentLoaded", () => {
+//    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+//    if (!isMobile) {
+//        aktifkanCloudPrintEngine();
+//    }
+//});
 
 // =========================================================================
 // ENGINE SUB-PAGE DYNAMIC LOADING (MODULAR APPS)

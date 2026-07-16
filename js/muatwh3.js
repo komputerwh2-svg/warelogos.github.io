@@ -1,38 +1,68 @@
 // js/muatwh3.js
-
-// --- DEKLARASI DI PALING ATAS ---
-const DB_FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
-
 console.log("Modul Muat WH-3 dimuat.");
 
-// Fungsi getDB yang lebih aman
-window.getDB = function() {
-    // Cek apakah firebase sudah terinisialisasi
-    if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
-        return firebase.database();
-    }
-    console.error("Firebase App belum diinisialisasi di halaman utama!");
-    return null;
-};
+window.cacheMasterBarang = {};
 
-// Fungsi load master barang
-let cacheMasterBarang = {};
-async function loadMasterBarang() {
-    const snap = await fetch(`${DB_FIREBASE_URL}master_barang.json`);
-    cacheMasterBarang = await snap.json();
-    console.log("Master Barang berhasil dimuat:", cacheMasterBarang);
-}
+window.loadMasterBarang = async function() {
+    try {
+        const db = window.getFirestore ? window.getFirestore() : window.db;
+        
+        // 1. Coba ambil dari Firestore terlebih dahulu (lebih cepat daripada RTDB)
+        const docRef = db.collection("bank_data").doc("master_barang");
+        const doc = await docRef.get();
+
+        if (doc.exists) {
+            window.cacheMasterBarang = doc.data();
+            console.log("Master Barang dimuat dari Firestore.");
+        } else {
+            // 2. Jika tidak ada di Firestore, ambil dari RTDB (fallback)
+            if (!window.rtdb) throw new Error("RTDB tidak tersedia");
+            
+            const snapshot = await window.rtdb.ref('master_barang').once('value');
+            const data = snapshot.val();
+            
+            if (data) {
+                window.cacheMasterBarang = data;
+                // 3. Sinkronkan ke Firestore agar tidak perlu ambil dari RTDB lagi di masa depan
+                await docRef.set(data, { merge: true });
+                console.log("Master Barang dimuat dari RTDB dan disinkronkan ke Firestore.");
+            }
+        }
+    } catch (error) {
+        console.error("Gagal memuat master barang:", error);
+        window.miuiAlert("Gagal memuat master barang: " + error.message);
+    }
+};
 
 // Fungsi Inisialisasi utama
 window.initMuatWH3 = async function() {
     console.log("Inisialisasi modul Muat WH-3...");
-    window.generatePeriodeDropdown(); 
-    await updateTanggalDropdownMuatWH3();
+    
+    // Pastikan menggunakan fungsi helper dari main.js
+    const db = window.getFirestore ? window.getFirestore() : window.db;
+    
+    if (db) {
+        console.log("Firestore siap digunakan.");
+    } else {
+        console.warn("Firestore belum siap, sistem mungkin hanya berjalan di RTDB mode.");
+    }
+
+    // Jalankan fungsi inisialisasi lainnya
     await loadMasterBarang();
+    if (typeof window.generatePeriodeDropdown === 'function') {
+        window.generatePeriodeDropdown(); 
+    } 
+    await updateTanggalDropdownMuatWH3();
+    
 };
 
-// Panggil langsung tanpa menunggu DOMContentLoaded
-window.initMuatWH3();
+// Panggil inisialisasi secara aman
+// Gunakan DOMContentLoaded agar elemen HTML sudah siap diakses
+document.addEventListener('DOMContentLoaded', () => {
+    if (typeof window.initMuatWH3 === 'function') {
+        window.initMuatWH3();
+    }
+});
 
 
 window.updateJamMuatWH3 = function() {
@@ -127,67 +157,78 @@ window.formatTanggal = function(tglStr) {
 };
 
 // Fungsi inisialisasi dropdown tanggal
-async function updateTanggalDropdownMuatWH3() {
+window.updateTanggalDropdownMuatWH3 = async function() {
     const selPeriode = document.getElementById('select-periode-muat');
     const selTanggal = document.getElementById('select-tanggal-muat');
+    const db = window.db; 
     
-    if (!selPeriode || !selTanggal) return;
+    if (!selPeriode || !selTanggal || !db) return;
 
-    const [targetTahun, targetBulan] = selPeriode.value.split('-').map(Number);
     selTanggal.innerHTML = '<option value="">Memuat...</option>';
 
     try {
-        const response = await fetch(`${DB_FIREBASE_URL}muat_wh3.json`);
-        const allData = await response.json();
+        // Berdasarkan struktur Query Builder: /muat_wh3/20260714/datatujuan/...
+        // Kita tidak bisa membaca root 'muat_wh3' jika ia adalah dokumen.
+        // Kita harus membaca dari koleksi yang menampung dokumen tanggal tersebut.
         
-        if (!allData) {
+        // Kita coba ambil koleksi yang bernama 'datatujuan' menggunakan CollectionGroup
+        // karena itu adalah koleksi pertama yang muncul di bawah dokumen tanggal.
+        const snapshot = await db.collectionGroup('datatujuan').get();
+        
+        console.log("DEBUG: Menggunakan CollectionGroup('datatujuan'). Hasil:", snapshot.size);
+
+        let availableDates = new Set(); // Menggunakan Set agar tanggal tidak duplikat
+        const [targetTahun, targetBulan] = selPeriode.value.split('-').map(Number);
+
+        snapshot.forEach(doc => {
+            // Path doc adalah: muat_wh3/20260714/datatujuan/FOLDER_ID
+            // Kita ambil ID dokumen tanggalnya dari path parent-nya
+            const pathParts = doc.ref.path.split('/');
+            // Pathnya: muat_wh3 (0) / 20260714 (1) / datatujuan (2) / FOLDER_ID (3)
+            const tglId = pathParts[1]; 
+
+            if (tglId && /^\d{8}$/.test(tglId)) {
+                const docTahun = parseInt(tglId.substring(0, 4));
+                const docBulan = parseInt(tglId.substring(4, 6));
+
+                if (docTahun === targetTahun && docBulan === targetBulan) {
+                    availableDates.add(tglId);
+                }
+            }
+        });
+
+        if (availableDates.size === 0) {
             selTanggal.innerHTML = '<option value="">Data Tidak Ada</option>';
             return;
         }
 
-        let availableDates = [];
-
-        // Filter tanggal sesuai target tahun dan bulan
-        Object.keys(allData).forEach(rawDate => {
-            const tahun = parseInt(rawDate.substring(0, 4));
-            const bulan = parseInt(rawDate.substring(4, 6));
-            const hari = rawDate.substring(6, 8);
-
-            if (tahun === targetTahun && bulan === targetBulan) {
-                availableDates.push({
-                    val: rawDate, 
-                    label: `${hari}/${bulan}/${tahun}`
-                });
-            }
-        });
-
-        availableDates.sort((a, b) => b.val.localeCompare(a.val));
-
+        // Urutkan dan masukkan ke dropdown
+        const sortedDates = Array.from(availableDates).sort((a, b) => b.localeCompare(a));
         selTanggal.innerHTML = '<option value="">Pilih Tanggal</option>';
-        availableDates.forEach(date => {
-            selTanggal.add(new Option(date.label, date.val));
+        
+        sortedDates.forEach(tglId => {
+            const hari = tglId.substring(6, 8);
+            const bulan = tglId.substring(4, 6);
+            const tahun = tglId.substring(0, 4);
+            selTanggal.add(new Option(`${hari}/${bulan}/${tahun}`, tglId));
         });
 
-        // Jika ada data, pilih yang terbaru
-        if (availableDates.length > 0) {
-            selTanggal.value = availableDates[0].val;
-            window.renderTabelGabungan();
-        } else {
-            selTanggal.innerHTML = '<option value="">Data Tidak Ada</option>';
-            document.getElementById('tabel-matriks-body').innerHTML = '';
-        }
+        selTanggal.value = sortedDates[0];
+        if (typeof window.renderTabelGabungan === 'function') await window.renderTabelGabungan();
+
     } catch (e) {
-        console.error("Gagal sinkronisasi tanggal:", e);
-        selTanggal.innerHTML = '<option value="">Gagal</option>';
+        console.error("Gagal sinkronisasi:", e);
+        selTanggal.innerHTML = '<option value="">Error Akses</option>';
     }
-}
+};
 
 window.updateStatistikMuat = async function(tglId) {
-    const url = `${DB_FIREBASE_URL}muat_wh3/${tglId}.json`;
+    if (!tglId) return;
     
     try {
-        const response = await fetch(url);
-        const data = await response.json();
+        // Menggunakan window.rtdb (Firebase SDK) sebagai pengganti fetch
+        const snapshot = await window.rtdb.ref(`muat_wh3/${tglId}`).once('value');
+        const data = snapshot.val();
         
         let totalTujuan = 0;
         let totalNoDO = 0;
@@ -199,15 +240,19 @@ window.updateStatistikMuat = async function(tglId) {
 
             // Menghitung Total No DO dari setiap tujuan
             semuaTujuan.forEach(tujuanKey => {
-                if (data[tujuanKey].data) {
+                // Memastikan data[tujuanKey] adalah objek dan memiliki properti data
+                if (data[tujuanKey] && data[tujuanKey].data) {
                     totalNoDO += Object.keys(data[tujuanKey].data).length;
                 }
             });
         }
 
         // Update ke UI
-        document.getElementById('txt-total-tujuan').innerText = totalTujuan;
-        document.getElementById('txt-total-nodo').innerText = totalNoDO;
+        const elTujuan = document.getElementById('txt-total-tujuan');
+        const elNoDO = document.getElementById('txt-total-nodo');
+        
+        if (elTujuan) elTujuan.innerText = totalTujuan;
+        if (elNoDO) elNoDO.innerText = totalNoDO;
 
     } catch (e) {
         console.error("Gagal update statistik:", e);
@@ -292,15 +337,51 @@ async function prosesFileMutasi(event) {
     const file = event.target.files[0];
     if (!file) return;
 
-    // --- LOGIKA EKSTRAKSI TANGGAL DARI NAMA FILE ---
-    // Nama file contoh: "Form Mutasi 2026 07-13 Senin 15.31.20.xls"
+    // --- 1. EKSTRAKSI TANGGAL DARI NAMA FILE ---
+    // Nama file contoh: "Form Mutasi 2026 07-16 Senin 15.31.20.xls"
     const fileName = file.name;
-    const parts = fileName.split(" "); // ["Form", "Mutasi", "2026", "07-13", ...]
-    const tglParts = parts[3].split("-"); // ["07", "13"]
-    const tahun = parts[2].slice(-2); // "26"
+    const parts = fileName.split(" "); 
+    const tahunFile = parts[2]; 
+    const fileDateStr = parts[3]; // "07-16"
     
-    // Hasil: "13726" (Tanggal + Bulan + digit terakhir Tahun)
-    const noDOMutasi = `${parseInt(tglParts[1])}${parseInt(tglParts[0])}${tahun}`;
+    if (!fileDateStr) {
+        window.miuiAlert("Format nama file tidak valid!");
+        return;
+    }
+
+    const [bln, tgl] = fileDateStr.split("-");
+    const formattedFileDate = `${tgl}-${bln}-${tahunFile}`; // "16-07-2026"
+
+    // --- 2. AMBIL DARI DROPDOWN (Nilai: "20260716") ---
+    const dropdownVal = document.getElementById('select-tanggal-muat').value; 
+    
+    if (!dropdownVal) {
+        window.miuiAlert("Pilih tanggal muat terlebih dahulu!");
+        return;
+    }
+
+    const y = dropdownVal.substring(0, 4);
+    const m = dropdownVal.substring(4, 6);
+    const d = dropdownVal.substring(6, 8);
+    
+    const dateObj = new Date(y, m - 1, d);
+    dateObj.setDate(dateObj.getDate() - 1); 
+    
+    const targetTgl = String(dateObj.getDate()).padStart(2, '0');
+    const targetBln = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const targetThn = dateObj.getFullYear();
+    const targetDateStr = `${targetTgl}-${targetBln}-${targetThn}`;
+
+    // --- 3. VERIFIKASI ---
+    if (formattedFileDate !== targetDateStr) {
+        window.miuiAlert(`Peringatan: File yang Anda pilih adalah mutasi tanggal ${formattedFileDate}, sedangkan untuk tanggal muat ${d}/${m}/${y}, sistem memerlukan file tanggal ${targetDateStr}. Import dibatalkan!`);
+        event.target.value = ''; 
+        return;
+    }
+
+    // --- 4. PEMBENTUKAN NO DO ---
+    // Menggunakan variabel yang sudah dideklarasikan di atas
+    const noDOMutasi = `${parseInt(tgl)}${parseInt(bln)}${tahunFile.slice(-2)}`; // "160726"
 
     const reader = new FileReader();
     reader.onload = function(e) {
@@ -314,12 +395,14 @@ async function prosesFileMutasi(event) {
             row['Rak'] && row['Rak'].toString().includes('WH-3')
         );
 
-        // Transformasi ke format JSON
+        if (dataWh3.length === 0) {
+            window.miuiAlert("Tidak ditemukan data WH-3 dalam file ini.");
+            return;
+        }
+
         const formattedData = {};
-        
-        // Menggunakan noDOMutasi sebagai kunci dinamis
         formattedData[noDOMutasi] = {
-            tujuan: "zMUTASI", // Tetap konsisten dengan nama tujuan
+            tujuan: "Z-MUTASI",
             data: {}
         };
 
@@ -331,90 +414,96 @@ async function prosesFileMutasi(event) {
             };
         });
 
-        // 1. Tampilkan ke Textarea
         const ta = document.getElementById('ta-bosnet-input');
         ta.value = JSON.stringify(formattedData, null, 2);
 
-        // 2. ISI OTOMATIS INPUT TUJUAN
         const inputKodeTujuan = document.getElementById('input-kode-tujuan');
         const inputNamaTujuan = document.getElementById('input-nama-tujuan');
 
-        if (inputKodeTujuan) inputKodeTujuan.value = "zMUTASI";
+        if (inputKodeTujuan) inputKodeTujuan.value = "Z-MUTASI";
         if (inputNamaTujuan) inputNamaTujuan.value = `MUTASI GUDANG WH-2 (${noDOMutasi})`;
 
-        // 3. Notifikasi
         window.miuiAlert(`Berhasil memuat ${dataWh3.length} baris data Mutasi (${noDOMutasi}).`);
     };
     reader.readAsArrayBuffer(file);
 }
 
-window.simpanKeFirebase = async function(parsedData, kodeTujuan) {
-    // 1. Logika Tanggal
-    let liburNasional = [];
-    try {
-        liburNasional = await window.getHariLiburNasional();
-    } catch (e) {
-        console.warn("Gagal ambil hari libur, lanjut tanpa pengecekan libur.");
+window.simpanKeFirebase = async function(parsedData, kodeTujuan, namaLengkapTujuan) {
+    const firestoreDB = window.db; 
+    
+    if (!firestoreDB) {
+        window.miuiAlert("Error: Koneksi Database tidak ditemukan.");
+        return;
     }
-
-    const getNextWorkingDay = (date) => {
-        let nextDate = new Date(date);
-        nextDate.setDate(nextDate.getDate() + 1);
-        while (nextDate.getDay() === 0 || liburNasional.includes(nextDate.toISOString().split('T')[0])) {
-            nextDate.setDate(nextDate.getDate() + 1);
-        }
-        return nextDate;
-    };
-
-    const targetDate = getNextWorkingDay(new Date());
-    const tglId = targetDate.toISOString().split('T')[0].replace(/-/g, '');
+    
     const kodeClean = (kodeTujuan || "UNKNOWN").toUpperCase();
     
-    // Perubahan: Hilangkan logika spesifik MUTASI pada uniqueId agar struktur seragam
-    // Ini akan membuat folder: MUTASI_20260714
+    // --- 1. LOGIKA PENENTUAN TANGGAL ---
+    let tglId = "";
+    const selectTanggal = document.getElementById('select-tanggal-muat');
+
+    // Jika Mutasi, ambil dari dropdown. Jika Bosnet, pakai logika hari kerja berikutnya.
+    if (kodeClean === "Z-MUTASI" && selectTanggal && selectTanggal.value) {
+        tglId = selectTanggal.value; // Nilai format "20260716"
+    } else {
+        // Logika hari kerja berikutnya untuk BOSNET
+        let liburNasional = [];
+        try {
+            liburNasional = await window.getHariLiburNasional();
+        } catch (e) {
+            console.warn("Gagal ambil hari libur, lanjut tanpa pengecekan libur.");
+        }
+
+        const getNextWorkingDay = (date) => {
+            let nextDate = new Date(date);
+            nextDate.setDate(nextDate.getDate() + 1);
+            while (nextDate.getDay() === 0 || liburNasional.includes(nextDate.toISOString().split('T')[0])) {
+                nextDate.setDate(nextDate.getDate() + 1);
+            }
+            return nextDate;
+        };
+
+        const targetDate = getNextWorkingDay(new Date());
+        tglId = targetDate.toISOString().split('T')[0].replace(/-/g, '');
+    }
+    
+    // folderId menggunakan nama kodeTujuan agar unik per tujuan di hari yang sama
     const folderId = `${kodeClean}_${tglId}`;
     
-    // 2. URL Path
-    const baseUrl = `${DB_FIREBASE_URL}muat_wh3/${tglId}/${folderId}`;
-
     try {
-        // 3. Simpan Metadata
-        await fetch(`${baseUrl}.json`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                tujuan: kodeClean,
-                tanggal_kirim: tglId,
-                status: "DRAFT",
-                tipe: kodeClean === "MUTASI" ? "MUTASI" : "BOSNET"
-            })
+        // 3. Path disesuaikan dengan struktur: muat_wh3 > tglId > datatujuan > folderId
+        const folderRef = firestoreDB.collection("muat_wh3").doc(tglId).collection("datatujuan").doc(folderId);
+        
+        await folderRef.set({
+            tujuan: kodeClean,
+            nama_tujuan: namaLengkapTujuan || kodeClean,
+            tanggal_kirim: tglId,
+            status: "DRAFT",
+            tipe: kodeClean === "Z-MUTASI" ? "MUTASI" : "BOSNET",
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
-        // 4. Simpan Data (Sekarang Mutasi & Bosnet perlakuannya sama)
-        // noDO sekarang sudah berisi nomor unik (misal: 13726 untuk mutasi)
+        // 4. Simpan Data Transaksi (Batch)
+        const batch = firestoreDB.batch();
         for (const noDO in parsedData) {
             if (parsedData.hasOwnProperty(noDO)) {
-                // Path menjadi .../muat_wh3/20260714/MUTASI_20260714/data/13726/
-                await fetch(`${baseUrl}/data/${noDO}.json`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(parsedData[noDO].data) 
-                });
+                const docRef = folderRef.collection("data").doc(noDO);
+                batch.set(docRef, parsedData[noDO]); 
             }
         }
+        await batch.commit();
         
-        console.log("Data berhasil disimpan:", folderId);
-        window.miuiAlert("Data Berhasil Disimpan!");
+        console.log("Data berhasil disimpan ke Firestore:", folderId);
+        window.miuiAlert(`Data Berhasil Disimpan ke periode ${tglId}!`);
         
         // 5. Reset dan Refresh UI
         if (typeof window.resetFormulir === 'function') window.resetFormulir();
         if (typeof window.renderTabelGabungan === 'function') await window.renderTabelGabungan();
         if (typeof window.updateTanggalDropdownMuatWH3 === 'function') await window.updateTanggalDropdownMuatWH3();
-        if (typeof window.updateStatistikMuat === 'function') await window.updateStatistikMuat(tglId);
         
     } catch (error) {
-        console.error("Gagal mengirim data:", error);
-        window.miuiAlert("Error: Gagal menyimpan data ke server.");
+        console.error("Gagal mengirim data ke Firestore:", error);
+        window.miuiAlert("Error: Gagal menyimpan ke server: " + error.message);
     }
 };
 
@@ -429,7 +518,8 @@ window.renderTabelGabungan = async function() {
     const tglId = document.getElementById('select-tanggal-muat').value;
     const tbody = document.getElementById('tabel-matriks-body');
     const thead = document.getElementById('tabel-matriks-head');
-    
+    const db = window.getFirestore(); // Menggunakan instance firestore yang sudah ada
+
     if (!tglId) {
         document.getElementById('txt-total-tujuan').innerText = '0';
         document.getElementById('txt-total-nodo').innerText = '0';
@@ -438,17 +528,18 @@ window.renderTabelGabungan = async function() {
     }
 
     try {
-        const response = await fetch(`${DB_FIREBASE_URL}muat_wh3/${tglId}.json`);
-        const data = await response.json();
+        // --- 1. MENGAMBIL DATA DARI FIRESTORE ---
+        // Path: muat_wh3/{tglId}/datatujuan/{folderId}
+        const snapshot = await db.collection("muat_wh3").doc(tglId).collection("datatujuan").get();
 
-        if (!data) {
+        if (snapshot.empty) {
             document.getElementById('txt-total-tujuan').innerText = '0';
             document.getElementById('txt-total-nodo').innerText = '0';
             tbody.innerHTML = '<tr><td colspan="10" class="text-center p-4">Data tidak ditemukan</td></tr>';
             return;
         }
 
-        // --- 1. DEFINISI FUNGSI PENGURUTAN ---
+        // --- 2. DEFINISI FUNGSI PENGURUTAN (TETAP) ---
         const polaUtama = ["CRR", "CRR EA", "THR EA", "THR", "MRMR", "MRR", "MJR HJ", "MJR", "MOB4A", "MOR2A EA", "MOR2A EB", "MOR2A", "MP", "PDR", "MTR3A", "PR-PKT", "PR-CUP", "MRSR", "LTGR", "MTGR", "MEB", "MOL", "MRL", "MTL", "ISEL"];
         
         const getSortScore = (kode) => {
@@ -482,61 +573,52 @@ window.renderTabelGabungan = async function() {
             return match ? (parseInt(match.join('').slice(-4)) || 999) : 999;
         };
 
-        // --- 2. PROSES DATA (DIPERBAIKI UNTUK STRUKTUR BARU) ---
+        // --- 3. PROSES DATA DARI FIRESTORE ---
         let daftarBarangSet = new Set();
         let groupTujuan = {}; 
         let totalNoDO = 0;
 
-        Object.keys(data).forEach(keyTujuan => {
-            const itemTujuan = data[keyTujuan];
-            if (!itemTujuan || !itemTujuan.data) return;
+        for (const doc of snapshot.docs) {
+            const itemTujuan = doc.data(); 
+            const folderId = doc.id;
+            const namaTujuan = itemTujuan.tujuan || folderId;
+            const isMutasi = itemTujuan.tujuan === "Z-MUTASI";
 
-            const namaTujuan = itemTujuan.tujuan || keyTujuan;
-            
-            // --- PERBAIKAN: Deteksi Mutasi berdasarkan property 'tujuan' ---
-            const isMutasi = itemTujuan.tujuan === "zMUTASI";
+            const subSnapshot = await doc.ref.collection("data").get();
+            const listNoDO = subSnapshot.docs.map(d => d.id);
+            totalNoDO += listNoDO.length;
 
-            if (isMutasi) {
-                // STRUKTUR MUTASI (Langsung baca dari .data)
-                if (!groupTujuan[namaTujuan]) {
-                    groupTujuan[namaTujuan] = { label: "zMUTASI", data: {} };
-                }
+            if (!groupTujuan[namaTujuan]) {
+                // Perbaikan: Hapus paksaan teks "MUTASI", gunakan listNoDO untuk semua tipe
+                // Jika listNoDO hanya ada 1, tampilkan ID-nya. Jika lebih, tampilkan format ringkas.
+                let labelNoDO = (listNoDO.length === 1) 
+                    ? listNoDO[0] 
+                    : (listNoDO[0] + "," + listNoDO.slice(1).map(id => id.slice(-2)).join(","));
                 
-                const dataBarang = itemTujuan.data; // Sekarang langsung .data (noDO adalah key-nya)
-                
-                Object.keys(dataBarang).forEach(noDO => {
-                    totalNoDO += 1;
-                    Object.keys(dataBarang[noDO]).forEach(kode => {
-                        daftarBarangSet.add(kode);
-                        groupTujuan[namaTujuan].data[kode] = (groupTujuan[namaTujuan].data[kode] || 0) + 
-                            parseInt(dataBarang[noDO][kode].qtyUtama || 0);
-                    });
-                });
-            } else {
-                // STRUKTUR BOSNET (Standar)
-                const listNoDO = Object.keys(itemTujuan.data);
-                totalNoDO += listNoDO.length;
-
-                let labelNoDO = "";
-                if (listNoDO.length === 1) {
-                    labelNoDO = listNoDO[0];
-                } else {
-                    labelNoDO = listNoDO[0] + "," + listNoDO.slice(1).map(id => id.slice(-2)).join(",");
-                }
-
-                if (!groupTujuan[namaTujuan]) {
-                    groupTujuan[namaTujuan] = { label: labelNoDO, data: {} };
-                }
-
-                listNoDO.forEach(noDO => {
-                    Object.keys(itemTujuan.data[noDO]).forEach(kode => {
-                        daftarBarangSet.add(kode);
-                        groupTujuan[namaTujuan].data[kode] = (groupTujuan[namaTujuan].data[kode] || 0) + 
-                            parseInt(itemTujuan.data[noDO][kode].qtyUtama || 0);
-                    });
-                });
+                groupTujuan[namaTujuan] = { label: labelNoDO, data: {} };
             }
-        });
+
+            subSnapshot.docs.forEach(doDoc => {
+                const rawDoc = doDoc.data();
+                
+                // --- TAMBAHKAN INI UNTUK DEBUGGING ---
+                console.log("DEBUG: Isi dokumen DO (" + doDoc.id + "):", rawDoc);
+                // -------------------------------------
+
+                // Kita coba deteksi apakah barang berada di field 'data' atau langsung di root
+                const dataBarang = rawDoc.data || rawDoc; 
+
+                Object.keys(dataBarang).forEach(kode => {
+                    const barang = dataBarang[kode];
+                    
+                    // Cek apakah ini objek barang yang valid (punya qtyUtama)
+                    if (barang && typeof barang === 'object' && barang.qtyUtama !== undefined) {
+                        daftarBarangSet.add(kode);
+                        groupTujuan[namaTujuan].data[kode] = (groupTujuan[namaTujuan].data[kode] || 0) + parseInt(barang.qtyUtama || 0);
+                    }
+                });
+            });
+        }
         
         const sortedBarang = Array.from(daftarBarangSet).sort((a, b) => {
             const scoreA1 = getSortScore(a), scoreB1 = getSortScore(b);
@@ -549,7 +631,7 @@ window.renderTabelGabungan = async function() {
         document.getElementById('txt-total-tujuan').innerText = Object.keys(groupTujuan).length;
         document.getElementById('txt-total-nodo').innerText = totalNoDO;
 
-        // --- 4. RENDER HEADER (Tetap sama) ---
+        // --- 4. RENDER HEADER (Sama) ---
         let row1 = `<th rowspan="2" class="p-3 border border-slate-500">KODE BARANG</th>`;
         let row2 = "";
         const listTujuanKeys = Object.keys(groupTujuan);
@@ -563,7 +645,7 @@ window.renderTabelGabungan = async function() {
                  <th rowspan="2" class="p-3 border border-slate-500 text-center">PLT | KRT</th>`;
         if (thead) thead.innerHTML = `<tr>${row1}</tr><tr>${row2}</tr>`;
 
-        // --- 5. RENDER BODY ---
+        // --- 5. RENDER BODY (Sama) ---
         tbody.innerHTML = '';
         sortedBarang.forEach(kode => {
             let rowTotal = 0;
@@ -575,7 +657,7 @@ window.renderTabelGabungan = async function() {
                 cells += `<td class="p-3 text-center border border-slate-500">${qty > 0 ? qty : ''}</td>`;
             });
 
-            const masterInfo = cacheMasterBarang ? cacheMasterBarang[kode] : null;
+            const masterInfo = window.cacheMasterBarang ? window.cacheMasterBarang[kode] : null;
             const qtyPerPalet = (masterInfo && masterInfo.QTY) ? parseInt(masterInfo.QTY) : 1;
             const hasilPlt = Math.floor(rowTotal / qtyPerPalet);
             const sisaKrt = rowTotal % qtyPerPalet;
@@ -595,6 +677,7 @@ window.renderTabelGabungan = async function() {
         });
 
     } catch (e) {
-        console.error("Error sinkronisasi:", e);
+        console.error("Error sinkronisasi Firestore:", e);
+        window.miuiAlert("Gagal memuat data dari Firestore: " + e.message);
     }
 };
