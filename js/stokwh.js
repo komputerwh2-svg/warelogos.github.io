@@ -2426,22 +2426,28 @@ window.bl_resetForm = function() {
 };
 
 // --- Fungsi Pemformatan Expired (Auto JAN-27) ---
-document.getElementById('bl_tx_expired').addEventListener('blur', function(e) {
-    let val = e.target.value.trim();
-    const months = ["JAN", "FEB", "MAR", "APR", "MEI", "JUN", "JUL", "AGT", "SEP", "OKT", "NOV", "DES"];
-    
-    // Regex untuk memisahkan MM dan YY
-    const match = val.match(/^(\d{1,2})[-/](\d{2})$/);
-    
-    if (match) {
-        const monthIndex = parseInt(match[1]) - 1;
-        const year = match[2];
+const elExpired = document.getElementById('bl_tx_expired');
+
+if (elExpired) {
+    elExpired.addEventListener('blur', function(e) {
+        let val = e.target.value.trim();
+        const months = ["JAN", "FEB", "MAR", "APR", "MEI", "JUN", "JUL", "AGT", "SEP", "OKT", "NOV", "DES"];
         
-        if (monthIndex >= 0 && monthIndex < 12) {
-            e.target.value = `${months[monthIndex]}-${year}`;
+        // Regex untuk memisahkan MM dan YY
+        const match = val.match(/^(\d{1,2})[-/](\d{2})$/);
+        
+        if (match) {
+            const monthIndex = parseInt(match[1]) - 1;
+            const year = match[2];
+            
+            if (monthIndex >= 0 && monthIndex < 12) {
+                e.target.value = `${months[monthIndex]}-${year}`;
+            }
         }
-    }
-});
+    });
+} else {
+    console.warn("Elemen 'bl_tx_expired' belum dimuat di DOM.");
+}
 
 window.updateStokLebih_bl = async function(data) {
     const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
