@@ -14,6 +14,11 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Library Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     
     <link rel="stylesheet" href="css/style.css">
 </head>
@@ -260,13 +265,13 @@
         </div>
 
         <nav id="os-dock-bottom" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-900/25 backdrop-blur-2xl border border-white/10 px-4 py-3 rounded-[26px] flex items-center gap-4 transition-all duration-300 z-40 shadow-xl shadow-black/40 select-none">
-            <button onclick="miuiAlert('Navigasi: Beranda Utama')" class="w-12 h-12 rounded-xl bg-sky-500 text-white flex items-center justify-center text-xl shadow-lg active:scale-90 transition-all border border-sky-400/30">
+            <button onclick="window.location.reload()" class="w-12 h-12 rounded-xl bg-sky-500 text-white flex items-center justify-center text-xl shadow-lg active:scale-90 transition-all border border-sky-400/30">
                 <i class="fa-solid fa-house"></i>
             </button>
             <button onclick="miuiAlert('Navigasi: Chat WhatsApp Group')" class="w-12 h-12 rounded-xl bg-slate-950/60 text-emerald-400 border border-white/10 flex items-center justify-center text-xl active:scale-90 transition-all hover:bg-slate-900/80 shadow-md">
                 <i class="fa-brands fa-whatsapp"></i>
             </button>
-            <button onclick="miuiAlert('Navigasi: Sinkronisasi Excel')" class="w-12 h-12 rounded-xl bg-slate-950/60 text-slate-200 border border-white/10 flex items-center justify-center text-xl active:scale-90 transition-all hover:bg-slate-900/80 shadow-md">
+            <button onclick="handleMigrasiClick(event)" class="w-12 h-12 rounded-xl bg-slate-950/60 text-slate-200 border border-white/10 flex items-center justify-center text-xl active:scale-90 transition-all hover:bg-slate-900/80 shadow-md">
                 <i class="fa-solid fa-arrows-rotate"></i>
             </button>
             <div class="miui-dock-line"></div>
@@ -276,33 +281,44 @@
         </nav>
     </div>
 
-    <div id="miui-global-miuiAlert" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-[10000] p-6 select-none animate-fade-in">
-        <div class="bg-[#e4e4e4] w-full max-w-[260px] rounded-[14px] overflow-hidden shadow-2xl border border-[#b2b2b2] flex flex-col font-sans text-slate-800">
+    <!-- Modal Progress MIUI V5 -->
+    <div id="progress-container" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center; flex-direction:column;">
+        <div style="background:#fff; padding:30px; border-radius:20px; text-align:center; box-shadow:0 10px 25px rgba(0,0,0,0.2); width:200px;">
+            <!-- Lingkaran Progress -->
+            <div style="width:60px; height:60px; border:6px solid #e0e0e0; border-top:6px solid hsl(28, 98%, 52%); border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 15px;"></div>
             
-            <div class="bg-gradient-to-b from-[#323232] to-[#202020] px-4 py-2.5 flex items-center border-b border-[#151515]">
-                <h3 class="text-white font-medium text-xs tracking-wide drop-shadow flex items-center gap-1.5">
-                    <i class="fa-solid fa-circle-info text-orange-400 text-[10px]"></i> Informasi Sistem
+            <p id="progress-text" style="font-family:sans-serif; font-weight:bold; color:#333; margin:0;">Memulai...</p>
+        </div>
+    </div>
+
+    <div id="miui-global-miuiAlert" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-[10000] p-6 select-none animate-fade-in">
+        <!-- Kontainer utama: 11/12 lebar layar di HP, max 320px di HP, max 400px di layar lebar -->
+        <div class="bg-[#e4e4e4] w-11/12 max-w-[320px] md:max-w-[400px] rounded-[14px] overflow-hidden shadow-2xl border border-[#b2b2b2] flex flex-col font-sans text-slate-800">
+            
+            <div class="bg-gradient-to-b from-[#323232] to-[#202020] px-4 py-3 flex items-center border-b border-[#151515]">
+                <h3 class="text-white font-medium text-sm tracking-wide drop-shadow flex items-center gap-2">
+                    <i class="fa-solid fa-circle-info text-orange-400 text-xs"></i> Informasi Sistem
                 </h3>
             </div>
 
-            <div class="p-5 flex items-center justify-center text-center">
-                <p id="miui-miuiAlert-message" class="text-xs font-bold text-slate-800 leading-relaxed">
+            <div class="p-6 flex items-center justify-center text-center">
+                <p id="miui-miuiAlert-message" class="text-sm font-bold text-slate-800 leading-relaxed">
                     Pesan notifikasi di sini...
                 </p>
             </div>
 
             <div id="miui-container-ok" class="border-t border-[#d0d0d0] bg-[#dbdbdb]">
                 <button onclick="tutupmiuiAlert()" 
-                        class="w-full py-3 text-center text-xs font-bold text-white bg-gradient-to-b from-[#ff8b00] to-[#f36c00] active:from-[#e56000] transition-all">
+                        class="w-full py-4 text-center text-sm font-bold text-white bg-gradient-to-b from-[#ff8b00] to-[#f36c00] active:from-[#e56000] transition-all">
                     OK
                 </button>
             </div>
             
             <div id="miui-container-confirm" class="hidden flex border-t border-[#d0d0d0] bg-[#dbdbdb]">
-                <button id="miui-btn-tidak" class="w-1/2 py-3 text-center text-xs font-bold text-slate-600 bg-transparent hover:bg-[#d0d0d0] transition-all border-r border-[#d0d0d0]">
+                <button id="miui-btn-tidak" class="w-1/2 py-4 text-center text-sm font-bold text-slate-600 bg-transparent hover:bg-[#d0d0d0] transition-all border-r border-[#d0d0d0]">
                     BATAL
                 </button>
-                <button id="miui-btn-ya" class="w-1/2 py-3 text-center text-xs font-bold text-white bg-gradient-to-b from-[#ff8b00] to-[#f36c00] active:from-[#e56000] transition-all">
+                <button id="miui-btn-ya" class="w-1/2 py-4 text-center text-sm font-bold text-white bg-gradient-to-b from-[#ff8b00] to-[#f36c00] active:from-[#e56000] transition-all">
                     YA
                 </button>
             </div>
@@ -658,22 +674,16 @@
         </div>
     </div>
 
-    <script src="js/clock.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-
+    <!-- Muat file logika Anda -->
     <script type="module" src="js/main.js"></script>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
-
+    <script type="module" src="js/clock.js"></script> <!-- Tambahkan ini -->
     <script type="module" src="js/rekap-blok.js"></script>
-
     <script type="module" src="js/ongkir.js"></script>
-
     <script type="module" src="js/stokwh.js"></script>
-
     <script type="module" src="js/muatwh3.js"></script>
+    <script type="module" src="js/bank-data.js"></script>
+    <script type="module" src="js/migration.js"></script>
+
     
     <script>
         if ('serviceWorker' in navigator) {
@@ -684,5 +694,9 @@
             });
         }
     </script>
+
+    <style>
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
 </body>
 </html>
