@@ -25,25 +25,7 @@
 
         <div class="flex items-center background: linear-gradient(to bottom, #3c3c3c, #2a2a2a); border-bottom: 1px solid #1a1a1a; p-2 rounded-xl border border-black/10 shadow-inner gap-4">
     
-            <!-- Grup Dropdown: Dibuat lebih ringkas -->
-            <div class="flex items-center gap-3">
-                <!-- Dropdown Periode -->
-                <div class="flex flex-col">
-                    <label class="text-[10px] font-black text-slate-100 uppercase tracking-wider mb-0.5">Periode Bulan</label>
-                    <select id="select-periode-muat" onchange="updateTanggalDropdownMuatWH3()"
-                        class="px-2 py-1 text-xs text-gray-800 font-bold bg-white border border-orange-200 rounded-md focus:border-orange-500 outline-none transition-all">
-                    </select>
-                </div>
-
-                <!-- Dropdown Tanggal -->
-                <div class="flex flex-col">
-                    <label class="text-[10px] font-black text-slate-100 uppercase tracking-wider mb-0.5">Tanggal Muat</label>
-                    <select id="select-tanggal-muat" onchange="renderTabelGabungan()"
-                        class="px-2 py-1 text-xs text-gray-800 font-bold bg-white border border-orange-200 rounded-md focus:border-orange-500 outline-none transition-all">
-                        <option value="">Pilih Tgl</option>
-                    </select>
-                </div>
-            </div>
+            
 
             <!-- Garis Pemisah Tipis -->
             <div class="h-8 w-[1px] bg-white/10 mx-1"></div>
@@ -76,76 +58,77 @@
             <!-- Konten Input Bosnet (Slide 1) -->
             <div class="w-1/2 flex-shrink-0 p-4 space-y-4">
                 <!-- Card Utama Input -->
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-orange-200">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-orange-500">
                     <!-- Area Kontrol Input -->
                     <div class="space-y-4">
-                        <!-- Textarea Modern -->
-                        <div>
-                            <label class="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1.5 block">Pastekan data bosnet kesini:</label>
-                            <textarea id="ta-bosnet-input" 
-                                class="w-full h-36 p-4 bg-slate-50 border border-orange-200 rounded-xl text-xs font-medium text-slate-700 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all resize-none shadow-inner"
-                                placeholder="Paste data dari Bosnet di sini..."></textarea>
-                        </div>
-
-                        <!-- Grup Input (Kode + Nama) -->
-                        <div class="flex gap-3">
-                            <!-- Kode Tujuan -->
-                            <div class="w-1/4 md:w-1/5">
-                                <label class="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1.5 block">Kode Tujuan</label>
-                                <input type="text" id="input-kode-tujuan" placeholder="Cth: LPG..."
-                                    class="w-full px-4 py-2.5 text-xs text-gray-800 font-bold bg-white border border-orange-200 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none uppercase transition-all">
+                        <!-- Header & Kontrol Utama -->
+                        <div class="grid grid-cols-12 gap-4 mb-4">
+                            <!-- KOLOM KIRI -->
+                            <div class="col-span-12 lg:col-span-8 flex flex-col space-y-3">
+                                <!-- Input Tujuan -->
+                                <div class="flex gap-3">
+                                    <div class="w-1/4 lg:w-1/6">
+                                        <label class="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">Kode Tujuan:</label>
+                                        <input type="text" id="input-kode-tujuan" placeholder="Cth: LPG..."
+                                            class="w-full px-4 py-2 text-xs text-gray-700 font-bold border border-orange-500 rounded-xl outline-none uppercase focus:border-orange-500">
+                                    </div>
+                                    <div class="flex-1">
+                                        <label class="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">Nama Lengkap Tujuan:</label>
+                                        <input type="text" id="input-nama-tujuan" placeholder="Nama alamat tujuan..."
+                                            class="w-full px-4 py-2 text-xs text-gray-700 font-bold border border-orange-500 rounded-xl outline-none focus:border-orange-500">
+                                    </div>
+                                </div>
+                                
+                                <!-- Textarea: Diubah dari h-32 ke flex-grow agar otomatis menyesuaikan -->
+                                <div class="flex flex-col flex-grow">
+                                    <label class="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Pastekan data bosnet kesini:</label>
+                                    <textarea id="ta-bosnet-input" 
+                                        class="w-full flex-grow p-4 bg-slate-50 border border-orange-500 rounded-xl text-xs font-medium text-slate-700 focus:border-orange-500 transition-all resize-none shadow-inner"
+                                        placeholder="Paste data dari Bosnet di sini..."></textarea>
+                                </div>
                             </div>
-                            <!-- Nama Tujuan -->
-                            <div class="flex-1">
-                                <label class="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1.5 block">Nama Lengkap Tujuan</label>
-                                <input type="text" id="input-nama-tujuan" placeholder="Nama alamat tujuan..."
-                                    class="w-full px-4 py-2.5 text-xs text-gray-800 font-bold bg-white border border-orange-200 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all">
+
+                            <!-- KOLOM KANAN -->
+                            <div class="col-span-12 lg:col-span-4 flex flex-col gap-3">
+                                <!-- Dropdown -->
+                                <div class="grid grid-cols-2 gap-2 bg-orange-50 p-3 rounded-xl border border-orange-500">
+                                    <div>
+                                        <label class="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">Periode Bulan</label>
+                                        <select id="select-periode-muat" onchange="updateTanggalDropdownMuatWH3()" class="w-full px-2 py-1 text-[10px] text-slate-700 font-bold border border-orange-500 rounded-md"></select>
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">Tanggal Muat</label>
+                                        <select id="select-tanggal-muat" onchange="renderTabelGabungan()" class="w-full px-2 py-1 text-[10px] text-slate-700 font-bold border border-orange-500 rounded-md">
+                                            <option value="">Pilih Tgl</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <!-- Statistik -->
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div class="bg-white p-2 rounded-xl border border-orange-500 text-center">
+                                        <span class="text-[10px] font-black text-slate-400 uppercase">Total Tujuan:</span>
+                                        <div id="txt-total-tujuan" class="text-lg font-black text-slate-800">0</div>
+                                    </div>
+                                    <div class="bg-white p-2 rounded-xl border border-orange-500 text-center">
+                                        <span class="text-[10px] font-black text-slate-400 uppercase">Total Nomor DO:</span>
+                                        <div id="txt-total-nodo" class="text-lg font-black text-orange-600">0</div>
+                                    </div>
+                                </div>
+
+                                <!-- Tombol -->
+                                <div class="flex gap-2 w-full">
+                                    <button onclick="prosesDataBosnet()" class="flex-[3] py-3 bg-orange-500 text-white font-black text-[10px] rounded-lg hover:bg-orange-600 uppercase transition-all">CONVERT DATA</button>
+                                    <button onclick="bukaFileMutasi()" class="flex-[2] py-3 bg-emerald-600 text-white font-black text-[10px] rounded-lg hover:bg-emerald-700 uppercase transition-all">MUTASI DEPO/SP</button>
+                                    <button onclick="resetFormulir()" class="flex-[1] py-3 bg-rose-500 text-white font-black text-[10px] rounded-lg hover:bg-rose-600 uppercase transition-all">BATAL</button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- Tombol Aksi -->
-                    <div class="mt-6 flex gap-2">
-                        <!-- Tombol Utama (Convert) - Mengambil porsi terbesar -->
-                        <button onclick="prosesDataBosnet()" 
-                            class="flex-[3] py-3.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-black text-[11px] rounded-xl shadow-lg shadow-orange-500/20 transition-all active:scale-[0.98] uppercase tracking-widest">
-                            <i class="fa-solid fa-bolt mr-2"></i> Convert Data Bosnet/Mutasi
-                        </button>
-
-                        <!-- Tombol Mutasi - Mengambil porsi menengah -->
-                        <!-- Tombol Mutasi -->
-                        <button onclick="bukaFileMutasi()" 
-                            class="flex-[2] py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] rounded-xl shadow-lg shadow-emerald-500/20 transition-all active:scale-[0.98] uppercase tracking-widest">
-                            <i class="fa-solid fa-file-excel mr-2"></i> Mutasi DEPO/SP
-                        </button>
-
-                        <!-- Hidden Input -->
-                        <input type="file" id="input-file-mutasi" accept=".xls,.xlsx" class="hidden" onchange="prosesFileMutasi(event)">
-
-                        <!-- Tombol Reset - Mengambil porsi terkecil -->
-                        <button onclick="resetFormulir()" 
-                            class="flex-[0.5] py-3.5 bg-rose-100 hover:bg-red-200 text-rose-500 hover:text-rose-600 border border-red-500 font-black text-xs rounded-xl transition-all active:scale-[0.98] uppercase tracking-widest">
-                            <i class="fa-solid fa-trash-can mr-2"></i> Batal
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Statistik Singkat -->
-                <div class="grid grid-cols-2 gap-4">
-                    <!-- Total Tujuan -->
-                    <div class="bg-white p-4 rounded-xl border border-orange-200 shadow-sm flex flex-col">
-                        <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Tujuan</span>
-                        <span id="txt-total-tujuan" class="text-2xl font-black text-slate-800">0</span>
-                    </div>
-                    <!-- Total No DO -->
-                    <div class="bg-white p-4 rounded-xl border border-orange-200 shadow-sm flex flex-col">
-                        <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Nomor DO</span>
-                        <span id="txt-total-nodo" class="text-2xl font-black text-orange-600">0</span>
-                    </div>
+                    </div>   
                 </div>
 
                 <!-- Tabel Data Tersimpan -->
-                <div class="overflow-x-auto bg-white rounded-2xl shadow-sm border border-orange-200 p-4">
+                <div class="overflow-x-auto bg-white rounded-2xl shadow-sm border border-orange-500 p-4">
                     <table class="w-full text-left border-collapse">
                         <!-- Header 2 Baris -->
                         <thead id="tabel-matriks-head" class="text-[11px] uppercase font-black text-slate-800 border-b-2 border-blue-200 bg-orange-100">
@@ -165,13 +148,61 @@
                 </div>
             </div>
 
-            <!-- Slide 2: RAK & PENGAMBILAN BLOK -->
+            <!-- Slide 2: RAK & PENGAMBILAN BLOK (Sangat Simpel) -->
             <div class="w-1/2 flex-shrink-0 p-3.5 space-y-4" id="slide-rak-blok">
-                <!-- Isi konten Manajemen Rak Anda di sini -->
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-orange-200">
-                    <h2 class="text-lg font-black text-slate-800 uppercase">Manajemen Rak & Blok</h2>
-                    <!-- Tabel daftar rak dan tombol print di sini -->
+                
+                <!-- Header & Filter (Label di atas Dropdown) -->
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-orange-200 flex items-end justify-between gap-4">
+                    
+                    <!-- Judul di kiri -->
+                    <h2 class="text-[20px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1.5 block">
+                        Manajemen Rak & Blok
+                    </h2>
+                    
+                    <!-- Kontrol (Label + Dropdown + Tombol) -->
+                    <div class="flex items-end gap-3 w-full max-w-lg">
+                        
+                        <!-- Wrapper Dropdown agar label di atas -->
+                        <div class="flex flex-col w-full">
+                            <label for="select-tanggal-stok-wh3" class="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1.5 block">
+                                Pilih Tanggal Stok
+                            </label>
+                            <select id="select-tanggal-stok-wh3" class="bg-slate-50 border border-orange-200 p-2 rounded-lg text-[12px] text-gray-800 font-bold w-full outline-none focus:ring-2 focus:ring-orange-500">
+                                <option value="">-- Pilih Tanggal --</option>
+                            </select>
+                        </div>
+                        
+                        <button id="btn-proses-otomatis" onclick="window.prosesOtomatisStok()" class="bg-orange-600 hover:bg-orange-700 text-white font-black py-2 px-6 rounded-lg text-xs uppercase tracking-wider transition-all whitespace-nowrap">
+                            Proses Rak & Blok
+                        </button>
+                        <button id="btn-simpan-rak-blok" onclick="simpanDataRakBlok()" class="bg-orange-600 hover:bg-orange-700 text-white font-black py-2 px-6 rounded-lg text-xs uppercase tracking-wider transition-all whitespace-nowrap">
+                            Simpan Muat WH-3
+                        </button>
+                    </div>
                 </div>
+
+                <!-- Area Hasil (Bersih & Langsung ke Inti) -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-orange-200 min-h-[400px]">
+                    <table class="w-full text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-600 uppercase">
+                                <th class="p-3 border">KODE</th>
+                                <th class="p-3 border">TOTAL</th>
+                                <th class="p-3 border">PLT | KRT</th>
+                                <th class="p-3 border">RAK AMBIL</th>
+                                <th class="p-3 border">TOTAL STOK</th>
+                                <th class="p-3 border">SISA STOK</th>
+                                <th class="p-3 border">PLT | KRT</th>
+                                <th class="p-3 border">AMBIL BLOK</th>
+                                <th class="p-3 border">EXP BLOK</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabel-rak-body">
+                            <!-- Data akan di-render di sini -->
+                        </tbody>
+                    </table>
+                </div>
+
             </div>
 
         </div>
