@@ -53,7 +53,10 @@ window.initMuatWH3 = async function() {
         window.generatePeriodeDropdown(); 
     } 
     await updateTanggalDropdownMuatWH3();
+    // Panggil langsung, dia akan menunggu jika HTML belum siap
+    window.muatDropdownStok(); 
     
+    await window.renderTabelGabungan();
 };
 
 // Panggil inisialisasi secara aman
@@ -61,6 +64,17 @@ window.initMuatWH3 = async function() {
 document.addEventListener('DOMContentLoaded', () => {
     if (typeof window.initMuatWH3 === 'function') {
         window.initMuatWH3();
+    }
+
+    const btnProses = document.getElementById('btn-proses-otomatis');
+    if (btnProses) {
+        btnProses.addEventListener('click', () => {
+            if (typeof window.prosesOtomatisStok === 'function') {
+                window.prosesOtomatisStok();
+            } else {
+                console.error("Fungsi prosesOtomatisStok belum didefinisikan.");
+            }
+        });
     }
 });
 
@@ -96,17 +110,17 @@ window.gantiModulMuatWH3 = function(mode) {
     if (!slider) return;
 
     if (mode === 'KONFIRMASI') {
-        // Kembali ke posisi awal (slide 1)
         slider.style.transform = 'translateX(0%)';
         console.log("Mode: KONFIRMASI BOSNET");
     } else if (mode === 'RAK') {
-        // Geser ke slide 2 (karena total 2 slide, maka -50%)
         slider.style.transform = 'translateX(-50%)';
         console.log("Mode: RAK & BLOK");
         
-        // Panggil fungsi render tabel jika diperlukan
-        if (typeof window.renderTabelRak === 'function') {
-            window.renderTabelRak();
+        // Panggil fungsi yang benar dan pastikan bersifat asinkron
+        if (typeof window.renderTabelRakGabungan === 'function') {
+            window.renderTabelRakGabungan();
+        } else {
+            console.error("Fungsi renderTabelRakGabungan tidak ditemukan!");
         }
     }
 };
@@ -680,4 +694,312 @@ window.renderTabelGabungan = async function() {
         console.error("Error sinkronisasi Firestore:", e);
         window.miuiAlert("Gagal memuat data dari Firestore: " + e.message);
     }
+};
+
+// Pastikan fungsi ini dipanggil saat tombol AMBIL RAK & BLOK diklik
+window.handleAmbilRakBlok = async function() {
+    const tglMuat = document.getElementById('select-tanggal-muat').value;
+    console.log("Mode: RAK & BLOK. Mengambil data untuk:", tglMuat);
+
+    // Pastikan fungsi ini memicu rendering tabel gabungan
+    await window.renderTabelRakGabungan(); 
+};
+
+window.muatDropdownStok = async function(retryCount = 0) {
+    const select = document.getElementById('select-tanggal-stok-wh3');
+    
+    // Jika belum ditemukan, coba lagi maksimal 5 kali (setiap 200ms)
+    if (!select) {
+        if (retryCount < 5) {
+            setTimeout(() => window.muatDropdownStok(retryCount + 1), 200);
+            return;
+        }
+        console.error("Elemen select-tanggal-stok-wh3 tidak ditemukan setelah retry.");
+        return;
+    }
+
+    const db = firebase.database();
+    const ref = db.ref('stok_wh3');
+
+    const snapshot = await ref.once('value');
+    if (snapshot.exists()) {
+        const data = snapshot.val();
+        select.innerHTML = '<option value="">Pilih Stok WH-3</option>';
+
+        Object.keys(data).sort().reverse().forEach(key => {
+            const tglRaw = key.split('_')[1];
+            if (tglRaw && tglRaw.length === 8) {
+                const y = tglRaw.substring(0, 4);
+                const m = tglRaw.substring(4, 6);
+                const d = tglRaw.substring(6, 8);
+                
+                const option = document.createElement('option');
+                option.value = tglRaw;
+                option.textContent = `Stok WH-3 [ ${d}-${m}-${y} ]`;
+                select.appendChild(option);
+            }
+        });
+    }
+};
+
+window.renderTabelRakGabungan = async function() {
+    console.log("Mulai menjalankan renderTabelRakGabungan...");
+    const tglMuat = document.getElementById('select-tanggal-muat').value;
+    const tglStok = document.getElementById('select-tanggal-stok-wh3').value;
+    const tbody = document.getElementById('tabel-rak-body');
+    const db = window.getFirestore();
+
+    // 1. Ambil Data Muat
+    const snapshotMuat = await db.collection("muat_wh3").doc(tglMuat).collection("datatujuan").get();
+    let rekapMuat = {}; 
+    
+    if (snapshotMuat.empty) {
+        console.warn("Snapshot kosong!");
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center p-4">Tidak ada data muat.</td></tr>';
+        return;
+    }
+
+    for (const doc of snapshotMuat.docs) {
+        const subSnapshot = await doc.ref.collection("data").get();
+        subSnapshot.docs.forEach(doDoc => {
+            const barang = doDoc.data().data || doDoc.data();
+            Object.keys(barang).forEach(k => {
+                if(barang[k].qtyUtama) {
+                    rekapMuat[k] = (rekapMuat[k] || 0) + parseInt(barang[k].qtyUtama);
+                }
+            });
+        });
+    }
+
+    // --- LOGIKA PENGURUTAN (Sama dengan Slide 1) ---
+    const polaUtama = ["CRR", "CRR EA", "THR EA", "THR", "MRMR", "MRR", "MJR HJ", "MJR", "MOB4A", "MOR2A EA", "MOR2A EB", "MOR2A", "MP", "PDR", "MTR3A", "PR-PKT", "PR-CUP", "MRSR", "LTGR", "MTGR", "MEB", "MOL", "MRL", "MTL", "ISEL"];
+    
+    const getSortScore = (kode) => {
+        let k = kode.toUpperCase();
+        for (let i = 0; i < polaUtama.length; i++) {
+            if (k.includes(polaUtama[i])) {
+                if (polaUtama[i] === "MOR2A" && (k.includes("MOR2A EA") || k.includes("MOR2A EB"))) continue;
+                if (polaUtama[i] === "THR" && k.includes("THR EA")) continue;
+                if (polaUtama[i] === "MJR" && k.includes("MJR HJ")) continue;
+                if (polaUtama[i] === "CRR" && k.includes("CRR EA")) continue;
+                return i + 1;
+            }
+        }
+        return 999;
+    };
+
+    const getVarianScore = (kode) => {
+        let k = kode.toUpperCase();
+        if (k.includes("ZC")) return 1;
+        if (k.includes("SSL")) return 2;
+        if (k.includes("SLO")) return 3;
+        if (k.includes("TDS")) return 4;
+        if (k.includes("BAG")) return 5;
+        if (k.includes("WRG")) return 6;
+        if (k.includes("GTG")) return 7;
+        return 0;
+    };
+
+    const getAngkaAkhir = (kode) => {
+        const match = kode.match(/\d+/g);
+        return match ? (parseInt(match.join('').slice(-4)) || 999) : 999;
+    };
+
+    // 2. Ambil Data Stok
+    const snapshotStok = await firebase.database().ref('stok_wh3/stokwh3_' + tglStok).once('value');
+    const dataStok = snapshotStok.val() || {};
+
+    // 3. Render ke Tabel
+    tbody.innerHTML = '';
+    
+    Object.keys(rekapMuat).sort((a, b) => {
+        const scoreA1 = getSortScore(a), scoreB1 = getSortScore(b);
+        if (scoreA1 !== scoreB1) return scoreA1 - scoreB1;
+        const scoreA2 = getVarianScore(a), scoreB2 = getVarianScore(b);
+        if (scoreA2 !== scoreB2) return scoreA2 - scoreB2;
+        return getAngkaAkhir(a) - getAngkaAkhir(b);
+    }).forEach(kode => {
+        const total = rekapMuat[kode];
+        const stok = dataStok[kode] || { totalStok: 0, rak: '-', blok: '-', exp: '-' };
+        const kekurangan = total - stok.totalStok;
+
+        // Perhitungan Dinamis PLT | KRT
+        const masterInfo = window.cacheMasterBarang ? window.cacheMasterBarang[kode] : null;
+        const qtyPerPalet = (masterInfo && masterInfo.QTY) ? parseInt(masterInfo.QTY) : 1;
+        
+        const pltTotal = Math.floor(total / qtyPerPalet);
+        const krtTotal = total % qtyPerPalet;
+        
+        const kekuranganPositif = kekurangan > 0 ? kekurangan : 0;
+        const pltKurang = Math.floor(kekuranganPositif / qtyPerPalet);
+        const krtKurang = kekuranganPositif % qtyPerPalet;
+
+        tbody.innerHTML += `
+            <tr class="border-b hover:bg-slate-50">
+                <td class="p-3 font-bold text-slate-800">${kode}</td>
+                <td class="p-3 text-center text-slate-800">${total}</td>
+                <td class="p-3 text-center text-slate-800">
+                    <span class="font-black text-emerald-600">${pltTotal}</span> | 
+                    <span class="font-black text-rose-600">${krtTotal}</span>
+                </td>
+                <td class="p-3 text-left text-slate-800">${stok.rak || '-'}</td>
+                <td class="p-3 text-center text-slate-800">${stok.totalStok}</td>
+                <td class="p-3 text-center font-bold ${kekurangan > 0 ? 'text-red-600' : 'text-emerald-600'}">${kekurangan}</td>
+                <td class="p-3 text-center text-slate-800">
+                    <span class="font-black text-emerald-600">${pltKurang}</span> | 
+                    <span class="font-black text-rose-600">${krtKurang}</span>
+                </td>
+                <td class="p-3 text-left text-slate-800">${stok.blok || '-'}</td>
+                <td class="p-3 text-left text-[10px] text-slate-800">${stok.exp || '-'}</td>
+            </tr>
+        `;
+    });
+};
+
+window.prosesOtomatisStok = async function() {
+    const btn = document.getElementById('btn-proses-otomatis');
+    const tglStok = document.getElementById('select-tanggal-stok-wh3').value;
+    
+    if (!tglStok) {
+        miuiAlert("Pilih tanggal stok terlebih dahulu!");
+        return;
+    }
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerText = "MEMPROSES...";
+    }
+
+    // 1. Ambil data stok & data stok_blok sekaligus
+    const [snapshotStok, responseBlok] = await Promise.all([
+        firebase.database().ref('stok_wh3/stokwh3_' + tglStok).once('value'),
+        fetch("https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/stok_blok.json")
+    ]);
+    
+    const dataStok = snapshotStok.val() || {};
+    const dataBlok = await responseBlok.json() || {};
+
+    // Fungsi mapping untuk menyingkat nama blok
+    const mapNamaBlok = (nama) => {
+        const n = nama.toUpperCase();
+        if (n.includes('RETUR')) return 'RT';
+        if (n.includes('TEKOMAS')) return 'TK';
+        if (n.includes('18CD')) return 'CD';
+        if (n.includes('18E')) return 'E';
+        if (n.includes('18F')) return 'F';
+        if (n.includes('BLOK H')) return 'H';
+        if (n.includes('PROMOSI')) return 'PR';
+        return nama.replace('BLOK ', ''); // Default: hapus kata 'BLOK ' jika ada
+    };
+
+    // 2. Iterasi setiap baris di tabel
+    const rows = document.querySelectorAll('#tabel-rak-body tr');
+    
+    rows.forEach(row => {
+        const kode = row.cells[0].innerText;
+        const itemStok = dataStok[kode];
+
+        if (itemStok) {
+            const master = window.cacheMasterBarang ? window.cacheMasterBarang[kode] : null;
+            const konversi = (master && master.QTY) ? parseInt(master.QTY) : 1;
+            const totalStok = parseInt(itemStok.total) || 0;
+
+            // C. Format Rak Ambil
+            const detail = itemStok.detail_rak || {};
+            const formatRak = (str) => str ? str.replace(/(\d+)([A-Za-z]+)(\d+)/g, "$1 $2 $3") : "-";
+            const rakBeceran = formatRak(detail.beceran_rak || "");
+            const qtyBeceran = itemStok.beceran || "0";
+            const beceranDisplay = (rakBeceran !== "-") ? `${rakBeceran} = ${qtyBeceran}` : "";
+            
+            const utuhanFormatted = detail.utuhan_rak ? detail.utuhan_rak.split('+').map(part => formatRak(part.trim())).join(' + ') : "";
+            const rakAmbil = `${beceranDisplay}${utuhanFormatted ? (beceranDisplay ? ' + ' : '') + utuhanFormatted : ''}`;
+
+            // F. PROSES AMBIL BLOK & EXP BLOK
+            let ambilBlokArr = [];
+            let expBlokArr = [];
+
+            Object.keys(dataBlok).forEach(namaBlok => {
+                if (dataBlok[namaBlok][kode]) {
+                    const expData = dataBlok[namaBlok][kode];
+                    let blokPlt = 0;
+                    let expDetail = [];
+
+                    Object.keys(expData).forEach(exp => {
+                        const item = expData[exp];
+                        blokPlt += parseInt(item.plt) || 0;
+                        // Format Exp: TGL-BLN:PLT
+                        expDetail.push(`${exp.split('-')[0].substring(0,3).toUpperCase()}-${exp.split('-')[1]}:${item.plt}`);
+                    });
+
+                    const shortBlok = mapNamaBlok(namaBlok);
+                    ambilBlokArr.push(`${shortBlok}:${blokPlt}`);
+                    expBlokArr.push(`${shortBlok}: [${expDetail.join(' + ')}]`);
+                }
+            });
+
+            // D. Update tampilan baris tabel
+            row.cells[3].innerText = rakAmbil;
+            row.cells[4].innerText = totalStok;
+            row.cells[7].innerText = ambilBlokArr.length > 0 ? ambilBlokArr.join(' | ') : '-';
+            row.cells[8].innerText = expBlokArr.length > 0 ? expBlokArr.join(' | ') : '-';
+
+            // E. Update Kekurangan & PLT/KRT
+            const totalMuat = parseInt(row.cells[1].innerText);
+            const kekurangan = totalStok - totalMuat;
+            row.cells[5].innerText = kekurangan;
+            row.cells[5].className = `p-3 text-center font-bold ${kekurangan < 0 ? 'text-red-600' : 'text-emerald-600'}`;
+            
+            const kekuranganPos = kekurangan > 0 ? kekurangan : 0;
+            row.cells[6].innerHTML = `<span class="font-black text-emerald-600">${Math.floor(kekuranganPos / konversi)}</span> | <span class="font-black text-rose-600">${kekuranganPos % konversi}</span>`;
+        }
+    });
+
+    if (btn) {
+        btn.disabled = false;
+        btn.innerText = "PROSES RAK & BLOK";
+    }
+};
+
+
+window.simpanDataRakBlok = async function() {
+    const btn = document.getElementById('btn-simpan-rak-blok');
+    const tglStok = document.getElementById('select-tanggal-stok-wh3').value;
+    
+    if (!tglStok) {
+        miuiAlert("Pilih tanggal stok terlebih dahulu!");
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerText = "MENYIMPAN...";
+
+    // Mengambil data dari tabel
+    const rows = document.querySelectorAll('#tabel-rak-body tr');
+    let dataUntukDisimpan = {};
+
+    rows.forEach(row => {
+        const kode = row.cells[0].innerText;
+        // Kita simpan informasi penting dari tabel
+        dataUntukDisimpan[kode] = {
+            rak_ambil: row.cells[3].innerText,
+            total_stok: row.cells[4].innerText,
+            kekurangan: row.cells[5].innerText,
+            plt_krt_kekurangan: row.cells[6].innerText,
+            ambil_blok: row.cells[7].innerText,
+            exp_blok: row.cells[8].innerText,
+            timestamp: firebase.database.ServerValue.TIMESTAMP
+        };
+    });
+
+    try {
+        // Menyimpan ke folder muat_wh3/rak_blok_[tanggal]
+        await firebase.database().ref(`muat_wh3/rak_blok_${tglStok}`).set(dataUntukDisimpan);
+        miuiAlert("Data Rak & Blok berhasil disimpan!");
+    } catch (error) {
+        console.error(error);
+        miuiAlert("Gagal menyimpan data!");
+    }
+
+    btn.disabled = false;
+    btn.innerText = "SIMPAN";
 };
