@@ -140,6 +140,30 @@ window.getHariLiburNasional = async function() {
     }
 };
 
+// --- FUNGSI TAMBAHAN: Validasi hari kerja (Maju - untuk BOSNET) ---
+window.getValidWorkingDate = async function(dateInput) {
+    let liburNasional = await window.getHariLiburNasional();
+    let checkDate = new Date(dateInput);
+    
+    // Loop sampai bukan Minggu (0) dan bukan tanggal libur
+    while (checkDate.getDay() === 0 || liburNasional.includes(checkDate.toISOString().split('T')[0])) {
+        checkDate.setDate(checkDate.getDate() + 1);
+    }
+    return checkDate;
+};
+
+// --- FUNGSI TAMBAHAN: Validasi hari kerja (Mundur - untuk Mutasi/Import) ---
+window.getValidWorkingDateReverse = async function(dateInput) {
+    let liburNasional = await window.getHariLiburNasional();
+    let checkDate = new Date(dateInput);
+    
+    // Mundur sampai ketemu hari kerja (bukan Minggu dan bukan libur)
+    while (checkDate.getDay() === 0 || liburNasional.includes(checkDate.toISOString().split('T')[0])) {
+        checkDate.setDate(checkDate.getDate() - 1);
+    }
+    return checkDate;
+};
+
 // 1. Fungsi untuk generate 10 bulan terakhir
 window.generatePeriodeDropdown = function() {
     const selPeriode = document.getElementById('select-periode-muat');
@@ -353,12 +377,11 @@ function bukaFileMutasi() {
 }
 
 // Fungsi untuk membaca dan memproses Excel
-async function prosesFileMutasi(event) {
+window.prosesFileMutasi = async function(event) {
     const file = event.target.files[0];
     if (!file) return;
 
     // --- 1. EKSTRAKSI TANGGAL DARI NAMA FILE ---
-    // Nama file contoh: "Form Mutasi 2026 07-16 Senin 15.31.20.xls"
     const fileName = file.name;
     const parts = fileName.split(" "); 
     const tahunFile = parts[2]; 
@@ -372,7 +395,7 @@ async function prosesFileMutasi(event) {
     const [bln, tgl] = fileDateStr.split("-");
     const formattedFileDate = `${tgl}-${bln}-${tahunFile}`; // "16-07-2026"
 
-    // --- 2. AMBIL DARI DROPDOWN (Nilai: "20260716") ---
+    // --- 2. AMBIL DARI DROPDOWN ---
     const dropdownVal = document.getElementById('select-tanggal-muat').value; 
     
     if (!dropdownVal) {
@@ -384,15 +407,19 @@ async function prosesFileMutasi(event) {
     const m = dropdownVal.substring(4, 6);
     const d = dropdownVal.substring(6, 8);
     
-    const dateObj = new Date(y, m - 1, d);
-    dateObj.setDate(dateObj.getDate() - 1); 
+    // --- 3. VERIFIKASI DENGAN HARI KERJA (LOGIKA BARU) ---
+    // Kita mencari hari kerja terakhir sebelum tanggal muat yang dipilih
+    const dateFromDropdown = new Date(y, m - 1, d);
+    dateFromDropdown.setDate(dateFromDropdown.getDate() - 1); // Mulai cek dari hari sebelumnya
     
-    const targetTgl = String(dateObj.getDate()).padStart(2, '0');
-    const targetBln = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const targetThn = dateObj.getFullYear();
+    // Menggunakan fungsi libur nasional yang baru kita buat
+    const validExpectedDate = await window.getValidWorkingDateReverse(dateFromDropdown);
+    
+    const targetTgl = String(validExpectedDate.getDate()).padStart(2, '0');
+    const targetBln = String(validExpectedDate.getMonth() + 1).padStart(2, '0');
+    const targetThn = validExpectedDate.getFullYear();
     const targetDateStr = `${targetTgl}-${targetBln}-${targetThn}`;
 
-    // --- 3. VERIFIKASI ---
     if (formattedFileDate !== targetDateStr) {
         window.miuiAlert(`Peringatan: File yang Anda pilih adalah mutasi tanggal ${formattedFileDate}, sedangkan untuk tanggal muat ${d}/${m}/${y}, sistem memerlukan file tanggal ${targetDateStr}. Import dibatalkan!`);
         event.target.value = ''; 
@@ -400,8 +427,7 @@ async function prosesFileMutasi(event) {
     }
 
     // --- 4. PEMBENTUKAN NO DO ---
-    // Menggunakan variabel yang sudah dideklarasikan di atas
-    const noDOMutasi = `${parseInt(tgl)}${parseInt(bln)}${tahunFile.slice(-2)}`; // "160726"
+    const noDOMutasi = `${parseInt(tgl)}${parseInt(bln)}${tahunFile.slice(-2)}`; 
 
     const reader = new FileReader();
     reader.onload = function(e) {
@@ -1090,6 +1116,295 @@ window.simpanDataRakBlok = async function() {
 
     btn.disabled = false;
     btn.innerText = "SIMPAN RAK WH-3 & BLOK";
+};
+
+
+window.bukaModalAmbil = function() {
+    const modal = document.getElementById('modal-ambil-blok-custom');
+    if (modal) {
+        modal.classList.remove('hidden');
+        // Panggil fungsi untuk mengisi data referensi saat modal dibuka
+        window.isiDataReferensiModal();
+    }
+};
+
+window.tutupModalAmbil = function() {
+    const modal = document.getElementById('modal-ambil-blok-custom');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+};
+
+
+window.isiDataReferensiModal = function() {
+    const panelRef = document.getElementById('panel-kebutuhan-referensi');
+    const selectKode = document.getElementById('select-kode-ambil');
+    
+    panelRef.innerHTML = '';
+    selectKode.innerHTML = '<option value="">-- Pilih Kode Barang --</option>';
+
+    // Kita cari semua baris di dalam tabel yang ada di body
+    const rows = document.querySelectorAll('table tbody tr'); 
+    
+    rows.forEach(row => {
+        // Kita cari sel yang memiliki teks "AMBIL ["
+        const cellAmbil = Array.from(row.cells).find(cell => cell.innerText.includes('AMBIL ['));
+        
+        if (cellAmbil) {
+            const kode = row.cells[0].innerText;
+            const sisaStokRaw = row.cells[6].innerText.trim(); // contoh: "-2 | 68"
+            const infoAmbil = cellAmbil.innerText;
+
+            // --- LOGIKA PEMBULATAN PLT ---
+            let pltBulat = 0;
+            if (sisaStokRaw.includes('|')) {
+                const parts = sisaStokRaw.split('|');
+                const plt = parseInt(parts[0]); // -2
+                const krt = parseInt(parts[1]); // 68
+                
+                // Jika ada sisa karton (krt > 0), maka bulatkan ke arah yang lebih besar (tambah beban 1 plt)
+                // Karena nilainya negatif (kekurangan), kita gunakan Math.floor untuk menambah nilai negatifnya
+                pltBulat = krt > 0 ? (plt - 1) : plt;
+            } else {
+                pltBulat = parseInt(sisaStokRaw);
+            }
+            
+            // Tampilkan nilai absolutnya untuk kebutuhan ambil
+            const totalAmbil = Math.abs(pltBulat);
+
+            panelRef.innerHTML += `
+                <div class="mb-2 p-2 bg-white rounded border border-orange-100">
+                    <span class="font-black text-orange-700">${kode}</span> 
+                    <span class="text-[12px] text-slate-500">| Perlu Ambil: ${totalAmbil} PLT</span>
+                    <div class="text-[12px] italic text-slate-600">${infoAmbil}</div>
+                </div>`;
+            
+            selectKode.innerHTML += `<option value="${kode}" data-butuh="${totalAmbil}">${kode}</option>`;
+        }
+    });
+};
+
+
+document.getElementById('select-kode-ambil').addEventListener('change', function() {
+    const kodeDipilih = this.value;
+    const selectBlok = document.getElementById('select-blok-ambil');
+    
+    // Reset dropdown
+    selectBlok.innerHTML = '<option value="">-- Pilih Blok Asal --</option>';
+    if (!kodeDipilih) return;
+
+    // Cari baris berdasarkan teks kode barang di kolom pertama
+    const rows = document.querySelectorAll('table tbody tr');
+    let infoAmbil = '';
+    
+    rows.forEach(row => {
+        // 1. Pastikan kita berada di baris kode yang benar
+        if (row.cells[0].innerText.trim() === kodeDipilih) {
+            // 2. Cari sel yang mengandung kata "AMBIL" di seluruh sel baris tersebut
+            const cellAmbil = Array.from(row.cells).find(cell => 
+                cell.innerText.toUpperCase().includes('AMBIL')
+            );
+
+            if (cellAmbil) {
+                infoAmbil = cellAmbil.innerText;
+                console.log("Data ditemukan di sel:", infoAmbil);
+            }
+        }
+    });
+
+    // Debugging: cek di console apa yang tertangkap
+    console.log("Data Ambil untuk", kodeDipilih, ":", infoAmbil);
+
+    if (infoAmbil && infoAmbil.includes('AMBIL [')) {
+        // Hapus teks "AMBIL [" dan "]"
+        let isiDalamKurung = infoAmbil.replace('AMBIL [', '').replace(']', '');
+        // Pecah berdasarkan "|"
+        let daftarBlok = isiDalamKurung.split('|');
+        
+        daftarBlok.forEach(item => {
+            let namaBlok = item.split(':')[0].trim();
+            if (namaBlok) {
+                let opt = document.createElement('option');
+                opt.value = namaBlok;
+                opt.text = namaBlok;
+                selectBlok.appendChild(opt);
+            }
+        });
+    }
+});
+
+window.getDataStokByKode = function(kode) {
+    // Cari baris berdasarkan kode
+    const rows = document.querySelectorAll('table tbody tr');
+    let dataStok = [];
+    
+    rows.forEach(row => {
+        if (row.cells[0].innerText.trim() === kode) {
+            // Ambil teks dari kolom EXP (Kolom ke-7 / index 7)
+            const textExp = row.cells[7].innerText; 
+            // Parsing string seperti "CD: [28-FEB:2 + 28-JUN:4]"
+            // Di sini kita ubah jadi array objek untuk dihitung FEFO-nya
+            // ... (logika parsing string exp Anda)
+        }
+    });
+    return dataStok;
+};
+
+window.tambahAlokasi = function() {
+    const kode = document.getElementById('select-kode-ambil').value;
+    const blok = document.getElementById('select-blok-ambil').value;
+    const jumlah = parseInt(document.getElementById('input-plt-ambil').value);
+    
+    if (!kode || !blok || !jumlah) {
+        window.miuiAlert("Lengkapi data kode, blok, dan jumlah!");
+        return;
+    }
+
+    // 1. Ambil detail EXP spesifik berdasarkan blok
+    const infoExp = window.getExpDataDariTabel(kode, blok); 
+
+    // 2. Kalkulasi FEFO
+    const stokData = window.getDataStokByKode(kode); 
+    let sisaAmbil = jumlah;
+    let detailAlokasi = [];
+    
+    stokData.sort((a,b) => new Date(a.exp) - new Date(b.exp)).forEach(item => {
+        if (sisaAmbil <= 0) return;
+        let ambil = Math.min(sisaAmbil, item.stok);
+        detailAlokasi.push(`${item.expFormat}:${ambil}`);
+        sisaAmbil -= ambil;
+    });
+
+    // 3. Update Panel Ringkasan
+    const listRingkasan = document.getElementById('list-ringkasan');
+    
+    let blokContainer = document.getElementById(`blok-group-${blok}`);
+    let totalPerBlokEl = document.getElementById(`total-blok-${blok}`);
+
+    // Jika blok baru, buat container dan elemen totalnya sekaligus
+    if (!blokContainer) {
+        blokContainer = document.createElement('div');
+        blokContainer.id = `blok-group-${blok}`;
+        blokContainer.className = "mb-4 border-b pb-2";
+        blokContainer.innerHTML = `<div class="font-black text-orange-600 text-[11px] mb-1">BLOK ${blok}</div>`;
+        
+        // Buat elemen total di bawah
+        totalPerBlokEl = document.createElement('div');
+        totalPerBlokEl.id = `total-blok-${blok}`;
+        totalPerBlokEl.className = "text-[10px] font-black text-slate-700 mt-2 pt-1 border-t border-dashed border-orange-200 ml-2";
+        totalPerBlokEl.setAttribute('data-total', 0);
+        
+        blokContainer.appendChild(totalPerBlokEl);
+        listRingkasan.appendChild(blokContainer);
+    }
+
+    // 4. Tambahkan item barang baru SEBELUM elemen total
+    const itemDiv = document.createElement('div');
+    itemDiv.className = "flex justify-between text-[10px] ml-2 text-slate-800 mb-1";
+    itemDiv.innerHTML = `<span>${kode} = ${jumlah} PLT [${infoExp}]</span>`;
+    
+    // Gunakan insertBefore agar item baru selalu berada di atas Total
+    blokContainer.insertBefore(itemDiv, totalPerBlokEl);
+
+    // 5. Update Total per Blok
+    let totalLama = parseInt(totalPerBlokEl.getAttribute('data-total') || 0);
+    let totalBaru = totalLama + jumlah;
+    totalPerBlokEl.setAttribute('data-total', totalBaru);
+    totalPerBlokEl.innerText = `Total ${blok}: ${totalBaru} PLT`;
+
+    // 6. Update Grand Total
+    window.updateGrandTotal(jumlah);
+
+    // 7. RESET FORM
+    document.getElementById('input-plt-ambil').value = '';
+    document.getElementById('select-blok-ambil').selectedIndex = 0;
+    document.getElementById('select-kode-ambil').selectedIndex = 0; 
+};
+
+window.getExpDataDariTabel = function(kode, blok) {
+    const rows = document.querySelectorAll('table tbody tr');
+    let hasilExp = "EXP tidak tersedia";
+    
+    rows.forEach(row => {
+        // Pastikan baris sesuai dengan kode barang
+        if (row.cells[0].innerText.trim() === kode) {
+            // Ambil teks dari kolom EXP (indeks 7 sesuai tabel Anda)
+            const cellExp = row.cells[8].innerText; 
+            
+            // Logika baru: Cari teks blok yang diikuti oleh titik dua ":"
+            // Kita gunakan cara sederhana tanpa banyak regex yang rumit
+            const bagian = cellExp.split('|');
+            
+            bagian.forEach(item => {
+                // Jika item mengandung nama blok (misal "TK:")
+                if (item.toUpperCase().includes(blok.toUpperCase() + ':')) {
+                    // Ambil isi di dalam kurung siku [...]
+                    const start = item.indexOf('[');
+                    const end = item.indexOf(']');
+                    if (start !== -1 && end !== -1) {
+                        hasilExp = item.substring(start + 1, end).trim();
+                    }
+                }
+            });
+        }
+    });
+    
+    // Debugging untuk memastikan apa yang dibaca
+    console.log("Mencari EXP untuk:", kode, blok, "Hasil:", hasilExp);
+    return hasilExp;
+};
+
+window.updateGrandTotal = function(tambahan) {
+    let el = document.getElementById('grand-total-plt');
+    let current = parseInt(el.innerText) || 0;
+    el.innerText = (current + tambahan) + " PLT";
+};
+
+window.simpanAmbil = async function() {
+    const listRingkasan = document.getElementById('list-ringkasan');
+    const tanggalHariIni = "20260720"; 
+    
+    if (listRingkasan.children.length === 0) {
+        window.miuiAlert("Ringkasan alokasi masih kosong!");
+        return;
+    }
+
+    let dataAlokasi = [];
+    const blokGroups = listRingkasan.querySelectorAll('[id^="blok-group-"]');
+    
+    blokGroups.forEach(group => {
+        const blok = group.id.replace('blok-group-', '');
+        const totalEl = document.getElementById(`total-blok-${blok}`);
+        const total = totalEl ? totalEl.getAttribute('data-total') : 0;
+        
+        const items = Array.from(group.querySelectorAll('span')).map(span => span.innerText);
+        
+        dataAlokasi.push({
+            blok: blok,
+            total_plt: parseInt(total),
+            detail_barang: items
+        });
+    });
+
+    // MEMPERBAIKI AKSES GRAND TOTAL
+    // Cari elemen Grand Total yang ada di form Anda (biasanya di bagian bawah)
+    const grandTotalEl = document.querySelector('.grand-total-class'); // GANTI DENGAN CLASS/ID YG BENAR
+    const grandTotalVal = grandTotalEl ? grandTotalEl.innerText : "0";
+
+    try {
+        const db = firebase.firestore();
+        await db.collection('muat_wh3').doc(tanggalHariIni).collection('alokasi_ambil').add({
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            data: dataAlokasi,
+            total_grand: grandTotalVal
+        });
+
+        window.miuiAlert("Data berhasil disimpan ke Firestore!");
+        listRingkasan.innerHTML = '';
+    } catch (error) {
+        console.error("Gagal simpan: ", error);
+        window.miuiAlert("Gagal menyimpan data ke Firestore!");
+    }
 };
 
 
