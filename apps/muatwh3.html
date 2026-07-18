@@ -186,8 +186,8 @@
                                 Simpan Rak & Blok
                             </button>
 
-                            <button id="btn-cetak-rak-blok" onclick="cetakSemuaVersi()" 
-                                class="bg-orange-600 text-white font-black py-3 px-6 rounded-md text-[10px] uppercase transition-all whitespace-nowrap">
+                            <button id="btn-cetak-rak-blok" onclick="bukaModalAmbil()" 
+                                class="bg-orange-600 hover:bg-orange-700 text-white font-black py-3 px-6 rounded-md text-[10px] uppercase transition-all whitespace-nowrap cursor-pointer">
                                 Cetak Muat WH-3
                             </button>
                         </div>
@@ -218,6 +218,79 @@
 
             </div>
 
+        </div>
+    </div>
+
+
+    <!-- Modal Utama Ambil Blok -->
+    <div id="modal-ambil-blok-custom" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+            <!-- Header Modal -->
+            <div class="p-4 border-b flex justify-between items-center bg-orange-600 text-white">
+                <h3 class="font-black uppercase tracking-widest text-sm">Pengaturan Ambil Blok (WH-3)</h3>
+                <button onclick="tutupModalAmbil()" class="font-black text-xl">&times;</button>
+            </div>
+
+            <!-- Konten Modal -->
+            <div class="p-4 overflow-y-auto space-y-6">
+                
+                <!-- Panel Atas: Kebutuhan Ambil (Referensi) -->
+                <div class="bg-slate-50 p-4 rounded-xl border border-orange-200">
+                    <h4 class="text-[10px] font-black text-slate-500 uppercase mb-2">Referensi Kebutuhan Ambil Blok (Plt)</h4>
+                    <div id="panel-kebutuhan-referensi" class="text-[11px] font-bold text-slate-700 space-y-1">
+                        <!-- Data akan di-inject via JS -->
+                    </div>
+                </div>
+
+                <!-- Panel Tengah: Dropdown Input (Pengaturan) -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    
+                    <!-- Dropdown Kode -->
+                    <div class="col-span-1">
+                        <select id="select-kode-ambil" class="w-full p-2 border rounded-lg text-xs font-bold text-slate-700 border-orange-300">
+                            <option value="">-- Pilih Kode Barang --</option>
+                        </select>
+                    </div>
+
+                    <!-- Dropdown Blok -->
+                    <div class="col-span-1">
+                        <select id="select-blok-ambil" class="w-full p-2 border rounded-lg text-xs font-bold text-slate-700 border-orange-300">
+                            <option value="">-- Pilih Blok Asal --</option>
+                        </select>
+                    </div>
+
+                    <!-- Gabungan Input Jumlah & Tombol (Mengambil 2 kolom) -->
+                    <div class="col-span-2 flex gap-2">
+                        <input type="number" id="input-plt-ambil" placeholder="Jumlah PLT" 
+                            class="w-full p-2 border rounded-lg text-xs text-slate-600 font-bold border-orange-300">
+                        
+                        <button onclick="window.tambahAlokasi()" 
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-black text-[10px] whitespace-nowrap">
+                            TAMBAH
+                        </button>
+                    </div>
+
+                </div>
+
+                <!-- Panel Bawah: Ringkasan & Validasi -->
+                <div id="panel-ringkasan-ambil" class="bg-orange-50 p-4 rounded-xl border border-orange-200">
+                    <h4 class="text-[10px] font-black text-orange-600 uppercase mb-2">Ringkasan Alokasi</h4>
+                    <div id="list-ringkasan" class="text-[11px] font-bold text-slate-700 space-y-2">
+                        <!-- Hasil perhitungan FEFO akan muncul di sini -->
+                    </div>
+                    <div class="mt-4 pt-2 border-t border-orange-200 font-black text-xs text-slate-800 flex justify-between">
+                        <span>GRAND TOTAL</span>
+                        <span id="grand-total-plt">0 PLT</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer: Aksi -->
+            <div class="p-4 border-t bg-gray-50 flex gap-2">
+                <button onclick="window.simpanAmbil()" class="flex-1 bg-orange-600 text-white py-2 rounded-lg font-black text-[11px] uppercase">Simpan Ambil</button>
+                <button class="flex-1 bg-emerald-600 text-white py-2 rounded-lg font-black text-[11px] uppercase">Kirim WA Grup</button>
+                <button class="flex-1 bg-blue-600 text-white py-2 rounded-lg font-black text-[11px] uppercase">Cetak Dokumen</button>
+            </div>
         </div>
     </div>
 </div>
