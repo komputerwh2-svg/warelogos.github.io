@@ -319,10 +319,16 @@ window.parseDataBosnet = function(rawText, targetGudang) {
     lines.forEach(line => {
         if (!line.includes(targetGudang)) return; 
 
-        const match = line.match(/DO-HO\d+-\d+-(\d+)\s*([A-Z0-9]+).*?(\d+\/\d+\/\d+\/\d+)/);
+        // PERBAIKAN REGEX:
+        // Menggunakan [A-Za-z0-9]+ agar menangkap huruf kecil maupun besar
+        const match = line.match(/DO-HO\d+-\d+-(\d+)\s*([A-Za-z0-9]+).*?(\d+\/\d+\/\d+\/\d+)/);
 
         if (match) {
-            const [full, noDO, kodeBarang, rawQty] = match;
+            const [full, noDO, kodeRaw, rawQty] = match;
+            
+            // PAKSA KAPITAL: Mengubah kode barang menjadi huruf besar semua
+            const kodeBarang = kodeRaw.toUpperCase(); 
+            
             const qtyParts = rawQty.split('/').map(Number);
             
             if (!hasil[noDO]) {
@@ -331,7 +337,7 @@ window.parseDataBosnet = function(rawText, targetGudang) {
             
             hasil[noDO].data[kodeBarang] = {
                 gudang: targetGudang,
-                kodeBarang: kodeBarang,
+                kodeBarang: kodeBarang, // Disimpan dalam bentuk kapital
                 qtyUtama: qtyParts[0],
                 qtyDetail: qtyParts.slice(1)
             };
@@ -341,7 +347,7 @@ window.parseDataBosnet = function(rawText, targetGudang) {
     return hasil;
 };
 
-// Fungsi untuk memicu klik input file
+// Fungsi untuk memicu klik pada input file yang benar
 function bukaFileMutasi() {
     document.getElementById('input-file-mutasi').click();
 }
@@ -771,9 +777,8 @@ window.renderTabelRakGabungan = async function() {
         });
     }
 
-    // --- LOGIKA PENGURUTAN (Sama dengan Slide 1) ---
+    // ... (Logika getSortScore, getVarianScore, getAngkaAkhir tetap sama) ...
     const polaUtama = ["CRR", "CRR EA", "THR EA", "THR", "MRMR", "MRR", "MJR HJ", "MJR", "MOB4A", "MOR2A EA", "MOR2A EB", "MOR2A", "MP", "PDR", "MTR3A", "PR-PKT", "PR-CUP", "MRSR", "LTGR", "MTGR", "MEB", "MOL", "MRL", "MTL", "ISEL"];
-    
     const getSortScore = (kode) => {
         let k = kode.toUpperCase();
         for (let i = 0; i < polaUtama.length; i++) {
@@ -787,7 +792,6 @@ window.renderTabelRakGabungan = async function() {
         }
         return 999;
     };
-
     const getVarianScore = (kode) => {
         let k = kode.toUpperCase();
         if (k.includes("ZC")) return 1;
@@ -799,7 +803,6 @@ window.renderTabelRakGabungan = async function() {
         if (k.includes("GTG")) return 7;
         return 0;
     };
-
     const getAngkaAkhir = (kode) => {
         const match = kode.match(/\d+/g);
         return match ? (parseInt(match.join('').slice(-4)) || 999) : 999;
@@ -823,7 +826,6 @@ window.renderTabelRakGabungan = async function() {
         const stok = dataStok[kode] || { totalStok: 0, rak: '-', blok: '-', exp: '-' };
         const kekurangan = total - stok.totalStok;
 
-        // Perhitungan Dinamis PLT | KRT
         const masterInfo = window.cacheMasterBarang ? window.cacheMasterBarang[kode] : null;
         const qtyPerPalet = (masterInfo && masterInfo.QTY) ? parseInt(masterInfo.QTY) : 1;
         
@@ -842,18 +844,66 @@ window.renderTabelRakGabungan = async function() {
                     <span class="font-black text-emerald-600">${pltTotal}</span> | 
                     <span class="font-black text-rose-600">${krtTotal}</span>
                 </td>
-                <td class="p-3 text-left text-slate-800">${stok.rak || '-'}</td>
+                <td class="p-3 text-left text-slate-800">-</td> <!-- Rak Ambil -->
                 <td class="p-3 text-center text-slate-800">${stok.totalStok}</td>
                 <td class="p-3 text-center font-bold ${kekurangan > 0 ? 'text-red-600' : 'text-emerald-600'}">${kekurangan}</td>
                 <td class="p-3 text-center text-slate-800">
                     <span class="font-black text-emerald-600">${pltKurang}</span> | 
                     <span class="font-black text-rose-600">${krtKurang}</span>
                 </td>
-                <td class="p-3 text-left text-slate-800">${stok.blok || '-'}</td>
-                <td class="p-3 text-left text-[10px] text-slate-800">${stok.exp || '-'}</td>
+                <td class="p-3 text-left text-slate-800">-</td> <!-- Ambil Blok -->
+                <td class="p-3 text-left text-[10px] text-slate-800">-</td> <!-- Exp Blok -->
             </tr>
         `;
     });
+
+    // --- 4. LOAD DATA TERSIMPAN (SINKRON DENGAN FIRESTORE) ---
+    if (tglMuat) {
+        try {
+            // Mengambil dari koleksi info_rak_blok sesuai tglMuat
+            const docRef = db.collection("muat_wh3").doc(tglMuat).collection("info_rak_blok").doc("data_rekap");
+            const docSnapshot = await docRef.get();
+
+            if (docSnapshot.exists) {
+                const dataTersimpan = docSnapshot.data().data_per_item || {};
+                
+                const rows = tbody.querySelectorAll('tr');
+                rows.forEach(row => {
+                    const kode = row.cells[0].innerText;
+                    const data = dataTersimpan[kode];
+                    
+                    // Jika data tersedia, tampilkan; jika tidak, biarkan tanda '-' tetap ada
+                    if (data) {
+                        row.cells[3].innerText = data.rak_ambil || '-';
+                        row.cells[4].innerText = data.total_stok || '-';
+                        row.cells[5].innerText = data.sisa_stok || '-';
+                        
+                        // Update kelas warna sisa stok agar sinkron
+                        const sisa = parseInt(data.sisa_stok) || 0;
+                        row.cells[5].className = `p-3 text-center font-bold ${sisa < 0 ? 'text-red-600' : 'text-emerald-600'}`;
+                        
+                        // Update PLT | KRT
+                        row.cells[6].innerHTML = data.plt_krt_sisa || '-';
+                        
+                        
+                        // LOGIKA TAMPILAN AMBIL BLOK (Sinkron dengan format baru)
+                        if (sisa < 0) {
+                            // Jika minus, tampilkan dengan format AMBIL [ ... ] dan warna merah berkedip
+                            row.cells[7].innerHTML = `<span class="text-red-600 font-black animate-pulse">${data.ambil_blok || '-'}</span>`;
+                            row.cells[8].innerHTML = `<span class="text-gray-600 font-black">${data.exp_blok || '-'}</span>`;
+                        } else {
+                            // Jika tidak minus, tampilkan teks biasa
+                            row.cells[7].innerText = data.ambil_blok || '-';
+                            row.cells[8].innerText = data.exp_blok || '-';
+                        }
+                    }
+                });
+            }
+        } catch (error) {
+            miuiAlert("Gagal memuat data rak & blok: " + error.message);
+            console.error("Gagal memuat data rak & blok:", error);
+        }
+    }
 };
 
 window.prosesOtomatisStok = async function() {
@@ -870,7 +920,7 @@ window.prosesOtomatisStok = async function() {
         btn.innerText = "MEMPROSES...";
     }
 
-    // 1. Ambil data stok & data stok_blok sekaligus
+    // 1. Ambil data stok & data stok_blok
     const [snapshotStok, responseBlok] = await Promise.all([
         firebase.database().ref('stok_wh3/stokwh3_' + tglStok).once('value'),
         fetch("https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/stok_blok.json")
@@ -879,7 +929,6 @@ window.prosesOtomatisStok = async function() {
     const dataStok = snapshotStok.val() || {};
     const dataBlok = await responseBlok.json() || {};
 
-    // Fungsi mapping untuk menyingkat nama blok
     const mapNamaBlok = (nama) => {
         const n = nama.toUpperCase();
         if (n.includes('RETUR')) return 'RT';
@@ -889,10 +938,10 @@ window.prosesOtomatisStok = async function() {
         if (n.includes('18F')) return 'F';
         if (n.includes('BLOK H')) return 'H';
         if (n.includes('PROMOSI')) return 'PR';
-        return nama.replace('BLOK ', ''); // Default: hapus kata 'BLOK ' jika ada
+        return nama.replace('BLOK ', '');
     };
 
-    // 2. Iterasi setiap baris di tabel
+    // 2. Iterasi tabel
     const rows = document.querySelectorAll('#tabel-rak-body tr');
     
     rows.forEach(row => {
@@ -902,19 +951,21 @@ window.prosesOtomatisStok = async function() {
         if (itemStok) {
             const master = window.cacheMasterBarang ? window.cacheMasterBarang[kode] : null;
             const konversi = (master && master.QTY) ? parseInt(master.QTY) : 1;
-            const totalStok = parseInt(itemStok.total) || 0;
+            
+            // PERBAIKAN: Hitung total stok dari Beceran + Utuhan
+            const qtyBeceran = parseInt(itemStok.beceran) || 0;
+            const qtyUtuhan = parseInt(itemStok.utuhan) || 0;
+            const totalStok = qtyBeceran + qtyUtuhan;
 
             // C. Format Rak Ambil
             const detail = itemStok.detail_rak || {};
             const formatRak = (str) => str ? str.replace(/(\d+)([A-Za-z]+)(\d+)/g, "$1 $2 $3") : "-";
             const rakBeceran = formatRak(detail.beceran_rak || "");
-            const qtyBeceran = itemStok.beceran || "0";
             const beceranDisplay = (rakBeceran !== "-") ? `${rakBeceran} = ${qtyBeceran}` : "";
-            
             const utuhanFormatted = detail.utuhan_rak ? detail.utuhan_rak.split('+').map(part => formatRak(part.trim())).join(' + ') : "";
             const rakAmbil = `${beceranDisplay}${utuhanFormatted ? (beceranDisplay ? ' + ' : '') + utuhanFormatted : ''}`;
 
-            // F. PROSES AMBIL BLOK & EXP BLOK
+            // F. PROSES AMBIL BLOK & EXP BLOK (Sama seperti sebelumnya)
             let ambilBlokArr = [];
             let expBlokArr = [];
 
@@ -923,34 +974,64 @@ window.prosesOtomatisStok = async function() {
                     const expData = dataBlok[namaBlok][kode];
                     let blokPlt = 0;
                     let expDetail = [];
-
                     Object.keys(expData).forEach(exp => {
                         const item = expData[exp];
                         blokPlt += parseInt(item.plt) || 0;
-                        // Format Exp: TGL-BLN:PLT
                         expDetail.push(`${exp.split('-')[0].substring(0,3).toUpperCase()}-${exp.split('-')[1]}:${item.plt}`);
                     });
-
                     const shortBlok = mapNamaBlok(namaBlok);
                     ambilBlokArr.push(`${shortBlok}:${blokPlt}`);
                     expBlokArr.push(`${shortBlok}: [${expDetail.join(' + ')}]`);
                 }
             });
 
+            // E. Update Kekurangan & PLT/KRT
+            const totalMuat = parseInt(row.cells[1].innerText) || 0;
+            const kekurangan = totalStok - totalMuat;
+            
+            // Perbaikan Logika PLT | KRT agar akurat untuk angka negatif
+            const absKekurangan = Math.abs(kekurangan);
+            let pltSisa = Math.floor(absKekurangan / konversi);
+            let krtSisa = absKekurangan % konversi;
+
+            // Jika aslinya kekurangan (negatif), kita beri tanda negatif pada PLT 
+            // atau pada KRT jika PLT-nya adalah 0
+            if (kekurangan < 0) {
+                if (pltSisa > 0) {
+                    pltSisa = -pltSisa;
+                } else {
+                    krtSisa = -krtSisa;
+                }
+            }
+
             // D. Update tampilan baris tabel
             row.cells[3].innerText = rakAmbil;
             row.cells[4].innerText = totalStok;
-            row.cells[7].innerText = ambilBlokArr.length > 0 ? ambilBlokArr.join(' | ') : '-';
-            row.cells[8].innerText = expBlokArr.length > 0 ? expBlokArr.join(' | ') : '-';
-
-            // E. Update Kekurangan & PLT/KRT
-            const totalMuat = parseInt(row.cells[1].innerText);
-            const kekurangan = totalStok - totalMuat;
             row.cells[5].innerText = kekurangan;
             row.cells[5].className = `p-3 text-center font-bold ${kekurangan < 0 ? 'text-red-600' : 'text-emerald-600'}`;
             
-            const kekuranganPos = kekurangan > 0 ? kekurangan : 0;
-            row.cells[6].innerHTML = `<span class="font-black text-emerald-600">${Math.floor(kekuranganPos / konversi)}</span> | <span class="font-black text-rose-600">${kekuranganPos % konversi}</span>`;
+            // LOGIKA TAMPILAN AMBIL BLOK
+            let infoBlok = ambilBlokArr.length > 0 ? ambilBlokArr.join(' | ') : 'KOSONG!';
+            let infoExp = expBlokArr.length > 0 ? expBlokArr.join(' | ') : '-';
+            let tampilanBlok = '-';
+
+            if (kekurangan < 0) {
+                // KONDISI 1: Stok Kurang (Negatif) - Tampilkan dengan highlight
+                row.cells[7].innerHTML = `<span class="text-red-600 font-black animate-pulse">AMBIL [ ${infoBlok} ]</span>`;
+                row.cells[8].innerHTML = `<span class="text-gray-600 font-black">${infoExp}</span>`;
+            } else if (kekurangan < konversi) {
+                // KONDISI 2: Stok cukup TAPI sisa kurang dari 1 palet - Tampilkan normal
+                row.cells[7].innerText = ambilBlokArr.length > 0 ? `AMBIL [ ${infoBlok} ]` : '-';
+                row.cells[8].innerText = infoExp;
+            } else {
+                // KONDISI 3: Stok cukup & sisa >= 1 palet - Sembunyikan
+                row.cells[7].innerText = '-';
+                row.cells[8].innerText = '-';
+            }
+
+            // Update UI PLT | KRT
+            row.cells[6].innerHTML = `<span class="font-black ${kekurangan < 0 ? 'text-red-600' : 'text-emerald-600'}">${pltSisa}</span> | <span class="font-black text-rose-600">${Math.abs(krtSisa)}</span>`;
+            window.miuiAlert(`Data Rak & Blok Berhasil Disimpan`);
         }
     });
 
@@ -963,43 +1044,97 @@ window.prosesOtomatisStok = async function() {
 
 window.simpanDataRakBlok = async function() {
     const btn = document.getElementById('btn-simpan-rak-blok');
-    const tglStok = document.getElementById('select-tanggal-stok-wh3').value;
+    const tglMuat = document.getElementById('select-tanggal-muat').value; // Menggunakan tanggal muat sebagai acuan utama
+    const firestoreDB = window.db; 
     
-    if (!tglStok) {
-        miuiAlert("Pilih tanggal stok terlebih dahulu!");
+    if (!tglMuat) {
+        miuiAlert("Pilih tanggal muat terlebih dahulu!");
         return;
     }
 
     btn.disabled = true;
     btn.innerText = "MENYIMPAN...";
 
-    // Mengambil data dari tabel
+    // 1. Mengambil data dari tabel
     const rows = document.querySelectorAll('#tabel-rak-body tr');
     let dataUntukDisimpan = {};
 
     rows.forEach(row => {
         const kode = row.cells[0].innerText;
-        // Kita simpan informasi penting dari tabel
         dataUntukDisimpan[kode] = {
             rak_ambil: row.cells[3].innerText,
             total_stok: row.cells[4].innerText,
-            kekurangan: row.cells[5].innerText,
-            plt_krt_kekurangan: row.cells[6].innerText,
+            sisa_stok: row.cells[5].innerText,
+            plt_krt_sisa: row.cells[6].innerText,
             ambil_blok: row.cells[7].innerText,
             exp_blok: row.cells[8].innerText,
-            timestamp: firebase.database.ServerValue.TIMESTAMP
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
     });
 
     try {
-        // Menyimpan ke folder muat_wh3/rak_blok_[tanggal]
-        await firebase.database().ref(`muat_wh3/rak_blok_${tglStok}`).set(dataUntukDisimpan);
-        miuiAlert("Data Rak & Blok berhasil disimpan!");
+        // 2. Menyimpan ke Firestore
+        // Struktur: muat_wh3 -> [tglMuat] -> info_rak_blok -> data
+        const docRef = firestoreDB.collection("muat_wh3").doc(tglMuat).collection("info_rak_blok").doc("data_rekap");
+        
+        await docRef.set({
+            data_per_item: dataUntukDisimpan,
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        miuiAlert("Data Rak & Blok berhasil disimpan ke periode muat " + tglMuat);
     } catch (error) {
-        console.error(error);
-        miuiAlert("Gagal menyimpan data!");
+        console.error("Gagal menyimpan ke Firestore:", error);
+        miuiAlert("Gagal menyimpan data: " + error.message);
     }
 
     btn.disabled = false;
-    btn.innerText = "SIMPAN";
+    btn.innerText = "SIMPAN RAK WH-3 & BLOK";
+};
+
+
+window.cetakSemuaVersi = function() {
+    const win = window.open('', '_blank', 'width=900,height=800');
+    
+    // Ambil konten dari elemen di halaman
+    const tabelAtas = document.getElementById('tabel-utama-container').innerHTML;
+    const rows = document.querySelectorAll('#tabel-rak-body tr');
+    
+    // --- Draft (Versi 1) ---
+    let htmlDraft = `<h3>DRAFT - AMBIL BLOK</h3><table border="1" style="width:100%; border-collapse:collapse;">
+        <tr><th>KODE</th><th>AMBIL</th><th>DATA BLOK</th></tr>`;
+    rows.forEach(row => {
+        const ambilBlok = row.cells[7].innerText;
+        if (ambilBlok !== '-') {
+            htmlDraft += `<tr><td>${row.cells[0].innerText}</td><td>${ambilBlok}</td><td>${row.cells[8].innerText}</td></tr>`;
+        }
+    });
+    htmlDraft += '</table>';
+
+    // --- Penyiapan (Versi 2) ---
+    let htmlPenyiapan = `<h3>PENYIAPAN - LOKASI RAK</h3><table border="1" style="width:100%; border-collapse:collapse;">
+        <tr><th>KODE</th><th>LOKASI RAK</th></tr>`;
+    rows.forEach(row => {
+        htmlPenyiapan += `<tr><td>${row.cells[0].innerText}</td><td>${row.cells[3].innerText}</td></tr>`;
+    });
+    htmlPenyiapan += '</table>';
+
+    // Gabungkan dengan Page Break untuk cetakan
+    win.document.write(`
+        <html><head><style>
+            @media print {
+                .page-break { page-break-after: always; }
+                body { font-family: sans-serif; font-size: 11px; }
+            }
+            .content { margin-bottom: 20px; }
+        </style></head><body>
+            <div class="content">${tabelAtas} ${htmlDraft}</div>
+            <div class="page-break"></div>
+            <div class="content">${tabelAtas} ${htmlPenyiapan}</div>
+            <div class="page-break"></div>
+            <div class="content">${tabelAtas} ${htmlPenyiapan}</div>
+            <script>window.print();</script>
+        </body></html>
+    `);
+    win.document.close();
 };
