@@ -178,7 +178,7 @@
                         <div class="flex items-center gap-4">
                             <button id="btn-proses-otomatis" onclick="window.prosesOtomatisStok()" 
                                 class="bg-orange-600 text-white font-black py-3 px-6 rounded-md text-[10px] uppercase transition-all whitespace-nowrap">
-                                Proses Rak & Blok
+                                Ambil Rak & Blok
                             </button>
                             
                             <button id="btn-simpan-rak-blok" onclick="simpanDataRakBlok()" 
@@ -188,7 +188,7 @@
 
                             <button id="btn-cetak-rak-blok" onclick="bukaModalAmbil()" 
                                 class="bg-orange-600 hover:bg-orange-700 text-white font-black py-3 px-6 rounded-md text-[10px] uppercase transition-all whitespace-nowrap cursor-pointer">
-                                Cetak Muat WH-3
+                                Ambil Blok 
                             </button>
                         </div>
                     </div>
@@ -227,7 +227,7 @@
         <div class="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
             <!-- Header Modal -->
             <div class="p-4 border-b flex justify-between items-center bg-orange-600 text-white">
-                <h3 class="font-black uppercase tracking-widest text-sm">Pengaturan Ambil Blok (WH-3)</h3>
+                <h3 class="font-black uppercase tracking-widest text-sm">Data Ambil Blok (WH-3)</h3>
                 <button onclick="tutupModalAmbil()" class="font-black text-xl">&times;</button>
             </div>
 
@@ -265,7 +265,7 @@
                             class="w-full p-2 border rounded-lg text-xs text-slate-600 font-bold border-orange-300">
                         
                         <button onclick="window.tambahAlokasi()" 
-                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-black text-[10px] whitespace-nowrap">
+                            class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-black text-[10px] whitespace-nowrap">
                             TAMBAH
                         </button>
                     </div>
@@ -274,12 +274,19 @@
 
                 <!-- Panel Bawah: Ringkasan & Validasi -->
                 <div id="panel-ringkasan-ambil" class="bg-orange-50 p-4 rounded-xl border border-orange-200">
-                    <h4 class="text-[10px] font-black text-orange-600 uppercase mb-2">Ringkasan Alokasi</h4>
-                    <div id="list-ringkasan" class="text-[11px] font-bold text-slate-700 space-y-2">
-                        <!-- Hasil perhitungan FEFO akan muncul di sini -->
+                    <!-- Ganti baris lama Anda dengan ini -->
+                    <h4 class="text-[10px] font-black text-orange-600 uppercase mb-3 tracking-wider" id="judul-ringkasan">
+                        Ringkasan Alokasi Ambil Blok:
+                    </h4>
+                    
+                    <!-- List ringkasan dipertahankan, penambahan space-y-3 agar antar blok lebih renggang -->
+                    <div id="list-ringkasan" class="text-[11px] font-bold text-slate-700 space-y-3">
+                        <!-- Hasil perhitungan akan muncul di sini -->
                     </div>
-                    <div class="mt-4 pt-2 border-t border-orange-200 font-black text-xs text-slate-800 flex justify-between">
-                        <span>GRAND TOTAL</span>
+                    
+                    <!-- Total Ambil disesuaikan agar sama dengan skrinsut WA -->
+                    <div class="mt-4 pt-3 border-t border-orange-300 border-dashed font-black text-sm text-slate-800 flex justify-between">
+                        <span>TOTAL AMBIL:</span>
                         <span id="grand-total-plt">0 PLT</span>
                     </div>
                 </div>
@@ -288,7 +295,7 @@
             <!-- Footer: Aksi -->
             <div class="p-4 border-t bg-gray-50 flex gap-2">
                 <button onclick="window.simpanAmbil()" class="flex-1 bg-orange-600 text-white py-2 rounded-lg font-black text-[11px] uppercase">Simpan Ambil</button>
-                <button class="flex-1 bg-emerald-600 text-white py-2 rounded-lg font-black text-[11px] uppercase">Kirim WA Grup</button>
+                <button onclick="window.kirimWaGrup()" class="flex-1 bg-emerald-600 text-white py-2 rounded-lg font-black text-[11px] uppercase">Kirim WA Grup</button>
                 <button class="flex-1 bg-blue-600 text-white py-2 rounded-lg font-black text-[11px] uppercase">Cetak Dokumen</button>
             </div>
         </div>
