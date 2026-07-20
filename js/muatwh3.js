@@ -1145,40 +1145,44 @@ window.isiDataReferensiModal = function() {
     panelRef.innerHTML = '';
     selectKode.innerHTML = '<option value="">-- Pilih Kode Barang --</option>';
 
-    // Kita cari semua baris di dalam tabel yang ada di body
     const rows = document.querySelectorAll('table tbody tr'); 
     
     rows.forEach(row => {
-        // Kita cari sel yang memiliki teks "AMBIL ["
         const cellAmbil = Array.from(row.cells).find(cell => cell.innerText.includes('AMBIL ['));
         
         if (cellAmbil) {
             const kode = row.cells[0].innerText;
-            const sisaStokRaw = row.cells[6].innerText.trim(); // contoh: "-2 | 68"
+            const sisaStokRaw = row.cells[6].innerText.trim();
             const infoAmbil = cellAmbil.innerText;
+            
+            // --- MENGAMBIL INFO EXP ---
+            // Sesuaikan row.cells[X] dengan indeks kolom data Expire Anda
+            const infoExp = row.cells[8] ? row.cells[8].innerText.trim() : ""; 
 
             // --- LOGIKA PEMBULATAN PLT ---
             let pltBulat = 0;
             if (sisaStokRaw.includes('|')) {
                 const parts = sisaStokRaw.split('|');
-                const plt = parseInt(parts[0]); // -2
-                const krt = parseInt(parts[1]); // 68
-                
-                // Jika ada sisa karton (krt > 0), maka bulatkan ke arah yang lebih besar (tambah beban 1 plt)
-                // Karena nilainya negatif (kekurangan), kita gunakan Math.floor untuk menambah nilai negatifnya
+                const plt = parseInt(parts[0]);
+                const krt = parseInt(parts[1]);
                 pltBulat = krt > 0 ? (plt - 1) : plt;
             } else {
                 pltBulat = parseInt(sisaStokRaw);
             }
             
-            // Tampilkan nilai absolutnya untuk kebutuhan ambil
             const totalAmbil = Math.abs(pltBulat);
 
+            // --- TAMPILAN BARU ---
+            // Menambahkan infoExp di samping infoAmbil dengan pemisah |
             panelRef.innerHTML += `
                 <div class="mb-2 p-2 bg-white rounded border border-orange-100">
-                    <span class="font-black text-orange-700">${kode}</span> 
-                    <span class="text-[12px] text-slate-500">| Perlu Ambil: ${totalAmbil} PLT</span>
-                    <div class="text-[12px] italic text-slate-600">${infoAmbil}</div>
+                    <span class="font-black text-orange-600">${kode}</span> 
+                    <span class="text-[12px] text-slate-600 font-bold">| Perlu Ambil: ${totalAmbil} PLT</span>
+                    <div class="text-[12px]">
+                        <span class="text-emerald-600">${infoAmbil}</span> 
+                        <span class="text-slate-700">|</span> 
+                        <span class="text-orange-500">${infoExp ? `[${infoExp}]` : '-'}</span>
+                    </div>
                 </div>`;
             
             selectKode.innerHTML += `<option value="${kode}" data-butuh="${totalAmbil}">${kode}</option>`;
@@ -1551,48 +1555,187 @@ window.kirimWaGrup = async function() {
 };
 
 
-window.cetakSemuaVersi = function() {
-    const win = window.open('', '_blank', 'width=900,height=800');
+window.cetakSemuaVersi = async function() {
+    // Ambil tanggal dari select agar datanya sinkron
+    const tglMuat = document.getElementById('select-tanggal-muat').value;
     
-    // Ambil konten dari elemen di halaman
-    const tabelAtas = document.getElementById('tabel-utama-container').innerHTML;
-    const rows = document.querySelectorAll('#tabel-rak-body tr');
+    if (!tglMuat) {
+        window.miuiAlert("Pilih tanggal muat terlebih dahulu!");
+        return;
+    }
+
+    window.miuiAlert("Sedang memproses dokumen...");
+
+    // Cetak Versi 1 (1 copy)
+    await window.cetakDokumenVersi1(tglMuat);
+
+    // Cetak Versi 2 (2 copy) - Kita panggil dua kali
+    await window.cetakDokumenVersi2(tglMuat);
+    await window.cetakDokumenVersi2(tglMuat);
+
+    window.miuiAlert("Berhasil mengirim 3 dokumen ke antrean cetak!");
+};
+
+window.cetakDokumenVersi1 = async function(tglMuat) {
+    const judul = document.getElementById('judul-ringkasan').innerText;
+    const theadContent = document.querySelector('table thead').innerHTML;
+    const rows = document.querySelectorAll('table tbody tr');
     
-    // --- Draft (Versi 1) ---
-    let htmlDraft = `<h3>DRAFT - AMBIL BLOK</h3><table border="1" style="width:100%; border-collapse:collapse;">
-        <tr><th>KODE</th><th>AMBIL</th><th>DATA BLOK</th></tr>`;
+    let rowsUtamaHtml = '';
     rows.forEach(row => {
-        const ambilBlok = row.cells[7].innerText;
-        if (ambilBlok !== '-') {
-            htmlDraft += `<tr><td>${row.cells[0].innerText}</td><td>${ambilBlok}</td><td>${row.cells[8].innerText}</td></tr>`;
+        const selTotal = row.cells[row.cells.length - 2]?.innerText.trim();
+        if (selTotal !== "" && selTotal !== "-" && !isNaN(selTotal)) {
+            rowsUtamaHtml += `<tr>${row.innerHTML}</tr>`;
         }
     });
-    htmlDraft += '</table>';
 
-    // --- Penyiapan (Versi 2) ---
-    let htmlPenyiapan = `<h3>PENYIAPAN - LOKASI RAK</h3><table border="1" style="width:100%; border-collapse:collapse;">
-        <tr><th>KODE</th><th>LOKASI RAK</th></tr>`;
-    rows.forEach(row => {
-        htmlPenyiapan += `<tr><td>${row.cells[0].innerText}</td><td>${row.cells[3].innerText}</td></tr>`;
-    });
-    htmlPenyiapan += '</table>';
+    // AMBIL DAN PROSES DATA DARI PANEL
+    const panelRaw = document.getElementById('panel-kebutuhan-referensi').innerText;
+    const lines = panelRaw.split('\n');
+    
+    // Header format ringkas
+    let cleanData = 'AMBIL     | PLT | BLOK & EXP\n';
+    cleanData += '----------------------------------------------------------------------\n';
 
-    // Gabungkan dengan Page Break untuk cetakan
-    win.document.write(`
-        <html><head><style>
-            @media print {
-                .page-break { page-break-after: always; }
-                body { font-family: sans-serif; font-size: 11px; }
+    for (let i = 0; i < lines.length; i++) {
+        if (lines[i].includes('Perlu Ambil:')) {
+            const parts = lines[i].split('|');
+            const kode = parts[0].trim();
+            const plt = parts[1].replace('Perlu Ambil:', '').replace('PLT', '').trim();
+            
+            const detailLine = lines[i+1] || '';
+            
+            // Perbaikan di sini: Menghilangkan kata 'AMBIL' dari baris detail
+            const cleanDetail = detailLine.replace('AMBIL', '').trim();
+            
+            // Susun baris ringkas
+            cleanData += `${kode.padEnd(9)} | ${plt.padEnd(3)} | ${cleanDetail}\n`;
+            i++; 
+        }
+    }
+
+
+    const finalHtml = `
+    <html>
+    <head>
+        <style>
+            @page { size: 215mm 330mm portrait; margin: 10mm; }
+            /* Menggunakan Century Gothic ukuran 9pt untuk seluruh body */
+            body { font-family: 'Century Gothic', sans-serif; font-size: 9pt; }
+            
+            table { width: 100%; border-collapse: collapse; margin-bottom: 15px; table-layout: fixed; }
+            th, td { border: 1px solid #000; padding: 3px; text-align: center; font-family: 'Century Gothic', sans-serif; font-size: 9pt; }
+            .judul-tabel { font-weight: bold; font-size: 14pt; text-align: center; margin-bottom: 10px; }
+            
+            /* Tetap menggunakan monospace untuk data alokasi agar karakter tetap sejajar */
+            .info-blok { 
+                font-family: 'Courier New', monospace; 
+                white-space: pre-wrap; 
+                font-size: 9pt; 
+                margin-top: 5px; 
+                line-height: 1.4;
             }
-            .content { margin-bottom: 20px; }
-        </style></head><body>
-            <div class="content">${tabelAtas} ${htmlDraft}</div>
-            <div class="page-break"></div>
-            <div class="content">${tabelAtas} ${htmlPenyiapan}</div>
-            <div class="page-break"></div>
-            <div class="content">${tabelAtas} ${htmlPenyiapan}</div>
-            <script>window.print();</script>
-        </body></html>
-    `);
+        </style>
+    </head>
+    <body>
+        <div class="judul-tabel">MUAT WH-3 ${judul}</div>
+        <table><thead>${theadContent}</thead><tbody>${rowsUtamaHtml}</tbody></table>
+        
+        <div style="font-weight:bold; margin-top:15px; text-decoration:underline;">ALOKASI AMBIL BLOK:</div>
+        <div class="info-blok">${cleanData}</div>
+    </body>
+    </html>`;
+
+    const win = window.open("", "_blank");
+    win.document.write(finalHtml);
     win.document.close();
+
+    //await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs.json', {
+    //    method: 'POST',
+    //    body: JSON.stringify({ html: finalHtml, timestamp: Date.now() }),
+    //    headers: { 'Content-Type': 'application/json' }
+    //});
+};
+
+window.cetakDokumenVersi2 = async function(tglMuat) {
+    // 1. Definisikan rakIndex di awal agar bisa diakses oleh loop
+    const headerCells = Array.from(document.querySelectorAll('table thead th'));
+    const rakIndex = headerCells.findIndex(th => th.innerText.trim() === 'RAK AMBIL');
+
+    // 2. Fallback jika elemen tidak ditemukan
+    const elJudul = document.getElementById('judul-ringkasan');
+    const judul = elJudul ? elJudul.innerText : "DATA MUAT"; 
+    
+    const theadContent = document.querySelector('table thead') ? document.querySelector('table thead').innerHTML : '';
+    const rows = document.querySelectorAll('table tbody tr');
+    
+    let rowsUtamaHtml = '';
+    let dataRakList = ''; 
+
+    rows.forEach(row => {
+        const kode = row.cells[0]?.innerText.trim() || '-';
+        
+        // Perbaikan: Mengambil seluruh teks di kolom ke-4 (indeks 3)
+        // Jika kolom tersebut mengandung elemen lain, kita ambil innerText-nya
+        const selRak = row.cells[3];
+        const rak = selRak ? selRak.innerText.trim() : "-";
+        
+        const selTotal = row.cells[row.cells.length - 2]?.innerText.trim();
+        
+        if (selTotal !== "" && selTotal !== "-" && !isNaN(selTotal)) {
+            rowsUtamaHtml += `<tr>${row.innerHTML}</tr>`;
+            
+            // Tambahkan pengecekan: hanya jika rak mengandung data (bukan strip)
+            if (rak && rak !== "-" && rak !== "") {
+                // Gunakan format yang bersih
+                dataRakList += `${kode.padEnd(10)} | ${rak}\n`;
+            }
+        }
+    });
+
+    const finalHtml = `
+    <html>
+    <head>
+        <style>
+            @page { size: 215mm 330mm portrait; margin: 10mm; }
+            body { font-family: 'Century Gothic', sans-serif; font-size: 9pt; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 15px; table-layout: fixed; }
+            th, td { border: 1px solid #000; padding: 3px; text-align: center; font-family: 'Century Gothic', sans-serif; font-size: 9pt; }
+            .judul-tabel { font-weight: bold; font-size: 14pt; text-align: center; margin-bottom: 10px; }
+            .info-rak { 
+                font-family: 'Courier New', monospace; 
+                white-space: pre-wrap; 
+                font-size: 9pt; 
+                margin-top: 5px; 
+                line-height: 1.4;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="judul-tabel">MUAT WH-3 ${judul}</div>
+        <table><thead>${theadContent}</thead><tbody>${rowsUtamaHtml}</tbody></table>
+        
+        <div style="font-weight:bold; margin-top:15px; text-decoration:underline;">ALOKASI AMBIL RAK:</div>
+        <div class="info-rak">
+            KODE     | LOKASI RAK
+            ----------------------------------------------------------------------
+            ${dataRakList ? dataRakList : "Data tidak tersedia"}
+        </div>
+    </body>
+    </html>`;
+
+    const win = window.open("", "_blank");
+    if (win) {
+        win.document.write(finalHtml);
+        win.document.close();
+        win.focus();
+    } else {
+        (typeof miuiAlert !== 'undefined') ? miuiAlert("Gagal membuka jendela cetak.") : alert("Gagal membuka jendela cetak.");
+    }
+
+    //await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs.json', {
+    //    method: 'POST',
+    //    body: JSON.stringify({ html: finalHtml, timestamp: Date.now() }),
+    //    headers: { 'Content-Type': 'application/json' }
+    //});
 };
