@@ -1403,8 +1403,17 @@ window.updateGrandTotal = function(tambahan) {
 
 window.simpanAmbil = async function() {
     const listRingkasan = document.getElementById('list-ringkasan');
-    const tanggalHariIni = "20260720"; 
-    const docId = "muat_" + tanggalHariIni; 
+    
+    // Menggunakan tanggal muat dari elemen select sebagai acuan utama
+    const inputTgl = document.getElementById('select-tanggal-muat');
+    const tglMuat = inputTgl ? inputTgl.value : ""; 
+    
+    if (!tglMuat) {
+        window.miuiAlert("Tanggal muat belum dipilih atau elemen tidak ditemukan!");
+        return;
+    }
+    
+    const docId = "muat_" + tglMuat; 
     
     if (listRingkasan.children.length === 0) {
         window.miuiAlert("Ringkasan alokasi masih kosong!");
@@ -1412,7 +1421,7 @@ window.simpanAmbil = async function() {
     }
 
     let dataAlokasi = [];
-    let grandTotalHitung = 0; // Tambahkan variabel hitung
+    let grandTotalHitung = 0;
 
     const blokGroups = listRingkasan.querySelectorAll('[id^="blok-group-"]');
     
@@ -1421,7 +1430,7 @@ window.simpanAmbil = async function() {
         const totalEl = document.getElementById(`total-blok-${blok}`);
         const total = totalEl ? parseInt(totalEl.getAttribute('data-total')) : 0;
         
-        grandTotalHitung += total; // Jumlahkan langsung dari data blok
+        grandTotalHitung += total;
         
         const items = Array.from(group.querySelectorAll('span')).map(span => span.innerText);
         
@@ -1435,16 +1444,17 @@ window.simpanAmbil = async function() {
     try {
         const db = firebase.firestore();
         await db.collection('muat_wh3')
-                .doc(tanggalHariIni)
+                .doc(tglMuat) // Menggunakan tanggal muat dari elemen select
                 .collection('alokasi_ambil')
                 .doc(docId) 
                 .set({
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    tanggal_muat: tglMuat,
                     data: dataAlokasi,
-                    total_grand: grandTotalHitung.toString() // Gunakan hasil hitung
+                    total_grand: grandTotalHitung.toString()
                 });
 
-        window.miuiAlert("Data berhasil disimpan! Total: " + grandTotalHitung);
+        window.miuiAlert("Data berhasil disimpan untuk tanggal muat " + tglMuat + "! Total: " + grandTotalHitung);
     } catch (error) {
         console.error("Gagal simpan: ", error);
         window.miuiAlert("Gagal menyimpan data ke Firestore!");
@@ -1453,14 +1463,23 @@ window.simpanAmbil = async function() {
 
 window.loadDataAlokasi = async function() {
     const listRingkasan = document.getElementById('list-ringkasan');
-    const tanggalHariIni = "20260720"; 
-    const docId = "muat_" + tanggalHariIni;
+    
+    // Ambil tanggal muat dari elemen select sebagai acuan utama
+    const inputTgl = document.getElementById('select-tanggal-muat');
+    const tglMuat = inputTgl ? inputTgl.value : ""; 
+    
+    if (!tglMuat) {
+        listRingkasan.innerHTML = '<div class="text-[12px] text-slate-600 italic text-center">Pilih tanggal muat terlebih dahulu</div>';
+        return;
+    }
+
+    const docId = "muat_" + tglMuat;
     
     listRingkasan.innerHTML = '<div class="text-[10px] text-slate-400 italic text-center">Memuat data alokasi...</div>';
 
     try {
         const db = firebase.firestore();
-        const docRef = db.collection('muat_wh3').doc(tanggalHariIni).collection('alokasi_ambil').doc(docId);
+        const docRef = db.collection('muat_wh3').doc(tglMuat).collection('alokasi_ambil').doc(docId);
         const doc = await docRef.get();
 
         if (doc.exists) {
@@ -1497,13 +1516,16 @@ window.loadDataAlokasi = async function() {
             }
 
         } else {
-            listRingkasan.innerHTML = '<div class="text-[12px] text-slate-600 italic text-center">Belum ada data alokasi blok</div>';
+            listRingkasan.innerHTML = '<div class="text-[12px] text-slate-600 italic text-center">Belum ada data alokasi blok untuk tanggal ini</div>';
         }
     } catch (error) {
         console.error("Gagal memuat: ", error);
         listRingkasan.innerHTML = '<div class="text-[12px] text-red-500 italic text-center">Gagal memuat data</div>';
     }
-    window.updateJudulRingkasan();
+    
+    if (typeof window.updateJudulRingkasan === 'function') {
+        window.updateJudulRingkasan();
+    }
 };
 
 window.kirimWaGrup = async function() {
@@ -1594,8 +1616,8 @@ window.cetakDokumenVersi1 = async function(tglMuat) {
     const lines = panelRaw.split('\n');
     
     // Header format ringkas
-    let cleanData = 'AMBIL     | PLT | BLOK & EXP\n';
-    cleanData += '----------------------------------------------------------------------\n';
+    let cleanData = 'AMBIL     | PLT | BLOK\n';
+    cleanData += '------------------------------------------------\n';
 
     for (let i = 0; i < lines.length; i++) {
         if (lines[i].includes('Perlu Ambil:')) {
@@ -1603,37 +1625,106 @@ window.cetakDokumenVersi1 = async function(tglMuat) {
             const kode = parts[0].trim();
             const plt = parts[1].replace('Perlu Ambil:', '').replace('PLT', '').trim();
             
+            // Ambil baris detail pertama di bawahnya yang berisi alokasi blok lengkap
             const detailLine = lines[i+1] || '';
+            let cleanDetail = detailLine.replace('AMBIL', '').trim();
             
-            // Perbaikan di sini: Menghilangkan kata 'AMBIL' dari baris detail
-            const cleanDetail = detailLine.replace('AMBIL', '').trim();
-            
-            // Susun baris ringkas
+            // Potong string tepat sebelum bagian ekspedisi (yakni sebelum tanda ' | [')
+            const expSplitIndex = cleanDetail.indexOf(' | [');
+            if (expSplitIndex !== -1) {
+                cleanDetail = cleanDetail.substring(0, expSplitIndex).trim();
+            }
+
             cleanData += `${kode.padEnd(9)} | ${plt.padEnd(3)} | ${cleanDetail}\n`;
-            i++; 
+            i++; // Lewati baris ekspedisi di bawahnya
         }
     }
 
+    // AMBIL DATA HASIL RINGKASAN & GRAND TOTAL DARI LAYAR
+    const elListRingkasan = document.getElementById('list-ringkasan');
+    const ringkasanHtml = elListRingkasan ? elListRingkasan.innerHTML : '';
+    
+    const elGrandTotal = document.getElementById('grand-total-plt');
+    const grandTotalText = elGrandTotal ? elGrandTotal.innerText : '0 PLT';
 
     const finalHtml = `
     <html>
     <head>
         <style>
-            @page { size: 215mm 330mm portrait; margin: 10mm; }
-            /* Menggunakan Century Gothic ukuran 9pt untuk seluruh body */
-            body { font-family: 'Century Gothic', sans-serif; font-size: 9pt; }
+            @page { size: 215mm 330mm portrait; margin: 3mm; }
+            body { font-family: 'Century Gothic', sans-serif; font-size: 8pt; margin: 0; padding: 1; }
             
-            table { width: 100%; border-collapse: collapse; margin-bottom: 15px; table-layout: fixed; }
-            th, td { border: 1px solid #000; padding: 3px; text-align: center; font-family: 'Century Gothic', sans-serif; font-size: 9pt; }
-            .judul-tabel { font-weight: bold; font-size: 14pt; text-align: center; margin-bottom: 10px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 8px; table-layout: fixed; }
+            th, td { border: 1px solid #000; padding: 2px 3px; text-align: center; font-family: 'Century Gothic', sans-serif; font-size: 8pt; }
             
-            /* Tetap menggunakan monospace untuk data alokasi agar karakter tetap sejajar */
+            /* Kolom pertama (KODE BARANG) diset rata kiri dan diberi padding agar pas di dalam garis */
+            table th:first-child, table td:first-child {
+                text-align: left;
+                padding-left: 5px;
+                width: 75px;
+            }
+
+            .judul-tabel { font-weight: bold; font-size: 13pt; text-align: center; margin-bottom: 6px; }
+            
+            /* Layout 2 Kolom Berdampingan dengan pengaman min-width agar tidak saling menabrak */
+            .container-bawah {
+                display: flex;
+                gap: 10px;
+                margin-top: 8px;
+                align-items: flex-start;
+                width: 100%;
+            }
+            .kolom-kiri {
+                flex: 1.1;
+                min-width: 0;
+            }
+            .kolom-kanan {
+                flex: 1;
+                border-left: 1px dashed #000;
+                padding-left: 10px;
+                min-width: 0;
+            }
+            
+            .section-title {
+                font-weight: bold;
+                font-size: 8.5pt;
+                text-decoration: underline;
+                margin-bottom: 4px;
+            }
+
+            /* Kolom kiri: Mengatur teks panjang agar turun ke bawah secara otomatis (wrapping) */
             .info-blok { 
                 font-family: 'Courier New', monospace; 
                 white-space: pre-wrap; 
+                word-break: break-word;
+                overflow-wrap: break-word;
                 font-size: 9pt; 
-                margin-top: 5px; 
-                line-height: 1.4;
+                line-height: 1.2;
+            }
+
+            /* Kolom kanan: Format teks ringkasan dengan garis bawah pada nama blok & indentasi isi */
+            .info-ringkasan {
+                font-family: 'Courier New', monospace;
+                white-space: pre-wrap;
+                word-break: break-word;
+                overflow-wrap: break-word;
+                font-size: 9pt;
+                line-height: 1.2;
+            }
+
+            .info-ringkasan [id^="blok-group-"] {
+                margin-bottom: 6px;
+            }
+
+            .info-ringkasan .font-black {
+                font-weight: bold;
+                text-decoration: underline;
+                display: block;
+                margin-bottom: 2px;
+            }
+
+            .info-ringkasan div:not([id^="blok-group-"]) {
+                padding-left: 10px;
             }
         </style>
     </head>
@@ -1641,28 +1732,38 @@ window.cetakDokumenVersi1 = async function(tglMuat) {
         <div class="judul-tabel">MUAT WH-3 ${judul}</div>
         <table><thead>${theadContent}</thead><tbody>${rowsUtamaHtml}</tbody></table>
         
-        <div style="font-weight:bold; margin-top:15px; text-decoration:underline;">ALOKASI AMBIL BLOK:</div>
-        <div class="info-blok">${cleanData}</div>
+        <div class="container-bawah">
+            <!-- Kolom Kiri: Alokasi Ambil Blok (Hanya Blok & Kuantitas) -->
+            <div class="kolom-kiri">
+                <div class="section-title">ALOKASI AMBIL BLOK:</div>
+                <div class="info-blok">${cleanData}</div>
+            </div>
+
+            <!-- Kolom Kanan: Hasil Ringkasan Alokasi -->
+            <div class="kolom-kanan">
+                <div class="section-title">HASIL RINGKASAN ALOKASI:</div>
+                <div class="info-ringkasan">${ringkasanHtml}</div>
+                <div style="margin-top: 8px; font-weight: bold; font-size: 8pt; display: flex; justify-content: space-between; border-top: 1px solid #000; padding-top: 3px; font-family: 'Courier New', monospace;">
+                    <span>TOTAL AMBIL: ${grandTotalText}</span>
+                </div>
+            </div>
+        </div>
     </body>
     </html>`;
 
-    const win = window.open("", "_blank");
-    win.document.write(finalHtml);
-    win.document.close();
+    //const win = window.open("", "_blank");
+    //win.document.write(finalHtml);
+    //win.document.close();
 
-    //await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs.json', {
-    //    method: 'POST',
-    //    body: JSON.stringify({ html: finalHtml, timestamp: Date.now() }),
-    //    headers: { 'Content-Type': 'application/json' }
-    //});
+    await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs.json', {
+        method: 'POST',
+        body: JSON.stringify({ html: finalHtml, timestamp: Date.now() }),
+        headers: { 'Content-Type': 'application/json' }
+    });
 };
 
 window.cetakDokumenVersi2 = async function(tglMuat) {
-    // 1. Definisikan rakIndex di awal agar bisa diakses oleh loop
-    const headerCells = Array.from(document.querySelectorAll('table thead th'));
-    const rakIndex = headerCells.findIndex(th => th.innerText.trim() === 'RAK AMBIL');
-
-    // 2. Fallback jika elemen tidak ditemukan
+    // 1. Ambil Judul dan Tabel Utama dari Layar
     const elJudul = document.getElementById('judul-ringkasan');
     const judul = elJudul ? elJudul.innerText : "DATA MUAT"; 
     
@@ -1670,72 +1771,175 @@ window.cetakDokumenVersi2 = async function(tglMuat) {
     const rows = document.querySelectorAll('table tbody tr');
     
     let rowsUtamaHtml = '';
-    let dataRakList = ''; 
-
     rows.forEach(row => {
-        const kode = row.cells[0]?.innerText.trim() || '-';
-        
-        // Perbaikan: Mengambil seluruh teks di kolom ke-4 (indeks 3)
-        // Jika kolom tersebut mengandung elemen lain, kita ambil innerText-nya
-        const selRak = row.cells[3];
-        const rak = selRak ? selRak.innerText.trim() : "-";
-        
         const selTotal = row.cells[row.cells.length - 2]?.innerText.trim();
-        
         if (selTotal !== "" && selTotal !== "-" && !isNaN(selTotal)) {
             rowsUtamaHtml += `<tr>${row.innerHTML}</tr>`;
-            
-            // Tambahkan pengecekan: hanya jika rak mengandung data (bukan strip)
-            if (rak && rak !== "-" && rak !== "") {
-                // Gunakan format yang bersih
-                dataRakList += `${kode.padEnd(10)} | ${rak}\n`;
-            }
         }
     });
 
+    // 2. Definisi Logika Sorting (Sesuai renderTabelRakGabungan)
+    const polaUtama = ["CRR", "CRR EA", "THR EA", "THR", "MRMR", "MRR", "MJR HJ", "MJR", "MOB4A", "MOR2A EA", "MOR2A EB", "MOR2A", "MP", "PDR", "MTR3A", "PR-PKT", "PR-CUP", "MRSR", "LTGR", "MTGR", "MEB", "MOL", "MRL", "MTL", "ISEL"];
+    
+    const getSortScore = (kode) => {
+        let k = kode.toUpperCase();
+        for (let i = 0; i < polaUtama.length; i++) {
+            if (k.includes(polaUtama[i])) {
+                if (polaUtama[i] === "MOR2A" && (k.includes("MOR2A EA") || k.includes("MOR2A EB"))) continue;
+                if (polaUtama[i] === "THR" && k.includes("THR EA")) continue;
+                if (polaUtama[i] === "MJR" && k.includes("MJR HJ")) continue;
+                if (polaUtama[i] === "CRR" && k.includes("CRR EA")) continue;
+                return i + 1;
+            }
+        }
+        return 999;
+    };
+    
+    const getVarianScore = (kode) => {
+        let k = kode.toUpperCase();
+        if (k.includes("ZC")) return 1;
+        if (k.includes("SSL")) return 2;
+        if (k.includes("SLO")) return 3;
+        if (k.includes("TDS")) return 4;
+        if (k.includes("BAG")) return 5;
+        if (k.includes("WRG")) return 6;
+        if (k.includes("GTG")) return 7;
+        return 0;
+    };
+    
+    const getAngkaAkhir = (kode) => {
+        const match = kode.match(/\d+/g);
+        return match ? (parseInt(match.join('').slice(-4)) || 999) : 999;
+    };
+
+    // 3. Ambil Data Langsung dari Firestore (info_rak_blok -> data_rekap -> data_per_item)
+    let rowsRakHtml = '';
+    try {
+        const db = window.getFirestore();
+        if (db && tglMuat) {
+            const docRef = db.collection("muat_wh3").doc(tglMuat).collection("info_rak_blok").doc("data_rekap");
+            const docSnap = await docRef.get();
+
+            if (docSnap.exists) {
+                const dataPerItem = docSnap.data().data_per_item || {};
+                
+                // Urutkan kode barang menggunakan fungsi sorting yang sama
+                const sortedCodes = Object.keys(dataPerItem).sort((a, b) => {
+                    const scoreA1 = getSortScore(a), scoreB1 = getSortScore(b);
+                    if (scoreA1 !== scoreB1) return scoreA1 - scoreB1;
+                    const scoreA2 = getVarianScore(a), scoreB2 = getVarianScore(b);
+                    if (scoreA2 !== scoreB2) return scoreA2 - scoreB2;
+                    return getAngkaAkhir(a) - getAngkaAkhir(b);
+                });
+
+                // Loop setiap kode barang yang sudah terurut
+                sortedCodes.forEach(kode => {
+                    const itemData = dataPerItem[kode];
+                    const rakAmbil = itemData.rak_ambil || '-';
+
+                    // Hanya tampilkan jika rak ambil tidak kosong / bukan strip
+                    if (rakAmbil && rakAmbil !== "-" && rakAmbil !== "") {
+                        rowsRakHtml += `
+                            <tr>
+                                <td style="text-align: left; padding-left: 6px; font-weight: bold; width: 120px;">${kode}</td>
+                                <td style="text-align: left; padding-left: 6px;">${rakAmbil}</td>
+                            </tr>
+                        `;
+                    }
+                });
+            }
+        }
+    } catch (error) {
+        console.error("Gagal mengambil data rak dari Firestore:", error);
+    }
+
+    // Fallback jika data kosong
+    if (!rowsRakHtml) {
+        rowsRakHtml = '<tr><td colspan="2" style="text-align: center;">Data lokasi rak tidak tersedia</td></tr>';
+    }
+
+    // 4. Susun HTML Dokumen Cetak
     const finalHtml = `
     <html>
     <head>
         <style>
-            @page { size: 215mm 330mm portrait; margin: 10mm; }
-            body { font-family: 'Century Gothic', sans-serif; font-size: 9pt; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 15px; table-layout: fixed; }
-            th, td { border: 1px solid #000; padding: 3px; text-align: center; font-family: 'Century Gothic', sans-serif; font-size: 9pt; }
-            .judul-tabel { font-weight: bold; font-size: 14pt; text-align: center; margin-bottom: 10px; }
-            .info-rak { 
-                font-family: 'Courier New', monospace; 
-                white-space: pre-wrap; 
-                font-size: 9pt; 
-                margin-top: 5px; 
-                line-height: 1.4;
+            @page { size: 215mm 330mm portrait; margin: 3mm; }
+            body { font-family: 'Century Gothic', sans-serif; font-size: 8pt; margin: 0; padding: 1; }
+            
+            /* Tabel Utama di Atas */
+            table { width: 100%; border-collapse: collapse; margin-bottom: 12px; table-layout: fixed; }
+            th, td { border: 1px solid #000; padding: 2px 3px; text-align: center; font-family: 'Century Gothic', sans-serif; font-size: 8pt; }
+            
+            table th:first-child, table td:first-child {
+                text-align: left;
+                padding-left: 5px;
+                width: 75px;
+            }
+
+            .judul-tabel { font-weight: bold; font-size: 13pt; text-align: center; margin-bottom: 6px; }
+            
+            /* Bagian Bawah: Tabel Lokasi Rak */
+            .section-title {
+                font-weight: bold;
+                font-size: 10pt;
+                text-decoration: underline;
+                margin-bottom: 5px;
+                margin-top: 10px;
+            }
+
+            .tabel-rak {
+                width: 100%;
+                border-collapse: collapse;
+                table-layout: fixed;
+            }
+            .tabel-rak th, .tabel-rak td {
+                border: 1px solid #000;
+                padding: 3px 5px;
+                font-family: 'Century Gothic', sans-serif;
+                font-size: 10pt;
+            }
+            .tabel-rak th {
+                background-color: #f2f2f2;
+                font-family: 'Century Gothic', sans-serif;
+                font-weight: bold;
+                text-align: left;
             }
         </style>
     </head>
     <body>
-        <div class="judul-tabel">MUAT WH-3 ${judul}</div>
+        <div class="judul-tabel">MUAT WH-3 RAK ${judul}</div>
+        
+        <!-- Tabel Utama -->
         <table><thead>${theadContent}</thead><tbody>${rowsUtamaHtml}</tbody></table>
         
-        <div style="font-weight:bold; margin-top:15px; text-decoration:underline;">ALOKASI AMBIL RAK:</div>
-        <div class="info-rak">
-            KODE     | LOKASI RAK
-            ----------------------------------------------------------------------
-            ${dataRakList ? dataRakList : "Data tidak tersedia"}
-        </div>
+        <!-- Tabel Lokasi Rak di Bawah (Sudah Terurut) -->
+        <div class="section-title">LOKASI RAK AMBIL:</div>
+        <table class="tabel-rak">
+            <thead>
+                <tr>
+                    <th style="width: 150px; padding-left: 6px;">KODE</th>
+                    <th style="padding-left: 6px;">LOKASI RAK</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rowsRakHtml}
+            </tbody>
+        </table>
     </body>
     </html>`;
 
-    const win = window.open("", "_blank");
-    if (win) {
-        win.document.write(finalHtml);
-        win.document.close();
-        win.focus();
-    } else {
-        (typeof miuiAlert !== 'undefined') ? miuiAlert("Gagal membuka jendela cetak.") : alert("Gagal membuka jendela cetak.");
-    }
+    //const win = window.open("", "_blank");
+    //if (win) {
+    //    win.document.write(finalHtml);
+    //    win.document.close();
+    //    win.focus();
+    //} else {
+    //    (typeof miuiAlert !== 'undefined') ? miuiAlert("Gagal membuka jendela cetak.") : alert("Gagal membuka jendela cetak.");
+    //}
 
-    //await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs.json', {
-    //    method: 'POST',
-    //    body: JSON.stringify({ html: finalHtml, timestamp: Date.now() }),
-    //    headers: { 'Content-Type': 'application/json' }
-    //});
+    await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs.json', {
+        method: 'POST',
+        body: JSON.stringify({ html: finalHtml, timestamp: Date.now() }),
+        headers: { 'Content-Type': 'application/json' }
+    });
 };
