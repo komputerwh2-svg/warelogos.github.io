@@ -29,6 +29,12 @@ async function initApp() {
 // Fungsi ganti switch mode Stok WH (REKAP, WH-2, WH-3, LEBIH) dengan efek geser slider
 window.gantiModulStokWH = function(mode) {
     const slider = document.getElementById('slider-content-stokwh');
+    const btnFloatHP = document.getElementById('btnFloatingInputHP'); // Ambil elemen tombol floating HP
+    
+    // Atur visibilitas tombol floating HP: HANYA muncul di mode WH3
+    if (btnFloatHP) {
+        btnFloatHP.style.display = (mode === 'WH3') ? 'flex' : 'none';
+    }
     
     if (mode === 'REKAP') {
         slider.style.transform = 'translateX(0%)';
@@ -2028,6 +2034,208 @@ function bukaModalLihatRak(kode, event) {
     };
 }
 
+// Fungsi untuk membuka modal input fisik via HP
+function bukaModalInputHP() {
+    const modal = document.getElementById('modalInputHP');
+    if (modal) {
+        modal.style.display = 'flex';
+        
+        // Reset form setiap kali modal dibuka agar bersih dari input sebelumnya
+        document.getElementById('hp-kode-barang').value = '';
+        document.getElementById('hp-qty-beceran').value = '';
+        document.getElementById('hp-rak-beceran').value = '';
+        document.getElementById('hp-rak-utuhan').value = '';
+        
+        // Sembunyikan kontainer saran kode jika sempat terbuka
+        const saranContainer = document.getElementById('hp-saran-container');
+        if (saranContainer) {
+            saranContainer.style.display = 'none';
+        }
+        
+        // Set default ke tipe beceran
+        setTipeInputHP('beceran');
+    }
+}
+
+// Fungsi untuk menutup modal input fisik via HP
+function tutupModalInputHP() {
+    const modal = document.getElementById('modalInputHP');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// ==========================================
+// LOGIKA MODAL INPUT FISIK HP (STOK WH-3)
+// ==========================================
+
+let activeTipeHP = '';
+
+// Fungsi Membuka Modal HP
+function bukaModalInputHP() {
+    const modal = document.getElementById('modalInputHP');
+    if (modal) {
+        modal.style.display = 'flex';
+        document.getElementById('hp-kode-barang').value = '';
+        document.getElementById('hp-qty-beceran').value = '';
+        document.getElementById('hp-rak-beceran').value = '';
+        document.getElementById('hp-rak-utuhan').value = '';
+        
+        activeTipeHP = '';
+        const detailContainer = document.getElementById('form-detail-container');
+        if (detailContainer) detailContainer.style.display = 'none';
+        
+        document.getElementById('subform-beceran').style.display = 'none';
+        document.getElementById('subform-utuhan').style.display = 'none';
+        
+        resetTombolTipeHP();
+    }
+}
+
+// Fungsi Menutup Modal HP
+function tutupModalInputHP() {
+    const modal = document.getElementById('modalInputHP');
+    if (modal) {
+        modal.style.display = 'none';
+        document.getElementById('hp-saran-container').style.display = 'none';
+    }
+}
+
+// Reset Tampilan Tombol Jenis Input
+function resetTombolTipeHP() {
+    const btnB = document.getElementById('btn-tipe-beceran');
+    const btnU = document.getElementById('btn-tipe-utuhan');
+    
+    if (btnB && btnU) {
+        btnB.style.background = '#fff';
+        btnB.style.color = '#f97316';
+        btnB.style.borderColor = '#f97316';
+
+        btnU.style.background = '#fff';
+        btnU.style.color = '#555';
+        btnU.style.borderColor = '#ccc';
+    }
+}
+
+// Pilih Mode Input (Beceran / Utuhan)
+function pilihModeInputHP(tipe) {
+    activeTipeHP = tipe;
+    const btnB = document.getElementById('btn-tipe-beceran');
+    const btnU = document.getElementById('btn-tipe-utuhan');
+    const detailContainer = document.getElementById('form-detail-container');
+    const subBeceran = document.getElementById('subform-beceran');
+    const subUtuhan = document.getElementById('subform-utuhan');
+
+    if (detailContainer) detailContainer.style.display = 'flex';
+
+    if (tipe === 'beceran') {
+        btnB.style.background = '#f97316';
+        btnB.style.color = '#fff';
+        btnB.style.borderColor = '#f97316';
+
+        btnU.style.background = '#fff';
+        btnU.style.color = '#555';
+        btnU.style.borderColor = '#ccc';
+
+        subBeceran.style.display = 'flex';
+        subUtuhan.style.display = 'none';
+    } else {
+        btnU.style.background = '#f97316';
+        btnU.style.color = '#fff';
+        btnU.style.borderColor = '#f97316';
+
+        btnB.style.background = '#fff';
+        btnB.style.color = '#f97316';
+        btnB.style.borderColor = '#f97316';
+
+        subUtuhan.style.display = 'flex';
+        subBeceran.style.display = 'none';
+    }
+}
+
+// Live Search / Autocomplete Kode dari Data Stok WH-3 yang tampil di tabel
+function filterSaranKodeHP(keyword) {
+    const container = document.getElementById('hp-saran-container');
+    if (!container) return;
+
+    if (!keyword || keyword.trim() === '') {
+        container.style.display = 'none';
+        container.innerHTML = '';
+        return;
+    }
+
+    // Ambil daftar kode unik secara otomatis dari baris tabel Stok WH-3 yang sedang aktif dilayar
+    const listKodeSet = new Set();
+    const rows = document.querySelectorAll('tr'); // Atau sesuaikan selector tabel WH-3 Anda
+    rows.forEach(row => {
+        const kodeCell = row.cells ? row.cells[1] : null; // Asumsi kolom Kode ada di kolom ke-2 (index 1)
+        if (kodeCell && kodeCell.innerText.trim() !== '') {
+            listKodeSet.add(kodeCell.innerText.trim());
+        }
+    });
+
+    const listKode = Array.from(listKodeSet);
+    const filtered = listKode.filter(item => item.toLowerCase().includes(keyword.toLowerCase()));
+
+    if (filtered.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+
+    let html = '';
+    filtered.slice(0, 10).forEach(kode => { // Batasi maksimal 10 saran agar tidak terlalu panjang
+        html += `<div onclick="pilihKodeHP('${kode}')" style="padding:10px 12px; border-bottom:1px solid #eee; cursor:pointer; font-size:13px; color:#333;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='white'">${kode}</div>`;
+    });
+
+    container.innerHTML = html;
+    container.style.display = 'block';
+}
+
+// Saat Salah Satu Saran Kode Dipilih
+function pilihKodeHP(kode) {
+    document.getElementById('hp-kode-barang').value = kode;
+    document.getElementById('hp-saran-container').style.display = 'none';
+}
+
+// Fungsi Simpan Data Fisik dari HP
+function simpanDataFisikHP() {
+    const kode = document.getElementById('hp-kode-barang').value.trim();
+    if (!kode) {
+        miuiAlert('Silakan pilih atau ketik kode barang terlebih dahulu!');
+        return;
+    }
+
+    if (!activeTipeHP) {
+        miuiAlert('Silakan pilih jenis input (Beceran atau Utuhan)!');
+        return;
+    }
+
+    if (activeTipeHP === 'beceran') {
+        const qtyBeceran = document.getElementById('hp-qty-beceran').value;
+        const rakBeceran = document.getElementById('hp-rak-beceran').value;
+
+        if (!qtyBeceran) {
+            miuiAlert('Qty beceran harus diisi!');
+            return;
+        }
+
+        console.log("Menyimpan Beceran WH-3:", { kode, qtyBeceran, rakBeceran });
+        // TODO: Masukkan logika update data beceran ke sistem/array utama Anda di sini
+
+    } else {
+        const rakUtuhan = document.getElementById('hp-rak-utuhan').value;
+
+        console.log("Menyimpan Utuhan WH-3:", { kode, rakUtuhan });
+        // TODO: Masukkan logika update rak utuhan ke sistem/array utama Anda di sini
+    }
+
+    miuiAlert('Data fisik berhasil disimpan!');
+    tutupModalInputHP();
+
+    // Jika ada fungsi render ulang tabel utama, panggil di sini agar tabel langsung terupdate
+    // contoh: if (typeof renderTabelWH3 === 'function') renderTabelWH3();
+}
+
 // Buka Modal Admin
 function bukaModalAdmin(key, kode, bosnet, wms) {
     // Simpan data langsung dari parameter tombol
@@ -2672,3 +2880,4 @@ window.renderTabelBarangLebih = async function() {
         tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-red-500 text-[15px]">Gagal memuat data</td></tr>`;
     }
 };
+
