@@ -1,5 +1,4 @@
 // --- PASTIKAN INI ADALAH BARIS PALING ATAS ---
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
 import { getDatabase, ref, push, set, remove, get, child, update } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
 import { initPrinterMonitor } from "./printer-monitor.js";
 
@@ -7,11 +6,12 @@ import { initPrinterMonitor } from "./printer-monitor.js";
 const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
 
 // Tambahkan inisialisasi agar error 'No Firebase App' hilang
-const firebaseConfig = {
-    databaseURL: FIREBASE_URL
-};
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+//const firebaseConfig = {
+//    databaseURL: FIREBASE_URL
+//};
+//const app = initializeApp(firebaseConfig);
+//const db = getDatabase(app);
+const db = firebase.database();
 // ---------------------------------------------
 
 // Panggil fungsi ini tepat setelah halaman siap
@@ -877,7 +877,12 @@ window.cetakPresisi = async (idFirebase) => {
     localStorage.setItem('printData', JSON.stringify({ html: finalHtml }));
     //window.open('cetak.html', '_blank', 'width=800,height=600');
 
-    // 2. Kirim ke Firebase untuk Print Server
+    // 2. Panggil Modal Progress Universal
+    if (typeof window.showCetakProgress === 'function') {
+        window.showCetakProgress("Mengirim Dokumen Cetak Ongkir...");
+    }
+
+    // 3. Kirim ke Firebase untuk Print Server
     try {
         await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs.json', {
             method: 'POST',
@@ -1019,6 +1024,11 @@ window.cetakLaporanOngkir = async () => {
     `;
 
     const finalHtml = `<!DOCTYPE html><html><head>${styleCss}</head><body>${bodyHtml}</body></html>`;
+
+    // 2. Panggil Modal Progress Universal
+    if (typeof window.showCetakProgress === 'function') {
+        window.showCetakProgress("Mengirim Dokumen Cetak Laporan Ongkir...");
+    }
 
     // 3. Kirim ke Firebase Print Server
     try {

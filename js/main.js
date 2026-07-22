@@ -929,6 +929,11 @@ window.cetakLabelHariIni = async (jenisLabel) => {
         pagesHtml += `</div>`; 
     }
 
+    // 2. Panggil Modal Progress Universal
+    if (typeof window.showCetakProgress === 'function') {
+        window.showCetakProgress("Mengirim Dokumen Cetak Label PKT...");
+    }
+
     // 3. Kirim ke Print Server
     try {
         await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs.json', {
@@ -1124,6 +1129,11 @@ window.cetakKlaimHariIni = async () => {
         });
         
         pagesHtml += `</div>`;
+    }
+
+    // 2. Panggil Modal Progress Universal
+    if (typeof window.showCetakProgress === 'function') {
+        window.showCetakProgress("Mengirim Dokumen Cetak Klaim...");
     }
 
     // 2. Kirim ke Print Server
