@@ -550,4 +550,78 @@
     <div id="popupLihatRak" class="hidden absolute z-[10000] bg-gray-100 border border-orange-500 shadow-2xl rounded-[8px] p-3 text-[13px] w-max whitespace-nowrap overflow-hidden">
         <div id="popupContent" class="text-gray-800 font-medium"></div>
     </div>
+
+
+    <!-- Tombol Floating (Pojok Kanan Bawah) -->
+    <button id="btnFloatingInputHP" onclick="bukaModalInputHP()" style="display:none; position:fixed; bottom:25px; right:20px; background:#f97316; color:white; border:none; width:56px; height:56px; border-radius:50%; box-shadow:0 4px 12px rgba(0,0,0,0.3); z-index:9998; align-items:center; justify-content:center; font-size:24px; cursor:pointer;" title="Input Mobile">
+        📱
+    </button>
+
+    <!-- Struktur Modal Input HP (Otomatis Uppercase) -->
+    <div id="modalInputHP" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:99999; align-items:center; justify-content:center; padding:15px; box-sizing:border-box;">
+        <div style="background:white; width:100%; max-width:400px; border-radius:16px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 10px 25px rgba(0,0,0,0.3); animation: fadeIn 0.2s ease;">
+            
+            <!-- Header Modal -->
+            <div style="padding:12px 16px; background:#f97316; color:white; display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0; font-size:15px; font-weight:bold;">INPUT FISIK GUDANG (HP)</h3>
+                <button onclick="tutupModalInputHP()" style="background:none; border:none; color:white; font-size:18px; font-weight:bold; cursor:pointer;">&times;</button>
+            </div>
+
+            <!-- Body Form (Ringkas) -->
+            <div style="padding:16px; display:flex; flex-direction:column; gap:12px; max-height:75vh; overflow-y:auto;">
+                
+                <!-- 1. Input Kode dengan Autocomplete -->
+                <div style="position:relative;">
+                    <label style="display:block; font-size:11px; font-weight:bold; color:#374151; margin-bottom:4px;">KODE BARANG</label>
+                    <input type="text" id="hp-kode-barang" placeholder="Ketik kode (misal: CRR...)" autocomplete="off" oninput="this.value = this.value.toUpperCase(); filterSaranKodeHP(this.value)" style="width:100%; padding:10px; border:1px solid #9ca3af; border-radius:8px; font-size:14px; color:#1f2937; font-weight:600; text-transform:uppercase; box-sizing:border-box;">
+                    <div id="hp-saran-container" style="display:none; position:absolute; top:100%; left:0; width:100%; max-height:120px; overflow-y:auto; background:white; border:1px solid #9ca3af; border-radius:0 0 8px 8px; z-index:10; box-shadow:0 4px 6px rgba(0,0,0,0.1);"></div>
+                </div>
+
+                <!-- 2. Tombol Pilihan Jenis Input (Kecil & Berjajar) -->
+                <div>
+                    <label style="display:block; font-size:11px; font-weight:bold; color:#374151; margin-bottom:4px;">PILIH JENIS INPUT</label>
+                    <div style="display:flex; gap:8px;">
+                        <button type="button" id="btn-tipe-beceran" onclick="pilihModeInputHP('beceran')" style="flex:1; padding:8px; border:1.5px solid #f97316; background:#fff; color:#f97316; border-radius:8px; font-weight:bold; font-size:13px; cursor:pointer;">Beceran</button>
+                        <button type="button" id="btn-tipe-utuhan" onclick="pilihModeInputHP('utuhan')" style="flex:1; padding:8px; border:1.5px solid #9ca3af; background:#fff; color:#4b5563; border-radius:8px; font-weight:bold; font-size:13px; cursor:pointer;">Utuhan</button>
+                    </div>
+                </div>
+
+                <!-- 3. Form Input Detail -->
+                <div id="form-detail-container" style="display:none; flex-direction:column; gap:10px; border-top:1px dashed #cbd5e1; padding-top:10px; margin-top:2px;">
+                    
+                    <!-- Konten Beceran -->
+                    <div id="subform-beceran" style="display:none; flex-direction:column; gap:10px;">
+                        <div>
+                            <label style="display:block; font-size:11px; font-weight:bold; color:#374151; margin-bottom:4px;">QTY BECERAN</label>
+                            <input type="number" id="hp-qty-beceran" placeholder="Jumlah..." style="width:100%; padding:10px; border:1px solid #9ca3af; border-radius:8px; font-size:14px; color:#1f2937; font-weight:600; box-sizing:border-box;">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:11px; font-weight:bold; color:#374151; margin-bottom:4px;">RAK BECERAN</label>
+                            <input type="text" id="hp-rak-beceran" placeholder="Rak..." oninput="this.value = this.value.toUpperCase()" style="width:100%; padding:10px; border:1px solid #9ca3af; border-radius:8px; font-size:14px; color:#1f2937; font-weight:600; text-transform:uppercase; box-sizing:border-box;">
+                        </div>
+                    </div>
+
+                    <!-- Konten Utuhan -->
+                    <div id="subform-utuhan" style="display:none; flex-direction:column; gap:10px;">
+                        <div style="background:#eff6ff; padding:8px; border-radius:6px; font-size:11px; color:#1e40af; font-weight:500;">
+                            💡 Qty utuh dihitung otomatis. Cukup isi rak.
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:11px; font-weight:bold; color:#374151; margin-bottom:4px;">RAK UTUHAN</label>
+                            <input type="text" id="hp-rak-utuhan" placeholder="Rak utuhan..." oninput="this.value = this.value.toUpperCase()" style="width:100%; padding:10px; border:1px solid #9ca3af; border-radius:8px; font-size:14px; color:#1f2937; font-weight:600; text-transform:uppercase; box-sizing:border-box;">
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- Footer Tombol Aksi -->
+            <div style="padding:12px 16px; background:#f3f4f6; border-top:1px solid #e5e7eb; display:flex; gap:8px;">
+                <button onclick="tutupModalInputHP()" style="flex:1; padding:10px; background:#e5e7eb; border:none; border-radius:8px; font-weight:bold; color:#374151; font-size:13px; cursor:pointer;">Batal</button>
+                <button onclick="simpanDataFisikHP()" style="flex:2; padding:10px; background:#f97316; color:white; border:none; border-radius:8px; font-weight:bold; font-size:13px; cursor:pointer;">Simpan</button>
+            </div>
+
+        </div>
+    </div>
 </div>
