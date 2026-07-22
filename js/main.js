@@ -174,6 +174,7 @@ function bukaSetelan() {
 function tutupSetelan() {
     const pageSetelan = document.getElementById('subpage-setelan');
     if (pageSetelan) pageSetelan.classList.add('hidden');
+    window.kembaliKeHalamanUtama();
 }
 
 // =========================================================================
@@ -195,6 +196,7 @@ function tutupModalRakKosong() {
     if (modal) {
         modal.classList.add('hidden');
     }
+    window.kembaliKeHalamanUtama();
 }
 
 function eksekusiCetakRakKosong() {
@@ -518,7 +520,7 @@ function tutupSubPageRekapBlok() {
     if (typeof resetFormTransaksi === 'function') {
         resetFormTransaksi();
     }
-    
+    window.kembaliKeHalamanUtama();
     console.log("Subpage ditutup, semua area UI telah dikunci dan di-reset.");
 }
 
@@ -597,6 +599,7 @@ function tutupSubPageStokWH() {
     if (subpage) {
         subpage.classList.add('translate-x-full');
     }
+    window.kembaliKeHalamanUtama();
 }
 
 window.bukaSubPageStokWH = bukaSubPageStokWH;
@@ -659,6 +662,7 @@ window.tutupSubPageMuatWH3 = function() {
     if (subpage) {
         subpage.classList.add('translate-x-full');
     }
+    window.kembaliKeHalamanUtama();
 };
 
 console.log("Modul Muat WH-3 dimuat.");
@@ -713,7 +717,7 @@ function tutupSubPageOngkir() {
     if (typeof window.resetFormOngkir === 'function') {
         window.resetFormOngkir();
     }
-    
+    window.kembaliKeHalamanUtama();
     console.log("Subpage Ongkir ditutup.");
 }
 
@@ -806,6 +810,7 @@ function tutupSubPageBankData() {
         subPage.classList.remove("translate-x-0");
         subPage.classList.add("translate-x-full");
     }
+    window.kembaliKeHalamanUtama();
 }
 
 // EKSPOS KE WINDOW GLOBAL SCOPE
@@ -1134,60 +1139,79 @@ window.cetakKlaimHariIni = async () => {
     }
 };
 
-// Logika Pemantauan
-const printJobsRef = ref(dbPrinter, 'print_jobs');
-const statusBar = document.getElementById('print-status-bar');
-const statusText = document.getElementById('print-status-text');
-const printIcon = document.getElementById('print-icon');
-let printTimeout = null;
 
-// Gunakan onValue untuk memantau perubahan secara real-time
+// Helper Global Modal Progress Cetak
+window.showCetakProgress = function(pesan = "Memproses Cetak...") {
+    const modal = document.getElementById('modal-progress-cetak');
+    const textEl = document.getElementById('text-progress-cetak');
+    if (textEl) textEl.innerText = pesan;
+    if (modal) modal.style.display = 'flex';
+};
+
+window.hideCetakProgress = function() {
+    const modal = document.getElementById('modal-progress-cetak');
+    if (modal) modal.style.display = 'none';
+};
+
+// --- LOGIKA PEMANTAUAN ANTREAN CETAK TERPADU (MODAL MIUI V5) ---
+const printJobsRef = ref(dbPrinter, 'print_jobs');
+let printTimeout = null;
+let countdownInterval = null;
+
 onValue(printJobsRef, (snapshot) => {
     const data = snapshot.val();
-    
-    // Hitung jumlah job
     const jobCount = data ? Object.keys(data).length : 0;
     
-    console.log("Jumlah antrian di Firebase:", jobCount); // Debugging: Cek di Console F12
-
-    let countdownInterval = null;
-    let timeLeft = 10; // Durasi dalam detik
+    console.log("Jumlah antrian cetak di Firebase:", jobCount);
 
     if (jobCount > 0) {
-        // RESET STATUS BAR & TIMER
-        statusBar.classList.remove('hidden');
-        statusBar.className = "flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold bg-blue-500 text-white animate-pulse";
-        printIcon.className = "fa-solid fa-spinner animate-spin";
-        
-        // Reset timer
+        let timeLeft = 10;
+
+        // Panggil modal progress universal di tengah layar
+        if (window.showCetakProgress) {
+            window.showCetakProgress(`Sedang memproses ${jobCount} dokumen (${timeLeft}s)...`);
+        }
+
         if (printTimeout) clearTimeout(printTimeout);
         if (countdownInterval) clearInterval(countdownInterval);
-        
-        timeLeft = 10;
-        statusText.innerText = `Sedang mencetak ${jobCount} dokumen (${timeLeft}s)...`;
 
-        // Jalankan countdown setiap 1 detik
+        // Hitung mundur waktu proses
         countdownInterval = setInterval(() => {
             timeLeft--;
             if (timeLeft > 0) {
-                statusText.innerText = `Sedang mencetak ${jobCount} dokumen (${timeLeft}s)...`;
+                const textEl = document.getElementById('text-progress-cetak');
+                if (textEl) {
+                    textEl.innerText = `Sedang memproses ${jobCount} dokumen (${timeLeft}s)...`;
+                }
             } else {
                 clearInterval(countdownInterval);
             }
         }, 1000);
 
-        // Deteksi Masalah (Timeout 10 detik tetap berjalan)
+        // Timeout jika antrean macet lebih dari 10 detik
         printTimeout = setTimeout(() => {
-            clearInterval(countdownInterval); // Hentikan countdown
-            statusBar.className = "flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold bg-red-600 text-white";
-            printIcon.className = "fa-solid fa-circle-exclamation";
-            statusText.innerText = "Antrian cetak mengalami masalah!";
+            clearInterval(countdownInterval);
+            const textEl = document.getElementById('text-progress-cetak');
+            if (textEl) {
+                textEl.innerText = "Antrian cetak mengalami masalah!";
+                textEl.style.color = "#dc2626"; // Merah tanda error
+            }
+            setTimeout(() => {
+                if (window.hideCetakProgress) window.hideCetakProgress();
+                if (textEl) textEl.style.color = "#333";
+            }, 3000);
         }, 10000); 
 
     } else {
-        // ANTRIAN KOSONG: Bersihkan semua
+        // Jika antrean kosong, sembunyikan modal progress dengan mulus
         if (printTimeout) clearTimeout(printTimeout);
         if (countdownInterval) clearInterval(countdownInterval);
-        statusBar.classList.add('hidden');
+        
+        if (window.hideCetakProgress) {
+            window.hideCetakProgress();
+        }
+        
+        const textEl = document.getElementById('text-progress-cetak');
+        if (textEl) textEl.style.color = "#333";
     }
 });

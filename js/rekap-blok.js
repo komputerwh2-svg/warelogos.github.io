@@ -67,7 +67,7 @@ document.addEventListener('DOMContentLoaded', function() {
             window.cariKodeBarang(this.value);
         });
     } else {
-        console.warn("Dropdown belum ditemukan, mungkin dimuat secara dinamis.");
+        console.log("Dropdown belum ditemukan, mungkin dimuat secara dinamis.");
     }
     initPrinterMonitor();
 }); 
@@ -446,9 +446,9 @@ window.toggleEngineTransaksi = function(isOut) {
     if (typeof resetFormTransaksi === 'function') resetFormTransaksi();
 };
 
-window.gantiTabTransaksi = function(tipe) {
+//window.gantiTabTransaksi = function(tipe) {
     // Logic ganti tab UI Anda...
-};
+//};
 
 window.resetFormTransaksi = function() {
     document.getElementById('tx-tanggal').value = new Date().toISOString().split('T')[0];

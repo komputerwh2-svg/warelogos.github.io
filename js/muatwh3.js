@@ -561,26 +561,36 @@ window.resetFormulir = function() {
 };
 
 window.renderTabelGabungan = async function() {
-    const tglId = document.getElementById('select-tanggal-muat').value;
+    const selectTgl = document.getElementById('select-tanggal-muat');
     const tbody = document.getElementById('tabel-matriks-body');
     const thead = document.getElementById('tabel-matriks-head');
+
+    // Jika elemen-elemen utama ini tidak ada di halaman yang sedang dibuka, hentikan fungsi dengan aman
+    if (!selectTgl || !tbody) {
+        return; 
+    }
+
+    const tglId = selectTgl.value;
     const db = window.getFirestore(); // Menggunakan instance firestore yang sudah ada
 
     if (!tglId) {
-        document.getElementById('txt-total-tujuan').innerText = '0';
-        document.getElementById('txt-total-nodo').innerText = '0';
+        const elTotalTujuan = document.getElementById('txt-total-tujuan');
+        const elTotalNodo = document.getElementById('txt-total-nodo');
+        if (elTotalTujuan) elTotalTujuan.innerText = '0';
+        if (elTotalNodo) elTotalNodo.innerText = '0';
         tbody.innerHTML = '<tr><td colspan="10" class="text-center p-4">Pilih tanggal terlebih dahulu</td></tr>';
         return;
     }
 
     try {
         // --- 1. MENGAMBIL DATA DARI FIRESTORE ---
-        // Path: muat_wh3/{tglId}/datatujuan/{folderId}
         const snapshot = await db.collection("muat_wh3").doc(tglId).collection("datatujuan").get();
 
         if (snapshot.empty) {
-            document.getElementById('txt-total-tujuan').innerText = '0';
-            document.getElementById('txt-total-nodo').innerText = '0';
+            const elTotalTujuan = document.getElementById('txt-total-tujuan');
+            const elTotalNodo = document.getElementById('txt-total-nodo');
+            if (elTotalTujuan) elTotalTujuan.innerText = '0';
+            if (elTotalNodo) elTotalNodo.innerText = '0';
             tbody.innerHTML = '<tr><td colspan="10" class="text-center p-4">Data tidak ditemukan</td></tr>';
             return;
         }
@@ -628,15 +638,12 @@ window.renderTabelGabungan = async function() {
             const itemTujuan = doc.data(); 
             const folderId = doc.id;
             const namaTujuan = itemTujuan.tujuan || folderId;
-            const isMutasi = itemTujuan.tujuan === "Z-MUTASI";
 
             const subSnapshot = await doc.ref.collection("data").get();
             const listNoDO = subSnapshot.docs.map(d => d.id);
             totalNoDO += listNoDO.length;
 
             if (!groupTujuan[namaTujuan]) {
-                // Perbaikan: Hapus paksaan teks "MUTASI", gunakan listNoDO untuk semua tipe
-                // Jika listNoDO hanya ada 1, tampilkan ID-nya. Jika lebih, tampilkan format ringkas.
                 let labelNoDO = (listNoDO.length === 1) 
                     ? listNoDO[0] 
                     : (listNoDO[0] + "," + listNoDO.slice(1).map(id => id.slice(-2)).join(","));
@@ -646,18 +653,10 @@ window.renderTabelGabungan = async function() {
 
             subSnapshot.docs.forEach(doDoc => {
                 const rawDoc = doDoc.data();
-                
-                // --- TAMBAHKAN INI UNTUK DEBUGGING ---
-                console.log("DEBUG: Isi dokumen DO (" + doDoc.id + "):", rawDoc);
-                // -------------------------------------
-
-                // Kita coba deteksi apakah barang berada di field 'data' atau langsung di root
                 const dataBarang = rawDoc.data || rawDoc; 
 
                 Object.keys(dataBarang).forEach(kode => {
                     const barang = dataBarang[kode];
-                    
-                    // Cek apakah ini objek barang yang valid (punya qtyUtama)
                     if (barang && typeof barang === 'object' && barang.qtyUtama !== undefined) {
                         daftarBarangSet.add(kode);
                         groupTujuan[namaTujuan].data[kode] = (groupTujuan[namaTujuan].data[kode] || 0) + parseInt(barang.qtyUtama || 0);
@@ -674,10 +673,12 @@ window.renderTabelGabungan = async function() {
             return getAngkaAkhir(a) - getAngkaAkhir(b);
         });
 
-        document.getElementById('txt-total-tujuan').innerText = Object.keys(groupTujuan).length;
-        document.getElementById('txt-total-nodo').innerText = totalNoDO;
+        const elTotalTujuan = document.getElementById('txt-total-tujuan');
+        const elTotalNodo = document.getElementById('txt-total-nodo');
+        if (elTotalTujuan) elTotalTujuan.innerText = Object.keys(groupTujuan).length;
+        if (elTotalNodo) elTotalNodo.innerText = totalNoDO;
 
-        // --- 4. RENDER HEADER (Sama) ---
+        // --- 4. RENDER HEADER ---
         let row1 = `<th rowspan="2" class="p-3 border border-slate-500">KODE BARANG</th>`;
         let row2 = "";
         const listTujuanKeys = Object.keys(groupTujuan);
@@ -691,7 +692,7 @@ window.renderTabelGabungan = async function() {
                  <th rowspan="2" class="p-3 border border-slate-500 text-center">PLT | KRT</th>`;
         if (thead) thead.innerHTML = `<tr>${row1}</tr><tr>${row2}</tr>`;
 
-        // --- 5. RENDER BODY (Sama) ---
+        // --- 5. RENDER BODY ---
         tbody.innerHTML = '';
         sortedBarang.forEach(kode => {
             let rowTotal = 0;
@@ -746,7 +747,8 @@ window.muatDropdownStok = async function(retryCount = 0) {
             setTimeout(() => window.muatDropdownStok(retryCount + 1), 200);
             return;
         }
-        console.error("Elemen select-tanggal-stok-wh3 tidak ditemukan setelah retry.");
+        // Ganti console.error menjadi console.log biasa agar tidak memunculkan teks merah di Console
+        console.log("Info: Elemen select-tanggal-stok-wh3 tidak ada di halaman ini, dilewati.");
         return;
     }
 
@@ -1127,6 +1129,7 @@ window.bukaModalAmbil = function() {
         // Panggil fungsi untuk mengisi data referensi saat modal dibuka
         window.isiDataReferensiModal();
         window.loadDataAlokasi();
+        window.muatDropdownKodeDariStokBlok();
     }
 };
 
@@ -1191,53 +1194,126 @@ window.isiDataReferensiModal = function() {
 };
 
 
-document.getElementById('select-kode-ambil').addEventListener('change', function() {
-    const kodeDipilih = this.value;
-    const selectBlok = document.getElementById('select-blok-ambil');
+window.muatDropdownKodeDariStokBlok = async function() {
+    const selectKode = document.getElementById('select-kode-ambil');
+    if (!selectKode) return;
     
-    // Reset dropdown
-    selectBlok.innerHTML = '<option value="">-- Pilih Blok Asal --</option>';
-    if (!kodeDipilih) return;
+    // Kosongkan dan set default
+    selectKode.innerHTML = '<option value="">-- Pilih Kode Barang --</option>';
 
-    // Cari baris berdasarkan teks kode barang di kolom pertama
-    const rows = document.querySelectorAll('table tbody tr');
-    let infoAmbil = '';
-    
-    rows.forEach(row => {
-        // 1. Pastikan kita berada di baris kode yang benar
-        if (row.cells[0].innerText.trim() === kodeDipilih) {
-            // 2. Cari sel yang mengandung kata "AMBIL" di seluruh sel baris tersebut
-            const cellAmbil = Array.from(row.cells).find(cell => 
-                cell.innerText.toUpperCase().includes('AMBIL')
-            );
-
-            if (cellAmbil) {
-                infoAmbil = cellAmbil.innerText;
-                console.log("Data ditemukan di sel:", infoAmbil);
-            }
-        }
-    });
-
-    // Debugging: cek di console apa yang tertangkap
-    console.log("Data Ambil untuk", kodeDipilih, ":", infoAmbil);
-
-    if (infoAmbil && infoAmbil.includes('AMBIL [')) {
-        // Hapus teks "AMBIL [" dan "]"
-        let isiDalamKurung = infoAmbil.replace('AMBIL [', '').replace(']', '');
-        // Pecah berdasarkan "|"
-        let daftarBlok = isiDalamKurung.split('|');
+    try {
+        const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
+        const response = await fetch(`${FIREBASE_URL}stok_blok.json`);
+        const allData = await response.json();
         
-        daftarBlok.forEach(item => {
-            let namaBlok = item.split(':')[0].trim();
-            if (namaBlok) {
-                let opt = document.createElement('option');
-                opt.value = namaBlok;
-                opt.text = namaBlok;
-                selectBlok.appendChild(opt);
+        if (!allData) return;
+
+        // Kumpulkan semua kode unik dari seluruh blok yang ada di database
+        let setKodeUnik = new Set();
+        Object.keys(allData).forEach(namaBlok => {
+            const blokData = allData[namaBlok];
+            if (blokData) {
+                Object.keys(blokData).forEach(kode => {
+                    setKodeUnik.add(kode);
+                });
             }
         });
+
+        // Urutkan kode secara alfabetis dan masukkan ke dalam dropdown
+        Array.from(setKodeUnik).sort().forEach(kode => {
+            const opt = document.createElement('option');
+            opt.value = kode;
+            opt.text = kode;
+            selectKode.appendChild(opt);
+        });
+
+        console.log("Dropdown kode barang berhasil dimuat dari stok_blok sejumlah:", setKodeUnik.size);
+    } catch (e) {
+        console.error("Gagal memuat daftar kode barang dari stok_blok:", e);
     }
-});
+};
+
+const selectKodeAmbil = document.getElementById('select-kode-ambil');
+
+if (selectKodeAmbil) {
+    selectKodeAmbil.addEventListener('change', async function() {
+        const kodeDipilih = this.value;
+        const selectBlok = document.getElementById('select-blok-ambil');
+        
+        // Reset dropdown blok jika ada
+        if (selectBlok) {
+            selectBlok.innerHTML = '<option value="">-- Pilih Blok Asal --</option>';
+        }
+        
+        if (!kodeDipilih || !selectBlok) return;
+
+        try {
+            const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
+            const response = await fetch(`${FIREBASE_URL}stok_blok.json`);
+            const allData = await response.json();
+            
+            if (!allData) return;
+
+            const master = window.dataMasterBarang || {};
+            const inisialDicari = master[kodeDipilih]?.INISIAL || kodeDipilih;
+
+            // Objek untuk menampung dan menggabungkan data per nama blok
+            let groupBlok = {};
+
+            // Iterasi melalui setiap blok di stok_blok.json
+            Object.keys(allData).forEach(namaBlok => {
+                const blokData = allData[namaBlok];
+                
+                Object.keys(blokData).forEach(kode => {
+                    const infoBarang = master[kode] || { INISIAL: kode };
+                    
+                    // Cocokkan berdasarkan inisial atau kode barang yang dipilih
+                    if (infoBarang.INISIAL === inisialDicari || kode === kodeDipilih) {
+                        const expData = blokData[kode];
+                        
+                        // Loop setiap tanggal expired di dalam blok tersebut
+                        Object.keys(expData).forEach(exp => {
+                            const item = expData[exp];
+                            const plt = parseInt(item.plt) || 0;
+                            const krt = parseInt(item.krt) || 0;
+                            
+                            if (plt > 0 || krt > 0) {
+                                // Jika nama blok belum ada di group, inisialisasi
+                                if (!groupBlok[namaBlok]) {
+                                    groupBlok[namaBlok] = {
+                                        totalPlt: 0,
+                                        arrExpDetail: []
+                                    };
+                                }
+
+                                // Akumulasi total palet per blok
+                                groupBlok[namaBlok].totalPlt += plt;
+                                // Masukkan rincian exp dan jumlahnya
+                                groupBlok[namaBlok].arrExpDetail.push(`${exp}:${plt}`);
+                            }
+                        });
+                    }
+                });
+            });
+
+            // Masukkan data yang sudah digabung ke dalam dropdown
+            Object.keys(groupBlok).forEach(namaBlok => {
+                const dataBlok = groupBlok[namaBlok];
+                const gabunganExp = dataBlok.arrExpDetail.join(' + ');
+
+                let opt = document.createElement('option');
+                opt.value = namaBlok;
+                
+                // Format akhir: TEKOMAS : 15 PLT [28-JUN:2 + 28-JUL:13]
+                opt.text = `${namaBlok} : ${dataBlok.totalPlt} PLT [${gabunganExp}]`;
+                selectBlok.appendChild(opt);
+            });
+
+        } catch (e) {
+            console.error("Gagal memuat rincian blok dari database:", e);
+        }
+    });
+}
 
 window.getDataStokByKode = function(kode) {
     // Cari baris berdasarkan kode
@@ -1270,17 +1346,36 @@ window.getNamaBlokPenuh = function(kodeSingkat) {
     return map[s] || `BLOK ${s}`;
 };
 
-window.tambahAlokasi = function() {
+window.tambahAlokasi = async function() {
+    const tglMuat = document.getElementById('select-tanggal-muat') ? document.getElementById('select-tanggal-muat').value : '';
     const kode = document.getElementById('select-kode-ambil').value;
-    const blok = document.getElementById('select-blok-ambil').value;
+    const selectBlokEl = document.getElementById('select-blok-ambil');
+    const blok = selectBlokEl.value;
     const jumlah = parseInt(document.getElementById('input-plt-ambil').value);
     
+    if (!tglMuat) {
+        window.miuiAlert("Pilih tanggal muat terlebih dahulu!");
+        return;
+    }
+
     if (!kode || !blok || !jumlah) {
         window.miuiAlert("Lengkapi data kode, blok, dan jumlah!");
         return;
     }
 
-    const infoExp = window.getExpDataDariTabel(kode, blok); 
+    // --- AMBIL INFO EXP LANGSUNG DARI TEKS DROPDOWN BLOK ASAL ---
+    let infoExp = "EXP tidak tersedia";
+    const selectedOption = selectBlokEl.options[selectBlokEl.selectedIndex];
+    if (selectedOption && selectedOption.text) {
+        // Format teks dropdown: "TEKOMAS : 15 PLT [28-JUL:13 + 28-JUN:2]" atau sejenisnya
+        let textOpt = selectedOption.text;
+        let start = textOpt.indexOf('[');
+        let end = textOpt.lastIndexOf(']');
+        if (start !== -1 && end !== -1) {
+            infoExp = textOpt.substring(start + 1, end).trim();
+        }
+    }
+    
     const listRingkasan = document.getElementById('list-ringkasan');
     
     // 1. Bersihkan placeholder "Belum ada data..." jika ada
@@ -1300,7 +1395,7 @@ window.tambahAlokasi = function() {
         blokContainer.className = "mb-4 border-b pb-2";
         
         // Header terpadu: Nama Penuh + Total awal
-        const namaPenuh = window.getNamaBlokPenuh(blok);
+        const namaPenuh = window.getNamaBlokPenuh ? window.getNamaBlokPenuh(blok) : blok;
         blokContainer.innerHTML = `<div class="font-black text-orange-600 text-[11px] mb-1" id="header-${blok}">${namaPenuh} = 0 PLT</div>`;
         
         // Elemen hidden untuk menyimpan angka total murni
@@ -1328,12 +1423,64 @@ window.tambahAlokasi = function() {
     totalHidden.setAttribute('data-total', totalBaru);
     
     // Update teks header
-    headerEl.innerText = `${window.getNamaBlokPenuh(blok)} = ${totalBaru} PLT`;
+    const namaPenuhHeader = window.getNamaBlokPenuh ? window.getNamaBlokPenuh(blok) : blok;
+    headerEl.innerText = `${namaPenuhHeader} = ${totalBaru} PLT`;
 
     // 5. Update Grand Total
-    window.updateGrandTotal(jumlah);
+    if (window.updateGrandTotal) {
+        window.updateGrandTotal(jumlah);
+    }
 
-    // 6. RESET FORM
+    // --- 6. SIMPAN KE FIRESTORE BERDASARKAN TGL MUAT ---
+    try {
+        const db = window.getFirestore();
+        if (db) {
+            const docRef = db.collection("muat_wh3").doc(tglMuat).collection("info_rak_blok").doc("data_rekap");
+            
+            // Ambil data eksisting terlebih dahulu agar tidak menimpa data item lain
+            const docSnap = await docRef.get();
+            let dataPerItem = docSnap.exists ? (docSnap.data().data_per_item || {}) : {};
+
+            // Jika item belum ada di data_per_item, inisialisasi struktur dasarnya
+            if (!dataPerItem[kode]) {
+                dataPerItem[kode] = {
+                    rak_ambil: "-",
+                    total_stok: 0,
+                    sisa_stok: 0,
+                    plt_krt_sisa: "0 | 0",
+                    ambil_blok: "",
+                    exp_blok: ""
+                };
+            }
+
+            let ambilBlokLama = dataPerItem[kode].ambil_blok || "";
+            let expBlokLama = dataPerItem[kode].exp_blok || "";
+
+            let formatAmbilBaru = `AMBIL [ ${blok}:${jumlah} ]`;
+            let formatExpBaru = `${blok}: [${infoExp}]`;
+
+            if (!ambilBlokLama || ambilBlokLama === "-") {
+                dataPerItem[kode].ambil_blok = formatAmbilBaru;
+                dataPerItem[kode].exp_blok = formatExpBaru;
+            } else {
+                dataPerItem[kode].ambil_blok = `${ambilBlokLama}, ${blok}:${jumlah}`;
+                dataPerItem[kode].exp_blok = `${expBlokLama} + ${blok}: [${infoExp}]`;
+            }
+
+            // Simpan kembali ke Firestore
+            await docRef.set({
+                data_per_item: dataPerItem,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+
+            console.log("Alokasi blok berhasil disimpan ke Firestore untuk tglMuat:", tglMuat);
+        }
+    } catch (error) {
+        console.error("Gagal menyimpan alokasi ke Firestore:", error);
+        window.miuiAlert("Gagal menyimpan data alokasi ke database: " + error.message);
+    }
+
+    // 7. RESET FORM
     document.getElementById('input-plt-ambil').value = '';
     document.getElementById('select-blok-ambil').selectedIndex = 0;
     document.getElementById('select-kode-ambil').selectedIndex = 0; 
@@ -1367,26 +1514,26 @@ window.getExpDataDariTabel = function(kode, blok) {
     let hasilExp = "EXP tidak tersedia";
     
     rows.forEach(row => {
-        // Pastikan baris sesuai dengan kode barang
-        if (row.cells[0].innerText.trim() === kode) {
-            // Ambil teks dari kolom EXP (indeks 7 sesuai tabel Anda)
-            const cellExp = row.cells[8].innerText; 
-            
-            // Logika baru: Cari teks blok yang diikuti oleh titik dua ":"
-            // Kita gunakan cara sederhana tanpa banyak regex yang rumit
-            const bagian = cellExp.split('|');
-            
-            bagian.forEach(item => {
-                // Jika item mengandung nama blok (misal "TK:")
-                if (item.toUpperCase().includes(blok.toUpperCase() + ':')) {
-                    // Ambil isi di dalam kurung siku [...]
-                    const start = item.indexOf('[');
-                    const end = item.indexOf(']');
-                    if (start !== -1 && end !== -1) {
-                        hasilExp = item.substring(start + 1, end).trim();
+        // Pastikan baris memiliki sel pertama dan kodenya cocok
+        if (row.cells && row.cells[0] && row.cells[0].innerText.trim() === kode) {
+            // Pastikan kolom ke-8 (indeks 8 / kolom EXP Blok) ada pada baris tersebut
+            if (row.cells.length > 8 && row.cells[8]) {
+                const cellExp = row.cells[8].innerText || "";
+                
+                const bagian = cellExp.split('|');
+                
+                bagian.forEach(item => {
+                    // Jika item mengandung nama blok (misal "TK:")
+                    if (item.toUpperCase().includes(blok.toUpperCase() + ':')) {
+                        // Ambil isi di dalam kurung siku [...]
+                        const start = item.indexOf('[');
+                        const end = item.indexOf(']');
+                        if (start !== -1 && end !== -1) {
+                            hasilExp = item.substring(start + 1, end).trim();
+                        }
                     }
-                }
-            });
+                });
+            }
         }
     });
     
@@ -1578,7 +1725,6 @@ window.kirimWaGrup = async function() {
 
 
 window.cetakSemuaVersi = async function() {
-    // Ambil tanggal dari select agar datanya sinkron
     const tglMuat = document.getElementById('select-tanggal-muat').value;
     
     if (!tglMuat) {
@@ -1586,16 +1732,40 @@ window.cetakSemuaVersi = async function() {
         return;
     }
 
-    window.miuiAlert("Sedang memproses dokumen...");
+    // Panggil modal progress universal
+    if (typeof window.showCetakProgress === 'function') {
+        window.showCetakProgress("Menyiapkan Dokumen Cetak (0/3)...");
+    } else {
+        console.warn("Fungsi showCetakProgress belum terdaftar di window!");
+    }
 
-    // Cetak Versi 1 (1 copy)
-    await window.cetakDokumenVersi1(tglMuat);
+    try {
+        // Cetak Versi 1
+        if (window.showCetakProgress) window.showCetakProgress("Mengirim Dokumen Versi 1 (1/3)...");
+        await window.cetakDokumenVersi1(tglMuat);
+        await new Promise(resolve => setTimeout(resolve, 400));
 
-    // Cetak Versi 2 (2 copy) - Kita panggil dua kali
-    await window.cetakDokumenVersi2(tglMuat);
-    await window.cetakDokumenVersi2(tglMuat);
+        // Cetak Versi 2 - Copy 1
+        if (window.showCetakProgress) window.showCetakProgress("Mengirim Dokumen Versi 2 - 1 (2/3)...");
+        await window.cetakDokumenVersi2(tglMuat);
+        await new Promise(resolve => setTimeout(resolve, 400));
 
-    window.miuiAlert("Berhasil mengirim 3 dokumen ke antrean cetak!");
+        // Cetak Versi 2 - Copy 2
+        if (window.showCetakProgress) window.showCetakProgress("Mengirim Dokumen Versi 2 - 2 (3/3)...");
+        await window.cetakDokumenVersi2(tglMuat);
+
+        // Sembunyikan modal setelah selesai
+        if (window.hideCetakProgress) {
+            window.hideCetakProgress();
+        }
+
+        window.miuiAlert("Berhasil mengirim 3 dokumen ke antrean cetak!");
+
+    } catch (error) {
+        console.error("Gagal memproses cetak:", error);
+        if (window.hideCetakProgress) window.hideCetakProgress();
+        window.miuiAlert("Terjadi kesalahan saat mengirim dokumen cetak.");
+    }
 };
 
 window.cetakDokumenVersi1 = async function(tglMuat) {
@@ -1651,8 +1821,8 @@ window.cetakDokumenVersi1 = async function(tglMuat) {
     <html>
     <head>
         <style>
-            @page { size: 215mm 330mm portrait; margin: 3mm; }
-            body { font-family: 'Century Gothic', sans-serif; font-size: 8pt; margin: 0; padding: 1; }
+            @page { size: 215mm 330mm portrait; margin: 20mm 1mm 1mm 1mm; }
+            body { font-family: 'Century Gothic', sans-serif; font-size: 8pt; margin: 0; padding: 0; }
             
             table { width: 100%; border-collapse: collapse; margin-bottom: 8px; table-layout: fixed; }
             th, td { border: 1px solid #000; padding: 2px 3px; text-align: center; font-family: 'Century Gothic', sans-serif; font-size: 8pt; }
@@ -1863,8 +2033,8 @@ window.cetakDokumenVersi2 = async function(tglMuat) {
     <html>
     <head>
         <style>
-            @page { size: 215mm 330mm portrait; margin: 3mm; }
-            body { font-family: 'Century Gothic', sans-serif; font-size: 8pt; margin: 0; padding: 1; }
+            @page { size: 215mm 330mm portrait; margin: 20mm 1mm 1mm 1mm; }
+            body { font-family: 'Century Gothic', sans-serif; font-size: 8pt; margin: 0; padding: 0; }
             
             /* Tabel Utama di Atas */
             table { width: 100%; border-collapse: collapse; margin-bottom: 12px; table-layout: fixed; }

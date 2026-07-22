@@ -496,7 +496,6 @@ async function initDropdownsRekap() {
     await updateTanggalDropdownRekap();
 }
 
-// 2. Fungsi init yang memanggil fungsi di atas
 async function initDropdowns() {
     console.log("Inisialisasi Dropdown WH2..."); 
     
@@ -505,7 +504,8 @@ async function initDropdowns() {
     const selTanggal = document.getElementById('select-tanggal-wh2');
     
     if (!selPeriode || !selTanggal) {
-        console.error("Dropdown WH2 tidak ditemukan!");
+        // Ganti console.error menjadi console.log biasa agar tidak memunculkan teks merah
+        console.log("Info: Dropdowns WH2 belum ada di halaman ini, dilewati.");
         return;
     }
 
@@ -2446,7 +2446,7 @@ if (elExpired) {
         }
     });
 } else {
-    console.warn("Elemen 'bl_tx_expired' belum dimuat di DOM.");
+    console.log("Elemen 'bl_tx_expired' belum dimuat di DOM.");
 }
 
 window.updateStokLebih_bl = async function(data) {
