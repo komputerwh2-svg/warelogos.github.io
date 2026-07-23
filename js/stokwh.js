@@ -2189,6 +2189,12 @@ function filterSaranKodeHP(keyword) {
 
     container.innerHTML = html;
     container.style.display = 'block';
+
+    // Paksa geser ke atas agar kotak saran & input kode terlihat jelas di atas keyboard
+    const inputKode = document.getElementById('hp-kode-barang');
+    if (inputKode) {
+        inputKode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
 }
 
 // Saat Salah Satu Saran Kode Dipilih
