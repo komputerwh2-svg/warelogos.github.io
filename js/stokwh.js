@@ -1218,10 +1218,10 @@ async function loadStokData() {
     }
 }
 
-// Variabel penyimpan interval agar tidak menumpuk
-let wh3RealtimeInterval = null;
+// Variabel penyimpan referensi listener agar tidak menumpuk
+let wh3DataListener = null;
 
-async function loadStokDatawh3() {
+function loadStokDatawh3() {
     const dateInput = document.getElementById('select-tanggal-wh3');
     const tanggal = dateInput ? dateInput.value : null;
 
@@ -1231,51 +1231,39 @@ async function loadStokDatawh3() {
     const radioChecked = document.querySelector('input[name="rb-mode-wh3"]:checked');
     const mode = radioChecked ? radioChecked.value : "STOK WH-3";
     
-    console.log("Memuat data mode:", mode, "untuk tanggal:", tanggal);
-
     const formattedDate = tanggal.replace(/-/g, '');
     
-    // Fungsi internal untuk fetch data dari Firebase
-    const fetchDataWH3 = async (isBackground = false) => {
-        try {
-            const response = await fetch(`${DB_FIREBASE_URL}stok_wh3.json`);
-            const allData = await response.json();
-            
-            // Cek apakah ada perubahan data atau ini muat pertama kali
-            window.currentStokData = allData;
-            
-            if (!allData) {
-                if (!isBackground) tampilkanKosongwh3(tanggal);
-                return;
-            }
+    // Path referensi spesifik ke database Firebase Anda
+    const dbRef = firebase.database().ref(`stok_wh3`);
 
-            const key = Object.keys(allData).find(k => k.includes(`stokwh3_${formattedDate}`));
-            
-            if (!key) {
-                if (!isBackground) tampilkanKosongwh3(tanggal);
-                return;
-            }
-
-            // Render ulang tabel secara otomatis
-            renderTabelwh3(allData[key], mode, key);
-        } catch (error) {
-            console.error("Gagal load data:", error);
-        }
-    };
-
-    // Muat data pertama kali secara langsung
-    await fetchDataWH3(false);
-
-    // Aktifkan Real-Time Polling khusus PC (Cek perubahan data dari HP setiap 3 detik otomatis)
-    if (!wh3RealtimeInterval) {
-        wh3RealtimeInterval = setInterval(() => {
-            // Pastikan halaman masih di tab/tanggal yang sama sebelum fetch background
-            const activeDateCheck = document.getElementById('select-tanggal-wh3')?.value;
-            if (activeDateCheck === tanggal) {
-                fetchDataWH3(true); // Fetch background tanpa mengganggu posisi scroll/input user
-            }
-        }, 3000); // Setiap 3 detik
+    // Hapus listener sebelumnya jika ada (agar tidak terjadi duplikasi event saat ganti tanggal)
+    if (wh3DataListener) {
+        dbRef.off('value', wh3DataListener);
     }
+
+    // Pasang onValue: Hanya berjalan otomatis saat Firebase mendeteksi adanya data masuk/berubah
+    wh3DataListener = dbRef.on('value', (snapshot) => {
+        const allData = snapshot.val();
+        window.currentStokData = allData;
+        
+        if (!allData) {
+            tampilkanKosongwh3(tanggal);
+            return;
+        }
+
+        const key = Object.keys(allData).find(k => k.includes(`stokwh3_${formattedDate}`));
+        
+        if (!key) {
+            tampilkanKosongwh3(tanggal);
+            return;
+        }
+
+        // Render tabel otomatis seketika saat ada perubahan data di server
+        renderTabelwh3(allData[key], mode, key);
+        console.log("Data diperbarui secara real-time dari Firebase.");
+    }, (error) => {
+        console.error("Gagal mendengarkan perubahan data:", error);
+    });
 }
 
 
