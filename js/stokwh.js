@@ -1533,16 +1533,27 @@ async function renderTabelwh3(dataStok, mode, key) {
         const bosnet = parseInt(item.bosnet) || 0;
         const beceran = parseInt(item.beceran) || 0;
         const utuhan = parseInt(item.utuhan) || 0;
-        const keterangan = item.keterangan || "-";
         
         let pak = item.pak_format || "-";
         if (pak === "0 | 0" || pak === "0") pak = "-";
 
         if (!((blok !== 0 || bosnet !== 0 || beceran !== 0 || utuhan !== 0) || pak !== "-")) return;
 
-        // Logika Fisik (Sama untuk hitung total dan baris)
+        // Logika Fisik 
         let totalFisik = kode.includes("PR-PKT") ? (beceran + utuhan) : (blok + beceran + utuhan);
         const selisih = totalFisik - bosnet;
+        
+        // Tentukan Satuan otomatis (PKT untuk paket, KRT untuk barang biasa)
+        const isPaket = kode.includes("PR-PKT");
+        const satuan = isPaket ? "PKT" : "KRT";
+
+        // BUAT KETERANGAN OTOMATIS SECARA DINAMIS BERDASARKAN SELISIH
+        let keterangan = "SESUAI";
+        if (selisih > 0) {
+            keterangan = `STOK LEBIH ${selisih} ${satuan}`;
+        } else if (selisih < 0) {
+            keterangan = `STOK KURANG ${Math.abs(selisih)} ${satuan}`;
+        }
         
         let kelasWarnaSelisih = selisih > 0 ? "text-blue-600 font-bold" : (selisih < 0 ? "text-red-600 font-bold" : "text-green-600 font-bold");
         let warnaKet = selisih > 0 ? "text-blue-600 font-bold" : (selisih < 0 ? "text-red-600 font-bold" : "text-green-600 font-bold");
@@ -1791,12 +1802,17 @@ async function bukaModalInputRak(kode) {
     document.getElementById('modalTitle').innerText = `Input Rak: ${kode} : ${item.selisih || 0} KRT/PKT`;
     
     const detail = item.detail_rak || {};
-    document.getElementById('inputBeceran').value = item.beceran || "";
+    
+    // UBAH DISINI: Ambil dari beceran_qty_teks (format teks asli seperti "9 + 12"), 
+    // fallback ke item.beceran jika teks aslinya belum ada
+    const teksBeceran = detail.beceran_qty_teks !== undefined ? detail.beceran_qty_teks : (item.beceran || "");
+    document.getElementById('inputBeceran').value = teksBeceran;
+    
     document.getElementById('inputRakBeceran').value = detail.beceran_rak || "";
     document.getElementById('inputRakUtuhan').value = detail.utuhan_rak || "";
     
     window.currentKode = kode;
-    hitungKonversi();
+    hitungKonversi(); // Tetap jalankan kalkulasi agar preview otomatis membaca total angkanya
     
     // 3. Tampilkan Modal dengan Animasi
     const modal = document.getElementById('modalInputRak');
@@ -1858,7 +1874,10 @@ function hitungKonversi() {
     }
 
     const kode = window.currentKode;
-    const inputBeceran = parseInt(document.getElementById('inputBeceran').value) || 0;
+    
+    // UBAH DISINI: Gunakan hitungTotalBeceran agar string "9+12" terbaca totalnya (21)
+    const rawBeceran = document.getElementById('inputBeceran').value;
+    const inputBeceran = hitungTotalBeceran(rawBeceran);
     
     // 2. Akses data master
     const master = window.masterData ? window.masterData[kode] : null;
@@ -1874,13 +1893,10 @@ function hitungKonversi() {
     let hasil = 0;
 
     // 3. LOGIKA PEMISAH:
-    // Jika PR-PKT, asumsikan input adalah angka total (bukan penjumlahan rak)
-    // Jika Barang Biasa, hitung berdasarkan jumlah rak (pemisah '+')
     if (kode.includes("PR-PKT")) {
         const jumlahKarton = parseInt(rakUtuhanInput) || 0;
         hasil = (jumlahKarton * konversi) + inputBeceran;
     } else {
-        // Logika hitung rak (fitur lama)
         const rakArray = rakUtuhanInput.split('+').filter(r => r.trim() !== "");
         hasil = (rakArray.length * konversi) + inputBeceran;
     }
@@ -1892,34 +1908,45 @@ function hitungKonversi() {
     }
 }
 
+function hitungTotalBeceran(inputStr) {
+    if (!inputStr) return 0;
+    const parts = String(inputStr).split('+');
+    let total = 0;
+    parts.forEach(part => {
+        const angka = parseFloat(part.trim()) || 0;
+        total += angka;
+    });
+    return total;
+}
+
 async function simpanRak() {
     const kode = window.currentKode;
     const dateInput = document.getElementById('select-tanggal-wh3');
     const tanggal = dateInput ? dateInput.value.replace(/-/g, '') : null;
     
-    // 1. Ambil nilai dari input modal
-    const beceranVal = parseInt(document.getElementById('inputBeceran').value) || 0;
+    // 1. Ambil input teks mentah untuk tampilan/multi-qty, lalu hitung totalnya untuk sistem
+    const rawBeceranVal = document.getElementById('inputBeceran').value; 
+    const beceranVal = hitungTotalBeceran(rawBeceranVal); // Hasil angka murni (misal: 21) untuk perhitungan sistem
+    
     const rakBeceranVal = document.getElementById('inputRakBeceran').value.toUpperCase();
     const rakUtuhanVal = document.getElementById('inputRakUtuhan').value.toUpperCase();
     
     // 2. Kalkulasi Utuhan berdasarkan jenis kode
     const master = window.masterData ? window.masterData[kode] : null;
-    const qtyPerRak = master ? parseInt(master.QTY) : 0; // Hapus default 95, paksa ke master
+    const qtyPerRak = master ? parseInt(master.QTY) : 0; 
     
     let utuhanVal = 0;
     const isPaket = kode.includes("PR-PKT");
 
     if (isPaket) {
-        // Paket: Input dianggap jumlah karton langsung
         const jumlahKarton = parseInt(rakUtuhanVal) || 0;
         utuhanVal = jumlahKarton * qtyPerRak;
     } else {
-        // Barang Biasa: Gunakan sistem penjumlahan rak '+'
         const rakArray = rakUtuhanVal.split('+').filter(r => r.trim() !== "");
         utuhanVal = rakArray.length * qtyPerRak;
     }
 
-    // 3. Kalkulasi Total & Selisih
+    // 3. Kalkulasi Total & Selisih menggunakan angka murni `beceranVal`
     const dataHarian = window.currentStokData[`stokwh3_${tanggal}`];
     const item = dataHarian ? dataHarian[kode] : null;
     
@@ -1945,6 +1972,7 @@ async function simpanRak() {
 
     // 5. Kirim ke Firebase
     try {
+        // Sistem di balik layar murni membaca angka dari field `beceran`
         await fetch(`${baseUrl}.json`, {
             method: "PATCH",
             body: JSON.stringify({ 
@@ -1956,15 +1984,17 @@ async function simpanRak() {
             })
         });
 
+        // Simpan teks multi-qty ke `detail_rak` khusus untuk tampilan antarmuka
         await fetch(`${baseUrl}/detail_rak.json`, {
             method: "PATCH",
             body: JSON.stringify({ 
                 beceran_rak: rakBeceranVal, 
-                utuhan_rak: rakUtuhanVal 
+                utuhan_rak: rakUtuhanVal,
+                beceran_qty_teks: rawBeceranVal 
             })
         });
 
-        console.log("Data berhasil disimpan dengan logika yang sesuai");
+        console.log("Data berhasil disimpan dengan pemisahan sistem dan tampilan");
         tutupModalRak();
         loadStokDatawh3();
     } catch (error) {
@@ -1984,7 +2014,9 @@ function bukaModalLihatRak(kode, event) {
     popup.classList.remove('show');
     popup.classList.add('hidden');
     
-    const item = window.dataStokTerkini ? window.dataStokTerkini[kode] : null;
+    const dataHarian = window.currentStokData ? window.currentStokData[`stokwh3_${document.getElementById('select-tanggal-wh3')?.value.replace(/-/g, '')}`] : null;
+    const item = dataHarian ? dataHarian[kode] : (window.dataStokTerkini ? window.dataStokTerkini[kode] : null);
+    
     if (!item) return;
 
     // Fungsi pemformatan rak
@@ -1994,29 +2026,34 @@ function bukaModalLihatRak(kode, event) {
     };
 
     const detail = item.detail_rak || {};
-    const rakBeceran = detail.beceran_rak ? formatRakV2(detail.beceran_rak) : "-";
-    const qtyBeceran = item.beceran || "0";
     
+    // Format rak beceran
+    const rawRakBeceran = detail.beceran_rak || "";
+    const rakBeceranFormatted = rawRakBeceran ? rawRakBeceran.split('+').map(part => formatRakV2(part.trim())).join(' + ') : "-";
+    
+    // AMBIL QTY & BERIKAN SPASI PADA TANDA TAMBAH (+)
+    const rawQtyBeceran = detail.beceran_qty_teks || item.beceran || "0";
+    const qtyBeceran = String(rawQtyBeceran).replace(/\s*\+\s*/g, ' + ');
+    
+    // Format rak utuhan
     const rawUtuhan = detail.utuhan_rak || "";
     const utuhanFormatted = rawUtuhan ? rawUtuhan.split('+').map(part => formatRakV2(part.trim())).join(' + ') : "";
     const utuhanRak = utuhanFormatted ? ` + ${utuhanFormatted}` : "";
     
-    // 2. Masukkan konten
+    // 2. Masukkan konten dengan format rapi
     content.innerHTML = `<div class="text-gray-800 font-bold text-[15px]">
-        ${kode} = ${item.bosnet} | Rak: ${rakBeceran} = ${qtyBeceran}${utuhanRak}
+        ${kode} = ${item.bosnet} | Rak: ${rakBeceranFormatted} = ${qtyBeceran}${utuhanRak}
     </div>`;
 
     // 3. Tampilkan popup dengan animasi
     popup.classList.remove('hidden');
     
-    // Hitung posisi setelah elemen muncul
     const rect = event.target.getBoundingClientRect();
     const popupWidth = popup.offsetWidth;
 
     popup.style.top = (rect.top + window.scrollY - popup.offsetHeight - 8) + "px";
     popup.style.left = (rect.left + window.scrollX - (popupWidth / 2) + 10) + "px";
 
-    // Trigger animasi dengan delay kecil agar transisi CSS berjalan
     setTimeout(() => {
         popup.classList.add('show');
     }, 10);
@@ -2024,11 +2061,10 @@ function bukaModalLihatRak(kode, event) {
     // 4. Event penutup popup
     document.onclick = (e) => {
         if (!popup.contains(e.target) && e.target !== event.target) {
-            // Animasi tutup sebelum di-hidden
             popup.classList.remove('show');
             setTimeout(() => {
                 popup.classList.add('hidden');
-            }, 200); // Durasi disesuaikan dengan CSS transition
+            }, 200);
             document.onclick = null;
         }
     };
@@ -2129,24 +2165,28 @@ function pilihModeInputHP(tipe) {
     if (detailContainer) detailContainer.style.display = 'flex';
 
     if (tipe === 'BECERAN') {
+        // Tombol Beceran Aktif
         btnB.style.background = '#f97316';
         btnB.style.color = '#fff';
         btnB.style.borderColor = '#f97316';
 
+        // Tombol Utuhan Tidak Aktif
         btnU.style.background = '#fff';
-        btnU.style.color = '#555';
-        btnU.style.borderColor = '#ccc';
+        btnU.style.color = '#4b5563';
+        btnU.style.borderColor = '#9ca3af';
 
         subBeceran.style.display = 'flex';
         subUtuhan.style.display = 'none';
     } else {
+        // Tombol Utuhan Aktif
         btnU.style.background = '#f97316';
         btnU.style.color = '#fff';
         btnU.style.borderColor = '#f97316';
 
+        // Tombol Beceran Tidak Aktif (Diperbaiki jadi abu-abu bersih)
         btnB.style.background = '#fff';
-        btnB.style.color = '#f97316';
-        btnB.style.borderColor = '#f97316';
+        btnB.style.color = '#4b5563';
+        btnB.style.borderColor = '#9ca3af';
 
         subUtuhan.style.display = 'flex';
         subBeceran.style.display = 'none';
@@ -2204,8 +2244,8 @@ function pilihKodeHP(kode) {
 }
 
 // Fungsi Simpan Data Fisik dari HP
-function simpanDataFisikHP() {
-    const kode = document.getElementById('hp-kode-barang').value.trim();
+async function simpanDataFisikHP() {
+    const kode = document.getElementById('hp-kode-barang').value.trim().toUpperCase();
     if (!kode) {
         miuiAlert('Silakan pilih atau ketik kode barang terlebih dahulu!');
         return;
@@ -2216,30 +2256,152 @@ function simpanDataFisikHP() {
         return;
     }
 
-    if (activeTipeHP === 'BECERAN') {
-        const qtyBeceran = document.getElementById('hp-qty-beceran').value;
-        const rakBeceran = document.getElementById('hp-rak-beceran').value;
+    const dateInput = document.getElementById('select-tanggal-wh3');
+    const tanggal = dateInput ? dateInput.value.replace(/-/g, '') : null;
+    if (!tanggal) {
+        miuiAlert('Tanggal aktif tidak ditemukan!');
+        return;
+    }
 
-        if (!qtyBeceran) {
+    // Ambil data harian saat ini untuk item tersebut
+    const dataHarian = window.currentStokData ? window.currentStokData[`stokwh3_${tanggal}`] : null;
+    const item = dataHarian ? dataHarian[kode] : null;
+
+    if (!item) {
+        miuiAlert(`Data barang ${kode} tidak ditemukan pada tanggal ini!`);
+        return;
+    }
+
+    const detailLama = item.detail_rak || {};
+    
+    // Variabel penampung nilai baru yang akan dikirim
+    let finalBeceranVal = item.beceran || 0;
+    let finalRawBeceran = detailLama.beceran_qty_teks || (item.beceran ? String(item.beceran) : "");
+    let finalRakBeceran = detailLama.beceran_rak || "";
+
+    let finalUtuhanVal = item.utuhan || 0;
+    let finalRakUtuhan = detailLama.utuhan_rak || "";
+
+    // 1. JIKA INPUT BERUPA BECERAN
+    if (activeTipeHP === 'BECERAN') {
+        const inputQtyBeceranStr = document.getElementById('hp-qty-beceran').value.trim();
+        const inputRakBeceranStr = document.getElementById('hp-rak-beceran').value.trim().toUpperCase();
+
+        if (!inputQtyBeceranStr) {
             miuiAlert('Qty beceran harus diisi!');
             return;
         }
 
-        console.log("Menyimpan Beceran WH-3:", { kode, qtyBeceran, rakBeceran });
-        // TODO: Masukkan logika update data beceran ke sistem/array utama Anda di sini
+        const nilaiBaru = parseFloat(inputQtyBeceranStr) || 0;
 
-    } else {
-        const rakUtuhan = document.getElementById('hp-rak-utuhan').value;
+        // Gabungkan Qty Angka Murni untuk sistem
+        finalBeceranVal = (parseInt(item.beceran) || 0) + nilaiBaru;
 
-        console.log("Menyimpan Utuhan WH-3:", { kode, rakUtuhan });
-        // TODO: Masukkan logika update rak utuhan ke sistem/array utama Anda di sini
+        // Gabungkan Teks Qty Tampilan (misal: "1" + "1" jadi "1 + 1")
+        if (finalRawBeceran && finalRawBeceran !== "0") {
+            finalRawBeceran = `${finalRawBeceran} + ${inputQtyBeceranStr}`;
+        } else {
+            finalRawBeceran = inputQtyBeceranStr;
+        }
+
+        // Gabungkan String Rak Beceran (misal: "3A14" + "2A35" jadi "3A14 + 2A35")
+        if (inputRakBeceranStr) {
+            if (finalRakBeceran) {
+                finalRakBeceran = `${finalRakBeceran} + ${inputRakBeceranStr}`;
+            } else {
+                finalRakBeceran = inputRakBeceranStr;
+            }
+        }
+
+    } 
+    // 2. JIKA INPUT BERUPA UTUHAN
+    else {
+        const inputRakUtuhanStr = document.getElementById('hp-rak-utuhan').value.trim().toUpperCase();
+
+        if (!inputRakUtuhanStr) {
+            miuiAlert('Rak utuhan harus diisi!');
+            return;
+        }
+
+        // Gabungkan String Rak Utuhan
+        if (inputRakUtuhanStr) {
+            if (finalRakUtuhan) {
+                finalRakUtuhan = `${finalRakUtuhan} + ${inputRakUtuhanStr}`;
+            } else {
+                finalRakUtuhan = inputRakUtuhanStr;
+            }
+        }
+
+        // Kalkulasi ulang nilai utuhan berdasarkan master data QTY per rak/karton
+        const master = window.masterData ? window.masterData[kode] : null;
+        const qtyPerRak = master ? parseInt(master.QTY) : 0;
+        const isPaket = kode.includes("PR-PKT");
+
+        if (isPaket) {
+            const jumlahKarton = parseInt(finalRakUtuhan) || 0;
+            finalUtuhanVal = jumlahKarton * qtyPerRak;
+        } else {
+            const rakArray = finalRakUtuhan.split('+').filter(r => r.trim() !== "");
+            finalUtuhanVal = rakArray.length * qtyPerRak;
+        }
     }
 
-    miuiAlert('Data fisik berhasil disimpan!');
-    tutupModalInputHP();
+    // 3. Kalkulasi Total Keseluruhan & Selisih
+    const blokVal = parseInt(item.blok) || 0;
+    const bosnetVal = parseInt(item.bosnet) || 0;
+    const isPaket = kode.includes("PR-PKT");
 
-    // Jika ada fungsi render ulang tabel utama, panggil di sini agar tabel langsung terupdate
-    // contoh: if (typeof renderTabelWH3 === 'function') renderTabelWH3();
+    const totalVal = (isPaket ? 0 : blokVal) + finalBeceranVal + finalUtuhanVal;
+    const selisihVal = totalVal - bosnetVal;
+
+    // 4. Logika Keterangan Otomatis
+    const satuan = isPaket ? "PKT" : "KRT";
+    let statusKeterangan = "SESUAI";
+
+    if (selisihVal > 0) {
+        statusKeterangan = `STOK LEBIH ${selisihVal} ${satuan}`;
+    } else if (selisihVal < 0) {
+        statusKeterangan = `STOK KURANG ${Math.abs(selisihVal)} ${satuan}`;
+    }
+
+    const baseUrl = `https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/stok_wh3/stokwh3_${tanggal}/${kode}`;
+
+    // 5. Kirim Pembaruan (Update/Merge) ke Firebase
+    try {
+        await fetch(`${baseUrl}.json`, {
+            method: "PATCH",
+            body: JSON.stringify({
+                beceran: finalBeceranVal,
+                utuhan: finalUtuhanVal,
+                total: totalVal,
+                selisih: selisihVal,
+                keterangan: statusKeterangan
+            })
+        });
+
+        await fetch(`${baseUrl}/detail_rak.json`, {
+            method: "PATCH",
+            body: JSON.stringify({
+                beceran_rak: finalRakBeceran,
+                utuhan_rak: finalRakUtuhan,
+                beceran_qty_teks: finalRawBeceran
+            })
+        });
+
+        console.log("Data fisik HP berhasil digabungkan & diperbarui:", { kode, finalBeceranVal, finalRakBeceran, finalRawBeceran });
+        
+        miuiAlert('Data fisik berhasil ditambahkan/diperbarui!');
+        tutupModalInputHP();
+
+        // Refresh tabel utama agar data langsung ter-update
+        if (typeof loadStokDatawh3 === 'function') {
+            loadStokDatawh3();
+        }
+
+    } catch (error) {
+        console.error("Gagal menyimpan data fisik HP:", error);
+        miuiAlert('Terjadi kesalahan saat menyimpan ke database.');
+    }
 }
 
 // Buka Modal Admin
