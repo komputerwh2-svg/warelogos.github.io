@@ -2382,7 +2382,6 @@ async function simpanDataFisikHP() {
         if (inputRakUtuhan) inputRakUtuhan.value = '';
         if (kodeInputEl) {
             kodeInputEl.value = ''; // Kosongkan kode barang atau biarkan jika ingin input beruntun di kode yg sama (bisa disesuaikan)
-            kodeInputEl.focus();
         }
 
         // ---> TAMBAHKAN INI: RESET JUDUL KEMBALI KE SEMULA <---
