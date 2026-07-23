@@ -563,7 +563,7 @@
             
             <!-- Header Modal -->
             <div style="padding:12px 16px; background:#3c3c3c; color:white; display:flex; justify-content:space-between; align-items:center;">
-                <h3 style="margin:0; font-size:15px; font-weight:bold;">INPUT FISIK GUDANG (MOBILE)</h3>
+                <h3 id="hp-modal-title" style="margin:0; font-size:15px; font-weight:bold;">INPUT FISIK GUDANG (MOBILE)</h3>
                 <button onclick="tutupModalInputHP()" style="background:none; border:none; color:rgb(251, 92, 0); font-size:30px; font-weight:bold; cursor:pointer;">&times;</button>
             </div>
 
@@ -585,7 +585,7 @@
                     <!-- Input Kode dengan Autocomplete -->
                     <div style="position:relative;">
                         <label style="display:block; font-size:11px; font-weight:bold; color:#374151; margin-bottom:4px;">KODE BARANG</label>
-                        <input type="text" id="hp-kode-barang" placeholder="KETIK KODE (MISAL: CRR...)" autocomplete="off" onfocus="this.scrollIntoView({behavior: 'smooth', block: 'start'})" oninput="this.value = this.value.toUpperCase(); filterSaranKodeHP(this.value)" style="width:100%; padding:10px; border:1px solid #9ca3af; border-radius:8px; font-size:14px; color:#1f2937; font-weight:600; text-transform:uppercase; box-sizing:border-box;">
+                        <input type="text" id="hp-kode-barang" placeholder="KETIK KODE (MISAL: CRR...)" autocomplete="off" onfocus="this.scrollIntoView({behavior: 'smooth', block: 'start'})" oninput="this.value = this.value.toUpperCase(); filterSaranKodeHP(this.value); updateJudulModalHP();" style="width:100%; padding:10px; border:1px solid #9ca3af; border-radius:8px; font-size:14px; color:#1f2937; font-weight:600; text-transform:uppercase; box-sizing:border-box;">
                         <div id="hp-saran-container" style="display:none; position:absolute; top:100%; left:0; width:100%; max-height:120px; overflow-y:auto; background:white; border:1px solid #9ca3af; border-radius:0 0 8px 8px; z-index:10; box-shadow:0 4px 6px rgba(0,0,0,0.1);"></div>
                     </div>
 
@@ -618,7 +618,7 @@
 
             <!-- Footer Tombol Aksi -->
             <div style="padding:12px 16px; background:#f3f4f6; border-top:1px solid #e5e7eb; display:flex; gap:8px;">
-                <button onclick="tutupModalInputHP()" style="flex:1; padding:10px; background:#e5e7eb; border:none; border-radius:8px; font-weight:bold; color:#374151; font-size:13px; cursor:pointer;">BATAL</button>
+                <button onclick="resetFormFisikHP()" style="flex:1; padding:10px; background:#e5e7eb; border:none; border-radius:8px; font-weight:bold; color:#374151; font-size:13px; cursor:pointer;">BATAL</button>
                 <button onclick="simpanDataFisikHP()" style="flex:2; padding:10px; background:#f97316; color:white; border:none; border-radius:8px; font-weight:bold; font-size:13px; cursor:pointer;">SIMPAN</button>
             </div>
 
