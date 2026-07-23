@@ -2128,7 +2128,7 @@ function pilihModeInputHP(tipe) {
 
     if (detailContainer) detailContainer.style.display = 'flex';
 
-    if (tipe === 'beceran') {
+    if (tipe === 'BECERAN') {
         btnB.style.background = '#f97316';
         btnB.style.color = '#fff';
         btnB.style.borderColor = '#f97316';
@@ -2210,7 +2210,7 @@ function simpanDataFisikHP() {
         return;
     }
 
-    if (activeTipeHP === 'beceran') {
+    if (activeTipeHP === 'BECERAN') {
         const qtyBeceran = document.getElementById('hp-qty-beceran').value;
         const rakBeceran = document.getElementById('hp-rak-beceran').value;
 
