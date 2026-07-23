@@ -2370,7 +2370,7 @@ async function simpanDataFisikHP() {
         console.log("Data fisik HP berhasil disimpan:", { kode, finalBeceranVal, finalRakBeceran });
         
         // Tampilkan notifikasi sukses TANPA menutup modal
-        miuiAlert('Data berhasil disimpan! Silakan input data berikutnya.');
+        //miuiAlert('Data berhasil disimpan! Silakan input data berikutnya.');
 
         // KOSONGKAN FORM INPUT (Reset input field agar siap untuk input berikutnya)
         const inputQtyBeceran = document.getElementById('hp-qty-beceran');
@@ -2380,9 +2380,7 @@ async function simpanDataFisikHP() {
         if (inputQtyBeceran) inputQtyBeceran.value = '';
         if (inputRakBeceran) inputRakBeceran.value = '';
         if (inputRakUtuhan) inputRakUtuhan.value = '';
-        if (kodeInputEl) {
-            kodeInputEl.value = ''; // Kosongkan kode barang atau biarkan jika ingin input beruntun di kode yg sama (bisa disesuaikan)
-        }
+        if (kodeInputEl) kodeInputEl.value = '';
 
         // ---> TAMBAHKAN INI: RESET JUDUL KEMBALI KE SEMULA <---
         const modalTitleEl = document.getElementById('hp-modal-title');
