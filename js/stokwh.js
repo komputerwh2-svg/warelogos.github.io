@@ -1218,8 +1218,10 @@ async function loadStokData() {
     }
 }
 
+// Variabel penyimpan interval agar tidak menumpuk
+let wh3RealtimeInterval = null;
+
 async function loadStokDatawh3() {
-    // Tidak perlu lagi memanggil getAgregatStokBlok()
     const dateInput = document.getElementById('select-tanggal-wh3');
     const tanggal = dateInput ? dateInput.value : null;
 
@@ -1233,29 +1235,46 @@ async function loadStokDatawh3() {
 
     const formattedDate = tanggal.replace(/-/g, '');
     
-    try {
-        const response = await fetch(`${DB_FIREBASE_URL}stok_wh3.json`);
-        const allData = await response.json();
-        window.currentStokData = allData;
-        
-        if (!allData) {
-            tampilkanKosongwh3(tanggal);
-            return;
-        }
+    // Fungsi internal untuk fetch data dari Firebase
+    const fetchDataWH3 = async (isBackground = false) => {
+        try {
+            const response = await fetch(`${DB_FIREBASE_URL}stok_wh3.json`);
+            const allData = await response.json();
+            
+            // Cek apakah ada perubahan data atau ini muat pertama kali
+            window.currentStokData = allData;
+            
+            if (!allData) {
+                if (!isBackground) tampilkanKosongwh3(tanggal);
+                return;
+            }
 
-        const key = Object.keys(allData).find(k => k.includes(`stokwh3_${formattedDate}`));
-        
-        if (!key) {
-            tampilkanKosongwh3(tanggal);
-            return;
-        }
+            const key = Object.keys(allData).find(k => k.includes(`stokwh3_${formattedDate}`));
+            
+            if (!key) {
+                if (!isBackground) tampilkanKosongwh3(tanggal);
+                return;
+            }
 
-        // Render tabel tanpa mengirim dataBlokAgregat lagi
-        // Data blok sekarang sudah ada di dalam allData[key] (sebagai item.blok)
-        renderTabelwh3(allData[key], mode, key);
-        
-    } catch (error) {
-        console.error("Gagal load data:", error);
+            // Render ulang tabel secara otomatis
+            renderTabelwh3(allData[key], mode, key);
+        } catch (error) {
+            console.error("Gagal load data:", error);
+        }
+    };
+
+    // Muat data pertama kali secara langsung
+    await fetchDataWH3(false);
+
+    // Aktifkan Real-Time Polling khusus PC (Cek perubahan data dari HP setiap 3 detik otomatis)
+    if (!wh3RealtimeInterval) {
+        wh3RealtimeInterval = setInterval(() => {
+            // Pastikan halaman masih di tab/tanggal yang sama sebelum fetch background
+            const activeDateCheck = document.getElementById('select-tanggal-wh3')?.value;
+            if (activeDateCheck === tanggal) {
+                fetchDataWH3(true); // Fetch background tanpa mengganggu posisi scroll/input user
+            }
+        }, 3000); // Setiap 3 detik
     }
 }
 
@@ -2070,37 +2089,6 @@ function bukaModalLihatRak(kode, event) {
     };
 }
 
-// Fungsi untuk membuka modal input fisik via HP
-function bukaModalInputHP() {
-    const modal = document.getElementById('modalInputHP');
-    if (modal) {
-        modal.style.display = 'flex';
-        
-        // Reset form setiap kali modal dibuka agar bersih dari input sebelumnya
-        document.getElementById('hp-kode-barang').value = '';
-        document.getElementById('hp-qty-beceran').value = '';
-        document.getElementById('hp-rak-beceran').value = '';
-        document.getElementById('hp-rak-utuhan').value = '';
-        
-        // Sembunyikan kontainer saran kode jika sempat terbuka
-        const saranContainer = document.getElementById('hp-saran-container');
-        if (saranContainer) {
-            saranContainer.style.display = 'none';
-        }
-        
-        // Set default ke tipe beceran
-        setTipeInputHP('beceran');
-    }
-}
-
-// Fungsi untuk menutup modal input fisik via HP
-function tutupModalInputHP() {
-    const modal = document.getElementById('modalInputHP');
-    if (modal) {
-        modal.style.display = 'none';
-    }
-}
-
 // ==========================================
 // LOGIKA MODAL INPUT FISIK HP (STOK WH-3)
 // ==========================================
@@ -2233,19 +2221,22 @@ function filterSaranKodeHP(keyword) {
     // Paksa geser ke atas agar kotak saran & input kode terlihat jelas di atas keyboard
     const inputKode = document.getElementById('hp-kode-barang');
     if (inputKode) {
-        inputKode.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
+        inputKode.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }   
 }
 
 // Saat Salah Satu Saran Kode Dipilih
 function pilihKodeHP(kode) {
     document.getElementById('hp-kode-barang').value = kode;
     document.getElementById('hp-saran-container').style.display = 'none';
+    updateJudulModalHP();
 }
 
 // Fungsi Simpan Data Fisik dari HP
 async function simpanDataFisikHP() {
-    const kode = document.getElementById('hp-kode-barang').value.trim().toUpperCase();
+    const kodeInputEl = document.getElementById('hp-kode-barang');
+    const kode = kodeInputEl ? kodeInputEl.value.trim().toUpperCase() : "";
+    
     if (!kode) {
         miuiAlert('Silakan pilih atau ketik kode barang terlebih dahulu!');
         return;
@@ -2304,7 +2295,7 @@ async function simpanDataFisikHP() {
             finalRawBeceran = inputQtyBeceranStr;
         }
 
-        // Gabungkan String Rak Beceran (misal: "3A14" + "2A35" jadi "3A14 + 2A35")
+        // Gabungkan String Rak Beceran
         if (inputRakBeceranStr) {
             if (finalRakBeceran) {
                 finalRakBeceran = `${finalRakBeceran} + ${inputRakBeceranStr}`;
@@ -2366,7 +2357,7 @@ async function simpanDataFisikHP() {
 
     const baseUrl = `https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/stok_wh3/stokwh3_${tanggal}/${kode}`;
 
-    // 5. Kirim Pembaruan (Update/Merge) ke Firebase
+    // 5. Kirim Pembaruan ke Firebase
     try {
         await fetch(`${baseUrl}.json`, {
             method: "PATCH",
@@ -2388,20 +2379,94 @@ async function simpanDataFisikHP() {
             })
         });
 
-        console.log("Data fisik HP berhasil digabungkan & diperbarui:", { kode, finalBeceranVal, finalRakBeceran, finalRawBeceran });
+        console.log("Data fisik HP berhasil disimpan:", { kode, finalBeceranVal, finalRakBeceran });
         
-        miuiAlert('Data fisik berhasil ditambahkan/diperbarui!');
-        tutupModalInputHP();
+        // Tampilkan notifikasi sukses TANPA menutup modal
+        miuiAlert('Data berhasil disimpan! Silakan input data berikutnya.');
 
-        // Refresh tabel utama agar data langsung ter-update
-        if (typeof loadStokDatawh3 === 'function') {
-            loadStokDatawh3();
+        // KOSONGKAN FORM INPUT (Reset input field agar siap untuk input berikutnya)
+        const inputQtyBeceran = document.getElementById('hp-qty-beceran');
+        const inputRakBeceran = document.getElementById('hp-rak-beceran');
+        const inputRakUtuhan = document.getElementById('hp-rak-utuhan');
+
+        if (inputQtyBeceran) inputQtyBeceran.value = '';
+        if (inputRakBeceran) inputRakBeceran.value = '';
+        if (inputRakUtuhan) inputRakUtuhan.value = '';
+        if (kodeInputEl) {
+            kodeInputEl.value = ''; // Kosongkan kode barang atau biarkan jika ingin input beruntun di kode yg sama (bisa disesuaikan)
+            kodeInputEl.focus();
+        }
+
+        // ---> TAMBAHKAN INI: RESET JUDUL KEMBALI KE SEMULA <---
+        const modalTitleEl = document.getElementById('hp-modal-title');
+        if (modalTitleEl) {
+            modalTitleEl.innerText = "INPUT FISIK GUDANG (MOBILE)";
         }
 
     } catch (error) {
         console.error("Gagal menyimpan data fisik HP:", error);
         miuiAlert('Terjadi kesalahan saat menyimpan ke database.');
     }
+}
+
+// Fungsi untuk mereset form input pada modal HP tanpa menutup modalnya
+function resetFormFisikHP() {
+    const kodeInputEl = document.getElementById('hp-kode-barang');
+    const inputQtyBeceran = document.getElementById('hp-qty-beceran');
+    const inputRakBeceran = document.getElementById('hp-rak-beceran');
+    const inputRakUtuhan = document.getElementById('hp-rak-utuhan');
+
+    if (kodeInputEl) kodeInputEl.value = '';
+    if (inputQtyBeceran) inputQtyBeceran.value = '';
+    if (inputRakBeceran) inputRakBeceran.value = '';
+    if (inputRakUtuhan) inputRakUtuhan.value = '';
+
+    // Kembalikan juga judul modal ke awal
+    const modalTitleEl = document.getElementById('hp-modal-title');
+    if (modalTitleEl) {
+        modalTitleEl.innerText = "INPUT FISIK GUDANG (MOBILE)";
+    }
+
+    // Kembalikan fokus ke input kode barang agar bisa langsung scan/ketik ulang
+    if (kodeInputEl) {
+        kodeInputEl.focus();
+    }
+
+    console.log("Form input fisik HP berhasil di-reset.");
+}
+
+function updateJudulModalHP() {
+    const modalTitleEl = document.getElementById('hp-modal-title'); 
+    if (!modalTitleEl) return;
+
+    const kodeInputEl = document.getElementById('hp-kode-barang');
+    const kode = kodeInputEl ? kodeInputEl.value.trim().toUpperCase() : "";
+
+    const dateInput = document.getElementById('select-tanggal-wh3');
+    const tanggal = dateInput ? dateInput.value.replace(/-/g, '') : null;
+    const dataHarian = window.currentStokData && tanggal ? window.currentStokData[`stokwh3_${tanggal}`] : null;
+
+    // Cek apakah kode yang dimasukkan benar-benar ada/valid di data harian
+    const item = dataHarian ? dataHarian[kode] : null;
+
+    // Jika kode kosong atau belum ada persis di data harian (masih ketikan setengah-setengah), 
+    // jangan tampilkan "Data tidak ditemukan", kembalikan saja ke judul default.
+    if (!kode || !item) {
+        modalTitleEl.innerText = "INPUT FISIK GUDANG (MOBILE)";
+        return;
+    }
+
+    // Jika kode sudah lengkap dan valid, hitung selisih dan tampilkan di judul
+    const blok = parseInt(item.blok) || 0;
+    const bosnet = parseInt(item.bosnet) || 0;
+    const beceran = parseInt(item.beceran) || 0;
+    const utuhan = parseInt(item.utuhan) || 0;
+    
+    let totalFisik = kode.includes("PR-PKT") ? (beceran + utuhan) : (blok + beceran + utuhan);
+    const selisih = totalFisik - bosnet;
+    const satuan = kode.includes("PR-PKT") ? "PKT" : "KRT";
+
+    modalTitleEl.innerText = `INPUT: ${kode} : ${selisih} ${satuan}`;
 }
 
 // Buka Modal Admin
