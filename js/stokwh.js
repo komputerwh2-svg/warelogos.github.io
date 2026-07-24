@@ -2611,11 +2611,27 @@ async function exportTabelKeExcelWH3() {
 
     const tglKey = selectTanggal.value; 
     let tglFormatted = tglKey;
+    let titleDateString = tglKey;
+    let mmFile = "";
+    let ddFile = "";
+    let namaHariFile = "";
+
     if (tglKey.length === 8) {
         const thn = tglKey.substring(0, 4);
         const bln = tglKey.substring(4, 6);
         const tgl = tglKey.substring(6, 8);
+        
         tglFormatted = `${tgl}-${bln}-${thn}`;
+        mmFile = bln;
+        ddFile = tgl;
+
+        // Konversi ke objek Date untuk mendapatkan nama hari berdasarkan tanggal yang dipilih
+        const dateObj = new Date(`${thn}-${bln}-${tgl}`);
+        const hariList = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+        const namaHariPilih = !isNaN(dateObj.getTime()) ? hariList[dateObj.getDay()] : '';
+
+        namaHariFile = namaHariPilih;
+        titleDateString = `${tgl}/${bln}/${thn} ${namaHariPilih}`;
     }
 
     // --- 2. AMBIL DATA LANGSUNG DARI FIREBASE ---
@@ -2657,9 +2673,18 @@ async function exportTabelKeExcelWH3() {
             return getAngkaAkhir(a[0]) - getAngkaAkhir(b[0]);
         });
 
-        const namaFile = `STOKWH3_${tglKey}.xls`;
+        // --- FORMAT NAMA FILE (BERDASARKAN TANGGAL DATA + JAM SIMPAN SAAT INI) ---
+        const now = new Date();
+        const jam = String(now.getHours()).padStart(2, '0');
+        const menit = String(now.getMinutes()).padStart(2, '0');
+        const detik = String(now.getSeconds()).padStart(2, '0');
+        const waktuSimpan = `${jam}.${menit}.${detik}`;
 
-        // --- 4. BANGUN STRUKTUR HTML EXCEL (.XLS) DENGAN GAYA & LEBAR KOLOM ---
+        const namaFile = `STOCK WHNB-2 ${mmFile}-${ddFile} ${namaHariFile} ${waktuSimpan}.xls`;
+
+        // --- 4. BANGUN STRUKTUR HTML EXCEL (.XLS) ---
+        let titleText = `WH-3 BOSNET ${titleDateString}`.toUpperCase();
+
         let html = `
         <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
         <head>
@@ -2669,19 +2694,24 @@ async function exportTabelKeExcelWH3() {
                 th, td { border: 0.5pt solid windowtext; padding: 3px 5px; text-align: center; vertical-align: middle; white-space: nowrap; mso-number-format:"\\@"; }
                 th { background-color: #f2f2f2; font-weight: bold; }
                 .text-left { text-align: left; }
-                .text-nama { text-align: left; font-size: 5pt; } /* Ukuran font khusus nama barang */
-                .title { font-size: 11pt; font-weight: bold; text-align: left; border: none; padding-bottom: 8px; white-space: nowrap; }
+                .text-nama { text-align: left; font-size: 4pt; } /* Ukuran font khusus nama barang */
+                .text-rak { text-align: left; font-size: 8pt; } /* Ukuran font khusus rak */
+                .title { font-size: 12pt; font-weight: bold; text-align: left; border: none; padding-bottom: 8px; white-space: nowrap; text-transform: uppercase;}
                 
+                /* Kelas Warna untuk Selisih */
+                .text-merah { color: #FF0000; font-weight: bold; }
+                .text-hijau { color: #008000; font-weight: bold; }
+
                 /* Lebar Kolom Presisi Excel */
                 .col-no { width: 35px; }
                 .col-kode { width: 110px; }
                 .col-blok { width: 45px; }
-                .col-nama { width: 140px; }
+                .col-nama { width: 100px; }
                 .col-bosnet { width: 65px; }
                 .col-pak { width: 50px; }
                 .col-qty-bcr { width: 65px; }
-                .col-rak-bcr { width: 85px; }
-                .col-rak-uth { width: 110px; }
+                .col-rak-bcr { width: 100px; }
+                .col-rak-uth { width: 120px; }
                 .col-qty-uth { width: 65px; }
                 .col-total { width: 65px; }
                 .col-selisih { width: 65px; }
@@ -2704,17 +2734,17 @@ async function exportTabelKeExcelWH3() {
                     <col class="col-selisih">
                 </colgroup>
                 <tr>
-                    <td colspan="12" class="title">WH-3 BOSNET ${tglFormatted}</td>
+                    <td colspan="12" class="title">${titleText}</td>
                 </tr>
                 <tr>
                     <th>NO</th>
                     <th>KODE</th>
                     <th>BLOK</th>
-                    <th>NAMA BARANG</th>
+                    <th>NAMA</th>
                     <th>BOSNET</th>
                     <th>PAK</th>
                     <th>BECERAN</th>
-                    <th>RAK BECERAN</th>
+                    <th>RAK BECER</th>
                     <th>RAK UTUHAN</th>
                     <th>UTUHAN</th>
                     <th>TOTAL</th>
@@ -2740,22 +2770,35 @@ async function exportTabelKeExcelWH3() {
             let rakUtuhan = item.detail_rak && item.detail_rak.utuhan_rak ? item.detail_rak.utuhan_rak : "";
             let qtyUtuhan = formatNilai(item.utuhan);
             let totalStok = formatNilai(item.total);
-            let selisih = (item.selisih !== undefined && item.selisih !== 0) ? item.selisih : "";
+            
+            // Logika Warna Kolom Selisih
+            let selisihVal = Number(item.selisih);
+            let selisihHtmlClass = "";
+            let selisihDisplay = "";
+
+            if (!isNaN(selisihVal) && item.selisih !== undefined && item.selisih !== "" && item.selisih !== 0) {
+                selisihDisplay = item.selisih;
+                if (selisihVal < 0) {
+                    selisihHtmlClass = "text-merah"; // Merah jika minus
+                } else if (selisihVal > 0) {
+                    selisihHtmlClass = "text-hijau"; // Hijau jika plus
+                }
+            }
 
             html += `
                 <tr>
                     <td>${no}</td>
-                    <td>${kode}</td>
+                    <td class="text-left">${kode}</td>
                     <td>${blok}</td>
                     <td class="text-nama">${nama}</td>
                     <td>${bosnet}</td>
                     <td>${pak}</td>
                     <td>${qtyBeceran}</td>
-                    <td class="text-left">${rakBeceran}</td>
-                    <td class="text-left">${rakUtuhan}</td>
+                    <td class="text-rak">${rakBeceran}</td>
+                    <td class="text-rak">${rakUtuhan}</td>
                     <td>${qtyUtuhan}</td>
                     <td>${totalStok}</td>
-                    <td>${selisih}</td>
+                    <td class="${selisihHtmlClass}">${selisihDisplay}</td>
                 </tr>
             `;
         });
