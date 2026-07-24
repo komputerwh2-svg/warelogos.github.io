@@ -1660,8 +1660,9 @@ async function renderSelisihWH3(allData) {
     if (!thead || !tbody) return;
 
     // --- FUNGSI SORTIR & KONFIGURASI ---
-    const polaUtama = ["CRR", "CRR EA", "THR EA", "THR", "MRMR", "MRR", "MJR HJ", "MJR", "MOB4A", "MOR2A EA", "MOR2A EB", "MOR2A", "MP", "PDR", "MTR3A", "PR-PKT", "PR-CUP", "MRSR", "LTGR", "MTGR", "MEB", "MOL", "MRL", "MTL", "ISEL"];
-    const daftarKelompok = ["CRR", "MRR", "MOR", "MJR", "MP", "PDR"]; // Kelompok untuk rekap
+    const polaUtama = ["CRR", "CRR EA", "THR EA", "THR", "MRMR", "MRR", "MJR HJ", "MJR", "MOB4A", "MOR2A EA", "MOR2A EB", "MOR2A", "MP", "PDR", "MTR3A", "PR-PKT", "PR-CUP", "MRSR", "LTGR", "MTGR", "MEB", "MEL", "MOL", "MRL", "MTL", "ISEL"];
+    const daftarKelompok = ["CRR", "MRR", "MOR", "MJR", "MP", "PDR", "DIY"]; // Kelompok untuk rekap selisih
+    const prefixDIY = ["MEB", "MEL", "MOL", "MRL", "MTL", "ISEL"]; // Daftar prefix khusus yang masuk ke kelompok DIY
 
     const getSortScore = (kode) => {
         kode = kode.toUpperCase();
@@ -1722,8 +1723,16 @@ async function renderSelisihWH3(allData) {
                 // Akumulasi Total
                 totalPerTgl[tgl] += selisih;
 
-                // Akumulasi Rekap Kelompok
-                const prefix = daftarKelompok.find(k => kode.toUpperCase().startsWith(k)) || "LAIN";
+                // Akumulasi Rekap Kelompok (Cek apakah masuk DIY atau kelompok standar lainnya)
+                const upperKode = kode.toUpperCase();
+                let prefix = "LAIN";
+                
+                if (prefixDIY.some(p => upperKode.startsWith(p))) {
+                    prefix = "DIY";
+                } else {
+                    prefix = daftarKelompok.find(k => k !== "DIY" && upperKode.startsWith(k)) || "LAIN";
+                }
+
                 if (!rekapKelompok[prefix]) rekapKelompok[prefix] = {};
                 rekapKelompok[prefix][tgl] = (rekapKelompok[prefix][tgl] || 0) + selisih;
             }
@@ -1732,11 +1741,11 @@ async function renderSelisihWH3(allData) {
 
     // --- RENDER HEADER ---
     thead.innerHTML = `
-        <th class="sticky-col py-3 px-3 text-center bg-slate-100 top-0 z-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">NO</th>
-        <th class="sticky-col-kode py-3 px-3 text-left bg-slate-100 top-0 z-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] whitespace-nowrap">KODE</th>` + 
+        <th class="sticky-col py-3 px-3 text-center top-0 whitespace-nowrap" style="min-width: 45px;">NO</th>
+        <th class="sticky-col-kode py-3 px-3 text-left top-0 whitespace-nowrap">KODE</th>` + 
         dates.map(d => {
             const dd = d.substring(6,8), mm = d.substring(4,6), yy = d.substring(2,4);
-            return `<th class="py-3 px-4 text-center bg-slate-100 sticky top-0 z-40 whitespace-nowrap">${dd}/${mm}/${yy}</th>`;
+            return `<th class="py-3 px-4 text-center bg-slate-100 sticky top-0 z-20 whitespace-nowrap">${dd}/${mm}/${yy}</th>`;
         }).join('');
 
     // --- RENDER BODY ---
@@ -1751,8 +1760,8 @@ async function renderSelisihWH3(allData) {
         return getAngkaAkhir(a) - getAngkaAkhir(b);
     }).forEach(kode => {
         let rowHtml = `<tr class="bg-white border-b hover:bg-gray-50">
-            <td class="sticky-col py-2 px-3 text-center text-slate-600 bg-white border-r">${no++}</td>
-            <td class="sticky-col-kode py-2 px-3 font-bold text-slate-800 whitespace-nowrap bg-white border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">${kode}</td>`;
+            <td class="sticky-col py-2 px-3 text-center text-slate-600 border-r" style="min-width: 45px;">${no++}</td>
+            <td class="sticky-col-kode py-2 px-3 font-bold text-slate-800 whitespace-nowrap border-r">${kode}</td>`;
         
         dates.forEach(tgl => {
             const val = dataMatriks[kode][tgl] || 0;
@@ -1764,21 +1773,21 @@ async function renderSelisihWH3(allData) {
 
     // --- RENDER TOTAL SELISIH GLOBAL ---
     let totalGlobalRow = `<tr class="bg-orange-100 border-t-2 border-orange-500 font-black">
-        <td class="sticky-col-total py-2 px-3 text-right text-[20px] bg-orange-100 text-red-600 border-r" colspan="2">TOTAL SELISIH :</td>`;
+        <td class="sticky-col-total py-2 px-3 text-right text-[16px] text-red-600 border-r" colspan="2" style="left: 0px; position: sticky;">TOTAL SELISIH :</td>`;
     dates.forEach(tgl => {
         const grandTotal = totalPerTgl[tgl] || 0;
-        totalGlobalRow += `<td class="py-2 px-4 text-[20px] text-center ${grandTotal !== 0 ? 'text-red-600' : 'text-gray-400'}">${grandTotal === 0 ? "-" : grandTotal}</td>`;
+        totalGlobalRow += `<td class="py-2 px-4 text-[16px] text-center ${grandTotal !== 0 ? 'text-red-600' : 'text-gray-400'} whitespace-nowrap">${grandTotal === 0 ? "-" : grandTotal}</td>`;
     });
     tbody.innerHTML += totalGlobalRow + `</tr>`;
 
     // --- RENDER REKAP KELOMPOK ---
     daftarKelompok.forEach(kel => {
         let kelRow = `<tr class="bg-gray-100 border-b hover:bg-gray-200 font-bold text-slate-700">
-            <td class="sticky-col-total py-2 px-3 text-right text-[14px] bg-gray-100 border-r" colspan="2">SELISIH ${kel} :</td>`;
+            <td class="sticky-col-total py-2 px-3 text-right text-[14px] border-r" colspan="2" style="left: 0px; position: sticky;">SELISIH ${kel} :</td>`;
         dates.forEach(tgl => {
             const val = rekapKelompok[kel] ? (rekapKelompok[kel][tgl] || 0) : 0;
             const warna = val !== 0 ? "text-gray-800" : "text-gray-400";
-            kelRow += `<td class="py-2 px-4 text-center ${warna}">${val === 0 ? "-" : val}</td>`;
+            kelRow += `<td class="py-2 px-4 text-center ${warna} whitespace-nowrap">${val === 0 ? "-" : val}</td>`;
         });
         tbody.innerHTML += kelRow + `</tr>`;
     });
@@ -2592,15 +2601,186 @@ function exportTabelKeExcel() {
     XLSX.writeFile(wb, fileName);
 }
 
-function exportTabelKeExcelWH3() {
-    const table = document.getElementById('tabel-stok-wh3');
-    if (!table) {
-        miuiAlert("Tabel tidak ditemukan!");
+async function exportTabelKeExcelWH3() {
+    // --- 1. AMBIL TANGGAL AKTIF DARI SELECTOR ---
+    const selectTanggal = document.getElementById('select-tanggal-wh3');
+    if (!selectTanggal || !selectTanggal.value) {
+        miuiAlert("Silakan pilih tanggal terlebih dahulu!");
         return;
     }
-    const wb = XLSX.utils.table_to_book(table, { sheet: "Laporan Stok WH3" });
-    const tgl = new Date().toLocaleDateString('id-ID').replace(/\//g, '-');
-    XLSX.writeFile(wb, `STOKWH3_${tgl}.xlsx`);
+
+    const tglKey = selectTanggal.value; 
+    let tglFormatted = tglKey;
+    if (tglKey.length === 8) {
+        const thn = tglKey.substring(0, 4);
+        const bln = tglKey.substring(4, 6);
+        const tgl = tglKey.substring(6, 8);
+        tglFormatted = `${tgl}-${bln}-${thn}`;
+    }
+
+    // --- 2. AMBIL DATA LANGSUNG DARI FIREBASE ---
+    try {
+        const dbRef = firebase.database().ref(`stok_wh3/stokwh3_${tglKey}`);
+        const snapshot = await dbRef.once('value');
+        const dailyData = snapshot.val();
+
+        if (!dailyData || Object.keys(dailyData).length === 0) {
+            miuiAlert("Data stok untuk tanggal tersebut kosong di database!");
+            return;
+        }
+
+        // --- 3. POLA SORTIR DATA ---
+        const polaUtama = ["CRR", "CRR EA", "THR EA", "THR", "MRMR", "MRR", "MJR HJ", "MJR", "MOB4A", "MOR2A EA", "MOR2A EB", "MOR2A", "MP", "PDR", "MTR3A", "PR-PKT", "PR-CUP", "MRSR", "LTGR", "MTGR", "MEB", "MOL", "MRL", "MTL", "ISEL"];
+        
+        const getSortScore = (kode) => {
+            kode = kode.toUpperCase();
+            for (let i = 0; i < polaUtama.length; i++) {
+                if (kode.includes(polaUtama[i])) {
+                    if (polaUtama[i] === "MOR2A" && (kode.includes("MOR2A EA") || kode.includes("MOR2A EB"))) continue;
+                    if (polaUtama[i] === "THR" && kode.includes("THR EA")) continue;
+                    if (polaUtama[i] === "MJR" && kode.includes("MJR HJ")) continue;
+                    if (polaUtama[i] === "CRR" && kode.includes("CRR EA")) continue;
+                    return i + 1;
+                }
+            }
+            return 999;
+        };
+        
+        const getAngkaAkhir = (kode) => {
+            const match = kode.match(/\d+/g);
+            return match ? parseInt(match.join('').slice(-4)) || 999 : 999;
+        };
+
+        const sortedEntries = Object.entries(dailyData).sort((a, b) => {
+            const sA = getSortScore(a[0]), sB = getSortScore(b[0]);
+            if (sA !== sB) return sA - sB;
+            return getAngkaAkhir(a[0]) - getAngkaAkhir(b[0]);
+        });
+
+        const namaFile = `STOKWH3_${tglKey}.xls`;
+
+        // --- 4. BANGUN STRUKTUR HTML EXCEL (.XLS) DENGAN GAYA & LEBAR KOLOM ---
+        let html = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+            <meta charset="utf-8">
+            <style>
+                table { border-collapse: collapse; width: 100%; font-family: 'Century Gothic', Arial, sans-serif; font-size: 10pt; }
+                th, td { border: 0.5pt solid windowtext; padding: 3px 5px; text-align: center; vertical-align: middle; white-space: nowrap; mso-number-format:"\\@"; }
+                th { background-color: #f2f2f2; font-weight: bold; }
+                .text-left { text-align: left; }
+                .text-nama { text-align: left; font-size: 5pt; } /* Ukuran font khusus nama barang */
+                .title { font-size: 11pt; font-weight: bold; text-align: left; border: none; padding-bottom: 8px; white-space: nowrap; }
+                
+                /* Lebar Kolom Presisi Excel */
+                .col-no { width: 35px; }
+                .col-kode { width: 110px; }
+                .col-blok { width: 45px; }
+                .col-nama { width: 140px; }
+                .col-bosnet { width: 65px; }
+                .col-pak { width: 50px; }
+                .col-qty-bcr { width: 65px; }
+                .col-rak-bcr { width: 85px; }
+                .col-rak-uth { width: 110px; }
+                .col-qty-uth { width: 65px; }
+                .col-total { width: 65px; }
+                .col-selisih { width: 65px; }
+            </style>
+        </head>
+        <body>
+            <table>
+                <colgroup>
+                    <col class="col-no">
+                    <col class="col-kode">
+                    <col class="col-blok">
+                    <col class="col-nama">
+                    <col class="col-bosnet">
+                    <col class="col-pak">
+                    <col class="col-qty-bcr">
+                    <col class="col-rak-bcr">
+                    <col class="col-rak-uth">
+                    <col class="col-qty-uth">
+                    <col class="col-total">
+                    <col class="col-selisih">
+                </colgroup>
+                <tr>
+                    <td colspan="12" class="title">WH-3 BOSNET ${tglFormatted}</td>
+                </tr>
+                <tr>
+                    <th>NO</th>
+                    <th>KODE</th>
+                    <th>BLOK</th>
+                    <th>NAMA BARANG</th>
+                    <th>BOSNET</th>
+                    <th>PAK</th>
+                    <th>BECERAN</th>
+                    <th>RAK BECERAN</th>
+                    <th>RAK UTUHAN</th>
+                    <th>UTUHAN</th>
+                    <th>TOTAL</th>
+                    <th>SELISIH</th>
+                </tr>
+        `;
+
+        // --- 5. PETAKAN DATA DAN BERSIHKAN NILAI NOL MENJADI KOSONG ---
+        const formatNilai = (val) => {
+            if (val === undefined || val === null || val === 0 || val === "0" || val === "- | -") return "";
+            return val;
+        };
+
+        sortedEntries.forEach(([kode, item], index) => {
+            let no = index + 1;
+            
+            let blok = formatNilai(item.blok);
+            let nama = item.nama !== undefined ? item.nama : "";
+            let bosnet = formatNilai(item.bosnet);
+            let pak = (item.pak_format !== undefined && item.pak_format !== "- | -") ? item.pak_format : "";
+            let qtyBeceran = formatNilai(item.beceran);
+            let rakBeceran = item.detail_rak && item.detail_rak.beceran_rak ? item.detail_rak.beceran_rak : "";
+            let rakUtuhan = item.detail_rak && item.detail_rak.utuhan_rak ? item.detail_rak.utuhan_rak : "";
+            let qtyUtuhan = formatNilai(item.utuhan);
+            let totalStok = formatNilai(item.total);
+            let selisih = (item.selisih !== undefined && item.selisih !== 0) ? item.selisih : "";
+
+            html += `
+                <tr>
+                    <td>${no}</td>
+                    <td>${kode}</td>
+                    <td>${blok}</td>
+                    <td class="text-nama">${nama}</td>
+                    <td>${bosnet}</td>
+                    <td>${pak}</td>
+                    <td>${qtyBeceran}</td>
+                    <td class="text-left">${rakBeceran}</td>
+                    <td class="text-left">${rakUtuhan}</td>
+                    <td>${qtyUtuhan}</td>
+                    <td>${totalStok}</td>
+                    <td>${selisih}</td>
+                </tr>
+            `;
+        });
+
+        html += `
+            </table>
+        </body>
+        </html>
+        `;
+
+        // --- 6. PROSES DOWNLOAD FILE .XLS ---
+        const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = namaFile;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+    } catch (error) {
+        console.error("Gagal mengambil data Firebase:", error);
+        miuiAlert("Terjadi kesalahan saat mengambil data dari database!");
+    }
 }
 
 
