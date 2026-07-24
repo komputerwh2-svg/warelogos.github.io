@@ -427,27 +427,53 @@ input[type=number] {
 }
 
 
-/* Sticky Column untuk Tabel */
+
+/* Sticky Column untuk Kolom 1 (NO) di tabel selisih wh3*/
+/* Posisi dasar sticky kolom pertama (NO) */
 .sticky-col {
-    position: -webkit-sticky;
-    position: sticky;
-    left: 0;
-    z-index: 20; /* Lebih tinggi dari z-50 di header agar tetap terlihat */
-    background-color: #f1f5f9; /* Sama dengan bg-slate-100 agar menyatu */
-    border-right: 1px solid #e5e7eb;
+    position: sticky !important;
+    left: 0px !important;
+    z-index: 25;
 }
 
-/* Khusus untuk kolom KODE agar posisinya tepat di samping NO */
+/* Posisi dasar sticky kolom kedua (KODE) menempel di sebelah kanan NO */
 .sticky-col-kode {
-    left: 40px; /* Sesuaikan dengan lebar kolom NO, misal lebar NO adalah 40px */
-    z-index: 20;
-    background-color: #f1f5f9;
+    position: sticky !important;
+    left: 45px !important; /* Sesuaikan lebar kolom NO */
+    z-index: 25;
+}
+
+/* Warna latar belakang untuk body agar tidak transparan saat digeser */
+tbody td.sticky-col, 
+tbody td.sticky-col-kode {
+    background-color: #ffffff !important;
     border-right: 1px solid #e5e7eb;
 }
 
-/* Pastikan header tetap di atas saat di-scroll vertikal */
-thead.sticky-header {
-    position: sticky;
-    top: 0;
-    z-index: 30;
+/* Warna latar belakang untuk header agar menimpa isi tabel di bawahnya */
+thead th.sticky-col,
+thead th.sticky-col-kode {
+    position: sticky !important;
+    top: 0 !important;
+    background-color: #f1f5f9 !important; /* bg-slate-100 */
+    z-index: 40 !important;
+    border-right: 1px solid #e5e7eb;
+}
+
+/* Perbaikan untuk baris TOTAL & REKAP di bawah agar ikut sticky di kiri */
+.sticky-col-total {
+    position: sticky !important;
+    left: 0px !important;
+    z-index: 30 !important;
+    background-color: inherit !important;
+    border-right: 1px solid #e5e7eb;
+}
+
+/* Warna background spesifik untuk baris total/rekap bawah agar solid */
+tr.bg-orange-100 td.sticky-col-total {
+    background-color: #ffedd5 !important; /* warna bg-orange-100 */
+}
+
+tr.bg-gray-100 td.sticky-col-total {
+    background-color: #f3f4f6 !important; /* warna bg-gray-100 */
 }
