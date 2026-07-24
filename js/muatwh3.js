@@ -1786,7 +1786,7 @@ window.cetakDokumenVersi1 = async function(tglMuat) {
     const lines = panelRaw.split('\n');
     
     // Header format ringkas
-    let cleanData = 'AMBIL     | PLT | BLOK\n';
+    let cleanData = 'AMBIL     | PLT | LOKASI BLOK\n';
     cleanData += '------------------------------------------------\n';
 
     for (let i = 0; i < lines.length; i++) {
@@ -1795,20 +1795,33 @@ window.cetakDokumenVersi1 = async function(tglMuat) {
             const kode = parts[0].trim();
             const plt = parts[1].replace('Perlu Ambil:', '').replace('PLT', '').trim();
             
-            // Ambil baris detail pertama di bawahnya yang berisi alokasi blok lengkap
-            const detailLine = lines[i+1] || '';
-            let cleanDetail = detailLine.replace('AMBIL', '').trim();
+            let cleanDetail = (lines[i+1] || '').replace('AMBIL', '').trim();
             
-            // Potong string tepat sebelum bagian ekspedisi (yakni sebelum tanda ' | [')
+            // Gabungkan jika baris terbungkus (wrap) ke bawah
+            let nextLine = (lines[i+2] || '').trim();
+            if (nextLine && !nextLine.includes(' | [') && !nextLine.includes('Perlu Ambil:')) {
+                cleanDetail += ' ' + nextLine;
+                i++; 
+            }
+            
+            // Potong string tepat sebelum tanda ' | [' (ekspedisi utama)
             const expSplitIndex = cleanDetail.indexOf(' | [');
             if (expSplitIndex !== -1) {
                 cleanDetail = cleanDetail.substring(0, expSplitIndex).trim();
+            }
+
+            // PANGKAS BERSIH: Buang bagian teks yang mengandung ', TEKOMAS' atau koma di belakang blok 
+            // karena bagian tersebut sudah direkap di panel sebelah kanan.
+            const tekomasCommaIdx = cleanDetail.indexOf(', TEKOMAS');
+            if (tekomasCommaIdx !== -1) {
+                cleanDetail = cleanDetail.substring(0, tekomasCommaIdx).trim();
             }
 
             cleanData += `${kode.padEnd(9)} | ${plt.padEnd(3)} | ${cleanDetail}\n`;
             i++; // Lewati baris ekspedisi di bawahnya
         }
     }
+
 
     // AMBIL DATA HASIL RINGKASAN & GRAND TOTAL DARI LAYAR
     const elListRingkasan = document.getElementById('list-ringkasan');
@@ -1822,13 +1835,14 @@ window.cetakDokumenVersi1 = async function(tglMuat) {
     <head>
         <style>
             @page { size: 215mm 330mm portrait; margin: 20mm 1mm 1mm 1mm; }
-            body { font-family: 'Century Gothic', sans-serif; font-size: 8pt; margin: 0; padding: 0; }
+            body { font-family: 'Century Gothic', sans-serif; font-size: 10pt; margin: 0; padding: 0; }
             
             table { width: 100%; border-collapse: collapse; margin-bottom: 8px; table-layout: fixed; }
-            th, td { border: 1px solid #000; padding: 2px 3px; text-align: center; font-family: 'Century Gothic', sans-serif; font-size: 8pt; }
+            th, td { border: 1px solid #000; padding: 2px 3px; text-align: center; font-family: 'Century Gothic', sans-serif; font-size: 10pt; }
             
             /* Kolom pertama (KODE BARANG) diset rata kiri dan diberi padding agar pas di dalam garis */
-            table th:first-child, table td:first-child {
+            table td:first-child {
+                font-weight: bold;
                 text-align: left;
                 padding-left: 5px;
                 width: 75px;
@@ -1857,7 +1871,7 @@ window.cetakDokumenVersi1 = async function(tglMuat) {
             
             .section-title {
                 font-weight: bold;
-                font-size: 8.5pt;
+                font-size: 10pt;
                 text-decoration: underline;
                 margin-bottom: 4px;
             }
@@ -1868,7 +1882,7 @@ window.cetakDokumenVersi1 = async function(tglMuat) {
                 white-space: pre-wrap; 
                 word-break: break-word;
                 overflow-wrap: break-word;
-                font-size: 9pt; 
+                font-size: 10pt; 
                 line-height: 1.2;
             }
 
@@ -1878,19 +1892,19 @@ window.cetakDokumenVersi1 = async function(tglMuat) {
                 white-space: pre-wrap;
                 word-break: break-word;
                 overflow-wrap: break-word;
-                font-size: 9pt;
+                font-size: 10pt;
                 line-height: 1.2;
             }
 
             .info-ringkasan [id^="blok-group-"] {
-                margin-bottom: 6px;
+                margin-bottom: 8px;
             }
 
             .info-ringkasan .font-black {
                 font-weight: bold;
                 text-decoration: underline;
                 display: block;
-                margin-bottom: 2px;
+                margin-bottom: 5px;
             }
 
             .info-ringkasan div:not([id^="blok-group-"]) {
@@ -1899,21 +1913,21 @@ window.cetakDokumenVersi1 = async function(tglMuat) {
         </style>
     </head>
     <body>
-        <div class="judul-tabel">MUAT WH-3 ${judul}</div>
+        <div class="judul-tabel">DAFTAR MUAT WH-3 & ${judul}</div>
         <table><thead>${theadContent}</thead><tbody>${rowsUtamaHtml}</tbody></table>
         
         <div class="container-bawah">
             <!-- Kolom Kiri: Alokasi Ambil Blok (Hanya Blok & Kuantitas) -->
             <div class="kolom-kiri">
-                <div class="section-title">ALOKASI AMBIL BLOK:</div>
+                <div class="section-title">SARAN ALOKASI AMBIL BLOK:</div>
                 <div class="info-blok">${cleanData}</div>
             </div>
 
             <!-- Kolom Kanan: Hasil Ringkasan Alokasi -->
             <div class="kolom-kanan">
-                <div class="section-title">HASIL RINGKASAN ALOKASI:</div>
+                <div class="section-title">RINGKASAN AMBIL BLOK:</div>
                 <div class="info-ringkasan">${ringkasanHtml}</div>
-                <div style="margin-top: 8px; font-weight: bold; font-size: 8pt; display: flex; justify-content: space-between; border-top: 1px solid #000; padding-top: 3px; font-family: 'Courier New', monospace;">
+                <div style="margin-top: 8px; font-weight: bold; font-size: 12pt; display: flex; justify-content: space-between; border-top: 1px solid #000; padding-top: 3px; font-family: 'Courier New', monospace;">
                     <span>TOTAL AMBIL: ${grandTotalText}</span>
                 </div>
             </div>
@@ -2034,13 +2048,14 @@ window.cetakDokumenVersi2 = async function(tglMuat) {
     <head>
         <style>
             @page { size: 215mm 330mm portrait; margin: 20mm 1mm 1mm 1mm; }
-            body { font-family: 'Century Gothic', sans-serif; font-size: 8pt; margin: 0; padding: 0; }
+            body { font-family: 'Century Gothic', sans-serif; font-size: 10pt; margin: 0; padding: 0; }
             
             /* Tabel Utama di Atas */
             table { width: 100%; border-collapse: collapse; margin-bottom: 12px; table-layout: fixed; }
-            th, td { border: 1px solid #000; padding: 2px 3px; text-align: center; font-family: 'Century Gothic', sans-serif; font-size: 8pt; }
+            th, td { border: 1px solid #000; padding: 2px 3px; text-align: center; font-family: 'Century Gothic', sans-serif; font-size: 10pt; }
             
-            table th:first-child, table td:first-child {
+            table td:first-child {
+                font-weight: bold;
                 text-align: left;
                 padding-left: 5px;
                 width: 75px;
@@ -2077,7 +2092,7 @@ window.cetakDokumenVersi2 = async function(tglMuat) {
         </style>
     </head>
     <body>
-        <div class="judul-tabel">MUAT WH-3 RAK ${judul}</div>
+        <div class="judul-tabel">DAFTAR MUAT WH-3 & ${judul}</div>
         
         <!-- Tabel Utama -->
         <table><thead>${theadContent}</thead><tbody>${rowsUtamaHtml}</tbody></table>
@@ -2102,7 +2117,7 @@ window.cetakDokumenVersi2 = async function(tglMuat) {
     //if (win) {
     //    win.document.write(finalHtml);
     //    win.document.close();
-    //    win.focus();
+    //   win.focus();
     //} else {
     //    (typeof miuiAlert !== 'undefined') ? miuiAlert("Gagal membuka jendela cetak.") : alert("Gagal membuka jendela cetak.");
     //}
