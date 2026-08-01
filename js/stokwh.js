@@ -3325,30 +3325,29 @@ window.renderTabelBarangLebih = async function() {
 let videoStreamHP = null;
 let targetScanField = null;
 let scanIntervalHP = null;
+let isProcessingScan = false; // Mencegah pembacaan beruntun
 
 window.bukaScannerQRHP = async function(jenis) {
     targetScanField = jenis;
+    isProcessingScan = false;
     
-    // 1. Tampilkan modal scanner
     const modalScanner = document.getElementById('modalScannerQR');
     if (modalScanner) modalScanner.style.display = 'flex';
 
-    // 2. Cek dukungan BarcodeDetector bawaan browser
     if (!('BarcodeDetector' in window)) {
-        alert("Maaf, pemindai langsung tidak didukung browser ini. Gunakan Google Chrome versi terbaru.");
+        miuiAlert("Maaf, pemindai langsung tidak didukung browser ini. Gunakan Google Chrome versi terbaru.");
         window.tutupScannerQRHP();
         return;
     }
 
-    // 3. Buat atau ambil elemen video di dalam kontainer #reader-qr-hp
     let container = document.getElementById('reader-qr-hp');
     if (!container) return;
     
-    container.innerHTML = '<video id="live-scanner-video" autoplay playsinline style="width:100%; height:220px; object-fit:cover; border-radius:8px;"></video>';
+    // Tinggi video disesuaikan menjadi 260px agar pas dengan bingkai kotak bidikan
+    container.innerHTML = '<video id="live-scanner-video" autoplay playsinline style="width:100%; height:260px; object-fit:cover;"></video>';
     let videoElement = document.getElementById('live-scanner-video');
 
     try {
-        // 4. Nyalakan kamera belakang secara live
         videoStreamHP = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: "environment" }
         });
@@ -3356,15 +3355,20 @@ window.bukaScannerQRHP = async function(jenis) {
 
         const barcodeDetector = new BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13'] });
 
-        // 5. Lakukan scanning otomatis setiap 300ms (Real-time seperti QRIS)
+        // Interval 800ms dan proteksi isProcessingScan agar tidak terlalu cepat
         scanIntervalHP = setInterval(async () => {
+            if (isProcessingScan) return;
+
             if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
                 try {
                     const barcodes = await barcodeDetector.detect(videoElement);
                     if (barcodes.length > 0) {
                         const hasilScan = barcodes[0].rawValue.trim().toUpperCase();
                         
-                        // Masukkan hasil ke input tujuan
+                        // Kunci proses agar tidak double-scan
+                        isProcessingScan = true;
+
+                        // Masukkan hasil scan ke form tujuan
                         if (targetScanField === 'beceran') {
                             const el = document.getElementById('hp-rak-beceran');
                             if (el) el.value = hasilScan;
@@ -3373,36 +3377,35 @@ window.bukaScannerQRHP = async function(jenis) {
                             if (el) el.value = hasilScan;
                         }
 
-                        // Matikan scanner dan tutup modal
-                        window.tutupScannerQRHP();
+                        // Berikan jeda visual 0.6 detik agar Anda sempat melihat kode rak terpindai
+                        setTimeout(() => {
+                            window.tutupScannerQRHP();
+                        }, 600);
                     }
                 } catch (err) {
-                    // Abaikan error deteksi per frame
+                    // Abaikan error per frame
                 }
             }
-        }, 300);
+        }, 800);
 
     } catch (err) {
         console.error("Gagal membuka kamera:", err);
-        alert("Gagal membuka kamera perangkat. Pastikan izin kamera diaktifkan.");
+        miuiAlert("Gagal membuka kamera perangkat. Pastikan izin kamera diaktifkan.");
         window.tutupScannerQRHP();
     }
 };
 
 window.tutupScannerQRHP = function() {
-    // Hentikan interval pemindaian
     if (scanIntervalHP) {
         clearInterval(scanIntervalHP);
         scanIntervalHP = null;
     }
 
-    // Matikan aliran lampu/kamera
     if (videoStreamHP) {
         videoStreamHP.getTracks().forEach(track => track.stop());
         videoStreamHP = null;
     }
 
-    // Tutup modal
     const modalScanner = document.getElementById('modalScannerQR');
     if (modalScanner) modalScanner.style.display = 'none';
 };
