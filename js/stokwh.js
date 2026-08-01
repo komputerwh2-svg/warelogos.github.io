@@ -3326,6 +3326,13 @@ let html5QrCodeHP = null;
 let targetScanField = null; // 'beceran' atau 'utuhan'
 
 function bukaScannerQRHP(jenis) {
+    console.log("Membuka scanner QR untuk:", jenis);
+    // Cek apakah library Html5Qrcode sudah benar-benar termuat
+    if (typeof Html5Qrcode === 'undefined') {
+        miuiAlert("Pustaka QR Scanner (html5-qrcode) belum/gagal dimuat. Periksa koneksi internet Anda.");
+        return;
+    }
+
     targetScanField = jenis;
     document.getElementById('modalScannerQR').style.display = 'flex';
 
@@ -3340,7 +3347,6 @@ function bukaScannerQRHP(jenis) {
             qrbox: { width: 220, height: 220 }
         },
         (decodedText, decodedResult) => {
-            // Berhasil scan QR
             const hasilScan = decodedText.trim().toUpperCase();
             if (targetScanField === 'beceran') {
                 document.getElementById('hp-rak-beceran').value = hasilScan;
@@ -3350,10 +3356,10 @@ function bukaScannerQRHP(jenis) {
             tutupScannerQRHP();
         },
         (errorMessage) => {
-            // Error scanning (diabaikan)
+            // Error scanning diabaikan
         }
     ).catch(err => {
-        alert("Gagal membuka kamera scanner: " + err);
+        miuiAlert("Gagal membuka kamera scanner: " + err);
         tutupScannerQRHP();
     });
 }
