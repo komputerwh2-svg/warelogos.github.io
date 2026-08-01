@@ -3322,56 +3322,64 @@ window.renderTabelBarangLebih = async function() {
     }
 };
 
-let html5QrCodeHP = null;
-let targetScanField = null; // 'beceran' atau 'utuhan'
+let targetScanField = null;
 
 function bukaScannerQRHP(jenis) {
-    console.log("Membuka scanner QR untuk:", jenis);
-    // Cek apakah library Html5Qrcode sudah benar-benar termuat
-    if (typeof Html5Qrcode === 'undefined') {
-        miuiAlert("Pustaka QR Scanner (html5-qrcode) belum/gagal dimuat. Periksa koneksi internet Anda.");
-        return;
-    }
-
     targetScanField = jenis;
-    document.getElementById('modalScannerQR').style.display = 'flex';
+    
+    // Membuat elemen input file tersembunyi dengan atribut capture kamera belakang
+    let fileInput = document.getElementById('dynamic-camera-input');
+    if (!fileInput) {
+        fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.id = 'dynamic-camera-input';
+        fileInput.accept = 'image/*';
+        fileInput.capture = 'environment'; // Langsung buka kamera belakang HP
+        fileInput.style.display = 'none';
+        
+        fileInput.addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
 
-    if (!html5QrCodeHP) {
-        html5QrCodeHP = new Html5Qrcode("reader-qr-hp");
+            // Periksa apakah browser mendukung BarcodeDetector bawaan
+            if (!('BarcodeDetector' in window)) {
+                alert("Maaf, browser Anda tidak mendukung pemindai QR bawaan. Gunakan Chrome versi terbaru di Android.");
+                return;
+            }
+
+            try {
+                const barcodeDetector = new BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13'] });
+                const imageBitmap = await createImageBitmap(file);
+                const barcodes = await barcodeDetector.detect(imageBitmap);
+
+                if (barcodes.length > 0) {
+                    const hasilScan = barcodes[0].rawValue.trim().toUpperCase();
+                    if (targetScanField === 'beceran') {
+                        document.getElementById('hp-rak-beceran').value = hasilScan;
+                    } else if (targetScanField === 'utuhan') {
+                        document.getElementById('hp-rak-utuhan').value = hasilScan;
+                    }
+                } else {
+                    alert("QR Code tidak terdeteksi pada foto. Silakan coba lagi.");
+                }
+            } catch (err) {
+                console.error("Gagal memindai QR:", err);
+                alert("Gagal memproses gambar kamera.");
+            }
+
+            // Reset input file agar bisa digunakan ulang untuk file yang sama
+            fileInput.value = '';
+        });
+
+        document.body.appendChild(fileInput);
     }
 
-    html5QrCodeHP.start(
-        { facingMode: "environment" }, 
-        {
-            fps: 10,
-            qrbox: { width: 220, height: 220 }
-        },
-        (decodedText, decodedResult) => {
-            const hasilScan = decodedText.trim().toUpperCase();
-            if (targetScanField === 'beceran') {
-                document.getElementById('hp-rak-beceran').value = hasilScan;
-            } else if (targetScanField === 'utuhan') {
-                document.getElementById('hp-rak-utuhan').value = hasilScan;
-            }
-            tutupScannerQRHP();
-        },
-        (errorMessage) => {
-            // Error scanning diabaikan
-        }
-    ).catch(err => {
-        miuiAlert("Gagal membuka kamera scanner: " + err);
-        tutupScannerQRHP();
-    });
+    // Picu klik untuk membuka kamera HP secara langsung
+    fileInput.click();
 }
 
 function tutupScannerQRHP() {
-    if (html5QrCodeHP) {
-        html5QrCodeHP.stop().then(() => {
-            document.getElementById('modalScannerQR').style.display = 'none';
-        }).catch(err => {
-            document.getElementById('modalScannerQR').style.display = 'none';
-        });
-    } else {
-        document.getElementById('modalScannerQR').style.display = 'none';
-    }
+    // Karena menggunakan kamera bawaan sistem, modal scanner manual bisa langsung ditutup
+    const modal = document.getElementById('modalScannerQR');
+    if (modal) modal.style.display = 'none';
 }
