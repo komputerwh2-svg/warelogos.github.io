@@ -3325,7 +3325,7 @@ window.renderTabelBarangLebih = async function() {
 let videoStreamHP = null;
 let targetScanField = null;
 let scanIntervalHP = null;
-let isProcessingScan = false; // Mencegah pembacaan beruntun
+let isProcessingScan = false;
 
 window.bukaScannerQRHP = async function(jenis) {
     targetScanField = jenis;
@@ -3335,7 +3335,7 @@ window.bukaScannerQRHP = async function(jenis) {
     if (modalScanner) modalScanner.style.display = 'flex';
 
     if (!('BarcodeDetector' in window)) {
-        miuiAlert("Maaf, pemindai langsung tidak didukung browser ini. Gunakan Google Chrome versi terbaru.");
+        alert("Maaf, pemindai tidak didukung di browser ini.");
         window.tutupScannerQRHP();
         return;
     }
@@ -3343,7 +3343,6 @@ window.bukaScannerQRHP = async function(jenis) {
     let container = document.getElementById('reader-qr-hp');
     if (!container) return;
     
-    // Tinggi video disesuaikan menjadi 260px agar pas dengan bingkai kotak bidikan
     container.innerHTML = '<video id="live-scanner-video" autoplay playsinline style="width:100%; height:260px; object-fit:cover;"></video>';
     let videoElement = document.getElementById('live-scanner-video');
 
@@ -3353,22 +3352,50 @@ window.bukaScannerQRHP = async function(jenis) {
         });
         videoElement.srcObject = videoStreamHP;
 
+        // Tunggu video siap sampai memiliki dimensi asli
+        await new Promise((resolve) => {
+            videoElement.onloadedmetadata = () => {
+                videoElement.play();
+                resolve();
+            };
+        });
+
         const barcodeDetector = new BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13'] });
 
-        // Interval 800ms dan proteksi isProcessingScan agar tidak terlalu cepat
+        // Buat canvas tersembunyi untuk cropping area bidikan
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+
+        // Interval diperlambat menjadi 900ms agar lebih stabil dan tenang saat digeser
         scanIntervalHP = setInterval(async () => {
             if (isProcessingScan) return;
 
             if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
                 try {
-                    const barcodes = await barcodeDetector.detect(videoElement);
+                    // Ambil dimensi video
+                    const videoWidth = videoElement.videoWidth;
+                    const videoHeight = videoElement.videoHeight;
+
+                    // Definisikan area crop (fokus hanya ke bagian tengah kotak bidikan)
+                    // Mengambil area kotak di tengah sebesar 50% dari lebar/tinggi video
+                    const cropSize = Math.min(videoWidth, videoHeight) * 0.55;
+                    const startX = (videoWidth - cropSize) / 2;
+                    const startY = (videoHeight - cropSize) / 2;
+
+                    canvas.width = cropSize;
+                    canvas.height = cropSize;
+
+                    // Gambar hanya bagian tengah video ke canvas
+                    context.drawImage(videoElement, startX, startY, cropSize, cropSize, 0, 0, cropSize, cropSize);
+
+                    // Deteksi barcode HANYA dari area canvas yang terpotong di tengah
+                    const barcodes = await barcodeDetector.detect(canvas);
+                    
                     if (barcodes.length > 0) {
                         const hasilScan = barcodes[0].rawValue.trim().toUpperCase();
                         
-                        // Kunci proses agar tidak double-scan
                         isProcessingScan = true;
 
-                        // Masukkan hasil scan ke form tujuan
                         if (targetScanField === 'beceran') {
                             const el = document.getElementById('hp-rak-beceran');
                             if (el) el.value = hasilScan;
@@ -3377,7 +3404,6 @@ window.bukaScannerQRHP = async function(jenis) {
                             if (el) el.value = hasilScan;
                         }
 
-                        // Berikan jeda visual 0.6 detik agar Anda sempat melihat kode rak terpindai
                         setTimeout(() => {
                             window.tutupScannerQRHP();
                         }, 600);
@@ -3386,7 +3412,7 @@ window.bukaScannerQRHP = async function(jenis) {
                     // Abaikan error per frame
                 }
             }
-        }, 800);
+        }, 900);
 
     } catch (err) {
         console.error("Gagal membuka kamera:", err);
