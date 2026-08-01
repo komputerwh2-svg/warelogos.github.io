@@ -3335,7 +3335,7 @@ window.bukaScannerQRHP = async function(jenis) {
     if (modalScanner) modalScanner.style.display = 'flex';
 
     if (!('BarcodeDetector' in window)) {
-        alert("Maaf, pemindai tidak didukung di browser ini.");
+        miuiAlert("Maaf, pemindai tidak didukung di browser tanpa kamera eksternal.");
         window.tutupScannerQRHP();
         return;
     }
