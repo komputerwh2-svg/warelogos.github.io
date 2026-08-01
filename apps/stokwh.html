@@ -557,7 +557,7 @@
         📱
     </button>
 
-    <!-- Struktur Modal Input HP (Fleksibel saat Keyboard Muncul) -->
+    <!-- Struktur Modal Input HP (Fleksibel saat Keyboard Muncul & Integrasi Scan QR Rak) -->
     <div id="modalInputHP" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:99999; align-items:flex-start; justify-content:center; padding:20px 15px; box-sizing:border-box; overflow-y:auto;">
         <div style="background:white; width:100%; max-width:400px; border-radius:16px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 10px 25px rgba(0,0,0,0.3); margin-top:auto; margin-bottom:auto; animation: fadeIn 0.2s ease;">
             
@@ -568,7 +568,7 @@
             </div>
 
             <!-- Body Form (Ringkas & Bisa di-scroll jika keyboard memakan ruang) -->
-            <div style="padding:16px; display:flex; flex-direction:column; gap:12px; max-height:60vh; overflow-y:auto;">
+            <div style="padding:16px; display:flex; flex-direction:column; gap:12px; max-height:65vh; overflow-y:auto;">
                 
                 <!-- 1. Tombol Pilihan Jenis Input (Kecil & Berjajar) -->
                 <div>
@@ -582,34 +582,40 @@
                 <!-- 3. Form Input Detail -->
                 <div id="form-detail-container" style="display:none; flex-direction:column; gap:10px; border-top:1px dashed #cbd5e1; padding-top:10px; margin-top:2px;">
                     
-                    <!-- Input Kode dengan Autocomplete -->
-                    <div style="position:relative;">
-                        <label style="display:block; font-size:11px; font-weight:bold; color:#374151; margin-bottom:4px;">KODE BARANG</label>
-                        <input type="text" id="hp-kode-barang" placeholder="KETIK KODE (MISAL: CRR...)" autocomplete="off" onfocus="this.scrollIntoView({behavior: 'smooth', block: 'start'})" oninput="this.value = this.value.toUpperCase(); filterSaranKodeHP(this.value); updateJudulModalHP();" style="width:100%; padding:10px; border:1px solid #9ca3af; border-radius:8px; font-size:14px; color:#1f2937; font-weight:600; text-transform:uppercase; box-sizing:border-box;">
-                        <div id="hp-saran-container" style="display:none; position:absolute; top:100%; left:0; width:100%; max-height:120px; overflow-y:auto; background:white; border:1px solid #9ca3af; border-radius:0 0 8px 8px; z-index:10; box-shadow:0 4px 6px rgba(0,0,0,0.1);"></div>
-                    </div>
-
-                    <!-- Konten Beceran -->
+                    <!-- Konten Beceran (Rak dipindah ke atas & ada tombol Scan QR) -->
                     <div id="subform-beceran" style="display:none; flex-direction:column; gap:10px;">
+                        <div>
+                            <label style="display:block; font-size:11px; font-weight:bold; color:#374151; margin-bottom:4px;">RAK BECERAN</label>
+                            <div style="display:flex; gap:6px;">
+                                <input type="text" id="hp-rak-beceran" placeholder="RAK BECERAN (MISAL: 2A03...)" oninput="this.value = this.value.toUpperCase()" style="flex:1; padding:10px; border:1.5px solid #f97316; border-radius:8px; font-size:14px; color:#1f2937; font-weight:600; text-transform:uppercase; box-sizing:border-box;">
+                                <button type="button" onclick="bukaScannerQRHP('beceran')" title="Scan QR Rak Beceran" style="background:#f97316; color:white; border:none; border-radius:8px; width:44px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:18px;"><i class="fas fa-qrcode"></i></button>
+                            </div>
+                        </div>
                         <div>
                             <label style="display:block; font-size:11px; font-weight:bold; color:#374151; margin-bottom:4px;">QTY BECERAN</label>
                             <input type="number" id="hp-qty-beceran" placeholder="QTY BECERAN..." style="width:100%; padding:10px; border:1px solid #9ca3af; border-radius:8px; font-size:14px; color:#1f2937; font-weight:600; box-sizing:border-box;">
                         </div>
-                        <div>
-                            <label style="display:block; font-size:11px; font-weight:bold; color:#374151; margin-bottom:4px;">RAK BECERAN</label>
-                            <input type="text" id="hp-rak-beceran" placeholder="RAK BECERAN (MISAL: 2A03...)" oninput="this.value = this.value.toUpperCase()" style="width:100%; padding:10px; border:1px solid #9ca3af; border-radius:8px; font-size:14px; color:#1f2937; font-weight:600; text-transform:uppercase; box-sizing:border-box;">
-                        </div>
                     </div>
 
-                    <!-- Konten Utuhan -->
+                    <!-- Konten Utuhan (Rak dipindah ke atas & ada tombol Scan QR) -->
                     <div id="subform-utuhan" style="display:none; flex-direction:column; gap:10px;">
                         <div style="background:#eff6ff; padding:8px; border-radius:6px; font-size:11px; color:#1e40af; font-weight:500;">
                             💡 Qty utuhan akan dihitung otomatis. Cukup isi rak saja.
                         </div>
                         <div>
                             <label style="display:block; font-size:11px; font-weight:bold; color:#374151; margin-bottom:4px;">RAK UTUHAN</label>
-                            <input type="text" id="hp-rak-utuhan" placeholder="RAK UTUHAN (MISAL: 2B03...)" oninput="this.value = this.value.toUpperCase()" style="width:100%; padding:10px; border:1px solid #9ca3af; border-radius:8px; font-size:14px; color:#1f2937; font-weight:600; text-transform:uppercase; box-sizing:border-box;">
+                            <div style="display:flex; gap:6px;">
+                                <input type="text" id="hp-rak-utuhan" placeholder="RAK UTUHAN (MISAL: 2B03...)" oninput="this.value = this.value.toUpperCase()" style="flex:1; padding:10px; border:1.5px solid #f97316; border-radius:8px; font-size:14px; color:#1f2937; font-weight:600; text-transform:uppercase; box-sizing:border-box;">
+                                <button type="button" onclick="bukaScannerQRHP('utuhan')" title="Scan QR Rak Utuhan" style="background:#f97316; color:white; border:none; border-radius:8px; width:44px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:18px;"><i class="fas fa-qrcode"></i></button>
+                            </div>
                         </div>
+                    </div>
+
+                    <!-- Input Kode Barang dengan Autocomplete (Dipindah ke bawah Rak) -->
+                    <div style="position:relative;">
+                        <label style="display:block; font-size:11px; font-weight:bold; color:#374151; margin-bottom:4px;">KODE BARANG</label>
+                        <input type="text" id="hp-kode-barang" placeholder="KETIK KODE (MISAL: CRR...)" autocomplete="off" onfocus="this.scrollIntoView({behavior: 'smooth', block: 'start'})" oninput="this.value = this.value.toUpperCase(); filterSaranKodeHP(this.value); updateJudulModalHP();" style="width:100%; padding:10px; border:1px solid #9ca3af; border-radius:8px; font-size:14px; color:#1f2937; font-weight:600; text-transform:uppercase; box-sizing:border-box;">
+                        <div id="hp-saran-container" style="display:none; position:absolute; top:100%; left:0; width:100%; max-height:120px; overflow-y:auto; background:white; border:1px solid #9ca3af; border-radius:0 0 8px 8px; z-index:10; box-shadow:0 4px 6px rgba(0,0,0,0.1);"></div>
                     </div>
 
                 </div>
@@ -622,6 +628,22 @@
                 <button onclick="simpanDataFisikHP()" style="flex:2; padding:10px; background:#f97316; color:white; border:none; border-radius:8px; font-weight:bold; font-size:13px; cursor:pointer;">SIMPAN</button>
             </div>
 
+        </div>
+    </div>
+
+    <!-- Modal Scanner QR Kamera -->
+    <div id="modalScannerQR" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:100000; flex-direction:column; align-items:center; justify-content:center; padding:20px; box-sizing:border-box;">
+        <div style="background:white; width:100%; max-width:360px; border-radius:16px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+            <div style="padding:12px 16px; background:#3c3c3c; color:white; display:flex; justify-content:space-between; align-items:center;">
+                <h4 style="margin:0; font-size:14px; font-weight:bold;">SCAN QR CODE RAK</h4>
+                <button onclick="tutupScannerQRHP()" style="background:none; border:none; color:#f97316; font-size:28px; font-weight:bold; cursor:pointer;">&times;</button>
+            </div>
+            <div style="padding:15px; background:#000; display:flex; justify-content:center; align-items:center;">
+                <div id="reader-qr-hp" style="width:100%; max-height:300px; border-radius:8px; overflow:hidden;"></div>
+            </div>
+            <div style="padding:12px; background:#f3f4f6; text-align:center; font-size:12px; color:#4b5563; font-weight:500;">
+                Arahkan kamera ke QR Code pada Rak Gudang
+            </div>
         </div>
     </div>
 </div>
