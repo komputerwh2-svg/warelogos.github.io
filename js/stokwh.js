@@ -3322,3 +3322,50 @@ window.renderTabelBarangLebih = async function() {
     }
 };
 
+let html5QrCodeHP = null;
+let targetScanField = null; // 'beceran' atau 'utuhan'
+
+function bukaScannerQRHP(jenis) {
+    targetScanField = jenis;
+    document.getElementById('modalScannerQR').style.display = 'flex';
+
+    if (!html5QrCodeHP) {
+        html5QrCodeHP = new Html5Qrcode("reader-qr-hp");
+    }
+
+    html5QrCodeHP.start(
+        { facingMode: "environment" }, 
+        {
+            fps: 10,
+            qrbox: { width: 220, height: 220 }
+        },
+        (decodedText, decodedResult) => {
+            // Berhasil scan QR
+            const hasilScan = decodedText.trim().toUpperCase();
+            if (targetScanField === 'beceran') {
+                document.getElementById('hp-rak-beceran').value = hasilScan;
+            } else if (targetScanField === 'utuhan') {
+                document.getElementById('hp-rak-utuhan').value = hasilScan;
+            }
+            tutupScannerQRHP();
+        },
+        (errorMessage) => {
+            // Error scanning (diabaikan)
+        }
+    ).catch(err => {
+        alert("Gagal membuka kamera scanner: " + err);
+        tutupScannerQRHP();
+    });
+}
+
+function tutupScannerQRHP() {
+    if (html5QrCodeHP) {
+        html5QrCodeHP.stop().then(() => {
+            document.getElementById('modalScannerQR').style.display = 'none';
+        }).catch(err => {
+            document.getElementById('modalScannerQR').style.display = 'none';
+        });
+    } else {
+        document.getElementById('modalScannerQR').style.display = 'none';
+    }
+}
