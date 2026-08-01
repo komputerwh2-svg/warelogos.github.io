@@ -3322,64 +3322,87 @@ window.renderTabelBarangLebih = async function() {
     }
 };
 
+let videoStreamHP = null;
 let targetScanField = null;
+let scanIntervalHP = null;
 
-function bukaScannerQRHP(jenis) {
+window.bukaScannerQRHP = async function(jenis) {
     targetScanField = jenis;
     
-    // Membuat elemen input file tersembunyi dengan atribut capture kamera belakang
-    let fileInput = document.getElementById('dynamic-camera-input');
-    if (!fileInput) {
-        fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.id = 'dynamic-camera-input';
-        fileInput.accept = 'image/*';
-        fileInput.capture = 'environment'; // Langsung buka kamera belakang HP
-        fileInput.style.display = 'none';
-        
-        fileInput.addEventListener('change', async function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
+    // 1. Tampilkan modal scanner
+    const modalScanner = document.getElementById('modalScannerQR');
+    if (modalScanner) modalScanner.style.display = 'flex';
 
-            // Periksa apakah browser mendukung BarcodeDetector bawaan
-            if (!('BarcodeDetector' in window)) {
-                alert("Maaf, browser Anda tidak mendukung pemindai QR bawaan. Gunakan Chrome versi terbaru di Android.");
-                return;
-            }
-
-            try {
-                const barcodeDetector = new BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13'] });
-                const imageBitmap = await createImageBitmap(file);
-                const barcodes = await barcodeDetector.detect(imageBitmap);
-
-                if (barcodes.length > 0) {
-                    const hasilScan = barcodes[0].rawValue.trim().toUpperCase();
-                    if (targetScanField === 'beceran') {
-                        document.getElementById('hp-rak-beceran').value = hasilScan;
-                    } else if (targetScanField === 'utuhan') {
-                        document.getElementById('hp-rak-utuhan').value = hasilScan;
-                    }
-                } else {
-                    alert("QR Code tidak terdeteksi pada foto. Silakan coba lagi.");
-                }
-            } catch (err) {
-                console.error("Gagal memindai QR:", err);
-                alert("Gagal memproses gambar kamera.");
-            }
-
-            // Reset input file agar bisa digunakan ulang untuk file yang sama
-            fileInput.value = '';
-        });
-
-        document.body.appendChild(fileInput);
+    // 2. Cek dukungan BarcodeDetector bawaan browser
+    if (!('BarcodeDetector' in window)) {
+        alert("Maaf, pemindai langsung tidak didukung browser ini. Gunakan Google Chrome versi terbaru.");
+        window.tutupScannerQRHP();
+        return;
     }
 
-    // Picu klik untuk membuka kamera HP secara langsung
-    fileInput.click();
-}
+    // 3. Buat atau ambil elemen video di dalam kontainer #reader-qr-hp
+    let container = document.getElementById('reader-qr-hp');
+    if (!container) return;
+    
+    container.innerHTML = '<video id="live-scanner-video" autoplay playsinline style="width:100%; height:220px; object-fit:cover; border-radius:8px;"></video>';
+    let videoElement = document.getElementById('live-scanner-video');
 
-function tutupScannerQRHP() {
-    // Karena menggunakan kamera bawaan sistem, modal scanner manual bisa langsung ditutup
-    const modal = document.getElementById('modalScannerQR');
-    if (modal) modal.style.display = 'none';
-}
+    try {
+        // 4. Nyalakan kamera belakang secara live
+        videoStreamHP = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "environment" }
+        });
+        videoElement.srcObject = videoStreamHP;
+
+        const barcodeDetector = new BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13'] });
+
+        // 5. Lakukan scanning otomatis setiap 300ms (Real-time seperti QRIS)
+        scanIntervalHP = setInterval(async () => {
+            if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
+                try {
+                    const barcodes = await barcodeDetector.detect(videoElement);
+                    if (barcodes.length > 0) {
+                        const hasilScan = barcodes[0].rawValue.trim().toUpperCase();
+                        
+                        // Masukkan hasil ke input tujuan
+                        if (targetScanField === 'beceran') {
+                            const el = document.getElementById('hp-rak-beceran');
+                            if (el) el.value = hasilScan;
+                        } else if (targetScanField === 'utuhan') {
+                            const el = document.getElementById('hp-rak-utuhan');
+                            if (el) el.value = hasilScan;
+                        }
+
+                        // Matikan scanner dan tutup modal
+                        window.tutupScannerQRHP();
+                    }
+                } catch (err) {
+                    // Abaikan error deteksi per frame
+                }
+            }
+        }, 300);
+
+    } catch (err) {
+        console.error("Gagal membuka kamera:", err);
+        alert("Gagal membuka kamera perangkat. Pastikan izin kamera diaktifkan.");
+        window.tutupScannerQRHP();
+    }
+};
+
+window.tutupScannerQRHP = function() {
+    // Hentikan interval pemindaian
+    if (scanIntervalHP) {
+        clearInterval(scanIntervalHP);
+        scanIntervalHP = null;
+    }
+
+    // Matikan aliran lampu/kamera
+    if (videoStreamHP) {
+        videoStreamHP.getTracks().forEach(track => track.stop());
+        videoStreamHP = null;
+    }
+
+    // Tutup modal
+    const modalScanner = document.getElementById('modalScannerQR');
+    if (modalScanner) modalScanner.style.display = 'none';
+};
