@@ -1482,7 +1482,6 @@ async function renderTabelwh3(dataStok, mode, key) {
         return 999;
     };
     
-    // ... (getVarianScore dan getAngkaAkhir tetap sama) ...
     const getVarianScore = (kode) => {
         kode = kode.toUpperCase();
         if (kode.includes("ZC")) return 1;
@@ -1517,7 +1516,6 @@ async function renderTabelwh3(dataStok, mode, key) {
         const beceran = parseInt(item.beceran) || 0;
         const utuhan = parseInt(item.utuhan) || 0;
         
-        // PERBAIKAN: Sertakan beceran + utuhan untuk PR-PKT
         let fisik = kode.includes("PR-PKT") ? (beceran + utuhan) : (blok + beceran + utuhan);
         totalSelisih += (fisik - bosnet);
     });
@@ -1555,7 +1553,7 @@ async function renderTabelwh3(dataStok, mode, key) {
         const satuan = isPaket ? "PKT" : "KRT";
 
         // BUAT KETERANGAN OTOMATIS SECARA DINAMIS BERDASARKAN SELISIH
-        let keterangan = "SESUAI";
+        let keterangan = item.keterangan || "SESUAI";
         if (selisih > 0) {
             keterangan = `STOK LEBIH ${selisih} ${satuan}`;
         } else if (selisih < 0) {
@@ -1565,6 +1563,8 @@ async function renderTabelwh3(dataStok, mode, key) {
         let kelasWarnaSelisih = selisih > 0 ? "text-blue-600 font-bold" : (selisih < 0 ? "text-red-600 font-bold" : "text-green-600 font-bold");
         let warnaKet = selisih > 0 ? "text-blue-600 font-bold" : (selisih < 0 ? "text-red-600 font-bold" : "text-green-600 font-bold");
 
+        // Tombol aksi baris
+        const btnEditDB = `<button onclick="bukaModalAdmin('EDIT_DB_WH3', '${kode}')" class="mr-2 text-indigo-600 hover:text-indigo-800" title="Edit Database Firebase">🗄️</button>`;
         const btnInputRak = `<button onclick="bukaModalInputRak('${kode}')" class="mr-2 text-blue-500 hover:text-blue-700">✏️</button>`;
         const btnLihatRak = `<button onclick="bukaModalLihatRak('${kode}', event)" class="mr-2 text-green-500 hover:text-green-700">👁️</button>`;
         const btnEditKet = `<button onclick="bukaModalEditKeterangan('${kode}', '${keterangan === "-" ? "" : keterangan}')" class="mr-2 text-yellow-600 hover:text-yellow-800">📝</button>`;
@@ -1572,7 +1572,7 @@ async function renderTabelwh3(dataStok, mode, key) {
         tbody.innerHTML += `
             <tr class="hover:bg-gray-50 border-b text-[15px]">
                 <td class="py-2 px-2">${no++}</td>
-                <td class="py-2 px-2 font-bold">${kode}</td>
+                <td class="py-2 px-2 whitespace-nowrap font-bold">${btnEditDB}${kode}</td>
                 <td class="py-2 px-2">${f(blok)}</td>
                 <td class="py-2 px-2">${f(bosnet)}</td>
                 <td class="py-2 px-2">${pak}</td>
@@ -1584,6 +1584,198 @@ async function renderTabelwh3(dataStok, mode, key) {
             </tr>
         `;
     });
+}
+
+window.bukaModalEditDatabaseWH3 = function(kode) {
+    console.log("Membuka modal database untuk kode:", kode);
+
+    const dataStok = window.dataStokTerkini || {};
+    const item = dataStok[kode];
+
+    if (!item) {
+        alert('Data item untuk kode ' + kode + ' tidak ditemukan di memori lokal!');
+        console.error("Data item kosong untuk key:", kode, "Data stok terkini:", dataStok);
+        return;
+    }
+
+    const dateInput = document.getElementById('select-tanggal-wh3') || document.querySelector('input[type="date"]');
+    const tanggal = dateInput ? dateInput.value.replace(/-/g, '') : new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+    let modalID = 'modal-edit-db-wh3';
+    let modal = document.getElementById(modalID);
+    
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = modalID;
+        document.body.appendChild(modal);
+    }
+
+    modal.className = 'fixed inset-0 bg-black bg-opacity-40 hidden z-[9999] flex items-center justify-center p-3';
+
+    modal.innerHTML = `
+        <div class="bg-white rounded-[12px] w-full max-w-md overflow-hidden shadow-2xl">
+            <!-- Header MIUI v5 -->
+            <div class="w-full h-14 bg-gradient-to-b from-[#3c3c3c] to-[#2a2a2a] flex items-center justify-between px-4">
+                <h3 class="text-white font-bold text-sm uppercase">EDIT DATABASE : ${kode}</h3>
+                <button type="button" onclick="document.getElementById('${modalID}').style.display='none'" class="text-orange-400 font-bold text-lg">✕</button>
+            </div>
+
+            <!-- Konten Form -->
+            <form id="form-edit-db-wh3" onsubmit="simpanEditDatabaseWH3(event, '${tanggal}', '${kode}')" class="p-4 space-y-3 max-h-[75vh] overflow-y-auto">
+                <div>
+                    <label class="text-[12px] font-bold text-gray-800 uppercase">Nama Barang</label>
+                    <input type="text" id="db-nama" value="${item.nama || ''}" class="w-full mt-1 border rounded px-2 py-1.5 text-[13px] text-gray-800 font-bold bg-gray-100" readonly>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-[12px] font-bold text-gray-800 uppercase">Blok</label>
+                        <input type="number" id="db-blok" value="${item.blok || 0}" class="w-full mt-1 border rounded px-2 py-1.5 text-[13px] text-gray-800 font-bold">
+                    </div>
+                    <div>
+                        <label class="text-[12px] font-bold text-gray-800 uppercase">Bosnet</label>
+                        <input type="number" id="db-bosnet" value="${item.bosnet || 0}" class="w-full mt-1 border rounded px-2 py-1.5 text-[13px] text-gray-800 font-bold">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-[12px] font-bold text-gray-800 uppercase">Beceran</label>
+                        <input type="number" id="db-beceran" value="${item.beceran || 0}" class="w-full mt-1 border rounded px-2 py-1.5 text-[13px] text-gray-800 font-bold">
+                    </div>
+                    <div>
+                        <label class="text-[12px] font-bold text-gray-800 uppercase">Utuhan</label>
+                        <input type="number" id="db-utuhan" value="${item.utuhan || 0}" class="w-full mt-1 border rounded px-2 py-1.5 text-[13px] text-gray-800 font-bold">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-[12px] font-bold text-gray-800 uppercase">Total</label>
+                        <input type="number" id="db-total" value="${item.total || 0}" class="w-full mt-1 border rounded px-2 py-1.5 text-[13px] text-gray-800 font-bold">
+                    </div>
+                    <div>
+                        <label class="text-[12px] font-bold text-gray-800 uppercase">Selisih</label>
+                        <input type="number" id="db-selisih" value="${item.selisih || 0}" class="w-full mt-1 border rounded px-2 py-1.5 text-[13px] text-gray-800 font-bold">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="text-[12px] font-bold text-gray-800 uppercase">Format Pak</label>
+                    <input type="text" id="db-pak" value="${item.pak_format || '-|-'}" class="w-full mt-1 border rounded px-2 py-1.5 text-[13px] text-gray-800 font-bold">
+                </div>
+
+                <div>
+                    <label class="text-[12px] font-bold text-gray-800 uppercase">Keterangan</label>
+                    <input type="text" id="db-keterangan" value="${item.keterangan || 'SESUAI'}" class="w-full mt-1 border rounded px-2 py-1.5 text-[13px] text-gray-800 font-bold">
+                </div>
+            </form>
+
+            <!-- Footer Tombol Aksi (Simpan & Hapus Data Rose) -->
+            <div class="px-4 py-3 bg-gray-50 flex gap-2">
+                <button type="submit" form="form-edit-db-wh3" class="flex-1 py-3 bg-orange-500 text-white font-black text-sm rounded-lg hover:bg-orange-600 transition-all shadow-lg">SIMPAN DATA</button>
+                <button type="button" onclick="konfirmasiHapusDatabaseWH3('${tanggal}', '${kode}')" class="flex-1 py-3 bg-rose-600 text-white font-black text-sm rounded-lg hover:bg-rose-700 transition-all shadow-lg">HAPUS DATA</button>
+            </div>
+        </div>
+    `;
+    
+    modal.style.display = 'flex';
+};
+
+window.simpanEditDatabaseWH3 = async function(event, tanggal, kode) {
+    event.preventDefault();
+
+    const updatedData = {
+        blok: parseInt(document.getElementById('db-blok').value) || 0,
+        bosnet: parseInt(document.getElementById('db-bosnet').value) || 0,
+        beceran: parseInt(document.getElementById('db-beceran').value) || 0,
+        utuhan: parseInt(document.getElementById('db-utuhan').value) || 0,
+        total: parseInt(document.getElementById('db-total').value) || 0,
+        selisih: parseInt(document.getElementById('db-selisih').value) || 0,
+        pak_format: document.getElementById('db-pak').value.trim(),
+        keterangan: document.getElementById('db-keterangan').value.trim()
+    };
+
+    const baseUrl = `https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/stok_wh3/stokwh3_${tanggal}/${kode}`;
+
+    try {
+        const response = await fetch(`${baseUrl}.json`, {
+            method: "PATCH",
+            body: JSON.stringify(updatedData)
+        });
+
+        if (response.ok) {
+            miuiAlert("Data database berhasil diperbarui!");
+            document.getElementById('modal-edit-db-wh3').style.display = 'none';
+            if (typeof muatDataStokWH3 === 'function') {
+                muatDataStokWH3();
+            } else {
+                location.reload();
+            }
+        } else {
+            miuiAlert("Gagal memperbarui database.");
+        }
+    } catch (err) {
+        console.error("Error updating database:", err);
+        miuiAlert("Terjadi kesalahan koneksi saat menyimpan.");
+    }
+};
+
+// Fungsi untuk memicu konfirmasi dan hapus permanen
+function konfirmasiHapusDatabaseWH3(tanggal, kode) {
+    // Gunakan konfirmasi standar browser agar pasti memicu dialog Yes/No
+    if (confirm(`PERINGATAN: Data produk [ ${kode} ] akan dihapus secara permanen dari database! Yakin ingin menghapusnya?`)) {
+        eksekusiHapusDatabaseWH3(tanggal, kode);
+    }
+}
+
+// Fungsi eksekusi penghapusan ke Firebase
+function eksekusiHapusDatabaseWH3(tanggal, kode) {
+    console.log(`Mencoba menghapus data untuk tanggal: ${tanggal}, kode: ${kode}`);
+
+    // Sesuaikan dengan struktur database Anda (Realtime Database)
+    const dbPath = `stok_wh3/${tanggal}/${kode}`;
+    
+    if (typeof firebase !== 'undefined' && firebase.database) {
+        firebase.database().ref(dbPath).remove()
+            .then(() => {
+                console.log("Data berhasil dihapus dari Firebase.");
+                
+                // Gunakan miuiAlert standar aplikasi Anda untuk pemberitahuan sukses
+                if (typeof miuiAlert === 'function') {
+                    miuiAlert("Data berhasil dihapus secara permanen!");
+                } else {
+                    alert("Data berhasil dihapus secara permanen!");
+                }
+
+                // Tutup modal
+                const modal = document.getElementById('modal-edit-db-wh3');
+                if (modal) {
+                    modal.style.display = 'none';
+                }
+
+                // Refresh data tabel WH-3
+                if (typeof muatDataWH3 === 'function') {
+                    muatDataWH3();
+                } else if (typeof loadDataWH3 === 'function') {
+                    loadDataWH3();
+                } else {
+                    // Fallback reload halaman jika fungsi refresh tidak ditemukan
+                    location.reload();
+                }
+            })
+            .catch((error) => {
+                console.error("Gagal menghapus data: ", error);
+                if (typeof miuiAlert === 'function') {
+                    miuiAlert("Gagal menghapus data: " + error.message);
+                } else {
+                    alert("Gagal menghapus data: " + error.message);
+                }
+            });
+    } else {
+        console.error("Firebase database belum diinisialisasi atau objek firebase tidak ditemukan.");
+        miuiAlert("Kesalahan sistem: Koneksi database tidak ditemukan.");
+    }
 }
 
 function renderRakWH3(dataStok) {
@@ -2229,7 +2421,7 @@ function pilihKodeHP(kode) {
     updateJudulModalHP();
 }
 
-// Fungsi Simpan Data Fisik dari HP
+// Fungsi Simpan Data Fisik dari HP (Support Auto-Create Data Baru)
 async function simpanDataFisikHP() {
     const kodeInputEl = document.getElementById('hp-kode-barang');
     const kode = kodeInputEl ? kodeInputEl.value.trim().toUpperCase() : "";
@@ -2252,12 +2444,35 @@ async function simpanDataFisikHP() {
     }
 
     // Ambil data harian saat ini untuk item tersebut
-    const dataHarian = window.currentStokData ? window.currentStokData[`stokwh3_${tanggal}`] : null;
-    const item = dataHarian ? dataHarian[kode] : null;
+    if (!window.currentStokData) window.currentStokData = {};
+    if (!window.currentStokData[`stokwh3_${tanggal}`]) {
+        window.currentStokData[`stokwh3_${tanggal}`] = {};
+    }
+
+    const dataHarian = window.currentStokData[`stokwh3_${tanggal}`];
+    
+    // CEK APAKAH ITEM SUDAH ADA. JIKA BELUM, BUAT STRUKTUR DATA BARU (DEFAULT BOSNET 0)
+    let item = dataHarian[kode];
+    let isNewItem = false;
 
     if (!item) {
-        miuiAlert(`Data barang ${kode} tidak ditemukan pada tanggal ini!`);
-        return;
+        isNewItem = true;
+        item = {
+            kode: kode,
+            nama: (window.masterData && window.masterData[kode]) ? window.masterData[kode].NAMA : "BARANG BARU / TEMUAN",
+            bosnet: 0,
+            blok: 0,
+            beceran: 0,
+            utuhan: 0,
+            total: 0,
+            selisih: 0,
+            keterangan: "STOK LEBIH",
+            detail_rak: {
+                beceran_rak: "",
+                utuhan_rak: "",
+                beceran_qty_teks: ""
+            }
+        };
     }
 
     const detailLama = item.detail_rak || {};
@@ -2327,20 +2542,20 @@ async function simpanDataFisikHP() {
 
         if (isPaket) {
             const jumlahKarton = parseInt(finalRakUtuhan) || 0;
-            finalUtuhanVal = jumlahKarton * qtyPerRak;
+            finalUtuhanVal = jumlahKarton * (qtyPerRak > 0 ? qtyPerRak : 1);
         } else {
             const rakArray = finalRakUtuhan.split('+').filter(r => r.trim() !== "");
-            finalUtuhanVal = rakArray.length * qtyPerRak;
+            finalUtuhanVal = rakArray.length * (qtyPerRak > 0 ? qtyPerRak : 1);
         }
     }
 
-    // 3. Kalkulasi Total Keseluruhan & Selisih
+    // 3. Kalkulasi Total Keseluruhan & Selisih (Bosnet dianggap 0 jika barang baru)
     const blokVal = parseInt(item.blok) || 0;
-    const bosnetVal = parseInt(item.bosnet) || 0;
+    const bosnetVal = parseInt(item.bosnet) || 0; // Bernilai 0 untuk data baru
     const isPaket = kode.includes("PR-PKT");
 
     const totalVal = (isPaket ? 0 : blokVal) + finalBeceranVal + finalUtuhanVal;
-    const selisihVal = totalVal - bosnetVal;
+    const selisihVal = totalVal - bosnetVal; // Karena bosnet 0, selisih otomatis bernilai positif sebesar total fisik
 
     // 4. Logika Keterangan Otomatis
     const satuan = isPaket ? "PKT" : "KRT";
@@ -2354,32 +2569,66 @@ async function simpanDataFisikHP() {
 
     const baseUrl = `https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/stok_wh3/stokwh3_${tanggal}/${kode}`;
 
-    // 5. Kirim Pembaruan ke Firebase
+    // 5. Kirim Pembaruan / Data Baru ke Firebase
     try {
-        await fetch(`${baseUrl}.json`, {
-            method: "PATCH",
-            body: JSON.stringify({
-                beceran: finalBeceranVal,
-                utuhan: finalUtuhanVal,
-                total: totalVal,
-                selisih: selisihVal,
-                keterangan: statusKeterangan
-            })
-        });
+        // Jika item baru, kita inisialisasi data utamanya dulu secara lengkap
+        if (isNewItem) {
+            await fetch(`${baseUrl}.json`, {
+                method: "PUT", // Gunakan PUT untuk membuat data baru secara utuh
+                body: JSON.stringify({
+                    kode: kode,
+                    nama: item.nama,
+                    bosnet: 0,
+                    blok: 0,
+                    beceran: finalBeceranVal,
+                    utuhan: finalUtuhanVal,
+                    total: totalVal,
+                    selisih: selisihVal,
+                    keterangan: statusKeterangan,
+                    detail_rak: {
+                        beceran_rak: finalRakBeceran,
+                        utuhan_rak: finalRakUtuhan,
+                        beceran_qty_teks: finalRawBeceran
+                    }
+                })
+            });
+        } else {
+            // Jika sudah ada, gunakan PATCH seperti biasa
+            await fetch(`${baseUrl}.json`, {
+                method: "PATCH",
+                body: JSON.stringify({
+                    beceran: finalBeceranVal,
+                    utuhan: finalUtuhanVal,
+                    total: totalVal,
+                    selisih: selisihVal,
+                    keterangan: statusKeterangan
+                })
+            });
 
-        await fetch(`${baseUrl}/detail_rak.json`, {
-            method: "PATCH",
-            body: JSON.stringify({
-                beceran_rak: finalRakBeceran,
-                utuhan_rak: finalRakUtuhan,
-                beceran_qty_teks: finalRawBeceran
-            })
-        });
+            await fetch(`${baseUrl}/detail_rak.json`, {
+                method: "PATCH",
+                body: JSON.stringify({
+                    beceran_rak: finalRakBeceran,
+                    utuhan_rak: finalRakUtuhan,
+                    beceran_qty_teks: finalRawBeceran
+                })
+            });
+        }
 
-        console.log("Data fisik HP berhasil disimpan:", { kode, finalBeceranVal, finalRakBeceran });
-        
-        // Tampilkan notifikasi sukses TANPA menutup modal
-        //miuiAlert('Data berhasil disimpan! Silakan input data berikutnya.');
+        // Update juga state data lokal agar UI langsung sinkron tanpa perlu refresh ulang
+        item.beceran = finalBeceranVal;
+        item.utuhan = finalUtuhanVal;
+        item.total = totalVal;
+        item.selisih = selisihVal;
+        item.keterangan = statusKeterangan;
+        item.detail_rak = {
+            beceran_rak: finalRakBeceran,
+            utuhan_rak: finalRakUtuhan,
+            beceran_qty_teks: finalRawBeceran
+        };
+        dataHarian[kode] = item;
+
+        console.log("Data fisik HP berhasil disimpan (Auto-Create/Update):", { kode, finalBeceranVal, finalRakBeceran });
 
         // KOSONGKAN FORM INPUT (Reset input field agar siap untuk input berikutnya)
         const inputQtyBeceran = document.getElementById('hp-qty-beceran');
@@ -2391,10 +2640,15 @@ async function simpanDataFisikHP() {
         if (inputRakUtuhan) inputRakUtuhan.value = '';
         if (kodeInputEl) kodeInputEl.value = '';
 
-        // ---> TAMBAHKAN INI: RESET JUDUL KEMBALI KE SEMULA <---
+        // RESET JUDUL KEMBALI KE SEMULA
         const modalTitleEl = document.getElementById('hp-modal-title');
         if (modalTitleEl) {
             modalTitleEl.innerText = "INPUT FISIK GUDANG (MOBILE)";
+        }
+
+        // Refresh tampilan tabel / rekap jika fungsi render tersedia di sistem Anda
+        if (typeof renderTabelStokWH3 === 'function') {
+            renderTabelStokWH3();
         }
 
     } catch (error) {
@@ -2463,37 +2717,63 @@ function updateJudulModalHP() {
     modalTitleEl.innerText = `INPUT: ${kode} : ${selisih} ${satuan}`;
 }
 
-// Buka Modal Admin
-function bukaModalAdmin(key, kode, bosnet, wms) {
-    // Simpan data langsung dari parameter tombol
-    window.tempAdjustData = { 
-        key: key, 
-        kode: kode, 
-        bosnet: bosnet, 
-        wms: wms 
-    };
+// Buka Modal Admin (Universal untuk WH-2 & WH-3)
+function bukaModalAdmin(param1, kode, bosnet, wms) {
+    // Cek apakah ini panggilan dari Edit Database WH-3
+    if (param1 === 'EDIT_DB_WH3') {
+        window.tempAdminAction = {
+            type: 'EDIT_DB_WH3',
+            kode: kode
+        };
+    } else {
+        // Jika bukan, berarti ini dari WH-2 (Adjust Stok)
+        window.tempAdminAction = {
+            type: 'ADJUST_WH2',
+            data: { key: param1, kode: kode, bosnet: bosnet, wms: wms }
+        };
+    }
 
-    // Buka modal admin
+    // Reset inputan & buka modal admin
+    document.getElementById('admin-userid').value = '';
+    document.getElementById('admin-pass').value = '';
     document.getElementById('modal-admin-stok').classList.remove('hidden');
+    document.getElementById('admin-userid').focus();
 }
 
 function tutupModalAdmin() {
     document.getElementById('modal-admin-stok').classList.add('hidden');
+    document.getElementById('admin-userid').value = '';
     document.getElementById('admin-pass').value = '';
+    window.tempAdminAction = null;
 }
 
-// Cek Password (Ganti 'admin' dengan password Anda)
+// Cek Password Universal
 function cekAdmin() {
     const pass = document.getElementById('admin-pass').value;
+    
+    // Ganti 'admin' dengan password yang Anda inginkan
     if (pass === "admin") {
         document.getElementById('modal-admin-stok').classList.add('hidden');
         document.getElementById('admin-userid').value = '';
         document.getElementById('admin-pass').value = '';
-        bukaModalAdjust(window.tempAdjustData);
+
+        // Eksekusi berdasarkan aksi yang disimpan sebelumnya
+        if (window.tempAdminAction) {
+            const action = window.tempAdminAction;
+            window.tempAdminAction = null; // Reset
+
+            if (action.type === 'EDIT_DB_WH3') {
+                // Lanjut buka modal Edit Database Firebase WH-3 (Gaya MIUI v5)
+                bukaModalEditDatabaseWH3(action.kode);
+            } else if (action.type === 'ADJUST_WH2') {
+                // Lanjut buka modal adjust stok WH-2 lama Anda
+                bukaModalAdjust(action.data);
+            }
+        }
     } else {
         miuiAlert("Password Salah! Anda tidak dizinkan mengakses menu ini!");
         document.getElementById('admin-pass').value = '';
-        document.getElementById('admin-userid').value = ''; // Reset input agar tidak bisa ditebak
+        document.getElementById('admin-userid').value = '';
     }
 }
 
@@ -3335,7 +3615,7 @@ window.bukaScannerQRHP = async function(jenis) {
     if (modalScanner) modalScanner.style.display = 'flex';
 
     if (!('BarcodeDetector' in window)) {
-        miuiAlert("Maaf, pemindai tidak didukung di browser tanpa kamera eksternal.");
+        alert("Maaf, pemindai tidak didukung di browser ini.");
         window.tutupScannerQRHP();
         return;
     }
