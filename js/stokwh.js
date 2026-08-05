@@ -1260,7 +1260,7 @@ function loadStokDatawh3() {
 
         // Render tabel otomatis seketika saat ada perubahan data di server
         renderTabelwh3(allData[key], mode, key);
-        console.log("Data diperbarui secara real-time dari Firebase.");
+        console.log("Data Stok WH-3 diperbarui secara real-time dari Firebase.");
     }, (error) => {
         console.error("Gagal mendengarkan perubahan data:", error);
     });
@@ -1565,14 +1565,9 @@ async function renderTabelwh3(dataStok, mode, key) {
 
         // Tombol aksi baris
         const kolomKode = `<td class="py-2 px-2 whitespace-nowrap font-bold text-indigo-600 cursor-pointer hover:underline" onclick="bukaModalAdmin('EDIT_DB_WH3', '${kode}')" title="Klik untuk Edit Database Firebase">${kode}</td>`;
-        const kolomBeceran = `<td class="py-2 px-2 whitespace-nowrap text-blue-600 cursor-pointer hover:underline" onclick="bukaModalInputRak('${kode}')" title="Klik untuk Input Rak Beceran">${f(beceran)}</td>`;
-        const kolomUtuhan = `<td class="py-2 px-2 whitespace-nowrap text-green-600 cursor-pointer hover:underline" onclick="bukaModalLihatRak('${kode}', event)" title="Klik untuk Lihat Rak Utuhan">${f(utuhan)}</td>`;
-        const kolomKeterangan = `<td class="py-2 px-2 whitespace-nowrap ${warnaKet} font-medium cursor-pointer hover:underline" onclick="bukaModalEditKeterangan('${kode}', '${keterangan === "-" ? "" : keterangan}')" title="Klik untuk Edit Keterangan">${keterangan}</td>`;
-
-        //const btnEditDB = `<button onclick="bukaModalAdmin('EDIT_DB_WH3', '${kode}')" class="mr-2 text-indigo-600 hover:text-indigo-800" title="Edit Database Firebase">🗄️</button>`;
-        //const btnInputRak = `<button onclick="bukaModalInputRak('${kode}')" class="mr-2 text-blue-500 hover:text-blue-700">✏️</button>`;
-        //const btnLihatRak = `<button onclick="bukaModalLihatRak('${kode}', event)" class="mr-2 text-green-500 hover:text-green-700">👁️</button>`;
-        //const btnEditKet = `<button onclick="bukaModalEditKeterangan('${kode}', '${keterangan === "-" ? "" : keterangan}')" class="mr-2 text-yellow-600 hover:text-yellow-800">📝</button>`;
+        const kolomBeceran = `<td class="py-2 px-2 whitespace-nowrap font-bold text-blue-600 cursor-pointer hover:underline" onclick="bukaModalInputRak('${kode}')" title="Klik untuk Input Rak Beceran">${f(beceran)}</td>`;
+        const kolomUtuhan = `<td class="py-2 px-2 whitespace-nowrap font-bold text-green-600 cursor-pointer hover:underline" onclick="bukaModalLihatRak('${kode}', event)" title="Klik untuk Lihat Rak Utuhan">${f(utuhan)}</td>`;
+        const kolomKeterangan = `<td class="py-2 px-2 whitespace-nowrap ${warnaKet} font-bold cursor-pointer hover:underline" onclick="bukaModalEditKeterangan('${kode}', '${keterangan === "-" ? "" : keterangan}')" title="Klik untuk Edit Keterangan">${keterangan}</td>`;
 
         tbody.innerHTML += `
             <tr class="hover:bg-gray-50 border-b text-[15px]">
@@ -1727,59 +1722,56 @@ window.simpanEditDatabaseWH3 = async function(event, tanggal, kode) {
 };
 
 // Fungsi untuk memicu konfirmasi dan hapus permanen
-function konfirmasiHapusDatabaseWH3(tanggal, kode) {
-    // Gunakan konfirmasi standar browser agar pasti memicu dialog Yes/No
+window.konfirmasiHapusDatabaseWH3 = function(tanggal, kode) {
     if (confirm(`PERINGATAN: Data produk [ ${kode} ] akan dihapus secara permanen dari database! Yakin ingin menghapusnya?`)) {
         eksekusiHapusDatabaseWH3(tanggal, kode);
     }
-}
+};
 
-// Fungsi eksekusi penghapusan ke Firebase
-function eksekusiHapusDatabaseWH3(tanggal, kode) {
+// Fungsi eksekusi penghapusan menggunakan Fetch API dan memuat ulang data tanpa reload halaman
+async function eksekusiHapusDatabaseWH3(tanggal, kode) {
     console.log(`Mencoba menghapus data untuk tanggal: ${tanggal}, kode: ${kode}`);
 
-    // Sesuaikan dengan struktur database Anda (Realtime Database)
-    const dbPath = `stok_wh3/${tanggal}/${kode}`;
-    
-    if (typeof firebase !== 'undefined' && firebase.database) {
-        firebase.database().ref(dbPath).remove()
-            .then(() => {
-                console.log("Data berhasil dihapus dari Firebase.");
-                
-                // Gunakan miuiAlert standar aplikasi Anda untuk pemberitahuan sukses
-                if (typeof miuiAlert === 'function') {
-                    miuiAlert("Data berhasil dihapus secara permanen!");
-                } else {
-                    alert("Data berhasil dihapus secara permanen!");
-                }
+    // Menggunakan URL dasar yang sama persis seperti pada fungsi simpan
+    const baseUrl = `https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/stok_wh3/stokwh3_${tanggal}/${kode}`;
 
-                // Tutup modal
-                const modal = document.getElementById('modal-edit-db-wh3');
-                if (modal) {
-                    modal.style.display = 'none';
-                }
+    try {
+        const response = await fetch(`${baseUrl}.json`, {
+            method: "DELETE"
+        });
 
-                // Refresh data tabel WH-3
-                if (typeof muatDataWH3 === 'function') {
-                    muatDataWH3();
-                } else if (typeof loadDataWH3 === 'function') {
-                    loadDataWH3();
-                } else {
-                    // Fallback reload halaman jika fungsi refresh tidak ditemukan
-                    location.reload();
-                }
-            })
-            .catch((error) => {
-                console.error("Gagal menghapus data: ", error);
-                if (typeof miuiAlert === 'function') {
-                    miuiAlert("Gagal menghapus data: " + error.message);
-                } else {
-                    alert("Gagal menghapus data: " + error.message);
-                }
-            });
-    } else {
-        console.error("Firebase database belum diinisialisasi atau objek firebase tidak ditemukan.");
-        miuiAlert("Kesalahan sistem: Koneksi database tidak ditemukan.");
+        if (response.ok) {
+            console.log("Data berhasil dihapus dari Firebase.");
+            miuiAlert("Data berhasil dihapus secara permanen!");
+
+            // Tutup modal edit database
+            const modal = document.getElementById('modal-edit-db-wh3');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+
+            // Hapus data dari objek penampung lokal jika ada
+            if (window.dataStokTerkini && window.dataStokTerkini[kode]) {
+                delete window.dataStokTerkini[kode];
+            }
+
+            // Refresh tabel menggunakan fungsi pemuat data WH-3 yang benar tanpa reload halaman
+            if (typeof window.loadStokDatawh3 === 'function') {
+                await window.loadStokDatawh3();
+            } else if (typeof triggerUpdateTampilanWH3 === 'function') {
+                const tanggalAktif = document.getElementById('tanggal-input-wh3')?.value || tanggal; 
+                await triggerUpdateTampilanWH3(tanggalAktif);
+            } else if (typeof muatDataStokWH3 === 'function') {
+                muatDataStokWH3();
+            } else {
+                console.warn("Fungsi pemuat data tidak ditemukan, tetapi data sudah terhapus di database.");
+            }
+        } else {
+            miuiAlert("Gagal menghapus data dari database.");
+        }
+    } catch (err) {
+        console.error("Error deleting from database:", err);
+        miuiAlert("Terjadi kesalahan koneksi saat menghapus.");
     }
 }
 
@@ -2503,7 +2495,7 @@ async function simpanDataFisikHP() {
         isNewItem = true;
         item = {
             kode: kode,
-            nama: (window.masterData && window.masterData[kode]) ? window.masterData[kode].NAMA : "BARANG BARU / TEMUAN",
+            nama: (window.masterData && window.masterData[kode]) ? window.masterData[kode].NAMA : "STOK BOSNET TIDAK ADA / BARANG SUDAH HABIS",
             bosnet: 0,
             blok: 0,
             beceran: 0,
@@ -2614,50 +2606,54 @@ async function simpanDataFisikHP() {
     const baseUrl = `https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/stok_wh3/stokwh3_${tanggal}/${kode}`;
 
     // 5. Kirim Pembaruan / Data Baru ke Firebase
-    try {
-        // Jika item baru, kita inisialisasi data utamanya dulu secara lengkap
-        if (isNewItem) {
-            await fetch(`${baseUrl}.json`, {
-                method: "PUT", // Gunakan PUT untuk membuat data baru secara utuh
-                body: JSON.stringify({
-                    kode: kode,
-                    nama: item.nama,
-                    bosnet: 0,
-                    blok: 0,
-                    beceran: finalBeceranVal,
-                    utuhan: finalUtuhanVal,
-                    total: totalVal,
-                    selisih: selisihVal,
-                    keterangan: statusKeterangan,
-                    detail_rak: {
+        try {
+            // Jika item baru, kita inisialisasi data utamanya dulu secara lengkap
+            if (isNewItem) {
+                await fetch(`${baseUrl}.json`, {
+                    method: "PUT", // Gunakan PUT untuk membuat data baru secara utuh
+                    body: JSON.stringify({
+                        kode: kode,
+                        nama: item.nama,
+                        bosnet: 0,
+                        blok: 0,
+                        beceran: finalBeceranVal,
+                        utuhan: finalUtuhanVal,
+                        total: totalVal,
+                        selisih: selisihVal,
+                        keterangan: statusKeterangan,
+                        detail_rak: {
+                            beceran_rak: finalRakBeceran,
+                            utuhan_rak: finalRakUtuhan,
+                            beceran_qty_teks: finalRawBeceran
+                        }
+                    })
+                });
+
+                // Munculkan informasi khusus hanya untuk barang baru / temuan
+                miuiAlert(`Info: Barang baru [ ${kode} ] ditambahkan ke stok sebagai temuan/lebih!`);
+
+            } else {
+                // Jika sudah ada, gunakan PATCH seperti biasa
+                await fetch(`${baseUrl}.json`, {
+                    method: "PATCH",
+                    body: JSON.stringify({
+                        beceran: finalBeceranVal,
+                        utuhan: finalUtuhanVal,
+                        total: totalVal,
+                        selisih: selisihVal,
+                        keterangan: statusKeterangan
+                    })
+                });
+
+                await fetch(`${baseUrl}/detail_rak.json`, {
+                    method: "PATCH",
+                    body: JSON.stringify({
                         beceran_rak: finalRakBeceran,
                         utuhan_rak: finalRakUtuhan,
                         beceran_qty_teks: finalRawBeceran
-                    }
-                })
-            });
-        } else {
-            // Jika sudah ada, gunakan PATCH seperti biasa
-            await fetch(`${baseUrl}.json`, {
-                method: "PATCH",
-                body: JSON.stringify({
-                    beceran: finalBeceranVal,
-                    utuhan: finalUtuhanVal,
-                    total: totalVal,
-                    selisih: selisihVal,
-                    keterangan: statusKeterangan
-                })
-            });
-
-            await fetch(`${baseUrl}/detail_rak.json`, {
-                method: "PATCH",
-                body: JSON.stringify({
-                    beceran_rak: finalRakBeceran,
-                    utuhan_rak: finalRakUtuhan,
-                    beceran_qty_teks: finalRawBeceran
-                })
-            });
-        }
+                    })
+                });
+            }
 
         // Update juga state data lokal agar UI langsung sinkron tanpa perlu refresh ulang
         item.beceran = finalBeceranVal;
