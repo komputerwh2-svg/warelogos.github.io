@@ -1564,23 +1564,28 @@ async function renderTabelwh3(dataStok, mode, key) {
         let warnaKet = selisih > 0 ? "text-blue-600 font-bold" : (selisih < 0 ? "text-red-600 font-bold" : "text-green-600 font-bold");
 
         // Tombol aksi baris
-        const btnEditDB = `<button onclick="bukaModalAdmin('EDIT_DB_WH3', '${kode}')" class="mr-2 text-indigo-600 hover:text-indigo-800" title="Edit Database Firebase">🗄️</button>`;
-        const btnInputRak = `<button onclick="bukaModalInputRak('${kode}')" class="mr-2 text-blue-500 hover:text-blue-700">✏️</button>`;
-        const btnLihatRak = `<button onclick="bukaModalLihatRak('${kode}', event)" class="mr-2 text-green-500 hover:text-green-700">👁️</button>`;
-        const btnEditKet = `<button onclick="bukaModalEditKeterangan('${kode}', '${keterangan === "-" ? "" : keterangan}')" class="mr-2 text-yellow-600 hover:text-yellow-800">📝</button>`;
+        const kolomKode = `<td class="py-2 px-2 whitespace-nowrap font-bold text-indigo-600 cursor-pointer hover:underline" onclick="bukaModalAdmin('EDIT_DB_WH3', '${kode}')" title="Klik untuk Edit Database Firebase">${kode}</td>`;
+        const kolomBeceran = `<td class="py-2 px-2 whitespace-nowrap text-blue-600 cursor-pointer hover:underline" onclick="bukaModalInputRak('${kode}')" title="Klik untuk Input Rak Beceran">${f(beceran)}</td>`;
+        const kolomUtuhan = `<td class="py-2 px-2 whitespace-nowrap text-green-600 cursor-pointer hover:underline" onclick="bukaModalLihatRak('${kode}', event)" title="Klik untuk Lihat Rak Utuhan">${f(utuhan)}</td>`;
+        const kolomKeterangan = `<td class="py-2 px-2 whitespace-nowrap ${warnaKet} font-medium cursor-pointer hover:underline" onclick="bukaModalEditKeterangan('${kode}', '${keterangan === "-" ? "" : keterangan}')" title="Klik untuk Edit Keterangan">${keterangan}</td>`;
+
+        //const btnEditDB = `<button onclick="bukaModalAdmin('EDIT_DB_WH3', '${kode}')" class="mr-2 text-indigo-600 hover:text-indigo-800" title="Edit Database Firebase">🗄️</button>`;
+        //const btnInputRak = `<button onclick="bukaModalInputRak('${kode}')" class="mr-2 text-blue-500 hover:text-blue-700">✏️</button>`;
+        //const btnLihatRak = `<button onclick="bukaModalLihatRak('${kode}', event)" class="mr-2 text-green-500 hover:text-green-700">👁️</button>`;
+        //const btnEditKet = `<button onclick="bukaModalEditKeterangan('${kode}', '${keterangan === "-" ? "" : keterangan}')" class="mr-2 text-yellow-600 hover:text-yellow-800">📝</button>`;
 
         tbody.innerHTML += `
             <tr class="hover:bg-gray-50 border-b text-[15px]">
                 <td class="py-2 px-2">${no++}</td>
-                <td class="py-2 px-2 whitespace-nowrap font-bold">${btnEditDB}${kode}</td>
+                <td class="py-2 px-2 whitespace-nowrap font-bold text-orange-600 cursor-pointer hover:underline" onclick="bukaModalAdmin('EDIT_DB_WH3', '${kode}')" title="Klik untuk Edit Database Firebase">${kode}</td>
                 <td class="py-2 px-2">${f(blok)}</td>
                 <td class="py-2 px-2">${f(bosnet)}</td>
                 <td class="py-2 px-2">${pak}</td>
-                <td class="py-2 px-2 whitespace-nowrap">${btnInputRak}<span>${f(beceran)}</span></td>
-                <td class="py-2 px-2 whitespace-nowrap">${btnLihatRak}<span>${f(utuhan)}</span></td>
+                <td class="py-2 px-2 whitespace-nowrap font-bold text-blue-600 cursor-pointer hover:underline" onclick="bukaModalInputRak('${kode}')" title="Klik untuk Input Rak Beceran">${f(beceran)}</td>
+                <td class="py-2 px-2 whitespace-nowrap font-bold text-green-600 cursor-pointer hover:underline" onclick="bukaModalLihatRak('${kode}', event)" title="Klik untuk Lihat Rak Utuhan">${f(utuhan)}</td>
                 <td class="py-2 px-2 font-bold">${f(totalFisik)}</td>
                 <td class="py-2 px-2 ${kelasWarnaSelisih}">${selisih === 0 ? "-" : selisih.toLocaleString()}</td>
-                <td class="py-2 px-2 whitespace-nowrap">${btnEditKet}<span class="${warnaKet} font-medium">${keterangan}</span></td>
+                <td class="py-2 px-2 whitespace-nowrap ${warnaKet} font-bold cursor-pointer hover:underline" onclick="bukaModalEditKeterangan('${kode}', '${keterangan === "-" ? "" : keterangan}')" title="Klik untuk Edit Keterangan">${keterangan}</td>
             </tr>
         `;
     });
@@ -2370,7 +2375,7 @@ function pilihModeInputHP(tipe) {
     }
 }
 
-// Live Search / Autocomplete Kode dari Data Stok WH-3 yang tampil di tabel
+// Live Search / Autocomplete Kode murni dari sumber data lokal dengan Logika Urut Standar WH-3
 function filterSaranKodeHP(keyword) {
     const container = document.getElementById('hp-saran-container');
     if (!container) return;
@@ -2381,17 +2386,11 @@ function filterSaranKodeHP(keyword) {
         return;
     }
 
-    // Ambil daftar kode unik secara otomatis dari baris tabel Stok WH-3 yang sedang aktif dilayar
-    const listKodeSet = new Set();
-    const rows = document.querySelectorAll('tr'); // Atau sesuaikan selector tabel WH-3 Anda
-    rows.forEach(row => {
-        const kodeCell = row.cells ? row.cells[1] : null; // Asumsi kolom Kode ada di kolom ke-2 (index 1)
-        if (kodeCell && kodeCell.innerText.trim() !== '') {
-            listKodeSet.add(kodeCell.innerText.trim());
-        }
-    });
+    // Ambil data stok global yang aktif
+    const dataStok = window.dataStokTerkini || {};
+    const listKode = Object.keys(dataStok);
 
-    const listKode = Array.from(listKodeSet);
+    // Filter berdasarkan keyword ketikan user
     const filtered = listKode.filter(item => item.toLowerCase().includes(keyword.toLowerCase()));
 
     if (filtered.length === 0) {
@@ -2399,8 +2398,53 @@ function filterSaranKodeHP(keyword) {
         return;
     }
 
+    // --- LOGIKA URUT DATA (SORTING) ---
+    const polaUtama = ["CRR", "CRR EA", "THR EA", "THR", "MRMR", "MRR", "MJR HJ", "MJR", "MOB4A", "MOR2A EA", "MOR2A EB", "MOR2A", "MP", "PDR", "MTR3A", "PR-PKT", "PR-CUP", "MRSR", "LTGR", "MTGR", "MEB", "MOL", "MRL", "MTL", "ISEL"];
+    
+    const getSortScore = (kode) => {
+        kode = kode.toUpperCase();
+        for (let i = 0; i < polaUtama.length; i++) {
+            if (kode.includes(polaUtama[i])) {
+                if (polaUtama[i] === "MOR2A" && (kode.includes("MOR2A EA") || kode.includes("MOR2A EB"))) continue;
+                if (polaUtama[i] === "THR" && kode.includes("THR EA")) continue;
+                if (polaUtama[i] === "MJR" && kode.includes("MJR HJ")) continue;
+                if (polaUtama[i] === "CRR" && kode.includes("CRR EA")) continue;
+                return i + 1;
+            }
+        }
+        return 999;
+    };
+    
+    const getVarianScore = (kode) => {
+        kode = kode.toUpperCase();
+        if (kode.includes("ZC")) return 1;
+        if (kode.includes("SSL")) return 2;
+        if (kode.includes("SLO")) return 3;
+        if (kode.includes("TDS")) return 4;
+        if (kode.includes("BAG")) return 5;
+        if (kode.includes("WRG")) return 6;
+        if (kode.includes("GTG")) return 7;
+        return 0;
+    };
+
+    const getAngkaAkhir = (kode) => {
+        const match = kode.match(/\d+/g);
+        if (!match) return 999;
+        return parseInt(match.join('').slice(-4)) || 999;
+    };
+
+    // Urutkan hasil filter sesuai standar pola gudang WH-3
+    filtered.sort((a, b) => {
+        const scoreA1 = getSortScore(a), scoreB1 = getSortScore(b);
+        if (scoreA1 !== scoreB1) return scoreA1 - scoreB1;
+        const scoreA2 = getVarianScore(a), scoreB2 = getVarianScore(b);
+        if (scoreA2 !== scoreB2) return scoreA2 - scoreB2;
+        return getAngkaAkhir(a) - getAngkaAkhir(b);
+    });
+    // ----------------------------------
+
     let html = '';
-    filtered.slice(0, 10).forEach(kode => { // Batasi maksimal 10 saran agar tidak terlalu panjang
+    filtered.slice(0, 10).forEach(kode => { // Batasi maksimal 10 saran teratas yang sudah terurut
         html += `<div onclick="pilihKodeHP('${kode}')" style="padding:10px 12px; border-bottom:1px solid #eee; cursor:pointer; font-size:13px; color:#333;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='white'">${kode}</div>`;
     });
 
