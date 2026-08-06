@@ -1491,6 +1491,7 @@ async function renderTabelwh3(dataStok, mode, key) {
         if (kode.includes("BAG")) return 5;
         if (kode.includes("WRG")) return 6;
         if (kode.includes("GTG")) return 7;
+        if (kode.includes("DRC")) return 8;
         return 0;
     };
     const getAngkaAkhir = (kode) => {
@@ -1875,6 +1876,7 @@ async function renderSelisihWH3(allData) {
         if (kode.includes("BAG")) return 5;
         if (kode.includes("WRG")) return 6;
         if (kode.includes("GTG")) return 7;
+        if (kode.includes("DRC")) return 8;
         return 0;
     };
     const getAngkaAkhir = (kode) => {
@@ -2367,7 +2369,7 @@ function pilihModeInputHP(tipe) {
     }
 }
 
-// Live Search / Autocomplete Kode murni dari sumber data lokal dengan Logika Urut Standar WH-3
+// Live Search / Autocomplete Kode dengan Nama Barang dari Sumber Data Lokal WH-3
 function filterSaranKodeHP(keyword) {
     const container = document.getElementById('hp-saran-container');
     if (!container) return;
@@ -2382,8 +2384,14 @@ function filterSaranKodeHP(keyword) {
     const dataStok = window.dataStokTerkini || {};
     const listKode = Object.keys(dataStok);
 
-    // Filter berdasarkan keyword ketikan user
-    const filtered = listKode.filter(item => item.toLowerCase().includes(keyword.toLowerCase()));
+    // Filter berdasarkan keyword ketikan user (bisa mencocokkan kode atau nama barang)
+    const filtered = listKode.filter(kode => {
+        const item = dataStok[kode] || {};
+        const namaBarang = (item.nama || '').toLowerCase();
+        const k = kode.toLowerCase();
+        const kw = keyword.toLowerCase();
+        return k.includes(kw) || namaBarang.includes(kw);
+    });
 
     if (filtered.length === 0) {
         container.style.display = 'none';
@@ -2416,6 +2424,7 @@ function filterSaranKodeHP(keyword) {
         if (kode.includes("BAG")) return 5;
         if (kode.includes("WRG")) return 6;
         if (kode.includes("GTG")) return 7;
+        if (kode.includes("DRC")) return 8;
         return 0;
     };
 
@@ -2436,8 +2445,11 @@ function filterSaranKodeHP(keyword) {
     // ----------------------------------
 
     let html = '';
-    filtered.slice(0, 10).forEach(kode => { // Batasi maksimal 10 saran teratas yang sudah terurut
-        html += `<div onclick="pilihKodeHP('${kode}')" style="padding:10px 12px; border-bottom:1px solid #eee; cursor:pointer; font-size:13px; color:#333;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='white'">${kode}</div>`;
+    filtered.slice(0, 10).forEach(kode => { // Batasi maksimal 10 saran teratas
+        const item = dataStok[kode] || {};
+        const namaBarang = item.nama ? ` - ${item.nama}` : '';
+        
+        html += `<div onclick="pilihKodeHP('${kode}')" style="padding:10px 12px; border-bottom:1px solid #eee; cursor:pointer; font-size:13px; color:#333;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='white'"><b>${kode}</b>${namaBarang}</div>`;
     });
 
     container.innerHTML = html;
