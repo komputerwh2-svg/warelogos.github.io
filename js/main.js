@@ -936,14 +936,49 @@ window.cetakLabelHariIni = async (jenisLabel) => {
 
     // 3. Kirim ke Print Server
     try {
-        await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs.json', {
-            method: 'POST',
-            body: JSON.stringify({ html: pagesHtml, timestamp: Date.now() }),
+        const now = new Date();
+        
+        // Nama Hari dalam Bahasa Indonesia
+        const daftarHari = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+        const hari = daftarHari[now.getDay()];
+        
+        // Format tanggal dd-mm-yyyy
+        const tgl = String(now.getDate()).padStart(2, '0');
+        const bln = String(now.getMonth() + 1).padStart(2, '0');
+        const thn = now.getFullYear();
+        const tanggalStr = `${tgl}-${bln}-${thn}`;
+        
+        // Format jam hh.mm.ss
+        const jam = String(now.getHours()).padStart(2, '0');
+        const menit = String(now.getMinutes()).padStart(2, '0');
+        const detik = String(now.getSeconds()).padStart(2, '0');
+        const waktuStr = `${jam}.${menit}.${detik}`;
+        
+        // Gabungkan format waktu: Hari / dd-mm-yyyy / hh.mm.ss
+        const formatWaktuLengkap = `${hari} / ${tanggalStr} / ${waktuStr}`;
+        
+        // Membuat judul yang dinamis berdasarkan jenis label
+        const judulTugas = `Cetak ${jenisLabel} (${dataHariIni.length} Label)`;
+
+        // Membuat nama kunci URL yang aman (Tanpa spasi dan titik, diganti underscore/strip)
+        const safeJenisLabel = jenisLabel.replace(/\s+/g, '_');
+        const safeKeyName = `Cetak_${safeJenisLabel}_${dataHariIni.length}_Label_${tgl}-${bln}-${thn}_${jam}-${menit}-${detik}`;
+
+        await fetch(`https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs/${safeKeyName}.json`, {
+            method: 'PUT',
+            body: JSON.stringify({ 
+                judul: judulTugas,
+                waktu_teks: formatWaktuLengkap,
+                html: pagesHtml, 
+                status: 'PENDING',
+                timestamp: Date.now() 
+            }),
             headers: { 'Content-Type': 'application/json' }
         });
+        
         miuiAlert(`Proses Mencetak ${dataHariIni.length} Label ${jenisLabel}.`);
     } catch (e) {
-        miuiAlert("Gagal mengirim perintah cetak: " + e.message);
+        miuiAlert("Gagal mengirim perintah cetak label: " + e.message);
     }
 };
 
@@ -1136,16 +1171,47 @@ window.cetakKlaimHariIni = async () => {
         window.showCetakProgress("Mengirim Dokumen Cetak Klaim...");
     }
 
-    // 2. Kirim ke Print Server
+    // 2. Kirim ke Print Server dengan Judul dan Format Waktu Baru (Metode PUT)
     try {
-        await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs.json', {
-            method: 'POST',
-            body: JSON.stringify({ html: pagesHtml, timestamp: Date.now() }),
+        const now = new Date();
+        
+        // Nama Hari dalam Bahasa Indonesia
+        const daftarHari = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+        const hari = daftarHari[now.getDay()];
+        
+        // Format tanggal dd-mm-yyyy
+        const tgl = String(now.getDate()).padStart(2, '0');
+        const bln = String(now.getMonth() + 1).padStart(2, '0');
+        const thn = now.getFullYear();
+        const tanggalStr = `${tgl}-${bln}-${thn}`;
+        
+        // Format jam hh.mm.ss (untuk teks tampilan bebas pakai titik)
+        const jam = String(now.getHours()).padStart(2, '0');
+        const menit = String(now.getMinutes()).padStart(2, '0');
+        const detik = String(now.getSeconds()).padStart(2, '0');
+        const formatWaktuLengkap = `${hari} / ${tanggalStr} / ${jam}.${menit}.${detik}`;
+        
+        // Teks judul untuk ditampilkan di tabel web
+        const judulTugas = `Cetak Klaim (${dataKlaim.length} Label)`;
+
+        // Buat nama kunci URL yang aman (Tanpa spasi dan tanpa titik, gunakan strip/underscore)
+        const safeKeyName = `Cetak_Klaim_${dataKlaim.length}_Label_${tgl}-${bln}-${thn}_${jam}-${menit}-${detik}`;
+
+        await fetch(`https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs/${safeKeyName}.json`, {
+            method: 'PUT',
+            body: JSON.stringify({ 
+                judul: judulTugas,
+                waktu_teks: formatWaktuLengkap,
+                html: pagesHtml, 
+                status: 'PENDING',
+                timestamp: Date.now() 
+            }),
             headers: { 'Content-Type': 'application/json' }
         });
+        
         miuiAlert(`Mencetak ${dataKlaim.length} label Klaim.`);
     } catch (e) {
-        miuiAlert("Gagal cetak: " + e.message);
+        miuiAlert("Gagal mencetak label klaim: " + e.message);
     }
 };
 
@@ -1224,4 +1290,124 @@ onValue(printJobsRef, (snapshot) => {
         const textEl = document.getElementById('text-progress-cetak');
         if (textEl) textEl.style.color = "#333";
     }
+});
+
+
+// Fungsi Kontrol Modal Printer
+window.bukaModalPrinter = function() {
+    console.log("Membuka modal kontrol printer...");
+    const modal = document.getElementById('modal-kontrol-printer');
+    if (modal) {
+        // Hapus kelas hidden jika ada dari Tailwind
+        modal.classList.remove('hidden');
+        // Paksa tampil menggunakan display flex secara inline
+        modal.style.setProperty('display', 'flex', 'important');
+        muatDataPrintJobs();
+    } else {
+        console.error("Elemen modal-kontrol-printer tidak ditemukan di HTML!");
+    }
+};
+
+window.tutupModalPrinter = function() {
+    const modal = document.getElementById('modal-kontrol-printer');
+    if (modal) {
+        modal.style.setProperty('display', 'none', 'important');
+        modal.classList.add('hidden');
+    }
+};
+
+window.muatDataPrintJobs = function() {
+    const tbody = document.getElementById('tbody-print-jobs');
+    if (!tbody) return;
+    
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center py-6 text-slate-400">Mengambil data...</td></tr>`;
+
+    const dbRef = firebase.database().ref('print_jobs');
+    dbRef.once('value', (snapshot) => {
+        const data = snapshot.val();
+        if (!data) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-6 text-slate-400">Tidak ada antrean.</td></tr>`;
+            return;
+        }
+
+        let html = '';
+        const now = Date.now();
+
+        Object.entries(data).forEach(([jobId, job]) => {
+            // Logika Deteksi Masalah (Jika lebih dari 15 detik masih ada di Firebase)
+            const isTooOld = (now - job.timestamp) > 15000; 
+            const status = isTooOld ? 'GAGAL' : 'PENDING';
+            const badgeColor = isTooOld ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800';
+
+            html += `<tr class="border-b hover:bg-slate-50">
+                <td class="py-2.5 px-3 font-medium text-slate-700">${job.waktu_teks}</td>
+                <td class="py-2.5 px-3 text-slate-800 font-semibold">
+                    <span class="bg-blue-50 text-blue-600 px-2 py-1 rounded border border-blue-100 inline-block">${job.judul}</span>
+                </td>
+                <td class="py-2.5 px-3 text-center">
+                    <span class="px-2 py-1 rounded-full text-[10px] font-bold ${badgeColor}">${status}</span>
+                </td>
+                <td class="py-2.5 px-3 text-center whitespace-nowrap">
+                    <button onclick="cetakUlangJob('${jobId}')" class="bg-blue-500 hover:bg-white text-white px-2.5 py-1 rounded text-[11px] font-bold mr-1 transition"><i class="fa-solid fa-print"></i></button>
+                    <button onclick="hapusJobPrinter('${jobId}')" class="bg-red-500 hover:bg-white text-white px-2.5 py-1 rounded text-[11px] font-bold transition"><i class="fa-solid fa-trash"></i></button>
+                </td>
+            </tr>`;
+        });
+        tbody.innerHTML = html;
+    });
+};
+
+window.cetakUlangJob = function(jobId) {
+    if (!confirm(`Jalankan ulang / cetak ulang tugas ${jobId}?`)) return;
+    firebase.database().ref(`print_jobs/${jobId}`).update({
+        status: 'PENDING',
+        updated_at: new Date().toISOString()
+    }).then(() => {
+        miuiAlert('Perintah cetak ulang dikirim!');
+        muatDataPrintJobs();
+    }).catch(err => miuiAlert('Gagal: ' + err.message));
+};
+
+window.hapusJobPrinter = function(jobId) {
+    if (!confirm(`Hapus permanen tugas ${jobId} dari antrean?`)) return;
+    firebase.database().ref(`print_jobs/${jobId}`).remove().then(() => {
+        muatDataPrintJobs();
+    }).catch(err => miuiAlert('Gagal menghapus: ' + err.message));
+};
+
+window.muatDataPrintJobs = muatDataPrintJobs;
+
+// Pantau Status Listener & Jumlah Antrean untuk Menu Utama Printer
+function initStatusMenuPrinter() {
+    const dotEl = document.getElementById('menu-dot-listener');
+    const badgeEl = document.getElementById('menu-badge-count');
+    
+    if (!dotEl || !badgeEl) return;
+
+    // 1. Pantau Status Listener (Python) - 2 Indikator: Hijau (Aktif) / Abu-abu (Mati)
+    firebase.database().ref('status_printer/wh_2').on('value', (snapshot) => {
+        const data = snapshot.val();
+        // Cek apakah data ada dan timestamp-nya di bawah 30 detik yang lalu
+        if (data && data.timestamp && (Date.now() - data.timestamp < 30000)) {
+            dotEl.className = "w-2.5 h-2.5 rounded-full bg-green-500 shadow-sm shadow-green-500/50";
+            dotEl.title = "Python Listener: Aktif & Terhubung";
+        } else {
+            dotEl.className = "w-2.5 h-2.5 rounded-full bg-gray-400";
+            dotEl.title = "Python Listener: Belum Aktif / Mati";
+        }
+    });
+
+    // 2. Pantau Jumlah Antrean Cetak di Firebase
+    firebase.database().ref('print_jobs').on('value', (snapshot) => {
+        const data = snapshot.val();
+        const count = data ? Object.keys(data).length : 0;
+        
+        badgeEl.innerText = count;
+        badgeEl.classList.remove('hidden');
+    });
+}
+
+// Panggil saat dokumen dimuat
+document.addEventListener("DOMContentLoaded", () => {
+    initStatusMenuPrinter();
 });

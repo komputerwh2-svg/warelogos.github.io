@@ -884,11 +884,40 @@ window.cetakPresisi = async (idFirebase) => {
 
     // 3. Kirim ke Firebase untuk Print Server
     try {
-        await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs.json', {
-            method: 'POST',
-            body: JSON.stringify({ html: finalHtml, timestamp: Date.now() }),
+        const now = new Date();
+        const daftarHari = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+        const hari = daftarHari[now.getDay()];
+        
+        const tgl = String(now.getDate()).padStart(2, '0');
+        const bln = String(now.getMonth() + 1).padStart(2, '0');
+        const thn = now.getFullYear();
+        const tanggalStr = `${tgl}-${bln}-${thn}`;
+        
+        // Gunakan underscore (_) menggantikan titik (.) pada jam agar tidak error 400
+        const jam = String(now.getHours()).padStart(2, '0');
+        const menit = String(now.getMinutes()).padStart(2, '0');
+        const detik = String(now.getSeconds()).padStart(2, '0');
+        const waktuStr = `${jam}:${menit}:${detik}`; // untuk tampilan teks (boleh pakai titik/titik dua)
+        
+        const formatWaktuLengkap = `${hari} / ${tanggalStr} / ${jam}.${menit}.${detik}`;
+        const judulTugas = 'Cetak_Ongkir'; // Gunakan underscore jika ada spasi
+
+        // KUNCI URL: Hanya huruf, angka, dan underscore (_) tanpa titik (.) atau spasi
+        const safeKeyName = `${judulTugas}_${tgl}-${bln}-${thn}_${jam}-${menit}-${detik}`;
+
+        await fetch(`https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs/${safeKeyName}.json`, {
+            method: 'PUT',
+            body: JSON.stringify({ 
+                judul: 'Cetak Ongkir',
+                waktu_teks: formatWaktuLengkap,
+                html: finalHtml, 
+                status: 'PENDING',
+                timestamp: Date.now() 
+            }),
             headers: { 'Content-Type': 'application/json' }
         });
+        
+        console.log("Berhasil kirim print job dengan key:", safeKeyName);
     } catch (error) {
         console.error("Gagal mengirim ke server:", error);
     }

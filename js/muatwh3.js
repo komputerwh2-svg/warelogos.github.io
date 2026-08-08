@@ -1939,11 +1939,45 @@ window.cetakDokumenVersi1 = async function(tglMuat) {
     //win.document.write(finalHtml);
     //win.document.close();
 
-    await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs.json', {
-        method: 'POST',
-        body: JSON.stringify({ html: finalHtml, timestamp: Date.now() }),
-        headers: { 'Content-Type': 'application/json' }
-    });
+    // 3. Kirim ke Print Server (Versi Dokumen v1)
+    try {
+        const now = new Date();
+        
+        // Nama Hari
+        const daftarHari = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+        const hari = daftarHari[now.getDay()];
+        
+        // Format tanggal dan jam
+        const tgl = String(now.getDate()).padStart(2, '0');
+        const bln = String(now.getMonth() + 1).padStart(2, '0');
+        const thn = now.getFullYear();
+        const jam = String(now.getHours()).padStart(2, '0');
+        const menit = String(now.getMinutes()).padStart(2, '0');
+        const detik = String(now.getSeconds()).padStart(2, '0');
+        
+        // String untuk tampilan
+        const formatWaktuLengkap = `${hari} / ${tgl}-${bln}-${thn} / ${jam}.${menit}.${detik}`;
+        const judulTugas = "Cetak Dokumen v1";
+
+        // Kunci URL yang aman (tanpa spasi/titik)
+        const safeKeyName = `Cetak_Dokumen_v1_${tgl}-${bln}-${thn}_${jam}-${menit}-${detik}`;
+
+        await fetch(`https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs/${safeKeyName}.json`, {
+            method: 'PUT',
+            body: JSON.stringify({ 
+                judul: judulTugas,
+                waktu_teks: formatWaktuLengkap,
+                html: finalHtml, 
+                status: 'PENDING',
+                timestamp: Date.now() 
+            }),
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        miuiAlert("Perintah cetak dokumen v1 dikirim.");
+    } catch (e) {
+        miuiAlert("Gagal cetak: " + e.message);
+    }
 };
 
 window.cetakDokumenVersi2 = async function(tglMuat) {
@@ -2122,9 +2156,43 @@ window.cetakDokumenVersi2 = async function(tglMuat) {
     //    (typeof miuiAlert !== 'undefined') ? miuiAlert("Gagal membuka jendela cetak.") : alert("Gagal membuka jendela cetak.");
     //}
 
-    await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs.json', {
-        method: 'POST',
-        body: JSON.stringify({ html: finalHtml, timestamp: Date.now() }),
-        headers: { 'Content-Type': 'application/json' }
-    });
+    // 3. Kirim ke Print Server (Versi Dokumen v2)
+    try {
+        const now = new Date();
+        
+        // Nama Hari
+        const daftarHari = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+        const hari = daftarHari[now.getDay()];
+        
+        // Format tanggal dan jam
+        const tgl = String(now.getDate()).padStart(2, '0');
+        const bln = String(now.getMonth() + 1).padStart(2, '0');
+        const thn = now.getFullYear();
+        const jam = String(now.getHours()).padStart(2, '0');
+        const menit = String(now.getMinutes()).padStart(2, '0');
+        const detik = String(now.getSeconds()).padStart(2, '0');
+        
+        // String untuk tampilan
+        const formatWaktuLengkap = `${hari} / ${tgl}-${bln}-${thn} / ${jam}.${menit}.${detik}`;
+        const judulTugas = "Cetak Dokumen v2";
+
+        // Kunci URL yang aman dari karakter terlarang (menggunakan underscore/strip)
+        const safeKeyName = `Cetak_Dokumen_v2_${tgl}-${bln}-${thn}_${jam}-${menit}-${detik}`;
+
+        await fetch(`https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs/${safeKeyName}.json`, {
+            method: 'PUT',
+            body: JSON.stringify({ 
+                judul: judulTugas,
+                waktu_teks: formatWaktuLengkap,
+                html: finalHtml, 
+                status: 'PENDING',
+                timestamp: Date.now() 
+            }),
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        miuiAlert("Perintah cetak dokumen v2 dikirim.");
+    } catch (e) {
+        miuiAlert("Gagal cetak: " + e.message);
+    }
 };
