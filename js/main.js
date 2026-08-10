@@ -1229,6 +1229,13 @@ window.hideCetakProgress = function() {
     if (modal) modal.style.display = 'none';
 };
 
+window.tutupModalProgressCetak = function() {
+    const modal = document.getElementById('modal-progress-cetak');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+};
+
 // --- LOGIKA PEMANTAUAN ANTREAN CETAK TERPADU (MODAL MIUI V5) ---
 const printJobsRef = ref(dbPrinter, 'print_jobs');
 let printTimeout = null;

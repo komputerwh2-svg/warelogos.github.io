@@ -1338,12 +1338,12 @@ window.getNamaBlokPenuh = function(kodeSingkat) {
         'RT': 'RETUR',
         'TK': 'TEKOMAS',
         'CD': '18CD',
-        'E':  'BLOK 18E',
-        'F':  'BLOK 18F',
-        'H':  'BLOK H',
+        'E':  '18E',
+        'F':  '18F',
+        'H':  'H',
         'PR': 'PROMOSI'
     };
-    return map[s] || `BLOK ${s}`;
+    return map[s] || `${s}`;
 };
 
 window.tambahAlokasi = async function() {
@@ -1544,8 +1544,11 @@ window.getExpDataDariTabel = function(kode, blok) {
 
 window.updateGrandTotal = function(tambahan) {
     let el = document.getElementById('grand-total-plt');
-    let current = parseInt(el.innerText) || 0;
-    el.innerText = (current + tambahan) + " PLT";
+    if (el) {
+        let current = parseInt(el.innerText) || 0;
+        let hasilBaru = Math.max(0, current + tambahan);
+        el.innerText = hasilBaru + " PLT";
+    }
 };
 
 window.simpanAmbil = async function() {
@@ -1610,8 +1613,6 @@ window.simpanAmbil = async function() {
 
 window.loadDataAlokasi = async function() {
     const listRingkasan = document.getElementById('list-ringkasan');
-    
-    // Ambil tanggal muat dari elemen select sebagai acuan utama
     const inputTgl = document.getElementById('select-tanggal-muat');
     const tglMuat = inputTgl ? inputTgl.value : ""; 
     
@@ -1621,7 +1622,6 @@ window.loadDataAlokasi = async function() {
     }
 
     const docId = "muat_" + tglMuat;
-    
     listRingkasan.innerHTML = '<div class="text-[10px] text-slate-400 italic text-center">Memuat data alokasi...</div>';
 
     try {
@@ -1638,23 +1638,33 @@ window.loadDataAlokasi = async function() {
 
             data.forEach(item => {
                 const namaPenuh = window.getNamaBlokPenuh(item.blok);
-                let blokContainer = document.getElementById(`blok-group-${item.blok}`);
+                let blokContainer = document.createElement('div');
+                blokContainer.id = `blok-group-${item.blok}`;
+                blokContainer.className = "mb-4 border-b pb-2";
                 
-                if (!blokContainer) {
-                    blokContainer = document.createElement('div');
-                    blokContainer.id = `blok-group-${item.blok}`;
-                    blokContainer.className = "mb-4 border-b pb-2";
-                    // Header terpadu (Nama Penuh + Total)
-                    blokContainer.innerHTML = `<div class="font-black text-orange-600 text-[11px] mb-1">${namaPenuh} = ${item.total_plt} PLT</div>`;
-                    listRingkasan.appendChild(blokContainer);
-                }
+                // Header blok dengan ID total-blok yang dicari oleh fungsi simpanAmbil
+                blokContainer.innerHTML = `
+                    <div class="font-black text-orange-600 text-[11px] mb-1" id="total-blok-${item.blok}" data-total="${item.total_plt}">
+                        ${namaPenuh} = ${item.total_plt} PLT
+                    </div>
+                `;
 
-                item.detail_barang.forEach(detail => {
+                item.detail_barang.forEach((detail, index) => {
                     const itemDiv = document.createElement('div');
-                    itemDiv.className = "flex justify-between text-[10px] ml-2 text-slate-800 mb-1";
-                    itemDiv.innerHTML = `<span>${detail}</span>`;
+                    itemDiv.className = "flex justify-between items-center text-[10px] ml-2 text-slate-800 mb-1";
+                    
+                    itemDiv.innerHTML = `
+                        <span>${detail}</span>
+                        <button onclick="hapusDetailItem('${item.blok}', ${index})" 
+                                style="background:#ef4444; color:#fff; border:none; padding:1px 5px; border-radius:3px; cursor:pointer; font-size:9px;" 
+                                title="Hapus Item">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    `;
                     blokContainer.appendChild(itemDiv);
                 });
+
+                listRingkasan.appendChild(blokContainer);
             });
 
             const grandTotalEl = document.getElementById('grand-total-plt'); 
@@ -1675,12 +1685,92 @@ window.loadDataAlokasi = async function() {
     }
 };
 
+window.hapusDetailItem = async function(kodeBlok, indexDetail) {
+    const inputTgl = document.getElementById('select-tanggal-muat');
+    const tglMuat = inputTgl ? inputTgl.value : "";
+    if (!tglMuat) return;
+
+    const docId = "muat_" + tglMuat;
+    const db = firebase.firestore();
+    const docRef = db.collection('muat_wh3').doc(tglMuat).collection('alokasi_ambil').doc(docId);
+
+    try {
+        const docSnap = await docRef.get();
+        if (!docSnap.exists) return;
+
+        let docData = docSnap.data();
+        let dataAlokasi = docData.data || [];
+
+        // Cari blok yang sesuai
+        let targetBlok = dataAlokasi.find(item => item.blok === kodeBlok);
+        if (targetBlok && targetBlok.detail_barang) {
+            // Hapus item dari array detail_barang berdasarkan index
+            targetBlok.detail_barang.splice(indexDetail, 1);
+
+            // --- HITUNG ULANG TOTAL PLT PER BLOK BERDASARKAN SISA DETAIL BARANG ---
+            let totalPltBaruBlok = 0;
+            targetBlok.detail_barang.forEach(detailStr => {
+                // Contoh string detail: "MRR4C15 = 3 PLT [28-AGU:14]" -> Ambil angka sebelum " PLT"
+                let match = detailStr.match(/=\s*(\d+)\s*PLT/i);
+                if (match && match[1]) {
+                    totalPltBaruBlok += parseInt(match[1]) || 0;
+                }
+            });
+            targetBlok.total_plt = totalPltBaruBlok;
+
+            // Jika detail barang kosong, hapus blok tersebut dari array utama
+            if (targetBlok.detail_barang.length === 0) {
+                dataAlokasi = dataAlokasi.filter(item => item.blok !== kodeBlok);
+            }
+
+            // Hitung ulang Grand Total keseluruhan dari masing-masing total_plt blok
+            let grandTotalBaru = 0;
+            dataAlokasi.forEach(item => {
+                grandTotalBaru += parseInt(item.total_plt || 0);
+            });
+
+            // Simpan pembaruan lengkap ke Firestore
+            await docRef.set({
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                tanggal_muat: tglMuat,
+                data: dataAlokasi,
+                total_grand: grandTotalBaru.toString()
+            });
+
+            // Muat ulang tampilan ringkasan agar sinkron seketika
+            window.loadDataAlokasi();
+
+            if (typeof window.miuiAlert === 'function') {
+                window.miuiAlert("Item berhasil dihapus dan total diperbarui!");
+            }
+        }
+    } catch (error) {
+        console.error("Gagal menghapus item:", error);
+        if (typeof window.miuiAlert === 'function') {
+            window.miuiAlert("Gagal menghapus item dari database.");
+        }
+    }
+};
+
 window.kirimWaGrup = async function() {
     const tglMuat = document.getElementById('select-tanggal-muat').value;
     const db = window.getFirestore();
 
     try {
-        // 1. Ambil data dari Firestore sesuai path di screenshot
+        // 1. Ambil data master_barang terlebih dahulu untuk konversi inisial
+        const masterBarangRef = db.collection("bank_data").doc("master_barang");
+        const masterSnap = await masterBarangRef.get();
+        const masterData = masterSnap.exists ? masterSnap.data() : {};
+
+        // Fungsi helper lokal untuk mengubah kode penuh menjadi inisial
+        const getInisialBarang = (kodePenuh) => {
+            if (masterData && masterData[kodePenuh] && masterData[kodePenuh].INISIAL) {
+                return masterData[kodePenuh].INISIAL;
+            }
+            return kodePenuh; // Fallback jika tidak ditemukan
+        };
+
+        // 2. Ambil data alokasi muat sesuai tanggal
         const docRef = db.collection("muat_wh3").doc(tglMuat)
                          .collection("alokasi_ambil").doc("muat_" + tglMuat);
         const doc = await docRef.get();
@@ -1694,25 +1784,35 @@ window.kirimWaGrup = async function() {
         const judul = document.getElementById('judul-ringkasan').innerText;
         let lines = [`*${judul}*\n`];
 
-        // 2. Loop array data untuk menyusun pesan
+        // 3. Loop array data untuk menyusun pesan & konversi detail barang
         data.forEach(item => {
-            // Gunakan helper Anda untuk mendapatkan nama blok penuh
             const namaBlokLengkap = window.getNamaBlokPenuh(item.blok);
             
-            // Susun header dengan nama blok yang sudah lengkap
             lines.push(`*${namaBlokLengkap} = ${item.total_plt} PLT*`);
             
             item.detail_barang.forEach(detail => {
-                lines.push(detail);
+                // Contoh format detail di Firestore biasanya: "MRR4A01 = 2 PLT [28-JUL:15]"
+                // Kita perlu mengganti bagian kode barang di depannya dengan inisial
+                let convertedDetail = detail;
+                
+                // Cari kode barang penuh di dalam string detail (misal mencocokkan key dari masterBarang)
+                Object.keys(masterData).forEach(kodePenuh => {
+                    if (detail.includes(kodePenuh)) {
+                        const inisial = masterData[kodePenuh].INISIAL;
+                        convertedDetail = detail.replace(kodePenuh, inisial);
+                    }
+                });
+
+                lines.push(convertedDetail);
             });
             lines.push(""); // Baris kosong antar blok
         });
 
-        // 3. Tambahkan Grand Total
+        // 4. Tambahkan Grand Total
         const grandTotal = document.getElementById('grand-total-plt').innerText;
         lines.push(`*TOTAL AMBIL: ${grandTotal}*`);
 
-        // 4. Kirim ke WhatsApp
+        // 5. Kirim ke WhatsApp
         const pesan = lines.join('\n');
         const url = `https://wa.me/?text=${encodeURIComponent(pesan)}`;
         window.open(url, '_blank');
