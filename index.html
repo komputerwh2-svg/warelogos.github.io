@@ -283,7 +283,11 @@
 
     <!-- Modal Progress Cetak Universal (Gaya MIUI V5) -->
     <div id="modal-progress-cetak" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:99999; justify-content:center; align-items:center; flex-direction:column;">
-        <div style="background:#fff; padding:30px; border-radius:20px; text-align:center; box-shadow:0 10px 25px rgba(0,0,0,0.2); width:220px;">
+        <div style="background:#fff; padding:30px; border-radius:20px; text-align:center; box-shadow:0 10px 25px rgba(0,0,0,0.2); width:240px; position:relative;">
+            
+            <!-- Tombol Tutup (X) -->
+            <button onclick="tutupModalProgressCetak()" style="position:absolute; top:10px; right:12px; background:transparent; border:none; font-size:16px; font-weight:bold; color:#999; cursor:pointer;" title="Tutup">&times;</button>
+
             <!-- Lingkaran Animasi Spinner -->
             <div style="width:60px; height:60px; border:6px solid #e0e0e0; border-top:6px solid #f97316; border-radius:50%; animation:spin-cetak 1s linear infinite; margin:0 auto 15px;"></div>
             
