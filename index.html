@@ -134,7 +134,7 @@
                 <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">TT Ongkir</span>
             </div>
 
-            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="miuiAlert('Membuka Surat Palet')">
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="bukaMenuSuratPalet()">
                 <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
                     <img src="img/palet.png" alt="Surat Palet" class="w-full h-full object-cover">
                 </div>
@@ -703,6 +703,93 @@
                 <button onclick="simpanDataKlaim()" class="py-3 text-[13px] font-bold text-white bg-gradient-to-b from-[#ff8b00] to-[#f36c00] transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]">Simpan</button>
                 <button onclick="cetakKlaimHariIni()" class="py-3 text-[13px] font-bold text-slate-700 bg-gradient-to-b from-[#f2f2f2] to-[#e0e0e0] border-l border-r border-[#c4c4c4] transition-all hover:bg-slate-200">Cetak</button>
             </div>
+        </div>
+    </div>
+
+    <!-- MODAL UTAMA SURAT PALET + PANEL HISTORI ALA KOMENTAR DI KANAN -->
+    <div id="modalFormPalet" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 select-none animate-fade-in">
+        <div class="flex flex-col md:flex-row gap-4 items-center justify-center max-w-[720px] w-full">
+            
+            <!-- BAGIAN KIRI: FORM UTAMA PALET -->
+            <div class="bg-[#e4e4e4] w-full max-w-[370px] rounded-[14px] overflow-hidden shadow-2xl border border-[#b2b2b2] flex flex-col font-sans text-slate-800 relative">
+                
+                <!-- Header Modal -->
+                <div class="bg-gradient-to-b from-[#323232] to-[#202020] px-4 py-3 flex items-center justify-between border-b border-[#151515]">
+                    <h3 id="titleFormPalet" class="text-white font-medium text-sm tracking-wide flex items-center gap-2">
+                        <i class="fa-solid fa-file-invoice text-orange-400 text-xs"></i> FORM PEMINJAMAN PALET
+                    </h3>
+                    <button onclick="tutupModal('modalFormPalet')" class="text-white hover:text-red-400 font-bold text-lg">✕</button>
+                </div>
+
+                <!-- Body Form -->
+                <div class="p-4 flex flex-col gap-3">
+                    
+                    <!-- Tombol Pemilihan Mode di Atas (Kiri & Kanan) -->
+                    <div class="grid grid-cols-2 gap-2 mb-1">
+                        <button type="button" id="btnModePinjam" onclick="setModePalet('PINJAM')" class="py-2 text-xs font-black rounded border transition shadow-sm bg-gradient-to-b from-amber-500 to-orange-600 text-white border-orange-400">
+                            PEMINJAMAN PALET
+                        </button>
+                        <button type="button" id="btnModeKembali" onclick="setModePalet('KEMBALI')" class="py-2 text-xs font-black rounded border transition shadow-sm bg-white text-slate-700 border-slate-400 hover:bg-slate-100">
+                            PENGEMBALIAN PALET
+                        </button>
+                    </div>
+
+                    <!-- Nama Driver -->
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-500 uppercase">Nama Driver:</label>
+                        <input type="text" id="inputDriverPalet" list="listDriverPalet" placeholder="Pilih atau Ketik Driver..." class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1.5 px-2 text-sm font-bold shadow-inner">
+                        <datalist id="listDriverPalet">
+                            <option value="AGUS"><option value="ANDIK"><option value="ARIEF"><option value="HUDA"><option value="INDRAYANA"><option value="ROZI"><option value="SETYADI"><option value="SIGIT"><option value="TRI KUNTORO"><option value="YANU"><option value="YAYAH"><option value="YUSUF">
+                        </datalist>
+                    </div>
+
+                    <!-- Nopol -->
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-500 uppercase">Nopol:</label>
+                        <input type="text" id="inputNopolPalet" value="H 8604 JA" class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1.5 px-2 text-sm font-bold shadow-inner">
+                    </div>
+
+                    <!-- Total -->
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-500 uppercase">Total Palet:</label>
+                        <input type="text" id="inputTotalPalet" list="listTotalPalet" placeholder="Pilih atau Ketik Total Palet..." class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1.5 px-2 text-sm font-bold shadow-inner">
+                        <datalist id="listTotalPalet">
+                            <option value="50"><option value="100"><option value="150"><option value="200">
+                        </datalist>
+                    </div>
+
+                </div>
+
+                <!-- Footer Tombol Aksi -->
+                <div class="grid grid-cols-2 border-t border-[#d0d0d0] bg-[#dbdbdb]">
+                    <button onclick="simpanDataPalet()" class="py-3 text-[13px] font-bold text-white bg-gradient-to-b from-amber-500 to-orange-600 border-r border-orange-700 transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] hover:from-amber-600 hover:to-orange-700">Simpan</button>
+                    <button onclick="hapusFormPalet()" class="py-3 text-[13px] font-bold text-slate-700 bg-gradient-to-b from-[#f2f2f2] to-[#e0e0e0] border-l border-[#c4c4c4] transition-all hover:bg-slate-300 hover:text-slate-900">Batal</button>
+                </div>
+
+            </div>
+
+            <!-- BAGIAN KANAN: PANEL HISTORI ALA KOMENTAR DENGAN PANAH PENUNJUK -->
+            <div class="relative bg-[#e4e4e4] w-full max-w-[310px] rounded-[12px] overflow-hidden shadow-2xl border border-[#b2b2b2] flex flex-col font-sans text-slate-800">
+                
+                <!-- Segitiga Penunjuk di Sisi Kiri (Menghadap ke Form Utama) -->
+                <div class="hidden md:block absolute -left-[7px] top-12 w-0 h-0 border-t-[7px] border-t-transparent border-b-[7px] border-b-transparent border-r-[7px] border-r-[#e4e4e4] z-10"></div>
+
+                <!-- Header Panel Riwayat (Tanpa Warna Gelap / Gaya Komentar) -->
+                <div class="bg-[#e4e4e4] px-3.5 py-2.5 flex items-center justify-between border-b border-[#cfcfcf]">
+                    <h3 class="text-slate-700 font-bold text-xs tracking-wide flex items-center gap-1.5">
+                        <i class="fa-solid fa-clock-rotate-left text-orange-500 text-xs"></i> HISTORI DATA PALET
+                        <span id="totalHistoriCount" class="text-orange-700 font-bold">(0)</span>
+                    </h3>
+                    <button onclick="muatHistoriPalet()" class="text-slate-600 hover:text-orange-600 text-xs transition-transform active:rotate-180" title="Muat Ulang Histori"><i class="fa-solid fa-rotate"></i></button>
+                </div>
+
+                <!-- List Konten Riwayat (Bisa Di-scroll) -->
+                <div id="containerHistoriPalet" class="p-2.5 flex flex-col gap-2 max-h-[350px] overflow-y-auto bg-[#ededed]">
+                    <div class="text-center text-xs text-slate-500 py-6 italic">Memuat histori data...</div>
+                </div>
+
+            </div>
+
         </div>
     </div>
 
