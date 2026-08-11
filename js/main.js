@@ -964,6 +964,10 @@ window.cetakLabelHariIni = async (jenisLabel) => {
         const safeJenisLabel = jenisLabel.replace(/\s+/g, '_');
         const safeKeyName = `Cetak_${safeJenisLabel}_${dataHariIni.length}_Label_${tgl}-${bln}-${thn}_${jam}-${menit}-${detik}`;
 
+        //const win = window.open("", "_blank");
+        //win.document.write(finalHtml);
+        //win.document.close();
+
         await fetch(`https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs/${safeKeyName}.json`, {
             method: 'PUT',
             body: JSON.stringify({ 
@@ -1215,6 +1219,393 @@ window.cetakKlaimHariIni = async () => {
     }
 };
 
+
+let jenisModePalet = 'PINJAM'; // Menyimpan status apakah sedang PINJAM atau KEMBALI
+
+// 1. Membuka modal tunggal Surat Palet langsung dari menu utama
+function bukaMenuSuratPalet() {
+    setModePalet('PINJAM');
+    const modal = document.getElementById('modalFormPalet');
+    if (modal) modal.classList.remove('hidden');
+    muatHistoriPalet(); // Ambil data histori dari Firebase
+}
+
+// Fungsi untuk menutup modal berdasarkan ID-nya
+function tutupModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) modal.classList.add('hidden');
+}
+
+// 2. Mengatur Mode Aktif (PINJAM / KEMBALI) dan Ubah Judul & Warna Tombol Atas (Tema Orange Aktif)
+function setModePalet(mode) {
+    jenisModePalet = mode;
+    const titleForm = document.getElementById('titleFormPalet');
+    const btnPinjam = document.getElementById('btnModePinjam');
+    const btnKembali = document.getElementById('btnModeKembali');
+
+    // Style Tombol Aktif (Orange) & Tidak Aktif (Putih)
+    const activeStyle = "py-2 text-xs font-black rounded border transition shadow-sm bg-gradient-to-b from-amber-500 to-orange-600 text-white border-orange-400";
+    const inactiveStyle = "py-2 text-xs font-black rounded border transition shadow-sm bg-white text-slate-700 border-slate-400 hover:bg-slate-100";
+
+    if (mode === 'PINJAM') {
+        if (titleForm) titleForm.innerHTML = `<i class="fa-solid fa-file-invoice text-orange-400 text-xs"></i> FORM PEMINJAMAN PALET`;
+        
+        if (btnPinjam) btnPinjam.className = activeStyle;
+        if (btnKembali) btnKembali.className = inactiveStyle;
+    } else {
+        if (titleForm) titleForm.innerHTML = `<i class="fa-solid fa-file-invoice text-orange-400 text-xs"></i> FORM PENGEMBALIAN PALET`;
+        
+        if (btnPinjam) btnPinjam.className = inactiveStyle;
+        if (btnKembali) btnKembali.className = activeStyle;
+    }
+}
+
+// 2. Fungsi Mengambil dan Menampilkan Histori dari Firebase RTDB
+async function muatHistoriPalet() {
+    const container = document.getElementById('containerHistoriPalet');
+    const badgeTotal = document.getElementById('totalHistoriCount'); // Elemen counter total data
+    if (!container) return;
+
+    container.innerHTML = `<div class="text-center text-xs text-slate-500 py-6 italic">Memuat histori data...</div>`;
+    if (badgeTotal) badgeTotal.textContent = "[ 0 Transaksi ]";
+
+    try {
+        const rtdbUrl = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app";
+        const res = await fetch(`${rtdbUrl}/palet_history.json`);
+        const data = await res.json();
+
+        if (!data) {
+            container.innerHTML = `<div class="text-center text-xs text-slate-500 py-6 italic">Belum ada riwayat data palet.</div>`;
+            if (badgeTotal) badgeTotal.textContent = "[ 0 Transaksi ]";
+            return;
+        }
+
+        const listData = Object.values(data).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        
+        // Perbarui teks total data pada judul
+        if (badgeTotal) badgeTotal.textContent = `[ ${listData.length} Transaksi ]`;
+
+        let htmlContent = '';
+        listData.forEach((item, index) => {
+            const id = item.id || '';
+            const tgl = item.tanggal || '';
+            const formatTgl = tgl.length === 8 ? `${tgl.substring(6,8)}/${tgl.substring(4,6)}/${tgl.substring(0,4)}` : tgl;
+            const waktu = item.waktu || '';
+            const jenis = item.jenis || 'PINJAM';
+            const driver = item.driver || '-';
+            const total = item.total || 0;
+
+            const badgeColor = jenis === 'PINJAM' ? 'bg-orange-500 text-white' : 'bg-slate-800 text-white';
+
+            const isLatest = index === 0;
+            const cardBgClass = isLatest 
+                ? 'bg-orange-100/50 border-orange-400 shadow' 
+                : 'bg-white border-orange-400 shadow-sm';
+
+            htmlContent += `
+                <div class="${cardBgClass} p-2.5 rounded-[8px] border flex flex-col gap-1 text-xs transition-all">
+                    <div class="flex items-center justify-between text-[11px] text-slate-600 font-semibold border-b border-slate-300/60 pb-1">
+                        <span><i class="fa-regular fa-clock mr-1"></i>${formatTgl} - ${waktu}</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="px-1.5 py-0.5 rounded text-[10px] font-black uppercase ${badgeColor}">${jenis}</span>
+                            <!-- Tombol Cetak Satuan -->
+                            <button onclick="cetakItemPalet('${id}')" class="w-5 h-5 flex items-center justify-center rounded bg-amber-100 text-amber-600 hover:bg-amber-600 hover:text-white transition-all shadow-sm" title="Cetak Surat Ini">
+                                <i class="fa-solid fa-print text-[10px]"></i>
+                            </button>
+                            <!-- Tombol Hapus -->
+                            <button onclick="hapusHistoriPalet('${id}')" class="w-5 h-5 flex items-center justify-center rounded bg-red-100 text-red-600 hover:bg-red-600 hover:text-white transition-all shadow-sm" title="Hapus Histori Ini">
+                                <i class="fa-solid fa-trash-can text-[10px]"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center pt-0.5">
+                        <span class="font-bold text-slate-800 uppercase"><i class="fa-solid fa-user-tag text-slate-400 mr-1"></i>${driver}</span>
+                        <span class="font-black text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-200">Total: ${total} Palet</span>
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = htmlContent;
+
+    } catch (error) {
+        console.error("Gagal memuat histori palet:", error);
+        container.innerHTML = `<div class="text-center text-xs text-red-700 py-6">Gagal memuat data dari server.</div>`;
+        if (badgeTotal) badgeTotal.textContent = "[ 0 Transaksi ]";
+    }
+}
+
+// 2. Fungsi untuk Menghapus Item Histori Tertentu berdasarkan ID-nya
+async function hapusHistoriPalet(id) {
+    const konfirmasi = confirm("Apakah Anda yakin ingin menghapus riwayat data palet ini?");
+    if (!konfirmasi) return;
+
+    try {
+        const rtdbUrl = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app";
+        const res = await fetch(`${rtdbUrl}/palet_history/${id}.json`, {
+            method: 'DELETE'
+        });
+
+        if (res.ok) {
+            if (typeof window.miuiAlert === 'function') {
+                window.miuiAlert("Histori data berhasil dihapus!");
+            } else {
+                alert("Histori data berhasil dihapus!");
+            }
+            
+            // Muat ulang daftar histori setelah dihapus
+            muatHistoriPalet();
+        } else {
+            throw new Error("Gagal menghapus data dari server.");
+        }
+    } catch (error) {
+        console.error("Error hapus histori:", error);
+        if (typeof window.miuiAlert === 'function') {
+            window.miuiAlert("Terjadi kesalahan saat menghapus data!");
+        } else {
+            alert("Terjadi kesalahan saat menghapus data!");
+        }
+    }
+}
+
+// Pastikan fungsi terdaftar secara global
+window.hapusHistoriPalet = hapusHistoriPalet;
+
+// 3. Tombol Aksi: SIMPAN ke Firebase Realtime Database
+async function simpanDataPalet() {
+    const driver = document.getElementById('inputDriverPalet').value.trim().toUpperCase();
+    const nopol = document.getElementById('inputNopolPalet').value.trim().toUpperCase();
+    const total = document.getElementById('inputTotalPalet').value.trim();
+
+    if (!driver) {
+        if (window.miuiAlert) window.miuiAlert("Nama driver harus diisi atau dipilih!");
+        else alert("Nama driver harus diisi atau dipilih!");
+        return;
+    }
+    if (!total) {
+        if (window.miuiAlert) window.miuiAlert("Masukkan jumlah total palet!");
+        else alert("Masukkan jumlah total palet!");
+        return;
+    }
+
+    // Format Tanggal (YYYYMMDD) dan Waktu (HHMMSS)
+    const now = new Date();
+    const tahun = now.getFullYear();
+    const bulan = String(now.getMonth() + 1).padStart(2, '0');
+    const tanggalNum = String(now.getDate()).padStart(2, '0');
+    const jam = String(now.getHours()).padStart(2, '0');
+    const menit = String(now.getMinutes()).padStart(2, '0');
+    const detik = String(now.getSeconds()).padStart(2, '0');
+
+    const tglStr = `${tahun}${bulan}${tanggalNum}`;
+    const waktuStr = `${jam}${menit}${detik}`;
+    
+    // Format Nama Driver tanpa spasi/karakter khusus agar aman untuk ID database (misal: TRI_KUNTORO)
+    const cleanDriver = driver.replace(/[^a-zA-Z0-9]/g, '_');
+    
+    // Menyesuaikan prefix ID secara dinamis berdasarkan tombol aktif (PINJAM atau KEMBALI)
+    const prefixId = jenisModePalet === 'PINJAM' ? 'PINJAM_PALET' : 'KEMBALI_PALET';
+    
+    // Format ID: [PREFIX]_[namadriver]_[totalpalet]_[tanggal]_[waktu]
+    const uniqueId = `${prefixId}_${cleanDriver}_${total}_${tglStr}_${waktuStr}`;
+
+    // Payload Data yang dikirim ke RTDB
+    const payload = {
+        id: uniqueId,
+        jenis: jenisModePalet, // PINJAM atau KEMBALI
+        driver: driver,
+        nopol: nopol,
+        total: Number(total),
+        tanggal: tglStr,
+        waktu: `${jam}:${menit}:${detik}`,
+        timestamp: Date.now()
+    };
+
+    try {
+        const rtdbUrl = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app";
+        const responseUrl = `${rtdbUrl}/palet_history/${uniqueId}.json`;
+
+        const res = await fetch(responseUrl, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            if (window.miuiAlert) {
+                window.miuiAlert(`Data ${jenisModePalet} Palet atas nama ${driver} berhasil disimpan!`);
+            } else {
+                alert(`Data ${jenisModePalet} Palet atas nama ${driver} berhasil disimpan!`);
+            }
+
+            // Reset form isian setelah sukses agar siap diisi kembali
+            hapusFormPalet();
+            muatHistoriPalet();
+        } else {
+            throw new Error("Gagal menyimpan ke server database.");
+        }
+    } catch (error) {
+        console.error("Error RTDB:", error);
+        if (window.miuiAlert) window.miuiAlert("Terjadi kesalahan saat menyimpan data ke database!");
+        else alert("Terjadi kesalahan saat menyimpan data ke database!");
+    }
+}
+
+// 4. Tombol Aksi: CETAK
+window.cetakItemPalet = async (id) => {
+    if (!id) {
+        if (typeof window.miuiAlert === 'function') window.miuiAlert("ID Transaksi tidak valid.");
+        else alert("ID Transaksi tidak valid.");
+        return;
+    }
+
+    try {
+        const rtdbUrl = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app";
+        const res = await fetch(`${rtdbUrl}/palet_history/${id}.json`);
+        const item = await res.json();
+
+        if (!item) {
+            if (typeof window.miuiAlert === 'function') window.miuiAlert("Data histori palet tidak ditemukan.");
+            else alert("Data histori palet tidak ditemukan.");
+            return;
+        }
+
+        const now = new Date();
+        const daftarHari = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+        const hari = daftarHari[now.getDay()];
+        const daftarBulan = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+        
+        const tglNum = String(now.getDate()).padStart(2, '0');
+        const blnNum = String(now.getMonth() + 1).padStart(2, '0');
+        const thnNum = now.getFullYear();
+        const tanggalFormatIndo = `${tglNum} ${daftarBulan[now.getMonth()]} ${thnNum}`;
+
+        const jenisSurat = item.jenis === 'PINJAM' ? 'PEMINJAMAN PALET' : 'PENGEMBALIAN PALET';
+        const kalimatTujuan = item.jenis === 'PINJAM' 
+            ? 'Bersama ini kami sampaikan untuk Peminjaman Palet ke Loscam yang akan dibawa oleh driver kami dengan data sebagai berikut:' 
+            : 'Bersama ini kami sampaikan untuk Pengembalian Palet ke Loscam yang akan dibawa oleh driver kami dengan data sebagai berikut:';
+
+        const pagesHtml = `
+        <div class="page" style="page-break-after: always; width: 210mm; min-height: 330mm; padding: 20mm; box-sizing: border-box; font-family: Arial, sans-serif; font-size: 14pt; color: #000; background: #fff;">
+            <div>
+                <table style="width: 100%; font-size: 14pt; margin-bottom: 20px; border-collapse: collapse;">
+                    <tr style="line-height: 1.2;">
+                        <td style="width: 85px; padding: 4px 0;">Tanggal</td>
+                        <td style="width: 15px; text-align: center; padding: 4px 0;">:</td>
+                        <td style="font-weight: bold; padding: 4px 0;">${hari}, ${tanggalFormatIndo}</td>
+                    </tr>
+                    <tr style="line-height: 1.2;">
+                        <td style="padding: 4px 0;">Kepada</td>
+                        <td style="text-align: center; padding: 4px 0;">:</td>
+                        <td style="font-weight: bold; padding: 4px 0;">PT LOSCAM</td>
+                    </tr>
+                    <tr style="line-height: 1.2;">
+                        <td style="padding: 4px 0;">Dari</td>
+                        <td style="text-align: center; padding: 4px 0;">:</td>
+                        <td style="font-weight: bold; padding: 4px 0;">PT MARIMAS PUTERA KENCANA</td>
+                    </tr>
+                    <tr style="line-height: 4.0;">
+                        <td style="padding: 4px 0; padding-top: 20px;">Hal</td>
+                        <td style="text-align: center; padding: 4px 0; padding-top: 20px;">:</td>
+                        <td style="font-weight: bold; text-decoration: underline; padding: 4px 0; padding-top: 20px;">${jenisSurat}</td>
+                    </tr>
+                </table>
+
+                <div style="margin-bottom: 10px; line-height: 1.5;">Dengan Hormat,</div>
+                <div style="margin-bottom: 20px; line-height: 1.5;">${kalimatTujuan}</div>
+
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; text-align: center;" border="1">
+                    <thead>
+                        <tr style="background-color: #f2f2f2;">
+                            <th style="padding: 8px; border: 1px solid #000; font-size: 14pt;">NAMA DRIVER</th>
+                            <th style="padding: 8px; border: 1px solid #000; font-size: 14pt; width: 180px;">NO POL</th>
+                            <th style="padding: 8px; border: 1px solid #000; font-size: 14pt; width: 150px;">TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #000; font-weight: bold; font-size: 14pt; text-transform: uppercase;">${item.driver || '-'}</td>
+                            <td style="padding: 8px; border: 1px solid #000; font-weight: bold; font-size: 14pt;">${item.nopol || 'H 8604 JA'}</td>
+                            <td style="padding: 8px; border: 1px solid #000; font-weight: bold; font-size: 14pt;">${item.total || 0}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div>Demikian Informasi dari kami. Atas perhatian dan kerjasamanya kami ucapkan terima kasih.</div>
+            </div>
+
+            <div style="margin-top: 125px;">
+                <table style="width: 100%; text-align: center; font-size: 14pt; border-collapse: collapse;">
+                    <tr>
+                        <td style="width: 33%;">Hormat kami,</td>
+                        <td style="width: 33%;">Driver</td>
+                        <td style="width: 33%;">Penerima</td>
+                    </tr>
+                    <tr>
+                        <td style="height: 130px; vertical-align: bottom; font-weight: bold; font-size: 14pt;">FARIN</td>
+                        <td style="height: 130px; vertical-align: bottom; font-weight: bold; font-size: 14pt; text-transform: uppercase;">${item.driver || ''}</td>
+                        <td style="height: 130px; vertical-align: bottom; font-weight: bold; font-size: 14pt;">PT LOSCAM</td>
+                    </tr>
+                </table>
+            </div>
+        </div>`;
+
+        if (typeof window.showCetakProgress === 'function') {
+            window.showCetakProgress("Mengirim Dokumen Cetak Palet...");
+        }
+
+        const jam = String(now.getHours()).padStart(2, '0');
+        const menit = String(now.getMinutes()).padStart(2, '0');
+        const detik = String(now.getSeconds()).padStart(2, '0');
+        const formatWaktuLengkap = `${hari} / ${tglNum}-${blnNum}-${thnNum} / ${jam}.${menit}.${detik}`;
+        
+        const driverNameClean = (item.driver || 'Driver').replace(/[^a-zA-Z0-9]/g, '_');
+        const judulTugas = `Cetak Surat Palet - ${item.driver}`;
+        const safeKeyName = `Cetak_Palet_Item_${driverNameClean}_${tglNum}-${blnNum}-${thnNum}_${jam}-${menit}-${detik}`;
+
+        //const win = window.open("", "_blank");
+        //win.document.write(pagesHtml);
+        //win.document.close();
+
+        await fetch(`${rtdbUrl}/print_jobs/${safeKeyName}.json`, {
+            method: 'PUT',
+            body: JSON.stringify({ 
+                judul: judulTugas,
+                waktu_teks: formatWaktuLengkap,
+                html: pagesHtml, 
+                status: 'PENDING',
+                timestamp: Date.now() 
+            }),
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (typeof window.miuiAlert === 'function') window.miuiAlert(`Berhasil mengirim dokumen cetak untuk ${item.driver}.`);
+        else alert(`Berhasil mengirim dokumen cetak untuk ${item.driver}.`);
+
+    } catch (e) {
+        console.error("Gagal mencetak item palet:", e);
+        if (typeof window.miuiAlert === 'function') window.miuiAlert("Gagal mencetak: " + e.message);
+        else alert("Gagal mencetak: " + e.message);
+    }
+};
+
+// 5. Tombol Aksi: HAPUS / RESET
+function hapusFormPalet() {
+    document.getElementById('inputDriverPalet').value = '';
+    document.getElementById('inputNopolPalet').value = 'H 8604 JA';
+    document.getElementById('inputTotalPalet').value = '';
+    if (window.miuiAlert) window.miuiAlert("Form berhasil dibersihkan.");
+}
+
+// Daftarkan ke objek window agar bisa diakses lewat atribut onclick di HTML
+window.bukaMenuSuratPalet = bukaMenuSuratPalet;
+window.tutupModal = tutupModal;
+window.setModePalet = setModePalet;
+window.simpanDataPalet = simpanDataPalet;
+window.hapusFormPalet = hapusFormPalet;
+window.muatHistoriPalet = muatHistoriPalet;
+window.hapusHistoriPalet = hapusHistoriPalet;
 
 // Helper Global Modal Progress Cetak
 window.showCetakProgress = function(pesan = "Memproses Cetak...") {
