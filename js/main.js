@@ -1607,6 +1607,553 @@ window.hapusFormPalet = hapusFormPalet;
 window.muatHistoriPalet = muatHistoriPalet;
 window.hapusHistoriPalet = hapusHistoriPalet;
 
+
+// Fungsi untuk membuka modal Berita Acara
+const RTDB_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app";
+let listSementaraItemBA = [];
+
+window.bukaModalBeritaAcara = function() {
+    const modal = document.getElementById('modalBeritaAcara');
+    if (modal) {
+        modal.classList.remove('hidden');
+        window.muatHistoriBeritaAcara();
+    }
+};
+
+window.tutupModal = function(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
+    window.tutupPopupItemBarang();
+};
+
+window.bukaPopupItemBarang = function() {
+    const popup = document.getElementById('popupItemBarang');
+    if (popup) popup.classList.remove('hidden');
+};
+
+window.tutupPopupItemBarang = function() {
+    const popup = document.getElementById('popupItemBarang');
+    if (popup) popup.classList.add('hidden');
+};
+
+// Variabel cache untuk menyimpan data master driver beserta nopolnya
+let cacheMasterDriver = {};
+
+// Panggil fungsi ini di dalam fungsi utama saat tombol buka modal Berita Acara diklik
+window.bukaModalBeritaAcara = function() {
+    const modal = document.getElementById('modalBeritaAcara');
+    if (modal) {
+        modal.classList.remove('hidden');
+        
+        // PENTING: Eksekusi pemuatan data master saat modal terbuka
+        window.muatDataMasterDropdown();
+        
+        if (typeof window.muatHistoriBeritaAcara === 'function') {
+            window.muatHistoriBeritaAcara();
+        }
+    }
+};
+
+window.muatDataMasterDropdown = async function() {
+    try {
+        // 1. Ambil Data Master Tujuan dari RTDB
+        const resTujuan = await fetch(`${RTDB_URL}/master_tujuan.json`);
+        const dataTujuan = await resTujuan.json();
+        const dlTujuan = document.getElementById('list_master_tujuan');
+
+        if (dataTujuan && dlTujuan) {
+            let htmlTujuan = '';
+            
+            // Cek apakah data berupa objek atau array
+            Object.keys(dataTujuan).forEach(key => {
+                const item = dataTujuan[key];
+                let valTujuan = '';
+
+                if (typeof item === 'object' && item !== null) {
+                    // Ambil secara spesifik properti 'TUJUAN' (atau fallback ke key jika tidak ada)
+                    valTujuan = item.TUJUAN || item.tujuan || item.nama || key;
+                } else {
+                    valTujuan = item; // Jika bentuknya string langsung
+                }
+
+                if (valTujuan) {
+                    htmlTujuan += `<option value="${valTujuan}">`;
+                }
+            });
+            
+            dlTujuan.innerHTML = htmlTujuan;
+        }
+
+        // 2. Ambil Data Master Driver & Nopol dari RTDB
+        const resDriver = await fetch(`${RTDB_URL}/master_driver.json`);
+        const dataDriver = await resDriver.json();
+        const dlDriver = document.getElementById('list_master_driver');
+        
+        if (dataDriver && dlDriver) {
+            let htmlDriver = '';
+            cacheMasterDriver = dataDriver; // Simpan untuk autofill Nopol
+            
+            Object.keys(dataDriver).forEach(key => {
+                const driverObj = dataDriver[key];
+                let namaDriver = '';
+
+                if (typeof driverObj === 'object' && driverObj !== null) {
+                    namaDriver = driverObj.nama || driverObj.driver || key;
+                } else {
+                    namaDriver = driverObj;
+                }
+
+                if (namaDriver) {
+                    htmlDriver += `<option value="${namaDriver}">`;
+                }
+            });
+            dlDriver.innerHTML = htmlDriver;
+        }
+    } catch (e) {
+        console.error("Gagal memuat master dropdown:", e);
+    }
+};
+
+// Fungsi otomatis mengisi Nopol dan Ekspedisi berdasarkan nama driver yang dipilih/diketik
+window.autofillDriverData = function(namaDriverInput) {
+    if (!cacheMasterDriver) return;
+    const inputClean = namaDriverInput.trim().toUpperCase();
+    const inputNopol = document.getElementById('ba_nopol');
+    const inputEkspedisi = document.getElementById('ba_ekspedisi');
+    
+    Object.keys(cacheMasterDriver).forEach(key => {
+        const driverObj = cacheMasterDriver[key];
+        
+        // Cek apakah data driver berupa objek
+        if (typeof driverObj === 'object' && driverObj !== null) {
+            const nama = (driverObj.driver || driverObj.nama || key).toUpperCase();
+            
+            if (nama === inputClean) {
+                // Ambil data dari properti PLAT (atau nopol jika strukturnya beda)
+                const rawPlat = driverObj.plat || driverObj.PLAT || driverObj.nopol || '';
+                
+                if (rawPlat.includes('-')) {
+                    // Format misal: "PHILIP - BE 8036 AME"
+                    const parts = rawPlat.split('-');
+                    const ekspedisiPart = parts[0].trim();
+                    const nopolPart = parts.slice(1).join('-').trim(); // Mengantisipasi jika ada strip ganda di nopol
+                    
+                    if (inputEkspedisi && ekspedisiPart) {
+                        inputEkspedisi.value = ekspedisiPart;
+                    }
+                    if (inputNopol && nopolPart) {
+                        inputNopol.value = nopolPart;
+                    }
+                } else {
+                    // Jika tidak ada tanda strip, langsung masukkan apa adanya ke nopol
+                    if (inputNopol && rawPlat) {
+                        inputNopol.value = rawPlat.trim();
+                    }
+                }
+            }
+        }
+    });
+};
+
+window.resetFormBeritaAcara = function() {
+    document.getElementById('ba_tujuan').value = '';
+    document.getElementById('ba_driver').value = '';
+    document.getElementById('ba_ekspedisi').value = '';
+    document.getElementById('ba_nopol').value = '';
+    document.getElementById('ba_nosurat').value = '';
+    document.getElementById('ba_lokasi').value = 'WH-2';
+
+    document.getElementById('ba_itemKode').value = '';
+    document.getElementById('ba_itemNama').value = '';
+    document.getElementById('ba_itemQtySurat').value = '';
+    document.getElementById('ba_itemQtySisa').value = '';
+    document.getElementById('ba_itemKet').value = '';
+
+    listSementaraItemBA = [];
+    renderTabelItemSementara();
+    window.tutupPopupItemBarang();
+};
+
+window.tambahItemBarangBA = function() {
+    const kode = document.getElementById('ba_itemKode').value.trim();
+    const namabarang = document.getElementById('ba_itemNama').value.trim();
+    const qtysurat = parseInt(document.getElementById('ba_itemQtySurat').value) || 0;
+    const qtysisa = parseInt(document.getElementById('ba_itemQtySisa').value) || 0;
+    const keterangan = document.getElementById('ba_itemKet').value.trim();
+
+    if (!namabarang) {
+        miuiAlert("Mohon isi Nama Barang terlebih dahulu!");
+        return;
+    }
+
+    listSementaraItemBA.push({
+        kode: kode || '-',
+        namabarang: namabarang,
+        qtysurat: qtysurat,
+        qtysisa: qtysisa,
+        keterangan: keterangan || '-'
+    });
+
+    document.getElementById('ba_itemKode').value = '';
+    document.getElementById('ba_itemNama').value = '';
+    document.getElementById('ba_itemQtySurat').value = '';
+    document.getElementById('ba_itemQtySisa').value = '';
+    document.getElementById('ba_itemKet').value = '';
+
+    renderTabelItemSementara();
+};
+
+window.hapusItemSementara = function(index) {
+    listSementaraItemBA.splice(index, 1);
+    renderTabelItemSementara();
+};
+
+function renderTabelItemSementara() {
+    const tbody = document.getElementById('ba_tabelItemBody');
+    const badge = document.getElementById('ba_badgeItemCount');
+    if (!tbody) return;
+
+    if (badge) badge.innerText = `${listSementaraItemBA.length} Item`;
+
+    if (listSementaraItemBA.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center text-slate-400 py-2 italic">Belum ada item.</td></tr>`;
+        return;
+    }
+
+    let html = '';
+    listSementaraItemBA.forEach((item, idx) => {
+        html += `
+        <tr class="border-b border-slate-200 hover:bg-slate-50">
+            <td class="p-1"><b>${item.kode}</b><br>${item.namabarang}</td>
+            <td class="p-1 text-center font-bold">${item.qtysurat}</td>
+            <td class="p-1 text-center font-bold">${item.qtysisa}</td>
+            <td class="p-1 text-center">
+                <button type="button" onclick="window.hapusItemSementara(${idx})" class="bg-red-500 hover:bg-red-600 text-white px-1.5 py-0.5 rounded text-[10px]">✕</button>
+            </td>
+        </tr>`;
+    });
+    tbody.innerHTML = html;
+}
+
+window.simpanSemuaBeritaAcara = async function() {
+    const tujuan = document.getElementById('ba_tujuan').value.trim();
+    const driver = document.getElementById('ba_driver').value.trim().toUpperCase();
+    const ekspedisi = document.getElementById('ba_ekspedisi').value.trim();
+    const nopol = document.getElementById('ba_nopol').value.trim().toUpperCase();
+    const nosurat = document.getElementById('ba_nosurat').value.trim();
+    const lokasi = document.getElementById('ba_lokasi').value.trim();
+
+    if (!driver || !nosurat) {
+        miuiAlert("Mohon lengkapi Nama Driver dan No Surat / DO!");
+        return;
+    }
+
+    if (listSementaraItemBA.length === 0) {
+        miuiAlert("Mohon buka popup dan tambahkan minimal 1 item barang!");
+        return;
+    }
+
+    const dataPayload = {
+        tujuan: tujuan,
+        driver: driver,
+        ekspedisi: ekspedisi,
+        nopol: nopol,
+        nosurat: nosurat,
+        lokasi: lokasi,
+        items: listSementaraItemBA,
+        timestamp: Date.now()
+    };
+
+    try {
+        const res = await fetch(`${RTDB_URL}/berita_acara_history.json`, {
+            method: 'POST',
+            body: JSON.stringify(dataPayload),
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (res.ok) {
+            miuiAlert("Berita Acara berhasil disimpan ke database!");
+            window.resetFormBeritaAcara();
+            window.muatHistoriBeritaAcara();
+        } else {
+            miuiAlert("Gagal menyimpan data ke database.");
+        }
+    } catch (e) {
+        console.error(e);
+        miuiAlert("Terjadi kesalahan koneksi saat menyimpan data.");
+    }
+};
+
+// Fungsi untuk menampilkan popup detail item dengan gaya modal MIUI v5
+window.tampilkanDetailItemBA = function(itemJsonStr) {
+    try {
+        const items = JSON.parse(decodeURIComponent(itemJsonStr));
+        let daftarHtml = '';
+        
+        if (Array.isArray(items) && items.length > 0) {
+            items.forEach((it, idx) => {
+                // Mengambil data dengan fallback yang lengkap
+                const kodeBrg = it.kodebarang || it.kode || '-';
+                const namaBrg = it.namabarang || it.nama || it.barang || 'Item';
+                const qtyBrg  = it.qtysisa ?? it.qty ?? it.jumlah ?? 1;
+                const ketBrg  = it.keterangan || it.ket || '-';
+
+                daftarHtml += `
+                <div class="bg-white border border-slate-200 rounded-[12px] p-3 mb-2 shadow-sm">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-[12px] font-bold bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded border border-orange-100 uppercase">
+                            ${idx + 1}. ${kodeBrg}
+                        </span>
+                        <span class="text-[12px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-100">
+                            Qty Tinggalan: ${qtyBrg} Krt
+                        </span>
+                    </div>
+                    <div class="font-bold text-slate-500 text-[11px] mb-1.5">${namaBrg}</div>
+                    <div class="text-[12px] text-slate-500 bg-slate-50 p-1.5 rounded border border-slate-100 flex items-center gap-1">
+                        <i class="fa-solid fa-circle-info text-orange-400"></i> Ket: ${ketBrg}
+                    </div>
+                </div>`;
+            });
+        } else {
+            daftarHtml = '<div class="py-6 text-xs text-slate-400 italic text-center">Tidak ada detail item.</div>';
+        }
+
+        const existingModal = document.getElementById('miui_custom_modal');
+        if (existingModal) existingModal.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'miui_custom_modal';
+        modal.className = "fixed inset-0 bg-black/50 backdrop-blur-[2px] flex items-center justify-center z-[99999] px-4 animate-in fade-in duration-150";
+        modal.innerHTML = `
+            <div class="bg-[#f8f8f8] w-full max-w-sm rounded-[20px] shadow-2xl overflow-hidden border border-slate-200 transform scale-100 transition-all">
+                <div class="bg-slate-900 text-white px-5 py-4 flex justify-between items-center">
+                    <h3 class="font-bold text-xs uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-boxes-stacked text-orange-400"></i> Daftar Item Barang Tinggalan
+                    </h3>
+                    <button onclick="document.getElementById('miui_custom_modal').remove()" class="text-slate-400 hover:text-white text-lg font-bold">&times;</button>
+                </div>
+                <div class="p-3 max-h-[60vh] overflow-y-auto">
+                    ${daftarHtml}
+                </div>
+                <div class="p-4 bg-white border-t border-slate-200">
+                    <button onclick="document.getElementById('miui_custom_modal').remove()" class="w-full bg-orange-600 hover:bg-orange-700 text-white py-2.5 rounded-[12px] font-bold text-xs shadow-md transition active:scale-95">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+    } catch(e) {
+        console.error("Gagal memproses detail item:", e);
+    }
+};
+
+window.muatHistoriBeritaAcara = async function() {
+    const container = document.getElementById('ba_containerHistori');
+    const countLabel = document.getElementById('ba_historiCount');
+    if (!container) return;
+
+    container.innerHTML = `<div class="text-center text-xs text-slate-500 py-3 italic">Memuat histori...</div>`;
+
+    try {
+        const res = await fetch(`${RTDB_URL}/berita_acara_history.json`);
+        const data = await res.json();
+
+        if (!data) {
+            container.innerHTML = `<div class="text-center text-xs text-slate-500 py-3 italic">Belum ada riwayat.</div>`;
+            if (countLabel) countLabel.innerText = "(0)";
+            return;
+        }
+
+        const keys = Object.keys(data).reverse();
+        if (countLabel) countLabel.innerText = `(${keys.length} Riwayat)`;
+
+        let html = '';
+        keys.forEach(key => {
+            const item = data[key];
+            
+            // Format waktu lengkap: Hari, Tanggal Bulan Tahun, Pukul Jam:Menit
+            const d = new Date(item.timestamp || Date.now());
+            const tgl = d.toLocaleDateString('id-ID', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            }).replace('.', ':');
+
+            const jumlahItem = item.items ? item.items.length : 0;
+            const itemsEncoded = encodeURIComponent(JSON.stringify(item.items || []));
+
+            // Format driver: Ekspedisi - Driver - Nopol
+            const ekspedisiStr = item.ekspedisi || '-';
+            const driverStr = item.driver || '-';
+            const nopolStr = item.nopol || '-';
+            const gabunganDriver = `${ekspedisiStr} - ${driverStr} - ${nopolStr}`;
+
+            html += `
+            <div class="bg-orange-50 rounded-[8px] p-2.5 border border-orange-200 shadow-sm text-xs flex flex-col gap-1.5">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-1">
+                    <span class="font-bold text-orange-600">📄 ${item.nosurat || '-'}</span>
+                    <span class="text-[10px] text-slate-700">${tgl}</span>
+                </div>
+                
+                <div class="flex items-center justify-between text-slate-700">
+                    <div><b>Tujuan:</b> ${item.tujuan || '-'}</div>
+                    <div class="cursor-pointer text-orange-600 hover:underline font-bold" onclick="tampilkanDetailItemBA('${itemsEncoded}')">
+                        Item: <span class="bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">${jumlahItem} brg 🔍</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-1 border-t border-orange-100 bg-orange-50 p-1.5 rounded">
+                    <div class="text-[11px] text-slate-700 flex-1 truncate pr-2" title="${gabunganDriver}">
+                        <b>Driver:</b> ${gabunganDriver}
+                    </div>
+                    <div class="flex gap-1 shrink-0">
+                        <button onclick="window.cetakBeritaAcara('${key}')" class="bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded-[4px] text-[10px] font-bold shadow">Cetak</button>
+                        <button onclick="window.hapusBeritaAcara('${key}')" class="bg-red-500 hover:bg-red-600 text-white px-2.5 py-1 rounded-[4px] text-[10px] font-bold shadow">Hapus</button>
+                    </div>
+                </div>
+            </div>`;
+        });
+
+        container.innerHTML = html;
+    } catch (e) {
+        console.error(e);
+        container.innerHTML = `<div class="text-center text-xs text-red-500 py-3">Gagal memuat histori.</div>`;
+    }
+};
+
+window.hapusBeritaAcara = async function(key) {
+    if (!confirm("Yakin ingin menghapus riwayat berita acara ini?")) return;
+    try {
+        await fetch(`${RTDB_URL}/berita_acara_history/${key}.json`, { method: 'DELETE' });
+        window.muatHistoriBeritaAcara();
+    } catch (e) {
+        miuiAlert("Gagal menghapus data riwayat.");
+    }
+};
+
+window.cetakBeritaAcara = async function(key) {
+    try {
+        const res = await fetch(`${RTDB_URL}/berita_acara_history/${key}.json`);
+        const item = await res.json();
+
+        if (!item) {
+            miuiAlert("Data berita acara tidak ditemukan.");
+            return;
+        }
+
+        let rowsHtml = '';
+        if (item.items && Array.isArray(item.items)) {
+            item.items.forEach((it, idx) => {
+                rowsHtml += `
+                <tr>
+                    <td style="padding: 6px 8px; border: 1px solid #000; text-align: center;">${idx + 1}</td>
+                    <td style="padding: 6px 8px; border: 1px solid #000; text-align: left;">
+                        <b>${it.kode || '-'}</b><br>${it.namabarang || '-'}
+                    </td>
+                    <td style="padding: 6px 8px; border: 1px solid #000; text-align: center; font-weight: bold;">${it.qtysurat || 0}</td>
+                    <td style="padding: 6px 8px; border: 1px solid #000; text-align: center; font-weight: bold;">${it.qtysisa || 0}</td>
+                    <td style="padding: 6px 8px; border: 1px solid #000; text-align: left;">${it.keterangan || '-'}</td>
+                </tr>`;
+            });
+        }
+
+        const pagesHtml = `
+        <div class="page" style="page-break-after: always; width: 210mm; min-height: 297mm; padding: 20mm; box-sizing: border-box; font-family: Arial, sans-serif; font-size: 11pt; color: #000; background: #fff;">
+            <div style="text-align: center; font-size: 15pt; font-weight: bold; text-decoration: underline; margin-bottom: 25px;">BERITA ACARA</div>
+            
+            <table style="width: 100%; font-size: 11pt; margin-bottom: 20px; border-collapse: collapse;">
+                <tr style="line-height: 1.5;">
+                    <td style="width: 150px;">Nama Expedisi</td>
+                    <td style="width: 15px; text-align: center;">:</td>
+                    <td style="font-weight: bold;">${item.ekspedisi || '-'}</td>
+                </tr>
+                <tr style="line-height: 1.5;">
+                    <td>Nama Driver</td>
+                    <td style="text-align: center;">:</td>
+                    <td style="font-weight: bold; text-transform: uppercase;">${item.driver || '-'}</td>
+                </tr>
+                <tr style="line-height: 1.5;">
+                    <td>No. Polisi</td>
+                    <td style="text-align: center;">:</td>
+                    <td style="font-weight: bold;">${item.nopol || '-'}</td>
+                </tr>
+                <tr style="line-height: 1.5;">
+                    <td>No. DO / Surat Jalan</td>
+                    <td style="text-align: center;">:</td>
+                    <td style="font-weight: bold;">${item.nosurat || '-'}</td>
+                </tr>
+                <tr style="line-height: 1.5;">
+                    <td>Lokasi Gudang</td>
+                    <td style="text-align: center;">:</td>
+                    <td style="font-weight: bold;">${item.lokasi || 'WH-2'}</td>
+                </tr>
+            </table>
+
+            <div style="margin-bottom: 15px; line-height: 1.5;">Bersama dengan ini kami mengirimkan barang ke <b>${item.tujuan || '-'}</b> dan barang kiriman terdapat beberapa item produk yang kurang / selisih sebagai berikut:</div>
+
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; text-align: center;" border="1">
+                <thead>
+                    <tr style="background-color: #f2f2f2;">
+                        <th style="padding: 6px; border: 1px solid #000; width: 40px;">NO</th>
+                        <th style="padding: 6px; border: 1px solid #000;">KODE BARANG / NAMA BARANG</th>
+                        <th style="padding: 6px; border: 1px solid #000; width: 100px;">QTY SURAT</th>
+                        <th style="padding: 6px; border: 1px solid #000; width: 100px;">QTY MUAT</th>
+                        <th style="padding: 6px; border: 1px solid #000; width: 130px;">KETERANGAN</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHtml}
+                </tbody>
+            </table>
+
+            <div style="margin-top: 50px;">
+                <table style="width: 100%; text-align: center; font-size: 11pt; border-collapse: collapse;">
+                    <tr>
+                        <td style="width: 33%;">Hormat Kami,</td>
+                        <td style="width: 33%;">Driver</td>
+                        <td style="width: 33%;">Penerima</td>
+                    </tr>
+                    <tr>
+                        <td style="height: 75px; vertical-align: bottom; font-weight: bold;">( ......................... )</td>
+                        <td style="height: 75px; vertical-align: bottom; font-weight: bold; text-transform: uppercase;">(${item.driver || '.........................'})</td>
+                        <td style="height: 75px; vertical-align: bottom; font-weight: bold;">( ......................... )</td>
+                    </tr>
+                </table>
+            </div>
+        </div>`;
+
+        const safeKeyName = `Cetak_BA_${(item.nosurat || 'DOC').replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}`;
+
+        const win = window.open("", "_blank");
+        win.document.write(pagesHtml);
+        win.document.close();
+
+        //await fetch(`${RTDB_URL}/print_jobs/${safeKeyName}.json`, {
+        //    method: 'PUT',
+        //    body: JSON.stringify({
+        //        judul: `Cetak Berita Acara - ${item.nosurat}`,
+        //        html: pagesHtml,
+        //        status: 'PENDING',
+        //        timestamp: Date.now()
+        //    }),
+        //    headers: { 'Content-Type': 'application/json' }
+        //});
+
+        miuiAlert("Dokumen Berita Acara berhasil dikirim ke antrean cetak!");
+    } catch (e) {
+        console.error(e);
+        miuiAlert("Gagal memproses cetak Berita Acara.");
+    }
+};
+
+
+
 // Helper Global Modal Progress Cetak
 window.showCetakProgress = function(pesan = "Memproses Cetak...") {
     const modal = document.getElementById('modal-progress-cetak');
@@ -1702,7 +2249,7 @@ window.bukaModalPrinter = function() {
         modal.style.setProperty('display', 'flex', 'important');
         muatDataPrintJobs();
     } else {
-        console.error("Elemen modal-kontrol-printer tidak ditemukan di HTML!");
+        console.log("Elemen modal-kontrol-printer tidak ditemukan di HTML!");
     }
 };
 
