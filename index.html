@@ -112,7 +112,7 @@
                 <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Ceklist DN</span>
             </div>
 
-            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="miuiAlert('Membuka Berita Acara')">
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="bukaModalBeritaAcara()">
                 <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
                     <img src="img/berita.png" alt="Berita Acara" class="w-full h-full object-cover">
                 </div>
@@ -786,6 +786,205 @@
                 <!-- List Konten Riwayat (Bisa Di-scroll) -->
                 <div id="containerHistoriPalet" class="p-2.5 flex flex-col gap-2 max-h-[350px] overflow-y-auto bg-[#ededed]">
                     <div class="text-center text-xs text-slate-500 py-6 italic">Memuat histori data...</div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+    <!-- MODAL UTAMA BERITA ACARA + PANEL HISTORI DI KANAN (LEBAR SEIMBANG) -->
+    <div id="modalBeritaAcara" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 select-none animate-fade-in">
+        <div class="flex flex-col md:flex-row gap-4 items-center justify-center max-w-[820px] w-full max-h-[90vh]">
+            
+            <!-- BAGIAN KIRI: FORM UTAMA BERITA ACARA -->
+            <div class="bg-[#e4e4e4] w-full max-w-[390px] rounded-[14px] overflow-hidden shadow-2xl border border-[#b2b2b2] flex flex-col font-sans text-slate-800 relative max-h-[85vh] md:max-h-[90vh]">
+                
+                <!-- Header Modal -->
+                <div class="bg-gradient-to-b from-[#323232] to-[#202020] px-4 py-3 flex items-center justify-between border-b border-[#151515] shrink-0">
+                    <h3 class="text-white font-medium text-sm tracking-wide flex items-center gap-2">
+                        <i class="fa-solid fa-file-signature text-orange-400 text-xs"></i> FORM BERITA ACARA TINGGALAN
+                    </h3>
+                    <button onclick="tutupModal('modalBeritaAcara')" class="text-white hover:text-red-400 font-bold text-lg">✕</button>
+                </div>
+
+                <!-- Body Utama (Bisa di-scroll) -->
+                <div class="p-3.5 flex flex-col gap-2.5 overflow-y-auto relative flex-1">
+                    
+                    <!-- PANEL INFORMASI PENGIRIMAN -->
+                    <fieldset class="border border-slate-400 p-2.5 rounded-[6px] bg-[#dcdcdc] flex flex-col gap-2">
+                        <legend class="text-[10px] font-bold text-slate-700 px-1.5 uppercase tracking-wide">Informasi Data Pengiriman</legend>
+                        
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-600 uppercase">Tujuan:</label>
+                            <input type="text" id="ba_tujuan" list="list_master_tujuan" class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs font-bold shadow-inner" placeholder="Tujuan pengiriman...">
+                            <datalist id="list_master_tujuan"></datalist>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-600 uppercase">Driver:</label>
+                            <input type="text" id="ba_driver" list="list_master_driver" oninput="autofillDriverData(this.value)" class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs font-bold shadow-inner" placeholder="Nama Driver...">
+                            <datalist id="list_master_driver"></datalist>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-600 uppercase">Expedisi:</label>
+                                <input type="text" id="ba_ekspedisi" list="list_tbexpedisi" class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs font-bold shadow-inner" placeholder="Nama Expedisi...">
+                                <datalist id="list_tbexpedisi">
+                                    <option value="UTH">
+                                    <option value="ADHI LINTAS NUSA">
+                                    <option value="ANEKA SAKTI">
+                                    <option value="BERDIKARI">
+                                    <option value="BERKATAMA">
+                                    <option value="BTM">
+                                    <option value="CTL">
+                                    <option value="DGL">
+                                    <option value="EUREKA">
+                                    <option value="GPI">
+                                    <option value="JDS">
+                                    <option value="IRON BIRD">
+                                    <option value="LAJU JAYA EXPRESS">
+                                    <option value="LANCAR">
+                                    <option value="MENARA MAS">
+                                    <option value="MIF">
+                                    <option value="MITRA ANDALAN">
+                                    <option value="PHILIP">
+                                    <option value="RAJAWALI PUTRA">
+                                    <option value="RUDY EXPRESS">
+                                    <option value="SAERAH SURYA PERKASA">
+                                    <option value="SATYA RAGAM">
+                                    <option value="SDM">
+                                    <option value="SRI PUTRA">
+                                    <option value="SUMBER MAS">
+                                    <option value="SURYA TAMA">
+                                    <option value="TRANSPORINDO">
+                                    <option value="TRISAKA">
+                                </datalist>
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-600 uppercase">NOPOL:</label>
+                                <input type="text" id="ba_nopol" class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs font-bold shadow-inner" placeholder="H 0000 XX...">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-600 uppercase">Surat:</label>
+                                <input type="text" id="ba_nosurat" list="list_nosurat_default" class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs font-bold shadow-inner" placeholder="No Surat / DO...">
+                                <datalist id="list_nosurat_default">
+                                    <option value="DO-HO001-">
+                                    <option value="DN-HO001-">
+                                </datalist>
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-600 uppercase">Lokasi:</label>
+                                <input type="text" id="ba_lokasi" value="WH-2" class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs font-bold shadow-inner">
+                            </div>
+                        </div>
+
+                        <!-- Tombol untuk Membuka Popup Item Barang -->
+                        <button type="button" onclick="bukaPopupItemBarang()" class="mt-1 py-2 px-3 bg-orange-600 hover:bg-orange-700 text-white rounded-[6px] text-xs font-bold shadow flex items-center justify-between transition">
+                            <span class="flex items-center gap-1.5">
+                                <i class="fa-solid fa-boxes-stacked text-orange-300"></i> Tambah Item Barang Tinggalan
+                            </span>
+                            <span id="ba_badgeItemCount" class="bg-gray-800 px-2 py-0.5 rounded-full text-[10px]">0 Item</span>
+                        </button>
+                    </fieldset>
+
+                </div>
+
+                <!-- POPUP ITEM BARANG (DI DALAM FORM UTAMA) -->
+                <div id="popupItemBarang" class="hidden absolute inset-0 bg-[#e4e4e4]/95 z-20 flex flex-col p-4 animate-fade-in">
+                    <div class="bg-gradient-to-b from-[#323232] to-[#202020] px-3.5 py-2.5 flex items-center justify-between border-b border-[#151515] rounded-t-[8px]">
+                        <h3 class="text-white font-medium text-xs tracking-wide flex items-center gap-1.5">
+                            <i class="fa-solid fa-box text-orange-400"></i> FORM ITEM BARANG TINGGALAN
+                        </h3>
+                        <button onclick="tutupPopupItemBarang()" class="text-white hover:text-red-400 font-bold text-sm">✕</button>
+                    </div>
+
+                    <div class="p-3 flex flex-col gap-2.5 bg-[#dcdcdc] flex-1 overflow-y-auto rounded-b-[8px] border border-t-0 border-[#b2b2b2]">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-600 uppercase">Kode Barang:</label>
+                                <input type="text" id="ba_itemKode" class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs shadow-inner" placeholder="Kode...">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-600 uppercase">Nama Barang:</label>
+                                <input type="text" id="ba_itemNama" class="w-full bg-[#e6ffff] border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs font-bold shadow-inner" placeholder="Nama...">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-600 uppercase">QTY Surat:</label>
+                                <input type="number" id="ba_itemQtySurat" class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs shadow-inner" placeholder="0">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-600 uppercase">QTY Muat:</label>
+                                <input type="number" id="ba_itemQtySisa" class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs shadow-inner" placeholder="0">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-600 uppercase">Keterangan:</label>
+                            <input type="text" id="ba_itemKet" class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs shadow-inner" placeholder="Kurang / Rusak...">
+                        </div>
+
+                        <button type="button" onclick="tambahItemBarangBA()" class="py-2 bg-orange-600 hover:bg-orange-700 text-white rounded text-xs font-bold shadow transition flex items-center justify-center gap-1">
+                            <i class="fa-solid fa-plus text-[10px]"></i> Tambah ke Daftar Barang
+                        </button>
+
+                        <!-- Tabel Item Sementara -->
+                        <div class="mt-1 max-h-[140px] overflow-y-auto bg-white border border-slate-300 rounded p-1">
+                            <table class="w-full text-left text-[11px]">
+                                <thead>
+                                    <tr class="bg-slate-100 text-slate-600 border-b border-slate-200">
+                                        <th class="p-1">Barang</th>
+                                        <th class="p-1 text-center">Surat</th>
+                                        <th class="p-1 text-center">Muat</th>
+                                        <th class="p-1 text-center">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ba_tabelItemBody">
+                                    <tr>
+                                        <td colspan="4" class="text-center text-slate-400 py-2 italic">Belum ada item barang.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <button type="button" onclick="tutupPopupItemBarang()" class="mt-auto py-2 bg-slate-700 hover:bg-slate-800 text-white rounded text-xs font-bold shadow transition">
+                            Kembali ke Form Utama
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Footer Tombol Aksi -->
+                <div class="grid grid-cols-2 border-t border-[#d0d0d0] bg-[#dbdbdb] shrink-0">
+                    <button onclick="simpanSemuaBeritaAcara()" class="py-2.5 text-[12px] font-bold text-white bg-gradient-to-b from-amber-500 to-orange-600 border-r border-orange-700 transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] hover:from-amber-600 hover:to-orange-700">SIMPAN SEMUA</button>
+                    <button onclick="resetFormBeritaAcara()" class="py-2.5 text-[12px] font-bold text-slate-700 bg-gradient-to-b from-[#f2f2f2] to-[#e0e0e0] border-l border-[#c4c4c4] transition-all hover:bg-slate-300">BATAL / RESET</button>
+                </div>
+
+            </div>
+
+            <!-- BAGIAN KANAN: PANEL HISTORI BERITA ACARA (DILEBARKAN SAMA DENGAN FORM UTAMA) -->
+            <div class="relative bg-[#e4e4e4] w-full max-w-[390px] rounded-[14px] overflow-hidden shadow-2xl border border-[#b2b2b2] flex flex-col font-sans text-slate-800 max-h-[85vh] md:max-h-[90vh]">
+                
+                <!-- Segitiga Penunjuk di Sisi Kiri (Desktop Only) -->
+                <div class="hidden md:block absolute -left-[7px] top-12 w-0 h-0 border-t-[7px] border-t-transparent border-b-[7px] border-b-transparent border-r-[7px] border-r-[#e4e4e4] z-10"></div>
+
+                <!-- Header Panel Riwayat -->
+                <div class="bg-gradient-to-b from-[#323232] to-[#202020] px-4 py-3 flex items-center justify-between border-b border-[#151515] shrink-0">
+                    <h3 class="text-white font-medium text-sm tracking-wide flex items-center gap-2">
+                        <i class="fa-solid fa-clock-rotate-left text-orange-400 text-xs"></i> RIWAYAT BERITA ACARA 
+                        <span id="ba_historiCount" class="text-orange-400 font-bold">(0)</span>
+                    </h3>
+                    <button onclick="muatHistoriBeritaAcara()" class="text-white hover:text-orange-400 text-sm transition-transform active:rotate-180" title="Muat Ulang Histori"><i class="fa-solid fa-rotate"></i></button>
+                </div>
+
+                <!-- List Konten Riwayat (Bisa Di-scroll) -->
+                <div id="ba_containerHistori" class="p-3.5 flex flex-col gap-2.5 overflow-y-auto bg-[#ededed] flex-1">
+                    <div class="text-center text-xs text-slate-500 py-6 italic">Memuat Riwayat...</div>
                 </div>
 
             </div>
