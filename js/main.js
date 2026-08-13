@@ -1626,14 +1626,32 @@ window.tutupModal = function(id) {
     window.tutupPopupItemBarang();
 };
 
+// Fungsi untuk membuka popup form item barang & mengubah panel kanan menjadi tabel item
 window.bukaPopupItemBarang = function() {
     const popup = document.getElementById('popupItemBarang');
+    const panelHistori = document.getElementById('panelHistoriBA');
+    const panelTabel = document.getElementById('panelTabelItem');
+    
+    // Munculkan modal popup form di kiri
     if (popup) popup.classList.remove('hidden');
+    
+    // Ubah panel kanan dari Riwayat menjadi Tabel Item Barang
+    if (panelHistori) panelHistori.classList.add('hidden');
+    if (panelTabel) panelTabel.classList.remove('hidden');
 };
 
+// Fungsi untuk menutup popup form item barang & mengembalikan panel kanan ke riwayat
 window.tutupPopupItemBarang = function() {
     const popup = document.getElementById('popupItemBarang');
+    const panelHistori = document.getElementById('panelHistoriBA');
+    const panelTabel = document.getElementById('panelTabelItem');
+    
+    // Sembunyikan modal popup form di kiri
     if (popup) popup.classList.add('hidden');
+    
+    // Kembalikan panel kanan dari Tabel Item ke Riwayat Berita Acara
+    if (panelTabel) panelTabel.classList.add('hidden');
+    if (panelHistori) panelHistori.classList.remove('hidden');
 };
 
 // Variabel cache untuk menyimpan data master driver beserta nopolnya
@@ -1755,7 +1773,62 @@ window.autofillDriverData = function(namaDriverInput) {
     });
 };
 
+// Global variabel penampung data master barang untuk pencarian cepat
+let masterBarangCache = {};
+
+// Fungsi untuk memuat data master barang ke Datalist saat form/aplikasi dibuka
+async function muatMasterBarangUntukBA() {
+    try {
+        const res = await fetch(`${RTDB_URL}/master_barang.json`);
+        const data = await res.json();
+        const datalist = document.getElementById('listMasterKodeBarang');
+        if (!datalist) return;
+        
+        datalist.innerHTML = '';
+        masterBarangCache = {};
+
+        if (data) {
+            const items = Array.isArray(data) ? data : Object.values(data);
+            
+            items.forEach(item => {
+                if (!item) return;
+                const kode = (item.KODE_BARANG || item.kodebarang || item.kode || '').trim();
+                const nama = (item.NAMA_BARANG || item.namabarang || item.nama || '').trim();
+                
+                if (kode) {
+                    masterBarangCache[kode.toUpperCase()] = nama;
+                    const opt = document.createElement('option');
+                    opt.value = kode;
+                    opt.textContent = nama;
+                    datalist.appendChild(opt);
+                }
+            });
+        }
+        console.log("Master Barang Berhasil Dimuat:", Object.keys(masterBarangCache).length, "item");
+    } catch (e) {
+        console.error("Gagal memuat master barang:", e);
+    }
+}
+
+// Fungsi otomatis mengisi nama barang berdasarkan kode yang diketik/dipilih
+window.handlePilihKodeBarang = function(kodeInput) {
+    const inputNama = document.getElementById('ba_itemNama');
+    if (!inputNama) return;
+    
+    const cleanKode = (kodeInput || '').trim().toUpperCase();
+    
+    if (masterBarangCache[cleanKode]) {
+        inputNama.value = masterBarangCache[cleanKode];
+    } else {
+        inputNama.value = '';
+    }
+};
+
+// Panggil fungsi ini saat pertama kali aplikasi/script dimuat agar datalist terisi
+muatMasterBarangUntukBA();
+
 window.resetFormBeritaAcara = function() {
+    // Reset input informasi utama form
     document.getElementById('ba_tujuan').value = '';
     document.getElementById('ba_driver').value = '';
     document.getElementById('ba_ekspedisi').value = '';
@@ -1763,77 +1836,128 @@ window.resetFormBeritaAcara = function() {
     document.getElementById('ba_nosurat').value = '';
     document.getElementById('ba_lokasi').value = 'WH-2';
 
-    document.getElementById('ba_itemKode').value = '';
-    document.getElementById('ba_itemNama').value = '';
-    document.getElementById('ba_itemQtySurat').value = '';
-    document.getElementById('ba_itemQtySisa').value = '';
-    document.getElementById('ba_itemKet').value = '';
+    // Reset input form item barang sementara
+    const itemKode = document.getElementById('ba_itemKode');
+    const itemNama = document.getElementById('ba_itemNama');
+    const itemQtySurat = document.getElementById('ba_itemQtySurat');
+    const itemQtySisa = document.getElementById('ba_itemQtySisa');
+    const itemKet = document.getElementById('ba_itemKet');
 
-    listSementaraItemBA = [];
-    renderTabelItemSementara();
-    window.tutupPopupItemBarang();
+    if (itemKode) itemKode.value = '';
+    if (itemNama) itemNama.value = '';
+    if (itemQtySurat) itemQtySurat.value = '';
+    if (itemQtySisa) itemQtySisa.value = '';
+    if (itemKet) itemKet.value = '';
+
+    // Kosongkan array global dan perbarui tampilan tabel serta badge
+    window.listSementaraItemBA = [];
+    
+    if (typeof window.renderTabelItemSementaraBA === 'function') {
+        window.renderTabelItemSementaraBA();
+    }
+    
+    if (typeof window.updateBadgeItemCount === 'function') {
+        window.updateBadgeItemCount();
+    }
+
+    // Tutup popup item jika sedang terbuka
+    if (typeof window.tutupPopupItemBarang === 'function') {
+        window.tutupPopupItemBarang();
+    }
 };
 
+// Perbarui fungsi tambah item agar mengambil nilai QTY Surat, Qty Muat, Qty Tinggalan, & Keterangan baru
 window.tambahItemBarangBA = function() {
-    const kode = document.getElementById('ba_itemKode').value.trim();
+    const kodebarang = document.getElementById('ba_itemKode').value.trim();
     const namabarang = document.getElementById('ba_itemNama').value.trim();
-    const qtysurat = parseInt(document.getElementById('ba_itemQtySurat').value) || 0;
-    const qtysisa = parseInt(document.getElementById('ba_itemQtySisa').value) || 0;
+    const qtysurat   = parseInt(document.getElementById('ba_itemQtySurat').value) || 0;
+    const qtymuat    = parseInt(document.getElementById('ba_itemQtyMuat') ? document.getElementById('ba_itemQtyMuat').value : 0) || 0; 
+    // Catatan: Jika input QTY Muat belum ada di HTML, bisa disesuaikan atau dihitung otomatis. Berdasarkan form di atas, kita gunakan input ba_itemQtySisa sebagai Qty Tinggalan:
+    const qtysisa    = parseInt(document.getElementById('ba_itemQtySisa').value) || 0;
     const keterangan = document.getElementById('ba_itemKet').value.trim();
 
-    if (!namabarang) {
-        miuiAlert("Mohon isi Nama Barang terlebih dahulu!");
+    if (!kodebarang || !namabarang) {
+        miuiAlert("Silakan pilih kode barang yang valid!");
         return;
     }
 
-    listSementaraItemBA.push({
-        kode: kode || '-',
+    if (!window.listSementaraItemBA) window.listSementaraItemBA = [];
+
+    window.listSementaraItemBA.push({
+        kodebarang: kodebarang,
         namabarang: namabarang,
         qtysurat: qtysurat,
+        qtymuat: qtymuat,
         qtysisa: qtysisa,
         keterangan: keterangan || '-'
     });
 
+    // Reset input form item setelah ditambah
     document.getElementById('ba_itemKode').value = '';
     document.getElementById('ba_itemNama').value = '';
     document.getElementById('ba_itemQtySurat').value = '';
     document.getElementById('ba_itemQtySisa').value = '';
     document.getElementById('ba_itemKet').value = '';
 
-    renderTabelItemSementara();
+    renderTabelItemSementaraBA();
+    updateBadgeItemCount();
 };
 
-window.hapusItemSementara = function(index) {
-    listSementaraItemBA.splice(index, 1);
-    renderTabelItemSementara();
+window.hapusItemSementaraBA = function(idx) {
+    if (window.listSementaraItemBA) {
+        window.listSementaraItemBA.splice(idx, 1);
+        renderTabelItemSementaraBA();
+        updateBadgeItemCount();
+    }
 };
 
-function renderTabelItemSementara() {
+// Perbarui fungsi render tabel item sementara di form utama
+window.renderTabelItemSementaraBA = function() {
     const tbody = document.getElementById('ba_tabelItemBody');
-    const badge = document.getElementById('ba_badgeItemCount');
     if (!tbody) return;
 
-    if (badge) badge.innerText = `${listSementaraItemBA.length} Item`;
-
-    if (listSementaraItemBA.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" class="text-center text-slate-400 py-2 italic">Belum ada item.</td></tr>`;
+    if (!window.listSementaraItemBA || window.listSementaraItemBA.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-slate-400 py-3 italic">Belum ada item barang.</td></tr>`;
         return;
     }
 
     let html = '';
-    listSementaraItemBA.forEach((item, idx) => {
+    window.listSementaraItemBA.forEach((it, idx) => {
+        let surat = parseInt(it.qtysurat) || 0;
+        let sisa = parseInt(it.qtysisa) || 0;
+        let muat = surat - sisa; // Hitung otomatis: Surat dikurangi Sisa/Tinggalan
+
         html += `
-        <tr class="border-b border-slate-200 hover:bg-slate-50">
-            <td class="p-1"><b>${item.kode}</b><br>${item.namabarang}</td>
-            <td class="p-1 text-center font-bold">${item.qtysurat}</td>
-            <td class="p-1 text-center font-bold">${item.qtysisa}</td>
-            <td class="p-1 text-center">
-                <button type="button" onclick="window.hapusItemSementara(${idx})" class="bg-red-500 hover:bg-red-600 text-white px-1.5 py-0.5 rounded text-[10px]">✕</button>
-            </td>
-        </tr>`;
+            <tr class="border-b border-slate-100 hover:bg-slate-50">
+                <td class="p-1.5">
+                    <div class="font-bold text-slate-800">${it.kodebarang || '-'}</div>
+                    <div class="text-[10px] text-slate-500 truncate max-w-[130px]">${it.namabarang || '-'}</div>
+                </td>
+                <td class="p-1.5 text-center font-medium">${surat}</td>
+                <td class="p-1.5 text-center font-medium text-emerald-600">${muat}</td>
+                <td class="p-1.5 text-center font-bold text-orange-600">${sisa}</td>
+                <td class="p-1.5 text-[10px] italic text-slate-600">${it.keterangan || '-'}</td>
+                <td class="p-1.5 text-center">
+                    <div class="flex items-center justify-center gap-1">
+                        <button type="button" onclick="hapusItemSementaraBA(${idx})" class="text-red-500 hover:text-red-700 font-bold px-1.5 py-0.5 rounded bg-red-50 text-xs" title="Hapus Item">✕</button>
+                    </div>
+                </td>
+            </tr>
+        `;
     });
     tbody.innerHTML = html;
 }
+
+// Pastikan dideklarasikan secara global di root script
+window.listSementaraItemBA = window.listSementaraItemBA || [];
+
+window.updateBadgeItemCount = function() {
+    const badge = document.getElementById('ba_badgeItemCount');
+    if (badge) {
+        const count = window.listSementaraItemBA ? window.listSementaraItemBA.length : 0;
+        badge.innerText = `${count} Item`;
+    }
+};
 
 window.simpanSemuaBeritaAcara = async function() {
     const tujuan = document.getElementById('ba_tujuan').value.trim();
@@ -1848,25 +1972,42 @@ window.simpanSemuaBeritaAcara = async function() {
         return;
     }
 
-    if (listSementaraItemBA.length === 0) {
+    // PERBAIKAN: Gunakan window. agar sinkron dengan deklarasi global
+    if (!window.listSementaraItemBA || window.listSementaraItemBA.length === 0) {
         miuiAlert("Mohon buka popup dan tambahkan minimal 1 item barang!");
         return;
     }
 
+    const timestamp = Date.now();
+    
+    const dateObj = new Date(timestamp);
+    const tglStr = dateObj.getFullYear() + 
+                   String(dateObj.getMonth() + 1).padStart(2, '0') + 
+                   String(dateObj.getDate()).padStart(2, '0');
+    const wktStr = String(dateObj.getHours()).padStart(2, '0') + 
+                   String(dateObj.getMinutes()).padStart(2, '0') + 
+                   String(dateObj.getSeconds()).padStart(2, '0');
+
+    const cleanDriver = driver.replace(/[\.#\$\[\]\/]/g, '').replace(/\s+/g, '_');
+    const cleanTujuan = (tujuan ? tujuan : 'UMUM').replace(/[\.#\$\[\]\/]/g, '').replace(/\s+/g, '_');
+
+    const customId = `${cleanDriver}_${cleanTujuan}_${tglStr}_${wktStr}`;
+
     const dataPayload = {
+        id: customId,
         tujuan: tujuan,
         driver: driver,
         ekspedisi: ekspedisi,
         nopol: nopol,
         nosurat: nosurat,
         lokasi: lokasi,
-        items: listSementaraItemBA,
-        timestamp: Date.now()
+        items: window.listSementaraItemBA, // Pastikan payload juga merujuk ke window.
+        timestamp: timestamp
     };
 
     try {
-        const res = await fetch(`${RTDB_URL}/berita_acara_history.json`, {
-            method: 'POST',
+        const res = await fetch(`${RTDB_URL}/berita_acara_history/${customId}.json`, {
+            method: 'PUT',
             body: JSON.stringify(dataPayload),
             headers: { 'Content-Type': 'application/json' }
         });
@@ -2047,103 +2188,283 @@ window.cetakBeritaAcara = async function(key) {
             return;
         }
 
+        // Format tanggal lengkap dengan hari untuk paragraf narasi
+        const optionsFull = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        const tanggalLengkap = new Date(item.timestamp || Date.now()).toLocaleDateString('id-ID', optionsFull);
+
+        // Format tanggal tanpa hari (hanya tanggal, bulan, dan tahun) untuk bagian bawah
+        const optionsShort = { year: 'numeric', month: 'long', day: 'numeric' };
+        const tanggalCetak = new Date(item.timestamp || Date.now()).toLocaleDateString('id-ID', optionsShort);
+
+        let totalSurat = 0;
+        let totalMuat = 0;
+        let totalSisa = 0;
+
         let rowsHtml = '';
         if (item.items && Array.isArray(item.items)) {
             item.items.forEach((it, idx) => {
+                let surat = parseInt(it.qtysurat) || 0;
+                let sisa = parseInt(it.qtysisa) || 0;
+                let muat = surat - sisa;
+
+                totalSurat += surat;
+                totalMuat += (muat > 0 ? muat : 0);
+                totalSisa += sisa;
+
                 rowsHtml += `
                 <tr>
-                    <td style="padding: 6px 8px; border: 1px solid #000; text-align: center;">${idx + 1}</td>
-                    <td style="padding: 6px 8px; border: 1px solid #000; text-align: left;">
-                        <b>${it.kode || '-'}</b><br>${it.namabarang || '-'}
+                    <td style="padding: 5px 6px; border: 1px solid #000; text-align: center; vertical-align: middle;">${idx + 1}</td>
+                    <td style="padding: 5px 6px; border: 1px solid #000; text-align: left; vertical-align: middle;">
+                        <div style="font-weight: bold;">${it.kode || it.kodebarang || '-'}</div>
+                        <div style="font-size: 10pt;">${it.namabarang || '-'}</div>
                     </td>
-                    <td style="padding: 6px 8px; border: 1px solid #000; text-align: center; font-weight: bold;">${it.qtysurat || 0}</td>
-                    <td style="padding: 6px 8px; border: 1px solid #000; text-align: center; font-weight: bold;">${it.qtysisa || 0}</td>
-                    <td style="padding: 6px 8px; border: 1px solid #000; text-align: left;">${it.keterangan || '-'}</td>
+                    <td style="padding: 5px 6px; border: 1px solid #000; text-align: center; font-weight: bold; vertical-align: middle;">${surat}</td>
+                    <td style="padding: 5px 6px; border: 1px solid #000; text-align: center; font-weight: bold; vertical-align: middle;">${muat > 0 ? muat : '-'}</td>
+                    <td style="padding: 5px 6px; border: 1px solid #000; text-align: center; font-weight: bold; vertical-align: middle;">${sisa}</td>
+                    <td style="padding: 5px 6px; border: 1px solid #000; text-align: left; vertical-align: middle; text-transform: uppercase;">${it.keterangan || '-'}</td>
                 </tr>`;
             });
         }
 
+        const minRows = 8;
+        const currentRowsCount = item.items ? item.items.length : 0;
+        if (currentRowsCount < minRows) {
+            for (let i = currentRowsCount; i < minRows; i++) {
+                rowsHtml += `
+                <tr>
+                    <td style="padding: 5px 6px; border: 1px solid #000; text-align: center; color: transparent;">${i + 1}</td>
+                    <td style="padding: 5px 6px; border: 1px solid #000;">&nbsp;</td>
+                    <td style="padding: 5px 6px; border: 1px solid #000;">&nbsp;</td>
+                    <td style="padding: 5px 6px; border: 1px solid #000;">&nbsp;</td>
+                    <td style="padding: 5px 6px; border: 1px solid #000;">&nbsp;</td>
+                    <td style="padding: 5px 6px; border: 1px solid #000;">&nbsp;</td>
+                </tr>`;
+            }
+        }
+
+        const logoUrl = "https://raw.githubusercontent.com/komputerwh2-svg/warelogos.github.io/main/uth.png";
+
         const pagesHtml = `
-        <div class="page" style="page-break-after: always; width: 210mm; min-height: 297mm; padding: 20mm; box-sizing: border-box; font-family: Arial, sans-serif; font-size: 11pt; color: #000; background: #fff;">
-            <div style="text-align: center; font-size: 15pt; font-weight: bold; text-decoration: underline; margin-bottom: 25px;">BERITA ACARA</div>
-            
-            <table style="width: 100%; font-size: 11pt; margin-bottom: 20px; border-collapse: collapse;">
-                <tr style="line-height: 1.5;">
-                    <td style="width: 150px;">Nama Expedisi</td>
+        <!DOCTYPE html>
+        <html lang="id">
+        <head>
+            <meta charset="UTF-8">
+            <title>Cetak Berita Acara - ${item.nosurat || ''}</title>
+            <style>
+                body {
+                    margin: 0;
+                    padding: 0;
+                    background: #fff;
+                    font-family: Arial, sans-serif;
+                    font-size: 11pt;
+                    color: #000;
+                }
+                .page {
+                    width: 210mm;
+                    min-height: 297mm;
+                    padding: 15mm 20mm;
+                    box-sizing: border-box;
+                    background: #fff;
+                    position: relative;
+                }
+                .header-container {
+                    position: relative;
+                    text-align: center;
+                    border-bottom: 3px solid #000;
+                    padding-bottom: 8px;
+                    margin-bottom: 15px;
+                }
+                .logo-img {
+                    position: absolute;
+                    left: 0;
+                    top: 2px;
+                    width: 65px;
+                    height: auto;
+                }
+                .company-name {
+                    font-size: 16pt;
+                    font-weight: bold;
+                    letter-spacing: 0.5px;
+                }
+                .title-ba {
+                    text-align: center;
+                    font-size: 13pt;
+                    font-weight: bold;
+                    margin-bottom: 15px;
+                }
+                .narration {
+                    margin-bottom: 12px;
+                    line-height: 1.4;
+                    text-align: justify;
+                }
+                .info-table {
+                    width: 100%;
+                    font-size: 11pt;
+                    margin-bottom: 15px;
+                    border-collapse: collapse;
+                }
+                .info-table td {
+                    padding: 2px 0;
+                    vertical-align: top;
+                }
+                .main-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-bottom: 15px;
+                    font-size: 10.5pt;
+                }
+                .main-table th {
+                    border: 1px solid #000;
+                    background: #f2f2f2;
+                    padding: 6px;
+                    text-align: center;
+                    font-size: 10pt;
+                }
+                .sign-table {
+                    width: 100%;
+                    text-align: center;
+                    font-size: 10pt;
+                    border-collapse: collapse;
+                    margin-top: 40px;
+                }
+                @media print {
+                    body { background: none; }
+                    .page { padding: 10mm 15mm; margin: 0; width: initial; min-height: initial; }
+                }
+            </style>
+        </head>
+        <body>
+        <div class="page">
+            <!-- KOP SURAT RESMI -->
+            <div class="header-container">
+                <img src="${logoUrl}" alt="Logo UTH" class="logo-img">
+                <div class="company-name">PT ULAM TIBA HALIM</div>
+                <div style="font-size: 9.5pt; margin-top: 2px;">Jl. Candi I Blok D21, Kawasan Industri Candi - Gatot Subroto</div>
+                <div style="font-size: 9.5pt;">Semarang 50148 - Indonesia</div>
+                <div style="font-size: 9pt; margin-top: 1px;">Telp. (024) 7614027 (Hunting) | Fax. (024) 7614037</div>
+            </div>
+
+            <div class="title-ba">BERITA ACARA</div>
+
+            <div class="narration">
+                Bersama dengan ini kami dari <b>PT ULAM TIBA HALIM</b>, pada hari ini <b>${tanggalLengkap}</b> telah mengirimkan barang ke <b>${item.tujuan || '-'}</b> Berdasarkan Surat Jalan dan barang kiriman terdapat beberapa item produk yang tidak sesuai, dengan rincian sebagai berikut:
+            </div>
+
+            <!-- INFORMASI PENGIRIMAN -->
+            <table class="info-table">
+                <tr>
+                    <td style="width: 160px;">Nama Expedisi</td>
                     <td style="width: 15px; text-align: center;">:</td>
-                    <td style="font-weight: bold;">${item.ekspedisi || '-'}</td>
+                    <td><b>${item.ekspedisi || '-'}</b></td>
                 </tr>
-                <tr style="line-height: 1.5;">
+                <tr>
                     <td>Nama Driver</td>
                     <td style="text-align: center;">:</td>
-                    <td style="font-weight: bold; text-transform: uppercase;">${item.driver || '-'}</td>
+                    <td><b>${item.driver || '-'}</b></td>
                 </tr>
-                <tr style="line-height: 1.5;">
+                <tr>
                     <td>No. Polisi</td>
                     <td style="text-align: center;">:</td>
-                    <td style="font-weight: bold;">${item.nopol || '-'}</td>
+                    <td><b>${item.nopol || '-'}</b></td>
                 </tr>
-                <tr style="line-height: 1.5;">
+                <tr>
                     <td>No. DO / Surat Jalan</td>
                     <td style="text-align: center;">:</td>
-                    <td style="font-weight: bold;">${item.nosurat || '-'}</td>
+                    <td><b>${item.nosurat || '-'}</b></td>
                 </tr>
-                <tr style="line-height: 1.5;">
+                <tr>
                     <td>Lokasi Gudang</td>
                     <td style="text-align: center;">:</td>
-                    <td style="font-weight: bold;">${item.lokasi || 'WH-2'}</td>
+                    <td><b>${item.lokasi || 'WH-2'}</b></td>
                 </tr>
             </table>
 
-            <div style="margin-bottom: 15px; line-height: 1.5;">Bersama dengan ini kami mengirimkan barang ke <b>${item.tujuan || '-'}</b> dan barang kiriman terdapat beberapa item produk yang kurang / selisih sebagai berikut:</div>
-
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; text-align: center;" border="1">
+            <!-- TABEL RINCIAN ITEM -->
+            <table class="main-table">
                 <thead>
-                    <tr style="background-color: #f2f2f2;">
-                        <th style="padding: 6px; border: 1px solid #000; width: 40px;">NO</th>
-                        <th style="padding: 6px; border: 1px solid #000;">KODE BARANG / NAMA BARANG</th>
-                        <th style="padding: 6px; border: 1px solid #000; width: 100px;">QTY SURAT</th>
-                        <th style="padding: 6px; border: 1px solid #000; width: 100px;">QTY MUAT</th>
-                        <th style="padding: 6px; border: 1px solid #000; width: 130px;">KETERANGAN</th>
+                    <tr>
+                        <th style="width: 35px;">NO</th>
+                        <th>KODE/NAMA<br>BARANG</th>
+                        <th style="width: 95px;">JML BARANG<br>SURAT JALAN</th>
+                        <th style="width: 95px;">JML BARANG<br>YANG DIMUAT</th>
+                        <th style="width: 95px;">JML BARANG<br>TINGGALAN</th>
+                        <th style="width: 140px;">KETERANGAN</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${rowsHtml}
+                    <!-- BARIS TOTAL -->
+                    <tr style="font-weight: bold; background: #fafafa;">
+                        <td colspan="2" style="text-align: center; border: 1px solid #000; padding: 6px;">TOTAL</td>
+                        <td style="text-align: center; border: 1px solid #000; padding: 6px;">${totalSurat}</td>
+                        <td style="text-align: center; border: 1px solid #000; padding: 6px;">${totalMuat > 0 ? totalMuat : '-'}</td>
+                        <td style="text-align: center; border: 1px solid #000; padding: 6px;">${totalSisa}</td>
+                        <td style="border: 1px solid #000; padding: 6px;"></td>
+                    </tr>
                 </tbody>
             </table>
 
-            <div style="margin-top: 50px;">
-                <table style="width: 100%; text-align: center; font-size: 11pt; border-collapse: collapse;">
-                    <tr>
-                        <td style="width: 33%;">Hormat Kami,</td>
-                        <td style="width: 33%;">Driver</td>
-                        <td style="width: 33%;">Penerima</td>
-                    </tr>
-                    <tr>
-                        <td style="height: 75px; vertical-align: bottom; font-weight: bold;">( ......................... )</td>
-                        <td style="height: 75px; vertical-align: bottom; font-weight: bold; text-transform: uppercase;">(${item.driver || '.........................'})</td>
-                        <td style="height: 75px; vertical-align: bottom; font-weight: bold;">( ......................... )</td>
-                    </tr>
-                </table>
+            <div style="margin-bottom: 20px; font-size: 10.5pt; line-height: 1.4;">
+                Demikian berita acara ini kami buat dengan sebenar-benarnya untuk dapat dipergunakan sebagaimana mestinya, Terima kasih atas perhatian dan kerjasamanya.
             </div>
-        </div>`;
+
+            <div style="text-align: right; margin-bottom: 10px; font-size: 10.5pt;">Semarang, ${tanggalCetak}</div>
+
+            <!-- TABEL TANDA TANGAN -->
+            <table class="sign-table">
+                <tr>
+                    <td style="width: 25%; font-weight: bold;">Mengetahui,</td>
+                    <td style="width: 25%;"></td>
+                    <td style="width: 25%;"></td>
+                    <td style="width: 25%;"></td>
+                </tr>
+                <tr>
+                    <td style="padding-bottom: 3px;">Koordinator Gudang</td>
+                    <td>Checker</td>
+                    <td>Customer</td>
+                    <td>Driver</td>
+                </tr>
+                <tr>
+                    <td colspan="4" style="height: 70px;"></td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold; text-decoration: underline;">ANTONIUS H.</td>
+                    <td>( .................................... )</td>
+                    <td>( .................................... )</td>
+                    <td style="font-weight: bold; text-transform: uppercase;">${item.driver || '( .................................... )'}</td>
+                </tr>
+            </table>
+        </div>
+        <script>
+            window.onload = function() {
+                setTimeout(function() {
+                    window.print();
+                }, 500);
+            };
+        </script>
+        </body>
+        </html>`;
 
         const safeKeyName = `Cetak_BA_${(item.nosurat || 'DOC').replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}`;
 
-        const win = window.open("", "_blank");
-        win.document.write(pagesHtml);
-        win.document.close();
+        if (typeof window.showCetakProgress === 'function') {
+            window.showCetakProgress("Mengirim Dokumen Cetak Berita Acara...");
+        }
 
-        //await fetch(`${RTDB_URL}/print_jobs/${safeKeyName}.json`, {
-        //    method: 'PUT',
-        //    body: JSON.stringify({
-        //        judul: `Cetak Berita Acara - ${item.nosurat}`,
-        //        html: pagesHtml,
-        //        status: 'PENDING',
-        //        timestamp: Date.now()
-        //    }),
-        //    headers: { 'Content-Type': 'application/json' }
-        //});
+        //const win = window.open("", "_blank");
+        //win.document.write(pagesHtml);
+        //win.document.close();
+
+        await fetch(`${RTDB_URL}/print_jobs/${safeKeyName}.json`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                judul: `Cetak Berita Acara - ${item.nosurat}`,
+                html: pagesHtml,
+                status: 'PENDING',
+                timestamp: Date.now()
+            }),
+            headers: { 'Content-Type': 'application/json' }
+        });
 
         miuiAlert("Dokumen Berita Acara berhasil dikirim ke antrean cetak!");
     } catch (e) {
