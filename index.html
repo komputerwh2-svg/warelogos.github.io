@@ -903,58 +903,54 @@
                     </div>
 
                     <div class="p-3 flex flex-col gap-2.5 bg-[#dcdcdc] flex-1 overflow-y-auto rounded-b-[8px] border border-t-0 border-[#b2b2b2]">
-                        <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="text-[10px] font-bold text-slate-600 uppercase">Kode Barang:</label>
-                                <input type="text" id="ba_itemKode" class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs shadow-inner" placeholder="Kode...">
-                            </div>
-                            <div>
-                                <label class="text-[10px] font-bold text-slate-600 uppercase">Nama Barang:</label>
-                                <input type="text" id="ba_itemNama" class="w-full bg-[#e6ffff] border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs font-bold shadow-inner" placeholder="Nama...">
-                            </div>
+                        
+                        <!-- Baris 1: Kode Barang (1 Baris Penuh) -->
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-600 uppercase">Kode Barang:</label>
+                            <input type="text" id="ba_itemKode" list="listMasterKodeBarang" oninput="handlePilihKodeBarang(this.value)" class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs shadow-inner" placeholder="Pilih / Ketik Kode...">
+                            <datalist id="listMasterKodeBarang">
+                                <!-- Opsi akan terisi otomatis dari database -->
+                            </datalist>
                         </div>
 
+                        <!-- Baris 2: Nama Barang (1 Baris Penuh) -->
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-600 uppercase">Nama Barang:</label>
+                            <input type="text" id="ba_itemNama" readonly class="w-full bg-[#e6ffff] border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs font-bold shadow-inner text-slate-700" placeholder="Otomatis terisi...">
+                        </div>
+
+                        <!-- Baris 3: Qty Surat & Qty Tinggalan -->
                         <div class="grid grid-cols-2 gap-2">
                             <div>
                                 <label class="text-[10px] font-bold text-slate-600 uppercase">QTY Surat:</label>
                                 <input type="number" id="ba_itemQtySurat" class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs shadow-inner" placeholder="0">
                             </div>
                             <div>
-                                <label class="text-[10px] font-bold text-slate-600 uppercase">QTY Muat:</label>
+                                <label class="text-[10px] font-bold text-slate-600 uppercase">QTY Tinggalan:</label>
                                 <input type="number" id="ba_itemQtySisa" class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs shadow-inner" placeholder="0">
                             </div>
                         </div>
 
+                        <!-- Keterangan dengan Datalist Referensi -->
                         <div>
                             <label class="text-[10px] font-bold text-slate-600 uppercase">Keterangan:</label>
-                            <input type="text" id="ba_itemKet" class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs shadow-inner" placeholder="Kurang / Rusak...">
+                            <input type="text" id="ba_itemKet" list="listOpsiKeterangan" class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs shadow-inner" placeholder="Pilih atau ketik keterangan...">
+                            <datalist id="listOpsiKeterangan">
+                                <option value="ARMADA TIDAK CUKUP">
+                                <option value="BARANG KURANG DR WH">
+                                <option value="CONTAINER TIDAK CUKUP">
+                                <option value="BARANG TERTINGGAL">
+                                <option value="REVISI DO/SURAT JALAN">
+                            </datalist>
                         </div>
 
-                        <button type="button" onclick="tambahItemBarangBA()" class="py-2 bg-orange-600 hover:bg-orange-700 text-white rounded text-xs font-bold shadow transition flex items-center justify-center gap-1">
+                        <!-- Tombol Tambah Item -->
+                        <button type="button" onclick="tambahItemBarangBA()" class="py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded text-xs font-bold shadow transition flex items-center justify-center gap-1 mt-2">
                             <i class="fa-solid fa-plus text-[10px]"></i> Tambah ke Daftar Barang
                         </button>
 
-                        <!-- Tabel Item Sementara -->
-                        <div class="mt-1 max-h-[140px] overflow-y-auto bg-white border border-slate-300 rounded p-1">
-                            <table class="w-full text-left text-[11px]">
-                                <thead>
-                                    <tr class="bg-slate-100 text-slate-600 border-b border-slate-200">
-                                        <th class="p-1">Barang</th>
-                                        <th class="p-1 text-center">Surat</th>
-                                        <th class="p-1 text-center">Muat</th>
-                                        <th class="p-1 text-center">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="ba_tabelItemBody">
-                                    <tr>
-                                        <td colspan="4" class="text-center text-slate-400 py-2 italic">Belum ada item barang.</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-
                         <button type="button" onclick="tutupPopupItemBarang()" class="mt-auto py-2 bg-slate-700 hover:bg-slate-800 text-white rounded text-xs font-bold shadow transition">
-                            Kembali ke Form Utama
+                            Kembali ke Form Berita Acara
                         </button>
                     </div>
                 </div>
@@ -962,29 +958,61 @@
                 <!-- Footer Tombol Aksi -->
                 <div class="grid grid-cols-2 border-t border-[#d0d0d0] bg-[#dbdbdb] shrink-0">
                     <button onclick="simpanSemuaBeritaAcara()" class="py-2.5 text-[12px] font-bold text-white bg-gradient-to-b from-amber-500 to-orange-600 border-r border-orange-700 transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] hover:from-amber-600 hover:to-orange-700">SIMPAN SEMUA</button>
-                    <button onclick="resetFormBeritaAcara()" class="py-2.5 text-[12px] font-bold text-slate-700 bg-gradient-to-b from-[#f2f2f2] to-[#e0e0e0] border-l border-[#c4c4c4] transition-all hover:bg-slate-300">BATAL / RESET</button>
+                    <button onclick="resetFormBeritaAcara()" class="py-2.5 text-[12px] font-bold text-slate-700 bg-gradient-to-b from-[#f2f2f2] to-[#e0e0e0] border-l border-[#c4c4c4] transition-all hover:bg-slate-300">BATAL</button>
                 </div>
 
             </div>
 
-            <!-- BAGIAN KANAN: PANEL HISTORI BERITA ACARA (DILEBARKAN SAMA DENGAN FORM UTAMA) -->
-            <div class="relative bg-[#e4e4e4] w-full max-w-[390px] rounded-[14px] overflow-hidden shadow-2xl border border-[#b2b2b2] flex flex-col font-sans text-slate-800 max-h-[85vh] md:max-h-[90vh]">
+            <!-- BAGIAN KANAN: WAHANA PANEL BERGANTI (RIWAYAT / TABEL ITEM) -->
+            <div class="relative w-full max-w-[390px] flex flex-col max-h-[85vh] md:max-h-[90vh]">
                 
-                <!-- Segitiga Penunjuk di Sisi Kiri (Desktop Only) -->
-                <div class="hidden md:block absolute -left-[7px] top-12 w-0 h-0 border-t-[7px] border-t-transparent border-b-[7px] border-b-transparent border-r-[7px] border-r-[#e4e4e4] z-10"></div>
+                <!-- 1. PANEL RIWAYAT (DEFAULT MUNCUL) -->
+                <div id="panelHistoriBA" class="bg-[#e4e4e4] w-full h-full rounded-[14px] overflow-hidden shadow-2xl border border-[#b2b2b2] flex flex-col font-sans text-slate-800 relative">
+                    <div class="hidden md:block absolute -left-[7px] top-12 w-0 h-0 border-t-[7px] border-t-transparent border-b-[7px] border-b-transparent border-r-[7px] border-r-[#e4e4e4] z-10"></div>
 
-                <!-- Header Panel Riwayat -->
-                <div class="bg-gradient-to-b from-[#323232] to-[#202020] px-4 py-3 flex items-center justify-between border-b border-[#151515] shrink-0">
-                    <h3 class="text-white font-medium text-sm tracking-wide flex items-center gap-2">
-                        <i class="fa-solid fa-clock-rotate-left text-orange-400 text-xs"></i> RIWAYAT BERITA ACARA 
-                        <span id="ba_historiCount" class="text-orange-400 font-bold">(0)</span>
-                    </h3>
-                    <button onclick="muatHistoriBeritaAcara()" class="text-white hover:text-orange-400 text-sm transition-transform active:rotate-180" title="Muat Ulang Histori"><i class="fa-solid fa-rotate"></i></button>
+                    <div class="bg-gradient-to-b from-[#323232] to-[#202020] px-4 py-3 flex items-center justify-between border-b border-[#151515] shrink-0">
+                        <h3 class="text-white font-medium text-sm tracking-wide flex items-center gap-2">
+                            <i class="fa-solid fa-clock-rotate-left text-orange-400 text-xs"></i> RIWAYAT BERITA ACARA 
+                            <span id="ba_historiCount" class="text-orange-400 font-bold">(0)</span>
+                        </h3>
+                        <button onclick="muatHistoriBeritaAcara()" class="text-white hover:text-orange-400 text-sm transition-transform active:rotate-180" title="Muat Ulang Histori"><i class="fa-solid fa-rotate"></i></button>
+                    </div>
+
+                    <div id="ba_containerHistori" class="p-3.5 flex flex-col gap-2.5 overflow-y-auto bg-[#ededed] flex-1">
+                        <div class="text-center text-xs text-slate-500 py-6 italic">Memuat Riwayat...</div>
+                    </div>
                 </div>
 
-                <!-- List Konten Riwayat (Bisa Di-scroll) -->
-                <div id="ba_containerHistori" class="p-3.5 flex flex-col gap-2.5 overflow-y-auto bg-[#ededed] flex-1">
-                    <div class="text-center text-xs text-slate-500 py-6 italic">Memuat Riwayat...</div>
+                <!-- 2. PANEL TABEL ITEM BARANG (SEMBUNYI AWALNYA, MUNCUL SAAT KLIK TAMBAH ITEM) -->
+                <div id="panelTabelItem" class="hidden animate-fade-in bg-[#e4e4e4] w-full h-full rounded-[14px] overflow-hidden shadow-2xl border border-[#b2b2b2] flex flex-col font-sans text-slate-800 relative">
+                    <div class="hidden md:block absolute -left-[7px] top-12 w-0 h-0 border-t-[7px] border-t-transparent border-b-[7px] border-b-transparent border-r-[7px] border-r-[#e4e4e4] z-10"></div>
+
+                    <div class="bg-gradient-to-b from-[#323232] to-[#202020] px-4 py-3 flex items-center justify-between border-b border-[#151515] shrink-0">
+                        <h3 class="text-white font-medium text-sm tracking-wide flex items-center gap-2">
+                            <i class="fa-solid fa-boxes-stacked text-orange-400 text-xs"></i> DAFTAR ITEM BARANG TINGGALAN
+                        </h3>
+                    </div>
+
+                    <div class="p-3.5 flex flex-col gap-2.5 overflow-y-auto bg-[#ededed] flex-1">
+                        <table class="w-full text-left text-[11px] bg-white rounded shadow-sm border border-slate-300">
+                            <thead>
+                                <tr class="bg-slate-200 border-b border-slate-300 text-slate-600 font-bold">
+                                    <th class="p-2">Kode / Nama</th>
+                                    <th class="p-2 text-center">Surat</th>
+                                    <th class="p-2 text-center">Muat</th>
+                                    <th class="p-2 text-center">Sisa</th>
+                                    <th class="p-2">Ket</th>
+                                    <th class="p-2 text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ba_tabelItemBody">
+                                <tr>
+                                    <td colspan="6" class="text-center text-slate-400 py-4 italic">Belum ada item barang.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    </div>
                 </div>
 
             </div>
