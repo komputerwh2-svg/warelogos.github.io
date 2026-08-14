@@ -2475,6 +2475,93 @@ window.cetakBeritaAcara = async function(key) {
 
 
 
+let currentActiveTabTT = 'WH';
+
+window.bukaModalTandaTerima = function() {
+    const modal = document.getElementById('modalTandaTerima');
+    if (modal) {
+        modal.classList.remove('hidden');
+        window.switchTabTT('WH');
+    }
+}
+
+window.tutupModalTandaTerima = function() {
+    const modal = document.getElementById('modalTandaTerima');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+window.switchTabTT = function(tabName) {
+    currentActiveTabTT = tabName;
+    
+    const btnWH = document.getElementById('tabBtn_WH');
+    const btnPJL = document.getElementById('tabBtn_PJL');
+    const contentWH = document.getElementById('formContent_WH');
+    const contentPJL = document.getElementById('formContent_PJL');
+    const modalTitle = document.getElementById('tt_modalTitle');
+    const btnPrintPJL = document.getElementById('btnPrint_PJL');
+
+    if (tabName === 'WH') {
+        if (btnWH) btnWH.className = "flex-1 py-2 px-3 bg-gradient-to-b from-amber-500 to-orange-600 text-white rounded-t-[6px] font-bold text-xs shadow transition flex items-center justify-center gap-2";
+        if (btnPJL) btnPJL.className = "flex-1 py-2 px-3 bg-[#b8b8b8] text-slate-700 rounded-t-[6px] font-bold text-xs shadow transition flex items-center justify-center gap-2 hover:bg-[#cccccc]";
+        
+        if (contentWH) contentWH.classList.remove('hidden');
+        if (contentPJL) contentPJL.classList.add('hidden');
+        if (modalTitle) modalTitle.innerHTML = `<i class="fa-solid fa-file-invoice text-orange-400"></i> FORM TANDA TERIMA (WH)`;
+        if (btnPrintPJL) btnPrintPJL.classList.add('hidden');
+
+    } else if (tabName === 'PJL') {
+        if (btnPJL) btnPJL.className = "flex-1 py-2 px-3 bg-gradient-to-b from-slate-700 to-slate-800 text-white rounded-t-[6px] font-bold text-xs shadow transition flex items-center justify-center gap-2";
+        if (btnWH) btnWH.className = "flex-1 py-2 px-3 bg-[#b8b8b8] text-slate-700 rounded-t-[6px] font-bold text-xs shadow transition flex items-center justify-center gap-2 hover:bg-[#cccccc]";
+        
+        if (contentPJL) contentPJL.classList.remove('hidden');
+        if (contentWH) contentWH.classList.add('hidden');
+        if (modalTitle) modalTitle.innerHTML = `<i class="fa-solid fa-file-signature text-orange-400"></i> FORM TANDA TERIMA (PJL)`;
+        if (btnPrintPJL) btnPrintPJL.classList.remove('hidden');
+
+        const tglInput = document.getElementById('tt_pjl_tanggal');
+        if (tglInput && !tglInput.value) {
+            tglInput.value = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+        }
+    }
+}
+
+window.simpanTandaTerima = function() {
+    if (currentActiveTabTT === 'WH') {
+        miuiAlert("Data Tanda Terima WH berhasil disimpan!");
+    } else {
+        miuiAlert("Data Tanda Terima PJL berhasil disimpan!");
+    }
+    window.tutupModalTandaTerima();
+}
+
+window.resetTandaTerima = function() {
+    if (currentActiveTabTT === 'WH') {
+        document.getElementById('tt_wh_kepada').value = '';
+        document.getElementById('tt_wh_alamat').value = '';
+        document.getElementById('tt_wh_isi').value = '';
+        document.getElementById('tt_wh_keterangan').value = '';
+    } else {
+        document.getElementById('tt_pjl_tujuan').value = '';
+        document.getElementById('tt_pjl_alamat').value = '';
+        document.getElementById('tt_pjl_nosurat').value = 'DO-H0001-';
+        document.getElementById('tt_pjl_kode').value = '';
+        document.getElementById('tt_pjl_qty').value = '';
+    }
+}
+
+window.printTandaTerimaPJL = function() {
+    miuiAlert("Mencetak Tanda Terima PJL...");
+}
+
+window.muatUlangHistori = function() {
+    console.log("Memuat ulang histori Tanda Terima...");
+}
+
+
+
+
 // Helper Global Modal Progress Cetak
 window.showCetakProgress = function(pesan = "Memproses Cetak...") {
     const modal = document.getElementById('modal-progress-cetak');

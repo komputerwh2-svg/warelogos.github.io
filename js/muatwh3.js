@@ -7,7 +7,7 @@ window.loadMasterBarang = async function() {
     try {
         const db = window.getFirestore ? window.getFirestore() : window.db;
         
-        // 1. Coba ambil dari Firestore terlebih dahulu (lebih cepat daripada RTDB)
+        // 1. Coba ambil dari Firestore terlebih dahulu
         const docRef = db.collection("bank_data").doc("master_barang");
         const doc = await docRef.get();
 
@@ -23,14 +23,20 @@ window.loadMasterBarang = async function() {
             
             if (data) {
                 window.cacheMasterBarang = data;
-                // 3. Sinkronkan ke Firestore agar tidak perlu ambil dari RTDB lagi di masa depan
+                // 3. Sinkronkan ke Firestore
                 await docRef.set(data, { merge: true });
                 console.log("Master Barang dimuat dari RTDB dan disinkronkan ke Firestore.");
             }
         }
     } catch (error) {
         console.error("Gagal memuat master barang:", error);
-        window.miuiAlert("Gagal memuat master barang: " + error.message);
+        
+        // Deteksi apakah error disebabkan oleh izin akses / masa kedaluwarsa Firestore
+        if (error.code === 'permission-denied' || (error.message && error.message.includes('Missing or insufficient permissions'))) {
+            window.miuiAlert("Masa aktif akses ke database telah habis, silakan hubungi developer untuk membeli masa aktif aksesnya.");
+        } else {
+            window.miuiAlert("Gagal memuat master barang: " + error.message);
+        }
     }
 };
 
