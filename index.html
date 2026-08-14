@@ -119,7 +119,7 @@
                 <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Berita Acara</span>
             </div>
 
-            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="miuiAlert('Membuka Tanda Terima')">
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="bukaModalTandaTerima()">
                 <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
                     <img src="img/tterima.png" alt="Tanda Terima" class="w-full h-full object-cover">
                 </div>
@@ -1015,6 +1015,130 @@
                     </div>
                 </div>
 
+            </div>
+
+        </div>
+    </div>
+
+    <!-- KONTRAINER UTAMA (MEMBUAT FORM & HISTORI BERDAMPINGAN) -->
+    <div id="modalTandaTerima" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 select-none animate-fade-in">
+        <div class="flex flex-col md:flex-row gap-4 items-start w-full max-w-[1000px]">
+            
+            <!-- 1. JENDELA KIRI: FORM TANDA TERIMA -->
+            <div class="bg-[#e4e4e4] w-full max-w-[500px] rounded-[14px] overflow-hidden shadow-2xl border border-[#b2b2b2] flex flex-col font-sans text-slate-800">
+                
+                <!-- Header Modal -->
+                <div class="bg-gradient-to-b from-[#323232] to-[#202020] px-4 py-3 flex items-center justify-between border-b border-[#151515]">
+                    <h3 id="tt_modalTitle" class="text-white font-medium text-xs tracking-wide flex items-center gap-2">
+                        <i class="fa-solid fa-file-invoice text-orange-400"></i> FORM TANDA TERIMA (WH)
+                    </h3>
+                    <button onclick="tutupModalTandaTerima()" class="text-white hover:text-red-400 font-bold text-lg">✕</button>
+                </div>
+
+                <!-- Tombol Tab Pilihan di Bagian Atas Form -->
+                <div class="px-4 pt-3 pb-1 bg-[#dcdcdc] flex gap-2 border-b border-[#cccccc]">
+                    <button type="button" id="tabBtn_WH" onclick="switchTabTT('WH')" class="flex-1 py-2 px-3 bg-gradient-to-b from-amber-500 to-orange-600 text-white rounded-t-[6px] font-bold text-xs shadow transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-warehouse"></i> TANDA TERIMA WH
+                    </button>
+                    <button type="button" id="tabBtn_PJL" onclick="switchTabTT('PJL')" class="flex-1 py-2 px-3 bg-[#b8b8b8] text-slate-700 rounded-t-[6px] font-bold text-xs shadow transition flex items-center justify-center gap-2 hover:bg-[#cccccc]">
+                        <i class="fa-solid fa-file-signature"></i> TANDA TERIMA PJL
+                    </button>
+                </div>
+
+                <!-- Konten Form -->
+                <div class="p-4 bg-[#dcdcdc] flex flex-col gap-3 text-xs">
+                    
+                    <!-- FORM 1: TANDA TERIMA WH -->
+                    <div id="formContent_WH" class="flex flex-col gap-2.5">
+                        <div class="grid grid-cols-3 gap-2 items-center">
+                            <label class="font-bold text-slate-700">Kepada</label>
+                            <input type="text" id="tt_wh_kepada" placeholder="Nama Penerima..." class="col-span-2 bg-white border border-[#c8c8c8] rounded px-2 py-1.5 shadow-inner">
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 items-start">
+                            <label class="font-bold text-slate-700 pt-1">Alamat</label>
+                            <textarea id="tt_wh_alamat" rows="2" placeholder="Alamat tujuan..." class="col-span-2 bg-white border border-[#c8c8c8] rounded px-2 py-1.5 shadow-inner"></textarea>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 items-center">
+                            <label class="font-bold text-slate-700">Dari</label>
+                            <input type="text" id="tt_wh_dari" value="PT ULAM TIBA HALIM" readonly class="col-span-2 bg-[#e6ffff] border border-[#c8c8c8] rounded px-2 py-1.5 font-bold text-slate-700 shadow-inner">
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 items-center">
+                            <label class="font-bold text-slate-700">Berupa / Isi</label>
+                            <input type="text" id="tt_wh_isi" placeholder="Jenis barang/karton..." class="col-span-2 bg-white border border-[#c8c8c8] rounded px-2 py-1.5 shadow-inner">
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 items-start">
+                            <label class="font-bold text-slate-700 pt-1">Keterangan</label>
+                            <textarea id="tt_wh_keterangan" rows="2" placeholder="Catatan tambahan..." class="col-span-2 bg-white border border-[#c8c8c8] rounded px-2 py-1.5 shadow-inner"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- FORM 2: TANDA TERIMA PJL (Hidden secara default) -->
+                    <div id="formContent_PJL" class="hidden flex flex-col gap-2.5">
+                        <div class="grid grid-cols-3 gap-2 items-center">
+                            <label class="font-bold text-slate-700">Tujuan</label>
+                            <select id="tt_pjl_tujuan" class="col-span-2 bg-white border border-[#c8c8c8] rounded px-2 py-1.5 font-bold shadow-inner">
+                                <option value="">Pilih Tujuan...</option>
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 items-center">
+                            <label class="font-bold text-slate-700">Tanggal</label>
+                            <input type="text" id="tt_pjl_tanggal" readonly class="col-span-2 bg-white border border-[#c8c8c8] rounded px-2 py-1.5 font-bold shadow-inner">
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 items-center">
+                            <label class="font-bold text-slate-700">Alamat</label>
+                            <input type="text" id="tt_pjl_alamat" placeholder="Alamat lengkap..." class="col-span-2 bg-white border border-[#c8c8c8] rounded px-2 py-1.5 shadow-inner">
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 items-center">
+                            <label class="font-bold text-slate-700">No Surat</label>
+                            <input type="text" id="tt_pjl_nosurat" value="DO-H0001-" class="col-span-2 bg-white border border-[#c8c8c8] rounded px-2 py-1.5 font-bold shadow-inner">
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 items-center">
+                            <label class="font-bold text-slate-700">Kode Barang</label>
+                            <select id="tt_pjl_kode" class="col-span-2 bg-white border border-[#c8c8c8] rounded px-2 py-1.5 font-bold shadow-inner">
+                                <option value="">Pilih Kode...</option>
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 items-center">
+                            <label class="font-bold text-slate-700">QTY</label>
+                            <input type="number" id="tt_pjl_qty" placeholder="0" class="col-span-2 bg-white border border-[#c8c8c8] rounded px-2 py-1.5 font-bold shadow-inner">
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Footer Tombol Aksi Form -->
+                <div class="p-3 bg-[#dbdbdb] border-t border-[#d0d0d0] flex items-center justify-between gap-2">
+                    <button onclick="simpanTandaTerima()" class="flex-1 py-2 bg-gradient-to-b from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold rounded shadow text-xs transition">SIMPAN</button>
+                    <button onclick="resetTandaTerima()" class="flex-1 py-2 bg-[#b8b8b8] hover:bg-[#a8a8a8] text-slate-800 font-bold rounded shadow text-xs transition">BARU</button>
+                    <button onclick="tutupModalTandaTerima()" class="flex-1 py-2 bg-[#888888] hover:bg-[#777777] text-white font-bold rounded shadow text-xs transition">BATAL</button>
+                    <button id="btnPrint_PJL" onclick="printTandaTerimaPJL()" class="hidden flex-1 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded shadow text-xs transition">PRINT</button>
+                </div>
+            </div>
+
+
+            <!-- 2. JENDELA KANAN: HISTORI / RIWAYAT TANDA TERIMA -->
+            <div class="bg-[#e4e4e4] w-full max-w-[450px] rounded-[14px] overflow-hidden shadow-2xl border border-[#b2b2b2] flex flex-col font-sans text-slate-800">
+                
+                <!-- Header Histori -->
+                <div class="bg-gradient-to-b from-[#323232] to-[#202020] px-4 py-3 flex items-center justify-between border-b border-[#151515]">
+                    <h3 class="text-white font-medium text-xs tracking-wide flex items-center gap-2">
+                        <i class="fa-solid fa-clock-rotate-left text-orange-400"></i> HISTORI TANDA TERIMA [ <span id="count_histori">0 Transaksi</span> ]
+                    </h3>
+                    <button onclick="tutupModalTandaTerima()" class="text-white hover:text-red-400 font-bold text-lg">✕</button>
+                </div>
+
+                <!-- Body Histori -->
+                <div class="p-3 bg-[#dcdcdc] flex flex-col gap-2 max-h-[340px] overflow-y-auto">
+                    <div id="container_histori" class="flex flex-col gap-2">
+                        <div class="text-center text-xs text-slate-500 py-6 italic">Belum ada histori tersimpan.</div>
+                    </div>
+                </div>
+
+                <!-- Footer Histori -->
+                <div class="bg-[#dbdbdb] px-3 py-2.5 border-t border-[#d0d0d0] flex justify-between items-center">
+                    <span class="text-[10px] text-slate-500 italic">Data tersimpan otomatis</span>
+                    <button onclick="muatUlangHistori()" class="px-3 py-1 bg-slate-700 hover:bg-slate-800 text-white rounded text-xs font-bold transition"><i class="fa-solid fa-rotate"></i> Muat Ulang</button>
+                </div>
             </div>
 
         </div>
