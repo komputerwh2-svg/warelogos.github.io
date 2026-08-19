@@ -351,7 +351,9 @@ window.parseDataBosnet = function(rawText, targetGudang) {
 
         // PERBAIKAN REGEX:
         // Menggunakan [A-Za-z0-9]+ agar menangkap huruf kecil maupun besar
-        const match = line.match(/DO-HO\d+-\d+-(\d+)\s*([A-Za-z0-9]+).*?(\d+\/\d+\/\d+\/\d+)/);
+        // const match = line.match(/DO-HO\d+-\d+-(\d+)\s*([A-Za-z0-9]+).*?(\d+\/\d+\/\d+\/\d+)/);
+        // Tambahkan karakter strip [-] di dalam kelas karakter kode barang
+        const match = line.match(/DO-HO\d+-\d+-(\d+)\s*([A-Za-z0-9-]+).*?(\d+\/\d+\/\d+\/\d+)/);
 
         if (match) {
             const [full, noDO, kodeRaw, rawQty] = match;
@@ -454,7 +456,7 @@ window.prosesFileMutasi = async function(event) {
 
         const formattedData = {};
         formattedData[noDOMutasi] = {
-            tujuan: "Z-MUTASI",
+            tujuan: "Z-MTS",
             data: {}
         };
 
@@ -472,7 +474,7 @@ window.prosesFileMutasi = async function(event) {
         const inputKodeTujuan = document.getElementById('input-kode-tujuan');
         const inputNamaTujuan = document.getElementById('input-nama-tujuan');
 
-        if (inputKodeTujuan) inputKodeTujuan.value = "Z-MUTASI";
+        if (inputKodeTujuan) inputKodeTujuan.value = "Z-MTS";
         if (inputNamaTujuan) inputNamaTujuan.value = `MUTASI GUDANG WH-2 (${noDOMutasi})`;
 
         window.miuiAlert(`Berhasil memuat ${dataWh3.length} baris data Mutasi (${noDOMutasi}).`);
@@ -495,7 +497,7 @@ window.simpanKeFirebase = async function(parsedData, kodeTujuan, namaLengkapTuju
     const selectTanggal = document.getElementById('select-tanggal-muat');
 
     // Jika Mutasi, ambil dari dropdown. Jika Bosnet, pakai logika hari kerja berikutnya.
-    if (kodeClean === "Z-MUTASI" && selectTanggal && selectTanggal.value) {
+    if (kodeClean === "Z-MTS" && selectTanggal && selectTanggal.value) {
         tglId = selectTanggal.value; // Nilai format "20260716"
     } else {
         // Logika hari kerja berikutnya untuk BOSNET
@@ -531,7 +533,7 @@ window.simpanKeFirebase = async function(parsedData, kodeTujuan, namaLengkapTuju
             nama_tujuan: namaLengkapTujuan || kodeClean,
             tanggal_kirim: tglId,
             status: "DRAFT",
-            tipe: kodeClean === "Z-MUTASI" ? "MUTASI" : "BOSNET",
+            tipe: kodeClean === "Z-MTS" ? "MUTASI" : "BOSNET",
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
@@ -571,13 +573,12 @@ window.renderTabelGabungan = async function() {
     const tbody = document.getElementById('tabel-matriks-body');
     const thead = document.getElementById('tabel-matriks-head');
 
-    // Jika elemen-elemen utama ini tidak ada di halaman yang sedang dibuka, hentikan fungsi dengan aman
     if (!selectTgl || !tbody) {
         return; 
     }
 
     const tglId = selectTgl.value;
-    const db = window.getFirestore(); // Menggunakan instance firestore yang sudah ada
+    const db = window.getFirestore();
 
     if (!tglId) {
         const elTotalTujuan = document.getElementById('txt-total-tujuan');
@@ -589,7 +590,6 @@ window.renderTabelGabungan = async function() {
     }
 
     try {
-        // --- 1. MENGAMBIL DATA DARI FIRESTORE ---
         const snapshot = await db.collection("muat_wh3").doc(tglId).collection("datatujuan").get();
 
         if (snapshot.empty) {
@@ -601,17 +601,25 @@ window.renderTabelGabungan = async function() {
             return;
         }
 
-        // --- 2. DEFINISI FUNGSI PENGURUTAN (TETAP) ---
+        // --- DEFINISI FUNGSI PENGURUTAN ---
         const polaUtama = ["CRR", "CRR EA", "THR EA", "THR", "MRMR", "MRR", "MJR HJ", "MJR", "MOB4A", "MOR2A EA", "MOR2A EB", "MOR2A", "MP", "PDR", "MTR3A", "PR-PKT", "PR-CUP", "MRSR", "LTGR", "MTGR", "MEB", "MOL", "MRL", "MTL", "ISEL"];
         
         const getSortScore = (kode) => {
             let k = kode.toUpperCase();
+            // Cek khusus untuk MP agar tidak buru-buru match jika ada string lebih panjang
+            for (let i = 0; i < polaUtama.length; i++) {
+                let pola = polaUtama[i];
+                if (k === pola || k.startsWith(pola + "-") || k.startsWith(pola + " ")) {
+                    if (pola === "MOR2A" && (k.includes("MOR2A EA") || k.includes("MOR2A EB"))) continue;
+                    if (pola === "THR" && k.includes("THR EA")) continue;
+                    if (pola === "MJR" && k.includes("MJR HJ")) continue;
+                    if (pola === "CRR" && k.includes("CRR EA")) continue;
+                    return i + 1;
+                }
+            }
+            // Fallbackincludes
             for (let i = 0; i < polaUtama.length; i++) {
                 if (k.includes(polaUtama[i])) {
-                    if (polaUtama[i] === "MOR2A" && (k.includes("MOR2A EA") || k.includes("MOR2A EB"))) continue;
-                    if (polaUtama[i] === "THR" && k.includes("THR EA")) continue;
-                    if (polaUtama[i] === "MJR" && k.includes("MJR HJ")) continue;
-                    if (polaUtama[i] === "CRR" && k.includes("CRR EA")) continue;
                     return i + 1;
                 }
             }
@@ -627,6 +635,7 @@ window.renderTabelGabungan = async function() {
             if (k.includes("BAG")) return 5;
             if (k.includes("WRG")) return 6;
             if (k.includes("GTG")) return 7;
+            if (k.includes("DRC")) return 8;
             return 0;
         };
 
@@ -635,7 +644,6 @@ window.renderTabelGabungan = async function() {
             return match ? (parseInt(match.join('').slice(-4)) || 999) : 999;
         };
 
-        // --- 3. PROSES DATA DARI FIRESTORE ---
         let daftarBarangSet = new Set();
         let groupTujuan = {}; 
         let totalNoDO = 0;
@@ -684,7 +692,7 @@ window.renderTabelGabungan = async function() {
         if (elTotalTujuan) elTotalTujuan.innerText = Object.keys(groupTujuan).length;
         if (elTotalNodo) elTotalNodo.innerText = totalNoDO;
 
-        // --- 4. RENDER HEADER ---
+        // --- RENDER HEADER ---
         let row1 = `<th rowspan="2" class="p-3 border border-slate-500">KODE BARANG</th>`;
         let row2 = "";
         const listTujuanKeys = Object.keys(groupTujuan);
@@ -698,7 +706,7 @@ window.renderTabelGabungan = async function() {
                  <th rowspan="2" class="p-3 border border-slate-500 text-center">PLT | KRT</th>`;
         if (thead) thead.innerHTML = `<tr>${row1}</tr><tr>${row2}</tr>`;
 
-        // --- 5. RENDER BODY ---
+        // --- RENDER BODY ---
         tbody.innerHTML = '';
         sortedBarang.forEach(kode => {
             let rowTotal = 0;
@@ -710,10 +718,20 @@ window.renderTabelGabungan = async function() {
                 cells += `<td class="p-3 text-center border border-slate-500">${qty > 0 ? qty : ''}</td>`;
             });
 
-            const masterInfo = window.cacheMasterBarang ? window.cacheMasterBarang[kode] : null;
+            // Perbaikan Pencarian Master Barang (Case-Insensitive & Trim)
+            let masterInfo = null;
+            if (window.cacheMasterBarang) {
+                const cleanKode = kode.trim().toUpperCase();
+                // Cari apakah key ada yang cocok secara case-insensitive
+                const foundKey = Object.keys(window.cacheMasterBarang).find(k => k.trim().toUpperCase() === cleanKode);
+                if (foundKey) {
+                    masterInfo = window.cacheMasterBarang[foundKey];
+                }
+            }
+
             const qtyPerPalet = (masterInfo && masterInfo.QTY) ? parseInt(masterInfo.QTY) : 1;
-            const hasilPlt = Math.floor(rowTotal / qtyPerPalet);
-            const sisaKrt = rowTotal % qtyPerPalet;
+            const hasilPlt = qtyPerPalet > 0 ? Math.floor(rowTotal / qtyPerPalet) : rowTotal;
+            const sisaKrt = qtyPerPalet > 0 ? rowTotal % qtyPerPalet : 0;
 
             tbody.innerHTML += `
                 <tr class="hover:bg-orange-50">
@@ -811,36 +829,48 @@ window.renderTabelRakGabungan = async function() {
         });
     }
 
-    // ... (Logika getSortScore, getVarianScore, getAngkaAkhir tetap sama) ...
-    const polaUtama = ["CRR", "CRR EA", "THR EA", "THR", "MRMR", "MRR", "MJR HJ", "MJR", "MOB4A", "MOR2A EA", "MOR2A EB", "MOR2A", "MP", "PDR", "MTR3A", "PR-PKT", "PR-CUP", "MRSR", "LTGR", "MTGR", "MEB", "MOL", "MRL", "MTL", "ISEL"];
-    const getSortScore = (kode) => {
-        let k = kode.toUpperCase();
-        for (let i = 0; i < polaUtama.length; i++) {
-            if (k.includes(polaUtama[i])) {
-                if (polaUtama[i] === "MOR2A" && (k.includes("MOR2A EA") || k.includes("MOR2A EB"))) continue;
-                if (polaUtama[i] === "THR" && k.includes("THR EA")) continue;
-                if (polaUtama[i] === "MJR" && k.includes("MJR HJ")) continue;
-                if (polaUtama[i] === "CRR" && k.includes("CRR EA")) continue;
-                return i + 1;
+    // --- DEFINISI FUNGSI PENGURUTAN ---
+        const polaUtama = ["CRR", "CRR EA", "THR EA", "THR", "MRMR", "MRR", "MJR HJ", "MJR", "MOB4A", "MOR2A EA", "MOR2A EB", "MOR2A", "MP", "PDR", "MTR3A", "PR-PKT", "PR-CUP", "MRSR", "LTGR", "MTGR", "MEB", "MOL", "MRL", "MTL", "ISEL"];
+        
+        const getSortScore = (kode) => {
+            let k = kode.toUpperCase();
+            // Cek khusus untuk MP agar tidak buru-buru match jika ada string lebih panjang
+            for (let i = 0; i < polaUtama.length; i++) {
+                let pola = polaUtama[i];
+                if (k === pola || k.startsWith(pola + "-") || k.startsWith(pola + " ")) {
+                    if (pola === "MOR2A" && (k.includes("MOR2A EA") || k.includes("MOR2A EB"))) continue;
+                    if (pola === "THR" && k.includes("THR EA")) continue;
+                    if (pola === "MJR" && k.includes("MJR HJ")) continue;
+                    if (pola === "CRR" && k.includes("CRR EA")) continue;
+                    return i + 1;
+                }
             }
-        }
-        return 999;
-    };
-    const getVarianScore = (kode) => {
-        let k = kode.toUpperCase();
-        if (k.includes("ZC")) return 1;
-        if (k.includes("SSL")) return 2;
-        if (k.includes("SLO")) return 3;
-        if (k.includes("TDS")) return 4;
-        if (k.includes("BAG")) return 5;
-        if (k.includes("WRG")) return 6;
-        if (k.includes("GTG")) return 7;
-        return 0;
-    };
-    const getAngkaAkhir = (kode) => {
-        const match = kode.match(/\d+/g);
-        return match ? (parseInt(match.join('').slice(-4)) || 999) : 999;
-    };
+            // Fallbackincludes
+            for (let i = 0; i < polaUtama.length; i++) {
+                if (k.includes(polaUtama[i])) {
+                    return i + 1;
+                }
+            }
+            return 999;
+        };
+
+        const getVarianScore = (kode) => {
+            let k = kode.toUpperCase();
+            if (k.includes("ZC")) return 1;
+            if (k.includes("SSL")) return 2;
+            if (k.includes("SLO")) return 3;
+            if (k.includes("TDS")) return 4;
+            if (k.includes("BAG")) return 5;
+            if (k.includes("WRG")) return 6;
+            if (k.includes("GTG")) return 7;
+            if (k.includes("DRC")) return 8;
+            return 0;
+        };
+
+        const getAngkaAkhir = (kode) => {
+            const match = kode.match(/\d+/g);
+            return match ? (parseInt(match.join('').slice(-4)) || 999) : 999;
+        };
 
     // 2. Ambil Data Stok
     const snapshotStok = await firebase.database().ref('stok_wh3/stokwh3_' + tglStok).once('value');

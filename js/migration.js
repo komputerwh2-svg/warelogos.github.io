@@ -9,35 +9,53 @@ window.handleMigrasiClick = async function(event) {
     }
 
     // 1. Memberikan konfirmasi
-    // Pastikan fungsi miuiConfirm mengembalikan boolean (true/false)
-    const konfirmasi = confirm("Apakah Anda yakin ingin melakukan sinkronisasi data dari RTDB ke Firestore? Proses ini bisa memakan waktu.");
+    const konfirmasi = confirm("Apakah Anda yakin ingin melakukan sinkronisasi data master_barang dan muat_wh3 dari RTDB ke Firestore? Proses ini bisa memakan waktu.");
     
     if (konfirmasi) {
         console.log("Konfirmasi disetujui, menjalankan migrasi...");
         // Ambil elemen tombol yang diklik
         const btn = event.currentTarget;
         const icon = btn.querySelector('i');
+        const progressContainer = document.getElementById('progress-container');
+        const progressText = document.getElementById('progress-text');
         
         // 2. Mulai animasi dan nonaktifkan tombol
-        icon.classList.add('fa-spin');
+        if (icon) icon.classList.add('fa-spin');
         btn.disabled = true;
         btn.style.opacity = "0.5"; // Memberikan efek visual nonaktif
 
+        // Tampilkan container progress jika ada
+        if (progressContainer) progressContainer.style.display = 'flex';
+
         try {
-            // 3. Panggil fungsi migrasi
+            // 3. Jalankan migrasi master_barang terlebih dahulu
+            if (typeof window.migrasiMasterBarangKeFirestore === 'function') {
+                await window.migrasiMasterBarangKeFirestore();
+            }
+
+            // 4. Lanjutkan dengan migrasi muat_wh3
             if (typeof window.migrasiMuatWH3KeFirestore === 'function') {
                 await window.migrasiMuatWH3KeFirestore();
             } else {
-                console.error("Fungsi migrasi belum didefinisikan!");
-                miuiAlert("Error: Fungsi migrasi tidak ditemukan.");
+                console.error("Fungsi migrasi muat_wh3 belum didefinisikan!");
+                if (typeof window.miuiAlert === 'function') {
+                    window.miuiAlert("Error: Fungsi migrasi muat_wh3 tidak ditemukan.");
+                }
             }
         } catch (error) {
             console.error("Terjadi kesalahan saat migrasi:", error);
+            if (typeof window.miuiAlert === 'function') {
+                window.miuiAlert("Gagal: " + error.message);
+            }
         } finally {
-            // 4. Hentikan animasi dan aktifkan kembali tombol
-            icon.classList.remove('fa-spin');
+            // 5. Hentikan animasi dan aktifkan kembali tombol
+            if (icon) icon.classList.remove('fa-spin');
             btn.disabled = false;
             btn.style.opacity = "1";
+            
+            if (progressContainer) {
+                setTimeout(() => { progressContainer.style.display = 'none'; }, 1000);
+            }
         }
     }
 };
@@ -131,5 +149,36 @@ window.migrasiMuatWH3KeFirestore = async function() {
         if (progressContainer) {
             setTimeout(() => { progressContainer.style.display = 'none'; }, 1000);
         }
+    }
+};
+
+window.migrasiMasterBarangKeFirestore = async function() {
+    console.log("Fungsi migrasi master_barang dipanggil!");
+    const rtdb = window.getRTDB();
+    const db = window.getFirestore();
+    
+    const progressText = document.getElementById('progress-text');
+    if (!rtdb || !db) return;
+
+    try {
+        if (progressText) progressText.innerText = "Sinkronisasi master_barang...";
+
+        // 1. Ambil data master_barang dari RTDB
+        const snapshot = await rtdb.ref('master_barang').once('value');
+        const dataMaster = snapshot.val();
+
+        if (!dataMaster) {
+            console.warn("Data master_barang di RTDB kosong.");
+            return;
+        }
+
+        // 2. Simpan ke Firestore dengan struktur dokumen tunggal dan merge: true
+        const docRef = db.collection("bank_data").doc("master_barang");
+        await docRef.set(dataMaster, { merge: true });
+
+        console.log("Master barang berhasil disinkronkan ke Firestore.");
+    } catch (error) {
+        console.error("Gagal migrasi master_barang:", error);
+        throw error;
     }
 };

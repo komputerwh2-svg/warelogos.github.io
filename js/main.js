@@ -2477,55 +2477,54 @@ window.cetakBeritaAcara = async function(key) {
 
 let currentActiveTabTT = 'WH';
 
+// Fungsi Membuka Modal Tanda Terima
 window.bukaModalTandaTerima = function() {
     const modal = document.getElementById('modalTandaTerima');
     if (modal) {
         modal.classList.remove('hidden');
-        window.switchTabTT('WH');
+        
+        // Panggil fungsi pendukung jika ada, misalnya muat histori atau tab default
+        if (typeof window.switchTabTT === 'function') {
+            window.switchTabTT('WH');
+        }
+        if (typeof window.muatHistoriTandaTerima === 'function') {
+            window.muatHistoriTandaTerima();
+        }
+    } else {
+        console.error("Elemen modalTandaTerima tidak ditemukan di DOM! Pastikan HTML modal sudah terpasang di index.html.");
     }
-}
+};
 
+// Fungsi Menutup Modal Tanda Terima (Bisa digunakan bersama sistem tutupModal umum jika ada)
 window.tutupModalTandaTerima = function() {
     const modal = document.getElementById('modalTandaTerima');
     if (modal) {
         modal.classList.add('hidden');
     }
-}
+};
 
-window.switchTabTT = function(tabName) {
-    currentActiveTabTT = tabName;
-    
+// Fungsi Switch Tab Tanda Terima (WH / PJL)
+window.switchTabTT = function(tipe) {
     const btnWH = document.getElementById('tabBtn_WH');
     const btnPJL = document.getElementById('tabBtn_PJL');
     const contentWH = document.getElementById('formContent_WH');
     const contentPJL = document.getElementById('formContent_PJL');
     const modalTitle = document.getElementById('tt_modalTitle');
-    const btnPrintPJL = document.getElementById('btnPrint_PJL');
 
-    if (tabName === 'WH') {
-        if (btnWH) btnWH.className = "flex-1 py-2 px-3 bg-gradient-to-b from-amber-500 to-orange-600 text-white rounded-t-[6px] font-bold text-xs shadow transition flex items-center justify-center gap-2";
-        if (btnPJL) btnPJL.className = "flex-1 py-2 px-3 bg-[#b8b8b8] text-slate-700 rounded-t-[6px] font-bold text-xs shadow transition flex items-center justify-center gap-2 hover:bg-[#cccccc]";
-        
+    if (tipe === 'WH') {
+        if (btnWH) btnWH.className = "flex-1 py-2 px-3 bg-gradient-to-b from-amber-500 to-orange-600 text-white rounded-t-[6px] font-bold text-[14px] shadow transition flex items-center justify-center gap-2";
+        if (btnPJL) btnPJL.className = "flex-1 py-2 px-3 bg-[#b8b8b8] text-slate-700 rounded-t-[6px] font-bold text-[14px] shadow transition flex items-center justify-center gap-2 hover:bg-[#cccccc]";
         if (contentWH) contentWH.classList.remove('hidden');
         if (contentPJL) contentPJL.classList.add('hidden');
-        if (modalTitle) modalTitle.innerHTML = `<i class="fa-solid fa-file-invoice text-orange-400"></i> FORM TANDA TERIMA (WH)`;
-        if (btnPrintPJL) btnPrintPJL.classList.add('hidden');
-
-    } else if (tabName === 'PJL') {
-        if (btnPJL) btnPJL.className = "flex-1 py-2 px-3 bg-gradient-to-b from-slate-700 to-slate-800 text-white rounded-t-[6px] font-bold text-xs shadow transition flex items-center justify-center gap-2";
-        if (btnWH) btnWH.className = "flex-1 py-2 px-3 bg-[#b8b8b8] text-slate-700 rounded-t-[6px] font-bold text-xs shadow transition flex items-center justify-center gap-2 hover:bg-[#cccccc]";
-        
+        if (modalTitle) modalTitle.innerHTML = '<i class="fa-solid fa-file-invoice text-orange-400"></i> FORM TANDA TERIMA (WH)';
+    } else {
+        if (btnPJL) btnPJL.className = "flex-1 py-2 px-3 bg-gradient-to-b from-amber-500 to-orange-600 text-white rounded-t-[6px] font-bold text-[14px] shadow transition flex items-center justify-center gap-2";
+        if (btnWH) btnWH.className = "flex-1 py-2 px-3 bg-[#b8b8b8] text-slate-700 rounded-t-[6px] font-bold text-[14px] shadow transition flex items-center justify-center gap-2 hover:bg-[#cccccc]";
         if (contentPJL) contentPJL.classList.remove('hidden');
         if (contentWH) contentWH.classList.add('hidden');
-        if (modalTitle) modalTitle.innerHTML = `<i class="fa-solid fa-file-signature text-orange-400"></i> FORM TANDA TERIMA (PJL)`;
-        if (btnPrintPJL) btnPrintPJL.classList.remove('hidden');
-
-        const tglInput = document.getElementById('tt_pjl_tanggal');
-        if (tglInput && !tglInput.value) {
-            tglInput.value = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-        }
+        if (modalTitle) modalTitle.innerHTML = '<i class="fa-solid fa-file-signature text-orange-400"></i> FORM TANDA TERIMA (PJL)';
     }
-}
+};
 
 window.simpanTandaTerima = function() {
     if (currentActiveTabTT === 'WH') {
