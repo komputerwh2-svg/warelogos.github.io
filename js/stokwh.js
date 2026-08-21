@@ -2727,7 +2727,7 @@ function updatePanelRiwayatHP(tipe, kode, rak, qty) {
     if (tipe === 'BECERAN') {
         elRiwayat.innerHTML = `<span style="color:#f97316;">[BECERAN]</span> ${kode} &bull; Rak: ${rak || '-'} &bull; Qty: ${qty || 0}`;
     } else {
-        elRiwayat.innerHTML = `<span style="color:#2563eb;">[UTUHAN]</span> ${kode} &bull; Rak: ${rak || '-'}`;
+        elRiwayat.innerHTML = `<span style="color:#f97316;">[UTUHAN]</span> ${kode} &bull; Rak: ${rak || '-'}`;
     }
 }
 
