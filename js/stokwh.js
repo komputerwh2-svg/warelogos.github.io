@@ -2667,6 +2667,16 @@ async function simpanDataFisikHP() {
                 });
             }
 
+        // AMBIL LANGSUNG NILAI MURNI DARI ELEMEN INPUT SAAT ITU JUGA
+        const inputKodeVal = kode ? kode : "";
+        const inputQtyVal = activeTipeHP === 'BECERAN' ? (document.getElementById('hp-qty-beceran') ? document.getElementById('hp-qty-beceran').value : "0") : "0";
+        const inputRakVal = activeTipeHP === 'BECERAN' 
+            ? (document.getElementById('hp-rak-beceran') ? document.getElementById('hp-rak-beceran').value : "") 
+            : (document.getElementById('hp-rak-utuhan') ? document.getElementById('hp-rak-utuhan').value : "");
+
+        // Update panel riwayat terakhir di modal HP
+        updatePanelRiwayatHP(activeTipeHP, inputKodeVal, inputRakVal, inputQtyVal);    
+
         // Update juga state data lokal agar UI langsung sinkron tanpa perlu refresh ulang
         item.beceran = finalBeceranVal;
         item.utuhan = finalUtuhanVal;
@@ -2706,6 +2716,18 @@ async function simpanDataFisikHP() {
     } catch (error) {
         console.error("Gagal menyimpan data fisik HP:", error);
         miuiAlert('Terjadi kesalahan saat menyimpan ke database.');
+    }
+}
+
+// Fungsi untuk memperbarui panel riwayat terakhir di modal HP
+function updatePanelRiwayatHP(tipe, kode, rak, qty) {
+    const elRiwayat = document.getElementById('teks-riwayat-terakhir');
+    if (!elRiwayat) return;
+
+    if (tipe === 'BECERAN') {
+        elRiwayat.innerHTML = `<span style="color:#f97316;">[BECERAN]</span> ${kode} &bull; Rak: ${rak || '-'} &bull; Qty: ${qty || 0}`;
+    } else {
+        elRiwayat.innerHTML = `<span style="color:#2563eb;">[UTUHAN]</span> ${kode} &bull; Rak: ${rak || '-'}`;
     }
 }
 
