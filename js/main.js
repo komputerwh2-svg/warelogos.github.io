@@ -78,6 +78,114 @@ if (view) {
 }
 
 
+// --- AUTO-INJECT WIDGET KE HALAMAN ---
+function injectWidgetOtomatis() {
+    if (!document.getElementById('widget-latensi')) {
+        const widget = document.createElement('div');
+        widget.id = 'widget-latensi';
+        widget.title = 'Geser ke kiri atau kanan';
+        widget.innerHTML = `
+            <span id="dot-latensi"></span>
+            <span id="teks-latensi">-- ms</span>
+        `;
+        document.body.appendChild(widget);
+    }
+}
+
+// --- INISIALISASI DRAGGABLE & LATENSI ---
+function initAppLatensi() {
+    injectWidgetOtomatis();
+    
+    const widget = document.getElementById('widget-latensi');
+    if (!widget) return;
+
+    let isDragging = false;
+    let startX = 0;
+    let initialLeft = 0;
+
+    widget.addEventListener('pointerdown', (e) => {
+        isDragging = true;
+        startX = e.clientX;
+        const rect = widget.getBoundingClientRect();
+        initialLeft = rect.left;
+        
+        widget.style.transform = 'none';
+        widget.style.left = initialLeft + 'px';
+        
+        try { widget.setPointerCapture(e.pointerId); } catch (err) {}
+        e.preventDefault();
+    });
+
+    widget.addEventListener('pointermove', (e) => {
+        if (!isDragging) return;
+        const deltaX = e.clientX - startX;
+        let newLeft = initialLeft + deltaX;
+        
+        const maxLeft = window.innerWidth - widget.offsetWidth - 10;
+        if (newLeft < 10) newLeft = 10;
+        if (newLeft > maxLeft) newLeft = maxLeft;
+        
+        widget.style.left = newLeft + 'px';
+    });
+
+    widget.addEventListener('pointerup', (e) => {
+        isDragging = false;
+        try { widget.releasePointerCapture(e.pointerId); } catch (err) {}
+    });
+
+    cekDanUpdateLatensi();
+    setInterval(cekDanUpdateLatensi, 6000);
+}
+
+async function cekDanUpdateLatensi() {
+    const widget = document.getElementById('widget-latensi');
+    const dot = document.getElementById('dot-latensi');
+    const teks = document.getElementById('teks-latensi');
+
+    if (!widget || !dot || !teks) return;
+
+    if (!navigator.onLine) {
+        dot.style.backgroundColor = '#ef4444';
+        teks.innerText = 'Offline';
+        widget.style.backgroundColor = '#7f1d1d';
+        return;
+    }
+
+    const startTime = performance.now();
+    try {
+        await fetch('https://www.google.com/favicon.ico?t=' + startTime, {
+            mode: 'no-cors',
+            cache: 'no-store'
+        });
+        
+        const endTime = performance.now();
+        const latency = Math.round(endTime - startTime);
+        
+        teks.innerText = latency + ' ms';
+
+        if (latency < 150) {
+            dot.style.backgroundColor = '#10b981';
+            widget.style.backgroundColor = '#1e293b';
+        } else if (latency < 350) {
+            dot.style.backgroundColor = '#f59e0b';
+            widget.style.backgroundColor = '#1e293b';
+        } else {
+            dot.style.backgroundColor = '#ef4444';
+            widget.style.backgroundColor = '#78350f';
+        }
+    } catch (error) {
+        dot.style.backgroundColor = '#ef4444';
+        teks.innerText = 'Error';
+        widget.style.backgroundColor = '#7f1d1d';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', initAppLatensi);
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    initAppLatensi();
+}
+
+
 // Fungsi global untuk getar
 window.triggerVibrate = (duration = 90) => {
     if ("vibrate" in navigator) {
