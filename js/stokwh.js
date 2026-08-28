@@ -4105,18 +4105,20 @@ async function sinkronisasiDatabaseStokWH3(kodeAsal, kodeTujuan) {
             return;
         }
 
-        // 1. Kurangi Bosnet Barang Asal (+)
+        // 1. Kurangi Qty Beceran Barang Asal (+) karena fisik diambil untuk pertukaran
         if (dataStok[kodeAsal]) {
-            let bosnetAsal = Number(dataStok[kodeAsal].bosnet || 0);
-            bosnetAsal = Math.max(0, bosnetAsal - 1);
-            await refStokTanggal.child(`${kodeAsal}/bosnet`).set(bosnetAsal);
+            let beceranAsal = Number(dataStok[kodeAsal].beceran || 0);
+            beceranAsal = Math.max(0, beceranAsal - 1);
+            await refStokTanggal.child(`${kodeAsal}/beceran`).set(beceranAsal);
+            console.log(`Beceran barang asal (+) ${kodeAsal} dikurangi menjadi: ${beceranAsal}`);
         }
 
-        // 2. Tambah atau Buat Baru Barang Tujuan (- / QA) di Tabel Utama
+        // 2. Tambah Bosnet Barang Tujuan (- / QA) di Tabel Utama
         if (dataStok[kodeTujuan]) {
             let bosnetTujuan = Number(dataStok[kodeTujuan].bosnet || 0);
             bosnetTujuan += 1;
             await refStokTanggal.child(`${kodeTujuan}/bosnet`).set(bosnetTujuan);
+            console.log(`Bosnet barang tujuan (-) ${kodeTujuan} ditambah menjadi: ${bosnetTujuan}`);
         } else {
             const dataBaruTujuan = {
                 bosnet: 1,
@@ -4130,6 +4132,7 @@ async function sinkronisasiDatabaseStokWH3(kodeAsal, kodeTujuan) {
                 }
             };
             await refStokTanggal.child(kodeTujuan).set(dataBaruTujuan);
+            console.log(`Barang tujuan ${kodeTujuan} belum ada, dibuat baru dengan bosnet: 1`);
         }
 
         // 3. Hapus data dari stok_tukar/qa_manual jika kode tersebut ada di dalamnya
@@ -4140,7 +4143,6 @@ async function sinkronisasiDatabaseStokWH3(kodeAsal, kodeTujuan) {
         if (dataQa) {
             Object.keys(dataQa).forEach(async (key) => {
                 let item = dataQa[key];
-                // Cek apakah key atau properti kode cocok dengan kodeAsal atau kodeTujuan
                 if (key.startsWith(kodeAsal) || key.startsWith(kodeTujuan) || item.kode === kodeAsal || item.kode === kodeTujuan) {
                     await dbConn.ref(`stok_tukar/qa_manual/${key}`).remove();
                     console.log(`Berhasil membersihkan data QA manual untuk: ${key}`);
