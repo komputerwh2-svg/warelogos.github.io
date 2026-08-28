@@ -3789,3 +3789,508 @@ window.tutupScannerQRHP = function() {
     const modalScanner = document.getElementById('modalScannerQR');
     if (modalScanner) modalScanner.style.display = 'none';
 };
+
+
+
+
+// Pastikan fungsi ini dipanggil saat tombol buka modal diklik
+function bukaModalTukarFisikWH3() {
+    console.log("Membuka modal tukar fisik WH-3...");
+    const modal = document.getElementById('modal-tukar-fisik-wh3');
+    if (modal) {
+        modal.classList.remove('hidden');
+        
+        // Panggil fungsi data panel
+        if (typeof muatDataPanelTukarFisik === 'function') {
+            muatDataPanelTukarFisik();
+        }
+        
+        // PANGGIL RENDER TABEL RIWAYAT DI SINI
+        if (typeof renderTabelRiwayatTukar === 'function') {
+            renderTabelRiwayatTukar();
+        } else {
+            console.error("Fungsi renderTabelRiwayatTukar tidak ditemukan!");
+        }
+    } else {
+        console.error("Elemen modal-tukar-fisik-wh3 tidak ditemukan di HTML!");
+    }
+}
+
+// Fungsi Menutup Modal
+function tutupModalTukarFisikWH3() {
+    const modal = document.getElementById('modal-tukar-fisik-wh3');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+// Fungsi Memetakan Data ke 3 Panel (Plus, Minus, & QA) Berdasarkan Tanggal Aktif
+function muatDataPanelTukarFisik() {
+    const containerPlus = document.getElementById('container-list-plus');
+    const containerMinus = document.getElementById('container-list-minus');
+    const selectAsalPlus = document.getElementById('select-asal-plus');
+    const selectTujuanMinus = document.getElementById('select-tujuan-minus');
+
+    containerPlus.innerHTML = '';
+    containerMinus.innerHTML = '';
+    selectAsalPlus.innerHTML = '<option value="">-- Pilih Stok Lebih (+) --</option>';
+    selectTujuanMinus.innerHTML = '<option value="">-- Pilih Target Kurang (-) --</option>';
+
+    // Ambil tanggal aktif dari input tanggal WH-3 (format YYYY-MM-DD diubah ke YYYYMMDD)
+    const dateInput = document.getElementById('select-tanggal-wh3');
+    const tanggalAktif = dateInput ? dateInput.value.replace(/-/g, '') : null;
+
+    if (!tanggalAktif) {
+        console.warn("Tanggal aktif WH-3 tidak ditemukan.");
+        return;
+    }
+
+    let countPlus = 0;
+    let countMinus = 0;
+    let totalQtyPlus = 0;   // Variabel akumulasi total Qty Plus
+    let totalQtyMinus = 0;  // Variabel akumulasi total Qty Minus
+
+    // Akses data stok terkini yang tersimpan di window atau dari variabel global
+    if (typeof window.currentStokData !== 'undefined' && window.currentStokData !== null) {
+        // Cari key yang sesuai dengan tanggal aktif (misal: stokwh3_20260822)
+        const keyAktif = Object.keys(window.currentStokData).find(k => k.includes(`stokwh3_${tanggalAktif}`));
+        
+        if (keyAktif && window.currentStokData[keyAktif]) {
+            const dailyData = window.currentStokData[keyAktif];
+
+            Object.entries(dailyData).forEach(([kode, item]) => {
+                const bosnet = parseInt(item.bosnet) || 0;
+                const blok = parseInt(item.blok) || 0;
+                const beceran = parseInt(item.beceran) || 0;
+                const utuhan = parseInt(item.utuhan) || 0;
+                
+                // Hitung fisik sesuai aturan (PR-PKT vs Barang Biasa)
+                const fisik = kode.includes("PR-PKT") ? (beceran + utuhan) : (blok + beceran + utuhan);
+                const selisih = fisik - bosnet;
+
+                const isPaket = kode.includes("PR-PKT");
+                const satuan = isPaket ? "PKT" : "KRT";
+
+                if (selisih > 0) {
+                    countPlus++;
+                    totalQtyPlus += selisih; // Tambahkan ke total akumulasi Qty Plus
+                    
+                    // Render ke Panel Stok Lebih (+)
+                    containerPlus.innerHTML += `
+                        <div class="p-2.5 text-xs bg-emerald-50/50 rounded-lg border border-emerald-100 flex justify-between items-center">
+                            <div>
+                                <b class="text-slate-700">${kode}</b>
+                                <div class="text-emerald-700 font-bold mt-0.5">+${selisih} ${satuan}</div>
+                            </div>
+                            <span class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">Sumber (+)</span>
+                        </div>`;
+                    
+                    // Masukkan ke Dropdown Asal (+)
+                    selectAsalPlus.innerHTML += `<option value="${kode}">${kode} (+${selisih} ${satuan})</option>`;
+                } 
+                else if (selisih < 0) {
+                    countMinus++;
+                    totalQtyMinus += Math.abs(selisih); // Tambahkan nilai absolut ke total akumulasi Qty Minus
+                    
+                    // Render ke Panel Stok Kurang (-)
+                    containerMinus.innerHTML += `
+                        <div class="p-2.5 text-xs bg-rose-50/50 rounded-lg border border-rose-100 flex justify-between items-center">
+                            <div>
+                                <b class="text-slate-700">${kode}</b>
+                                <div class="text-rose-700 font-bold mt-0.5">${selisih} ${satuan}</div>
+                            </div>
+                            <span class="text-[10px] bg-rose-100 text-rose-800 px-2 py-0.5 rounded font-bold">Target (-)</span>
+                        </div>`;
+                    
+                    // Masukkan ke Dropdown Tujuan (-)
+                    selectTujuanMinus.innerHTML += `<option value="${kode}">${kode} (${selisih} ${satuan})</option>`;
+                }
+            });
+        }
+    }
+
+    // Jika kosong
+    if (countPlus === 0) {
+        containerPlus.innerHTML = `<div class="text-center text-[10px] text-slate-400 py-3">Tidak ada stok lebih (+) pada tanggal ini.</div>`;
+    }
+    if (countMinus === 0) {
+        containerMinus.innerHTML = `<div class="text-center text-[10px] text-slate-400 py-3">Tidak ada stok kurang (-) pada tanggal ini.</div>`;
+    }
+
+    // Update Badge Counter Panel Plus & Minus dengan menyertakan Total Qty
+    document.getElementById('badge-total-plus').innerText = `${countPlus} Item / + ${totalQtyPlus} krt`;
+    document.getElementById('badge-total-minus').innerText = `${countMinus} Item / - ${totalQtyMinus} krt`;
+
+    // Muat data Panel QA Manual serta masukkan ke opsi pilihan tujuan
+    muatDataQaManual();
+}
+
+// Fungsi Helper untuk Mendapatkan Koneksi RTDB yang Pasti Berjalan
+function getDbRef() {
+    // Jika menggunakan Firebase Namespaced (v8 / compat) dengan URL spesifik
+    if (typeof firebase !== 'undefined') {
+        try {
+            // Coba ambil instance berdasarkan URL RTDB Anda
+            return firebase.database("https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/");
+        } catch (e) {
+            // Fallback ke default database jika sudah terinisialisasi
+            if (typeof firebase.database === 'function') {
+                return firebase.database();
+            }
+        }
+    }
+    
+    // Jika variabel db global sudah berupa objek database reference ber-method .ref()
+    if (typeof db !== 'undefined' && db && typeof db.ref === 'function') {
+        return db;
+    }
+    
+    if (typeof database !== 'undefined' && database && typeof database.ref === 'function') {
+        return database;
+    }
+
+    throw new Error("Koneksi Firebase Realtime Database tidak ditemukan.");
+}
+
+// Fungsi Menampilkan / Mengelola Input Manual Stok QA
+function muatDataQaManual() {
+    const containerQa = document.getElementById('container-list-qa');
+    const selectTujuanMinus = document.getElementById('select-tujuan-minus');
+    
+    if (!containerQa) return;
+
+    containerQa.innerHTML = `
+        <div class="mb-3 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+            <div class="text-[10px] font-bold text-amber-900 mb-1">Tambah Stok QA Manual (Sistem Bonset):</div>
+            <div class="flex gap-1.5">
+                <input type="text" id="input-kode-qa" placeholder="Kode Barang" class="w-1/2 text-xs text-slate-700 bg-white border border-amber-300 rounded px-2 py-1 uppercase">
+                <input type="number" id="input-qty-qa" placeholder="Qty (-)" class="w-1/4 text-xs text-slate-700 bg-white border border-amber-300 rounded px-2 py-1" value="-1">
+                <button onclick="tambahDataQaManual()" class="w-1/4 bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold rounded px-2 py-1">Tambah</button>
+            </div>
+        </div>
+        <div id="list-item-qa" class="space-y-2"></div>
+    `;
+
+    const listItemQa = document.getElementById('list-item-qa');
+
+    try {
+        const dbConn = getDbRef();
+        dbConn.ref('stok_tukar/qa_manual').once('value').then((snapshot) => {
+            const dataQaObj = snapshot.val() || {};
+            const keys = Object.keys(dataQaObj);
+            listItemQa.innerHTML = '';
+            
+            let totalQtyQa = 0; 
+            let countItem = 0;
+
+            if (keys.length === 0) {
+                listItemQa.innerHTML = `<div class="text-center text-[10px] text-slate-400 py-2">Belum ada data QA manual.</div>`;
+            } else {
+                keys.forEach((key) => {
+                    const item = dataQaObj[key];
+                    countItem++;
+                    const qtyVal = parseInt(item.qty) || 0;
+                    totalQtyQa += Math.abs(qtyVal);
+
+                    listItemQa.innerHTML += `
+                        <div class="p-2 text-xs bg-amber-50/50 rounded-lg border border-amber-100 flex justify-between items-center">
+                            <div>
+                                <b class="text-slate-700">${item.kode}</b>
+                                <div class="text-amber-700 font-bold mt-0.5">QA (${item.qty})</div>
+                            </div>
+                            <button onclick="hapusDataQaManual('${key}')" class="text-red-500 hover:text-red-700 text-[10px] font-bold px-1.5 py-0.5">Hapus</button>
+                        </div>`;
+                    
+                    if (selectTujuanMinus) {
+                        selectTujuanMinus.innerHTML += `<option value="${item.kode}">[QA] ${item.kode} (${item.qty})</option>`;
+                    }
+                });
+            }
+
+            const badgeQa = document.getElementById('badge-total-qa');
+            if (badgeQa) {
+                badgeQa.innerText = `${countItem} Item / -${totalQtyQa} krt`;
+            }
+        }).catch((err) => {
+            console.error("Gagal membaca database QA:", err);
+        });
+    } catch (e) {
+        console.error("Error getDbRef:", e.message);
+    }
+}
+
+// Fungsi Tambah QA Manual ke RTDB dengan Key Kustom (Kode_Timestamp)
+function tambahDataQaManual() {
+    const kode = document.getElementById('input-kode-qa').value.trim().toUpperCase();
+    const qty = document.getElementById('input-qty-qa').value;
+    
+    if (!kode) {
+        if (typeof miuiAlert === 'function') miuiAlert("Masukkan kode barang QA terlebih dahulu!");
+        else alert("Masukkan kode barang QA terlebih dahulu!");
+        return;
+    }
+
+    const timestamp = Date.now();
+    // Membuat key custom yang mudah dibaca: KODE_TIMESTAMP (spasi/karakter khusus diganti underscore)
+    const safeKode = kode.replace(/[^a-zA-Z0-9]/g, '_');
+    const customKey = `${safeKode}_${timestamp}`;
+
+    try {
+        const dbConn = getDbRef();
+        dbConn.ref('stok_tukar/qa_manual/' + customKey).set({
+            kode: kode,
+            qty: parseInt(qty) || -1,
+            timestamp: timestamp
+        }).then(() => {
+            // Bersihkan input setelah berhasil
+            const inputKode = document.getElementById('input-kode-qa');
+            if (inputKode) inputKode.value = '';
+
+            if (typeof muatDataPanelTukarFisik === 'function') {
+                muatDataPanelTukarFisik();
+            } else {
+                muatDataQaManual();
+            }
+        }).catch((error) => {
+            if (typeof miuiAlert === 'function') miuiAlert("Gagal menyimpan data QA: " + error.message);
+            else alert("Gagal menyimpan data QA: " + error.message);
+        });
+    } catch (e) {
+       miuiAlert(e.message);
+    }
+}
+
+// Fungsi Hapus QA Manual dari RTDB berdasarkan Key Kustom
+function hapusDataQaManual(firebaseKey) {
+    if (confirm("Yakin ingin menghapus data QA manual ini?")) {
+        try {
+            const dbConn = getDbRef();
+            dbConn.ref('stok_tukar/qa_manual/' + firebaseKey).remove().then(() => {
+                if (typeof muatDataPanelTukarFisik === 'function') {
+                    muatDataPanelTukarFisik();
+                } else {
+                    muatDataQaManual();
+                }
+            }).catch((error) => {
+                if (typeof miuiAlert === 'function') miuiAlert("Gagal menghapus data: " + error.message);
+                else alert("Gagal menghapus data: " + error.message);
+            });
+        } catch (e) {
+            miuiAlert(e.message);
+        }
+    }
+}
+
+async function sinkronisasiDatabaseStokWH3(kodeAsal, kodeTujuan) {
+    try {
+        const dbConn = getDbRef();
+        
+        let tanggalAktif = "20260824"; 
+        const dateInput = document.getElementById('select-tanggal-wh3');
+        if (dateInput && dateInput.value) {
+            let cleanVal = dateInput.value.replace(/[^0-9]/g, '');
+            if (cleanVal.length === 8) {
+                tanggalAktif = cleanVal;
+            }
+        }
+
+        const namaNodeTanggal = `stokwh3_${tanggalAktif}`;
+        const refStokTanggal = dbConn.ref(`stok_wh3/${namaNodeTanggal}`);
+
+        const snapshot = await refStokTanggal.once('value');
+        const dataStok = snapshot.val();
+
+        if (!dataStok) {
+            console.error(`Node stok_wh3/${namaNodeTanggal} tidak ditemukan di database!`);
+            return;
+        }
+
+        // 1. Kurangi Bosnet Barang Asal (+)
+        if (dataStok[kodeAsal]) {
+            let bosnetAsal = Number(dataStok[kodeAsal].bosnet || 0);
+            bosnetAsal = Math.max(0, bosnetAsal - 1);
+            await refStokTanggal.child(`${kodeAsal}/bosnet`).set(bosnetAsal);
+        }
+
+        // 2. Tambah atau Buat Baru Barang Tujuan (- / QA) di Tabel Utama
+        if (dataStok[kodeTujuan]) {
+            let bosnetTujuan = Number(dataStok[kodeTujuan].bosnet || 0);
+            bosnetTujuan += 1;
+            await refStokTanggal.child(`${kodeTujuan}/bosnet`).set(bosnetTujuan);
+        } else {
+            const dataBaruTujuan = {
+                bosnet: 1,
+                beceran: 0,
+                blok: 0,
+                kode: kodeTujuan,
+                nama: kodeTujuan,
+                detail_rak: {
+                    keterangan: "HASIL TUKAR FISIK",
+                    kode: kodeTujuan
+                }
+            };
+            await refStokTanggal.child(kodeTujuan).set(dataBaruTujuan);
+        }
+
+        // 3. Hapus data dari stok_tukar/qa_manual jika kode tersebut ada di dalamnya
+        const refQaManual = dbConn.ref('stok_tukar/qa_manual');
+        const snapQa = await refQaManual.once('value');
+        const dataQa = snapQa.val();
+        
+        if (dataQa) {
+            Object.keys(dataQa).forEach(async (key) => {
+                let item = dataQa[key];
+                // Cek apakah key atau properti kode cocok dengan kodeAsal atau kodeTujuan
+                if (key.startsWith(kodeAsal) || key.startsWith(kodeTujuan) || item.kode === kodeAsal || item.kode === kodeTujuan) {
+                    await dbConn.ref(`stok_tukar/qa_manual/${key}`).remove();
+                    console.log(`Berhasil membersihkan data QA manual untuk: ${key}`);
+                }
+            });
+        }
+
+        // Refresh tampilan panel dan tabel
+        if (typeof muatDataStokWH3 === 'function') muatDataStokWH3();
+        if (typeof muatDataPanelTukarFisik === 'function') muatDataPanelTukarFisik();
+
+    } catch (error) {
+        console.error("Error saat sinkronisasi database stok WH-3:", error);
+    }
+}
+
+// Fungsi Utama Eksekusi Pertukaran Fisik
+function eksekusiTukarFisik() {
+    const asalPlus = document.getElementById('select-asal-plus').value.trim().toUpperCase();
+    const tujuanMinus = document.getElementById('select-tujuan-minus').value.trim().toUpperCase();
+    const keteranganRak = document.getElementById('input-keterangan-rak').value.trim();
+
+    if (!asalPlus || !tujuanMinus) {
+        if (typeof miuiAlert === 'function') miuiAlert("Silakan pilih Barang Asal (+) dan Target Tujuan (- / QA) terlebih dahulu!");
+        else alert("Silakan pilih Barang Asal (+) dan Target Tujuan (- / QA) terlebih dahulu!");
+        return;
+    }
+
+    if (!keteranganRak) {
+        if (typeof miuiAlert === 'function') miuiAlert("Mohon isi keterangan / lokasi rak (Contoh: Ambil Rak 14 A 24)!");
+        else alert("Mohon isi keterangan / lokasi rak (Contoh: Ambil Rak 14 A 24)!");
+        return;
+    }
+
+    const waktuSekarang = new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
+    const timestamp = Date.now();
+    
+    const safeAsal = asalPlus.replace(/[^a-zA-Z0-9]/g, '_');
+    const safeTujuan = tujuanMinus.replace(/[^a-zA-Z0-9]/g, '_');
+    const customKey = `${safeAsal}ke${safeTujuan}_${timestamp}`;
+    
+    const dataBaru = {
+        waktu: waktuSekarang,
+        asal: `${asalPlus} = 1 krt`,
+        tujuan: `${tujuanMinus} = 1 krt`,
+        keterangan: keteranganRak,
+        timestamp: timestamp
+    };
+
+    try {
+        const dbConn = getDbRef();
+        // 1. Simpan Riwayat Tukar ke RTDB
+        dbConn.ref('stok_tukar/riwayat/' + customKey).set(dataBaru).then(() => {
+            // 2. Jalankan Sinkronisasi Stok RTDB Tanggal Aktif
+            if (typeof sinkronisasiDatabaseStokWH3 === 'function') {
+                sinkronisasiDatabaseStokWH3(asalPlus, tujuanMinus);
+            }
+
+            if (typeof miuiAlert === 'function') miuiAlert("Pertukaran fisik berhasil diproses dan disinkronkan dengan database utama!");
+            else alert("Pertukaran fisik berhasil diproses dan disinkronkan dengan database utama!");
+            
+            // Bersihkan input keterangan
+            document.getElementById('input-keterangan-rak').value = '';
+            
+            // 3. UPDATE / REFRESH OTOMATIS PANEL ATAS DAN TABEL RIWAYAT
+            if (typeof muatDataPanelTukarFisik === 'function') {
+                muatDataPanelTukarFisik();
+            }
+            if (typeof renderTabelRiwayatTukar === 'function') {
+                renderTabelRiwayatTukar();
+            }
+
+        }).catch((error) => {
+            if (typeof miuiAlert === 'function') miuiAlert("Gagal menyimpan riwayat pertukaran: " + error.message);
+            else alert("Gagal menyimpan riwayat pertukaran: " + error.message);
+        });
+    } catch (e) {
+        if (typeof miuiAlert === 'function') miuiAlert(e.message);
+        else alert(e.message);
+    }
+}
+
+async function renderTabelRiwayatTukar() {
+    // Cari dulu apakah kerangka tabelnya sudah pernah dibuat sebelumnya di dalam modal
+    let tbodyRiwayat = document.getElementById('tabel-riwayat-tukar-body');
+    
+    // Jika belum ada, buat kerangka tabelnya secara dinamis di dalam kontainer modal WH-3
+    if (!tbodyRiwayat) {
+        const containerModalBody = document.querySelector('#modal-tukar-fisik-wh3 .overflow-y-auto');
+        if (containerModalBody) {
+            const divBaru = document.createElement('div');
+            divBaru.className = 'bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mt-4';
+            divBaru.innerHTML = `
+                <div class="px-4 py-3 bg-slate-100 border-b border-gray-200 flex justify-between items-center">
+                    <span class="text-xs font-black text-slate-700 uppercase tracking-wider">Riwayat Catatan Tukar Fisik Barang</span>
+                    <span class="text-[10px] text-slate-500 font-medium">Sinkronisasi otomatis dengan database utama</span>
+                </div>
+                <div class="overflow-x-auto max-h-[200px]">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="bg-slate-50 text-slate-600 sticky top-0 border-b border-gray-200">
+                            <tr>
+                                <th class="px-4 py-2">Waktu</th>
+                                <th class="px-4 py-2">Asal (+)</th>
+                                <th class="px-4 py-2 text-center">Proses Tukar</th>
+                                <th class="px-4 py-2">Tujuan (-)</th>
+                                <th class="px-4 py-2">Keterangan / Rak</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabel-riwayat-tukar-body" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>`;
+            containerModalBody.appendChild(divBaru);
+            tbodyRiwayat = document.getElementById('tabel-riwayat-tukar-body');
+        }
+    }
+
+    if (!tbodyRiwayat) {
+        console.error("Gagal total menginisialisasi tbody riwayat.");
+        return;
+    }
+
+    tbodyRiwayat.innerHTML = `<tr><td colspan="5" class="px-4 py-3 text-center text-slate-400 italic">Memuat riwayat dari database...</td></tr>`;
+
+    try {
+        const dbConn = getDbRef();
+        const snapshot = await dbConn.ref('stok_tukar/riwayat').once('value');
+        const dataRiwayatObj = snapshot.val();
+        
+        tbodyRiwayat.innerHTML = '';
+
+        if (!dataRiwayatObj) {
+            tbodyRiwayat.innerHTML = `<tr><td colspan="5" class="px-4 py-3 text-center text-slate-400 italic">Belum ada riwayat tukar fisik di database.</td></tr>`;
+            return;
+        }
+
+        let riwayatList = Object.values(dataRiwayatObj);
+        riwayatList.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+        riwayatList.forEach(item => {
+            tbodyRiwayat.innerHTML += `
+                <tr class="bg-white border-b hover:bg-gray-50">
+                    <td class="px-4 py-2 text-slate-500 whitespace-nowrap">${item.waktu || '-'}</td>
+                    <td class="px-4 py-2 font-bold text-slate-700 whitespace-nowrap">${item.asal || '-'}</td>
+                    <td class="px-4 py-2 text-center text-blue-600 font-bold whitespace-nowrap">---></td>
+                    <td class="px-4 py-2 font-bold text-slate-700 whitespace-nowrap">${item.tujuan || '-'}</td>
+                    <td class="px-4 py-2 text-slate-500 italic">${item.keterangan || '-'}</td>
+                </tr>`;
+        });
+    } catch (error) {
+        console.error("Gagal memuat riwayat:", error);
+        tbodyRiwayat.innerHTML = `<tr><td colspan="5" class="px-4 py-3 text-center text-red-400 italic">Gagal memuat: ${error.message}</td></tr>`;
+    }
+}
