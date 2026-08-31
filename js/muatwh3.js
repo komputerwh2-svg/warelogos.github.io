@@ -170,7 +170,7 @@ window.getValidWorkingDateReverse = async function(dateInput) {
     return checkDate;
 };
 
-// 1. Fungsi untuk generate 10 bulan terakhir
+// 1. Fungsi untuk generate periode (mencakup 1 bulan ke depan dan 9 bulan ke belakang) - v3.6.1
 window.generatePeriodeDropdown = function() {
     const selPeriode = document.getElementById('select-periode-muat');
     if (!selPeriode) return;
@@ -178,8 +178,9 @@ window.generatePeriodeDropdown = function() {
     selPeriode.innerHTML = '';
     const sekarang = new Date();
     
-    for (let i = 0; i < 10; i++) {
-        // Membuat tanggal mundur per bulan
+    // Dimulai dari i = -1 (bulan depan) hingga i = 8 (total 10 bulan)
+    for (let i = -1; i < 9; i++) {
+        // Membuat tanggal dengan menggeser bulan dari posisi sekarang
         const d = new Date(sekarang.getFullYear(), sekarang.getMonth() - i, 1);
         const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
         const label = d.toLocaleString('id-ID', { month: 'long', year: 'numeric' });
@@ -187,7 +188,11 @@ window.generatePeriodeDropdown = function() {
         const option = new Option(label, value);
         selPeriode.add(option);
     }
-    // Periode bulan sekarang (index 0) otomatis terpilih
+    // Periode bulan sekarang secara otomatis akan berada di urutan kedua (index 1), 
+    // namun jika ingin bulan sekarang tetap menjadi default terpilih (selected), 
+    // kita arahkan nilainya ke bulan berjalan:
+    const bulanSekarangVal = `${sekarang.getFullYear()}-${String(sekarang.getMonth() + 1).padStart(2, '0')}`;
+    selPeriode.value = bulanSekarangVal;
 };
 
 // Fungsi pembantu format tanggal
