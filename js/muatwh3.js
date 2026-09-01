@@ -271,122 +271,234 @@ window.updateTanggalDropdownMuatWH3 = async function() {
     }
 };
 
-// Variabel untuk menyimpan data yang sedang diklik
-let stateRevisiTujuan = {
-    tujuan: '',
-    oldDate: '',
-    noDo: ''
-};
+// Variabel global untuk mencatat posisi asal data yang sedang direvisi
+let currentActiveTujuan = "";
+let currentActiveTanggalKey = "";
 
-// 1. Fungsi Buka Tutup Modal
-function bukaModalUbahTanggal(tujuan, noDo) {
-    // AMBIL TANGGAL LANGSUNG DARI DROPDOWN/INPUT TANGGAL MUAT DI HALAMAN UTAMA
-    // Sesuaikan ID elemen select/input tanggal muat di halaman Anda (contoh: 'tanggal-muat-wh3' atau sejenisnya)
-    // Jika formatnya YYYY-MM-DD dari input date, kita ubah ke YYYYMMDD. Jika dari select langsung YYYYMMDD, gunakan langsung.
+// Fungsi untuk membuka modal dan melacak tanggal dokumen yang benar di Firestore
+window.bukaModalUbahTanggal = async function(kodeTujuanDipilih) {
+    const modal = document.getElementById('modalUbahTanggal');
+    if (modal) modal.style.display = 'flex';
+
+    currentActiveTujuan = kodeTujuanDipilih || "BKL";
     
-    const elemenTanggalAktif = document.getElementById('select-tanggal-muat-wh3') || document.getElementById('tanggal-muat'); 
-    // Ambil nilai tanggal aktif (pastikan formatnya YYYYMMDD, misal: 20260822)
-    let currentDate = '';
-    
-    if (elemenTanggalAktif) {
-        let val = elemenTanggalAktif.value;
-        // Jika dari input type="date" (YYYY-MM-DD), bersihkan strip-nya
-        currentDate = val.includes('-') ? val.replace(/-/g, '') : val;
-    } else {
-        // Fallback jika elemen tidak ketemu, ambil dari teks header atau default
-        currentDate = '20260822'; // Sesuaikan atau ambil dari state aktif Anda
+    const infoTeks = document.getElementById('teks-info-ubah-tanggal');
+    if (infoTeks) {
+        infoTeks.textContent = `Mencari data ${currentActiveTujuan} di database...`;
     }
 
-    stateRevisiTujuan.tujuan = tujuan;
-    stateRevisiTujuan.oldDate = currentDate; 
-    stateRevisiTujuan.noDo = noDo || '';
+    const selectDo = document.getElementById('select-revisi-nodo');
+    if (selectDo) {
+        selectDo.innerHTML = '<option value="">-- Memuat Nomor DO... --</option>';
+    }
 
-    let infoText = noDo ? `${noDo} - ${tujuan} - ${currentDate}` : `${tujuan} - ${currentDate}`;
-    
-    document.getElementById('teks-info-ubah-tanggal').innerText = infoText;
-    document.getElementById('modalUbahTanggal').style.display = 'flex';
-}
+    let foundTanggal = "";
+    let targetDocRef = null;
 
-function tutupModalUbahTanggal() {
-    document.getElementById('modalUbahTanggal').style.display = 'none';
-    document.getElementById('input-tanggal-revisi').value = '';
-}
+    try {
+        // MENGHINDARI GHOST DOCUMENT FIRESTORE:
+        // Kita ambil daftar tanggal valid dari opsi dropdown di form yang sudah ter-load
+        const tanggalList = [];
+        const selTanggal = document.getElementById('select-tanggal-muat');
+        
+        if (selTanggal && selTanggal.options.length > 0) {
+            for (let i = 0; i < selTanggal.options.length; i++) {
+                const val = selTanggal.options[i].value;
+                if (val && val.length === 8) { // Pastikan formatnya YYYYMMDD
+                    tanggalList.push(val);
+                }
+            }
+        }
 
-// 2. Fungsi Utama Eksekusi Firebase (Pemindahan Data 2 Arah)
+        // Urutkan dari yang terbaru ke terlama (descending)
+        tanggalList.sort().reverse();
+
+        // Cari satu per satu dari tanggal terbaru
+        for (const tglKey of tanggalList) {
+            const docIdTujuan = `${currentActiveTujuan}_${tglKey}`;
+            const docRef = db.collection('muat_wh3').doc(tglKey).collection('datatujuan').doc(docIdTujuan);
+            
+            const docSnap = await docRef.get();
+            if (docSnap.exists) {
+                // Pastikan subkoleksi 'data' di dalamnya benar-benar ada isinya
+                const subData = await docRef.collection('data').get();
+                if (!subData.empty) {
+                    foundTanggal = tglKey;
+                    targetDocRef = docRef;
+                    break; // Berhenti begitu data DO ditemukan di tanggal ini
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Gagal scan Firestore:", e);
+    }
+
+    // Jika data ditemukan di tanggal baru (misal 20260902), gunakan itu
+    if (foundTanggal && targetDocRef) {
+        currentActiveTanggalKey = foundTanggal;
+    } else {
+        // Fallback jika anehnya tidak ketemu sama sekali
+        const selTanggal = document.getElementById('select-tanggal-muat');
+        currentActiveTanggalKey = (selTanggal && selTanggal.value) ? selTanggal.value : new Date().toISOString().split('T')[0].replace(/-/g, '');
+        targetDocRef = db.collection('muat_wh3').doc(currentActiveTanggalKey).collection('datatujuan').doc(`${currentActiveTujuan}_${currentActiveTanggalKey}`);
+    }
+
+    // Update teks info modal dengan format yang akurat (BKL_20260902)
+    if (infoTeks) {
+        infoTeks.textContent = `${currentActiveTujuan}_${currentActiveTanggalKey}`;
+    }
+
+    // Set input tanggal baru di modal
+    const inputTglBaru = document.getElementById('input-tanggal-revisi');
+    if (inputTglBaru) {
+        const formattedDate = `${currentActiveTanggalKey.substring(0, 4)}-${currentActiveTanggalKey.substring(4, 6)}-${currentActiveTanggalKey.substring(6, 8)}`;
+        inputTglBaru.value = formattedDate;
+    }
+
+    // Load dropdown DO
+    await window.loadNomorDoDariRef(targetDocRef);
+};
+
+// Helper (Jika Anda belum memasukkan ini di percobaan sebelumnya)
+window.loadNomorDoDariRef = async function(docRef) {
+    const selectDo = document.getElementById('select-revisi-nodo');
+    if (!selectDo) return;
+
+    selectDo.innerHTML = '<option value="">-- Pilih Nomor DO --</option>';
+
+    try {
+        const doSnapshot = await docRef.collection('data').get();
+        doSnapshot.forEach(doc => {
+            const nomorDo = doc.id;
+            const opt = document.createElement('option');
+            opt.value = nomorDo;
+            opt.textContent = `DO - ${nomorDo}`;
+            selectDo.appendChild(opt);
+        });
+    } catch (e) {
+        console.error("Gagal memuat DO:", e);
+    }
+};
+
+window.tutupModalUbahTanggal = function() {
+    const modal = document.getElementById('modalUbahTanggal');
+    if (modal) modal.style.display = 'none';
+};
+
+// 2. Fungsi eksekusi tombol PINDAH DATA
 async function prosesUbahTanggalDatabase() {
     const inputTgl = document.getElementById('input-tanggal-revisi').value;
+    const selectDo = document.getElementById('select-revisi-nodo');
+    
     if (!inputTgl) {
         miuiAlert("Silakan pilih tanggal baru terlebih dahulu!");
         return;
     }
 
-    const newDate = inputTgl.replace(/-/g, '');
-    const { oldDate, tujuan } = stateRevisiTujuan;
+    if (!selectDo || !selectDo.value) {
+        miuiAlert("Silakan pilih Nomor DO yang ingin dipindahkan!");
+        return;
+    }
 
-    // Jika user memilih tanggal yang sama dengan posisi data saat ini, tidak perlu proses
+    const nomorDoPilihan = selectDo.value; // Contoh: "47097"
+    const newDate = inputTgl.replace(/-/g, ''); // Format YYYYMMDD
+    const oldDate = currentActiveTanggalKey;    // Tanggal asal
+    const tujuan = currentActiveTujuan;         // Kode tujuan (misal: "BKL")
+
+    // Jika user memilih tanggal yang sama
     if (newDate === oldDate) {
         miuiAlert("Tanggal tujuan sama dengan tanggal asal, tidak perlu dipindahkan!");
         return;
     }
 
-    const konfirmasi = confirm(`Yakin ingin memindahkan ${tujuan} dari ${oldDate} ke ${newDate}?`);
+    const konfirmasi = confirm(`Yakin ingin memindahkan DO ${nomorDoPilihan} (${tujuan}) dari tanggal ${oldDate} ke ${newDate}?`);
     if (!konfirmasi) return;
 
     try {
         document.body.style.cursor = 'wait';
 
-        // PATH SOURCH: Menggunakan oldDate yang tersimpan saat modal dibuka
+        // Path dokumen asal dan subkoleksi DO
         const oldDocRef = db.collection('muat_wh3').doc(oldDate).collection('datatujuan').doc(`${tujuan}_${oldDate}`);
-        const newDocRef = db.collection('muat_wh3').doc(newDate).collection('datatujuan').doc(`${tujuan}_${newDate}`);
+        const oldDoRef = oldDocRef.collection('data').doc(nomorDoPilihan);
 
-        const oldDocSnap = await oldDocRef.get();
-        if (!oldDocSnap.exists) {
-            miuiAlert("Data sumber tidak ditemukan! Mungkin sudah dipindah.");
+        const oldDoSnap = await oldDoRef.get();
+        if (!oldDoSnap.exists) {
+            miuiAlert("Data DO sumber tidak ditemukan! Mungkin sudah dipindah.");
             return;
         }
 
-        // Cek data di tujuan
+        // Ambil data DO dari sumber
+        const dataDO = oldDoSnap.data();
+        dataDO.tanggal_kirim = newDate;
+        dataDO.updatedAt = new Date();
+
+        // Path dokumen tujuan baru
+        const newDocRef = db.collection('muat_wh3').doc(newDate).collection('datatujuan').doc(`${tujuan}_${newDate}`);
+        
+        // Cek apakah dokumen induk tujuan di tanggal baru sudah ada, jika belum buatkan metadata utamanya
         const newDocSnap = await newDocRef.get();
-        if (newDocSnap.exists) {
-            const timpa = confirm(`Data tujuan ${tujuan} sudah ada di tanggal ${newDate}. Lanjutkan penimpaan?`);
-            if (!timpa) return;
+        if (!newDocSnap.exists) {
+            const oldDocSnap = await oldDocRef.get();
+            let metadataInduk = {
+                tujuan: tujuan,
+                nama_tujuan: tujuan,
+                tanggal_kirim: newDate,
+                status: "DRAFT",
+                tipe: "BOSNET",
+                updatedAt: new Date()
+            };
+            if (oldDocSnap.exists) {
+                const oldMainData = oldDocSnap.data();
+                metadataInduk.nama_tujuan = oldMainData.nama_tujuan || tujuan;
+                metadataInduk.tipe = oldMainData.tipe || "BOSNET";
+            }
+            await newDocRef.set(metadataInduk);
         }
 
-        let mainData = oldDocSnap.data();
-        mainData.tanggal_kirim = newDate;
-        mainData.updatedAt = new Date();
+        // 1. Salin (Copas) data DO ke subkoleksi 'data' di tanggal yang baru
+        const newDoRef = newDocRef.collection('data').doc(nomorDoPilihan);
+        await newDoRef.set(dataDO);
 
-        // 1. Tulis ke tempat baru
-        await newDocRef.set(mainData);
+        // 2. Hapus data DO di tempat asal agar tidak terjadi duplikat data
+        await oldDoRef.delete();
 
-        // 2. Pindahkan sub-collection 'data'
-        const oldDataSub = await oldDocRef.collection('data').get();
-        let batch = db.batch();
-        
-        oldDataSub.forEach((docSnap) => {
-            batch.set(newDocRef.collection('data').doc(docSnap.id), docSnap.data());
-            batch.delete(oldDocRef.collection('data').doc(docSnap.id));
-        });
+        // 3. Cek apakah dokumen induk lama sudah kosong dari sisa DO lain. Jika kosong, bersihkan dokumen induknya.
+        const sisaDoAsal = await oldDocRef.collection('data').get();
+        if (sisaDoAsal.empty) {
+            await oldDocRef.delete();
+        }
 
-        await batch.commit();
-
-        // 3. Hapus induk lama
-        await oldDocRef.delete();
-
-        alert(`Data ${tujuan} berhasil dipindahkan ke ${newDate}!`);
+        miuiAlert(`DO ${nomorDoPilihan} (${tujuan}) berhasil dipindahkan ke tanggal ${newDate}!`);
         tutupModalUbahTanggal();
         
-        // Refresh UI
+        // Refresh UI tabel
         if (typeof window.renderTabelGabungan === 'function') await window.renderTabelGabungan();
-        if (typeof window.updateTanggalDropdownMuatWH3 === 'function') await window.updateTanggalDropdownMuatWH3(); 
+        if (typeof window.updateTanggalDropdownMuatWH3 === 'function') await window.updateTanggalDropdownMuatWH3();
+        if (typeof window.muatUlangDataTabel === 'function') await window.muatUlangDataTabel();
 
     } catch (error) {
-        console.error("Gagal:", error);
-        miuiAlert("Terjadi kesalahan saat memindahkan data.");
+        console.error("Gagal memindahkan DO:", error);
+        miuiAlert("Terjadi kesalahan saat memindahkan data DO.");
     } finally {
         document.body.style.cursor = 'default';
     }
 }
+
+// Tambahkan event listener agar teks informasi dokumen di modal ikut berubah saat tanggal baru dipilih
+document.addEventListener('DOMContentLoaded', () => {
+    const inputTglRevisi = document.getElementById('input-tanggal-revisi');
+    if (inputTglRevisi) {
+        inputTglRevisi.addEventListener('change', function() {
+            const tglBaruStr = this.value.replace(/-/g, ''); // Format jadi YYYYMMDD
+            if (currentActiveTujuan && tglBaruStr) {
+                const infoTeks = document.getElementById('teks-info-ubah-tanggal');
+                if (infoTeks) {
+                    infoTeks.textContent = `${currentActiveTujuan}_${tglBaruStr}`;
+                }
+            }
+        });
+    }
+});
 
 window.updateStatistikMuat = async function(tglId) {
     if (!tglId) return;
@@ -822,8 +934,8 @@ window.renderTabelGabungan = async function() {
         listTujuanKeys.forEach(tujuan => {
             row1 += `<th class="p-2 text-center border border-slate-500 text-[10px]">${groupTujuan[tujuan].label}</th>`;
             
-            // Ubah row2 agar kolom tujuan menjadi tombol interaktif (bisa diklik)
-            row2 += `<th onclick="bukaModalUbahTanggal('${tujuan}', '${typeof noDo !== 'undefined' ? noDo : ''}')" 
+            // Ubah row2 agar hanya mengirimkan '${tujuan}' saja karena tanggalnya dilacak otomatis oleh Firestore
+            row2 += `<th onclick="bukaModalUbahTanggal('${tujuan}')" 
                     class="p-1 text-center text-[11px] text-blue-600 font-bold border border-slate-500 cursor-pointer hover:bg-blue-100 transition-colors" 
                     title="Klik untuk mengubah tanggal muat tujuan ${tujuan}">
                     ${tujuan}
