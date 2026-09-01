@@ -301,25 +301,34 @@
     </div>
 </div>
 
-<!-- Modal Ubah Tanggal Tujuan -->
+<!-- Modal Ubah Tanggal Tujuan (Revisi dengan Pemisahan Tujuan & Nomor DO) -->
 <div id="modalUbahTanggal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:99999; align-items:center; justify-content:center; animation: fadeIn 0.2s ease;">
-    <div style="background:white; width:90%; max-width:350px; border-radius:12px; overflow:hidden; box-shadow:0 10px 25px rgba(0,0,0,0.3);">
+    <div style="background:white; width:90%; max-width:380px; border-radius:12px; overflow:hidden; box-shadow:0 10px 25px rgba(0,0,0,0.3);">
         <div style="padding:15px; background:#3c3c3c; color:white; display:flex; justify-content:space-between; align-items:center;">
             <h3 style="margin:0; font-size:15px; font-weight:bold;">REVISI TANGGAL MUAT</h3>
             <button onclick="tutupModalUbahTanggal()" style="background:none; border:none; color:#f97316; font-size:24px; cursor:pointer;">&times;</button>
         </div>
-        <div style="padding:20px; display:flex; flex-direction:column; gap:15px;">
+        <div style="padding:20px; display:flex; flex-direction:column; gap:12px;">
             <div>
-                <label style="display:block; font-size:15px; font-weight:bold; color:#000000; margin-bottom:5px; text-transform:uppercase;">MEMINDAHKAN DATA MUAT:</label>
-                <div style="background:#fff1d3; padding:10px; border-radius:8px; border:1px solid #ff9b20;">
-                    <p id="teks-info-ubah-tanggal" style="margin:0; font-size:12px; font-weight:bold; color:#1e3a8a; text-align:center;">
+                <label style="display:block; font-size:13px; font-weight:bold; color:#000000; margin-bottom:4px; text-transform:uppercase;">MEMINDAHKAN DATA MUAT:</label>
+                <div style="background:#fff1d3; padding:8px; border-radius:8px; border:1px solid #ff9b20;">
+                    <p id="teks-info-ubah-tanggal" style="margin:0; font-size:11px; font-weight:bold; color:#1e3a8a; text-align:center;">
                         DO - TUJUAN - TANGGAL
                     </p>
                 </div>
             </div>
+
+            <!-- Pilihan Nomor DO Terpisah -->
             <div>
-                <label style="display:block; font-size:15px; font-weight:bold; color:#000000; margin-bottom:5px;">PILIH TANGGAL MUAT:</label>
-                <input type="date" id="input-tanggal-revisi" style="width:100%; padding:10px; border:1px solid #ff9b20; border-radius:8px; font-weight:bold; font-size:12px; color:#000000; background-color:#fff1d3; box-sizing:border-box;">
+                <label style="display:block; font-size:13px; font-weight:bold; color:#000000; margin-bottom:4px;">PILIH NOMOR DO:</label>
+                <select id="select-revisi-nodo" style="width:100%; padding:8px; border:1px solid #ff9b20; border-radius:8px; font-weight:bold; font-size:12px; color:#000000; background-color:#fff1d3; box-sizing:border-box;">
+                    <option value="">-- Pilih Nomor DO --</option>
+                </select>
+            </div>
+
+            <div>
+                <label style="display:block; font-size:13px; font-weight:bold; color:#000000; margin-bottom:4px;">PILIH TANGGAL MUAT BARU:</label>
+                <input type="date" id="input-tanggal-revisi" style="width:100%; padding:8px; border:1px solid #ff9b20; border-radius:8px; font-weight:bold; font-size:12px; color:#000000; background-color:#fff1d3; box-sizing:border-box;">
             </div>
         </div>
         <div style="padding:15px; background:#f3f4f6; border-top:1px solid #e5e7eb; display:flex; gap:10px;">
