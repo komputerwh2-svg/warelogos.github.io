@@ -2001,7 +2001,7 @@ async function bukaModalInputRak(kode) {
 
     if (!item) {
         console.error("Data barang tidak ditemukan untuk kode:", kode);
-        alert("Data barang tidak ditemukan.");
+        miuiAlert("Data barang tidak ditemukan.");
         return;
     }
 
