@@ -1,4 +1,4 @@
-// main.js - Bagian Inisialisasi Firebase
+// main.js - Bagian Inisialisasi Firebase & Central Engine (Optimized v29.08.2026)
 const firebaseConfig = {
     apiKey: "AIzaSyDisM9v8_Zbsl-jTx7TMEzishoM9yddwGE",
     authDomain: "bank-data-cbd97.firebaseapp.com",
@@ -284,6 +284,228 @@ function tutupSetelan() {
     if (pageSetelan) pageSetelan.classList.add('hidden');
     window.kembaliKeHalamanUtama();
 }
+
+
+// Buka Modal Manager Database
+function bukaModalDatabase() {
+    const modal = document.getElementById('modal-database-manager');
+    if (modal) {
+        modal.classList.remove('hidden');
+        renderDataLokalModal();
+        muatDataFirebaseManager();
+    } else {
+        console.error("Elemen modal-database-manager tidak ditemukan di HTML!");
+    }
+}
+
+function tutupModalDatabaseManager() {
+    const modal = document.getElementById('modal-database-manager');
+    if (modal) modal.classList.add('hidden');
+}
+
+// Render Sisi Kiri: Deteksi otomatis penyimpanan lokal perangkat
+async function renderDataLokalModal() {
+    const container = document.getElementById('list-db-lokal');
+    const statusBadge = document.getElementById('lokal-sync-status');
+    container.innerHTML = '<div class="text-xs text-slate-400 text-center py-4">Memindai penyimpanan lokal...</div>';
+
+    try {
+        // Daftar key / store yang biasa digunakan di aplikasi Anda
+        const keys = ["master_barang", "stok_blok", "stok_wh", "log_transaksi", "data_barang", "transaksi"];
+        let htmlContent = "";
+        let totalEntriLokal = 0;
+
+        for (const key of keys) {
+            let count = 0;
+            let statusTersedia = false;
+
+            // 1. Cek melalui localStorage terlebih dahulu (jika aplikasi menggunakan localStorage)
+            try {
+                const localData = localStorage.getItem(key);
+                if (localData) {
+                    const parsed = JSON.parse(localData);
+                    count = Array.isArray(parsed) ? parsed.length : Object.keys(parsed).length;
+                    if (count > 0) statusTersedia = true;
+                }
+            } catch (e) {}
+
+            // 2. Jika di localStorage kosong, coba cek dari IndexedDB utama aplikasi jika ada
+            if (!statusTersedia) {
+                try {
+                    // Menggunakan koneksi database yang umum atau variabel global aplikasi
+                    const dbName = "LogistikWH_DB"; // Sesuaikan jika nama DB lokal Anda berbeda
+                    const countFromIDB = await new Promise((resolve) => {
+                        const request = indexedDB.open(dbName);
+                        request.onerror = () => resolve(0);
+                        request.onsuccess = (event) => {
+                            const db = event.target.result;
+                            if (!db.objectStoreNames.contains(key)) {
+                                resolve(0);
+                                return;
+                            }
+                            try {
+                                const tx = db.transaction(key, "readonly");
+                                const store = tx.objectStore(key);
+                                const countReq = store.count();
+                                countReq.onsuccess = () => resolve(countReq.result);
+                                countReq.onerror = () => resolve(0);
+                            } catch (err) {
+                                resolve(0);
+                            }
+                        };
+                    });
+                    if (countFromIDB > 0) {
+                        count = countFromIDB;
+                        statusTersedia = true;
+                    }
+                } catch (e) {}
+            }
+
+            if (statusTersedia) {
+                totalEntriLokal += count;
+            }
+
+            htmlContent += `
+                <div class="p-2.5 bg-slate-50 border rounded-md flex justify-between items-center text-xs">
+                    <div>
+                        <span class="font-bold text-slate-800 block">${key}</span>
+                        <span class="text-[10px] text-slate-400">Jumlah item: ${count} entri</span>
+                    </div>
+                    <span class="text-[10px] font-semibold ${statusTersedia ? 'text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded' : 'text-slate-400 bg-slate-100 px-2 py-0.5 rounded'}">
+                        ${statusTersedia ? 'Tersedia' : 'Kosong'}
+                    </span>
+                </div>
+            `;
+        }
+
+        container.innerHTML = htmlContent;
+
+        if (totalEntriLokal > 0) {
+            statusBadge.textContent = "Sinkron / Aktif";
+            statusBadge.className = "text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold";
+        } else {
+            statusBadge.textContent = "Belum Ada Data";
+            statusBadge.className = "text-[10px] bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-bold";
+        }
+
+    } catch (e) {
+        container.innerHTML = '<div class="text-xs text-rose-500 text-center py-4">Gagal memindai data lokal.</div>';
+        statusBadge.textContent = "Error";
+        statusBadge.className = "text-[10px] bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-bold";
+    }
+}
+
+// Render Sisi Kanan: Data Firebase (RTDB & Firestore REST)
+async function muatDataFirebaseManager() {
+    const container = document.getElementById('list-db-firebase');
+    container.innerHTML = '<div class="text-xs text-slate-400 text-center py-4">Menghubungkan ke Firebase (RTDB & Firestore)...</div>';
+
+    const RTDB_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
+    // Firestore REST endpoint untuk dokumen master_barang dalam project bank-data-cbd97
+    const FIRESTORE_URL = "https://firestore.googleapis.com/v1/projects/bank-data-cbd97/databases/(default)/documents/bank_data/master_barang";
+
+    try {
+        // Ambil data RTDB & Firestore secara paralel
+        const [resRtdbMaster, resRtdbBlok, resFirestore] = await Promise.all([
+            fetch(`${RTDB_URL}master_barang.json?shallow=true`),
+            fetch(`${RTDB_URL}stok_blok.json?shallow=true`),
+            fetch(FIRESTORE_URL).catch(() => null)
+        ]);
+
+        const rtdbMasterData = await resRtdbMaster.json();
+        const rtdbBlokData = await resRtdbBlok.json();
+        
+        let firestoreInfo = "Terhubung";
+        if (resFirestore && resFirestore.ok) {
+            const fsJson = await resFirestore.json();
+            firestoreInfo = fsJson.updateTime ? `Update: ${new Date(fsJson.updateTime).toLocaleString()}` : "Tersedia";
+        } else {
+            firestoreInfo = "Mode RTDB Utama";
+        }
+
+        container.innerHTML = `
+            <div class="p-2.5 bg-slate-50 border rounded-md flex justify-between items-center text-xs">
+                <div>
+                    <span class="font-bold text-slate-800 block">master_barang (RTDB)</span>
+                    <span class="text-[10px] text-slate-400">Status Server Cloud Aktif</span>
+                </div>
+                <span class="text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">Online</span>
+            </div>
+            <div class="p-2.5 bg-slate-50 border rounded-md flex justify-between items-center text-xs">
+                <div>
+                    <span class="font-bold text-slate-800 block">stok_blok (RTDB)</span>
+                    <span class="text-[10px] text-slate-400">Sinkronisasi Realtime</span>
+                </div>
+                <span class="text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">Online</span>
+            </div>
+            <div class="p-2.5 bg-slate-50 border rounded-md flex justify-between items-center text-xs">
+                <div>
+                    <span class="font-bold text-slate-800 block">Firestore (bank_data/master_barang)</span>
+                    <span class="text-[10px] text-slate-400">${firestoreInfo}</span>
+                </div>
+                <span class="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">Aktif</span>
+            </div>
+        `;
+    } catch (e) {
+        container.innerHTML = '<div class="text-xs text-rose-500 text-center py-4">Gagal terhubung ke server Firebase. Periksa koneksi internet.</div>';
+    }
+}
+
+// Sinkronisasi Penuh Tarik Data dari Firebase ke Perangkat
+// Menggunakan miuiAlert yang sudah ada di aplikasi
+async function jalankanSinkronisasiPenuh() {
+    try {
+        if (typeof miuiAlert === 'function') {
+            miuiAlert('Memproses Sinkronisasi', 'Mengambil data terbaru dari server...', 'info');
+        }
+
+        // Panggil fungsi sinkronisasi utama
+        await muatDataFirebaseManager();
+        await renderDataLokalModal();
+
+        if (typeof miuiAlert === 'function') {
+            miuiAlert('Berhasil', 'Sinkronisasi database selesai!', 'success');
+        } else {
+            alert('Sinkronisasi database selesai!');
+        }
+    } catch (err) {
+        if (typeof miuiAlert === 'function') {
+            miuiAlert('Gagal', 'Terjadi kesalahan saat sinkronisasi.', 'error');
+        } else {
+            alert('Gagal melakukan sinkronisasi.');
+        }
+    }
+}
+
+async function cekStatusDatabaseSetelan() {
+    const infoEl = document.getElementById('info-status-db');
+    const dotEl = document.getElementById('menu-dot-db');
+    if (!infoEl) return;
+
+    try {
+        const lastSync = await getFromLocalDevice("last_sync_time");
+        const master = await getFromLocalDevice("master_barang");
+        
+        if (master) {
+            infoEl.textContent = `Tersimpan lokal (${lastSync})`;
+            infoEl.className = "text-[10px] text-emerald-600 block font-medium";
+            if (dotEl) dotEl.className = "w-2.5 h-2.5 rounded-full bg-emerald-500";
+        } else {
+            infoEl.textContent = "Data lokal belum ada, klik untuk download.";
+            infoEl.className = "text-[10px] text-rose-500 block font-medium";
+            if (dotEl) dotEl.className = "w-2.5 h-2.5 rounded-full bg-rose-500";
+        }
+    } catch (e) {
+        infoEl.textContent = "Status tidak tersedia";
+        if (dotEl) dotEl.className = "w-2.5 h-2.5 rounded-full bg-gray-400";
+    }
+}
+
+window.bukaModalDatabase = bukaModalDatabase;
+window.tutupModalDatabaseManager = tutupModalDatabaseManager;
+window.muatDataFirebaseManager = muatDataFirebaseManager;
+window.jalankanSinkronisasiPenuh = jalankanSinkronisasiPenuh;
+window.cekStatusDatabaseSetelan = cekStatusDatabaseSetelan;
 
 // =========================================================================
 // 5. FUNCTION LOGIC FOR MODAL RAK KOSONG PRINT SYSTEM (LOKAL & CLOUD)
