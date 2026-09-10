@@ -1831,14 +1831,14 @@ function tampilkanKosongRekap(tanggal) {
 }
 
 
-// Fungsi untuk memuat dan menyimpan agregat stok blok dengan cache localStorage
+// ==========================================
+// 1. FUNGSI AGREGAT STOK BLOK (Tetap LocalStorage)
+// ==========================================
 async function getAgregatStokBlok() {
     const cacheKey = 'wh_cache_agregat_stok_blok';
     const cacheTimeKey = 'wh_cache_agregat_stok_blok_time';
-    const CACHE_DURATION = 10 * 60 * 1000; // Kadaluarsa dalam 10 menit
 
     try {
-        // Cek jika sedang offline atau ingin memanfaatkan cache terlebih dahulu
         if (!navigator.onLine) {
             console.warn("[Offline Mode] Menggunakan cache lokal untuk agregat stok blok.");
             const cachedData = localStorage.getItem(cacheKey);
@@ -1852,11 +1852,8 @@ async function getAgregatStokBlok() {
         const agregat = {};
 
         if (dataBlok) {
-            // Loop melalui setiap blok
             Object.values(dataBlok).forEach(blokItem => {
-                // Loop melalui setiap kode di dalam blok
                 Object.entries(blokItem).forEach(([kode, dataTanggal]) => {
-                    // Iterasi setiap entry tanggal di bawah kode tersebut
                     Object.values(dataTanggal).forEach(detail => {
                         const krt = parseInt(detail.krt) || 0;
                         if (!agregat[kode]) agregat[kode] = 0;
@@ -1866,32 +1863,72 @@ async function getAgregatStokBlok() {
             });
         }
 
-        // Simpan ke localStorage agar aman saat offline / mempercepat load berikutnya
         localStorage.setItem(cacheKey, JSON.stringify(agregat));
         localStorage.setItem(cacheTimeKey, Date.now().toString());
 
         return agregat;
     } catch (error) {
         console.warn("Gagal mengambil dari server, mencoba memuat cache lokal...", error.message);
-        
-        // Fallback ke localStorage jika terjadi gangguan jaringan
         const cachedData = localStorage.getItem(cacheKey);
         if (cachedData) {
             return JSON.parse(cachedData);
         }
-        
         return {};
     }
 }
 
-// Pastikan ini dipanggil saat aplikasi dimuat agar data QTY tersedia dengan dukungan Cache Lokal
+// ==========================================
+// HELPER INDEXEDDB KHUSUS MASTER BARANG
+// ==========================================
+function openMasterDB_wh() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open("WarehouseMasterDB", 1);
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains("master_store")) {
+                db.createObjectStore("master_store");
+            }
+        };
+        request.onsuccess = (event) => resolve(event.target.result);
+        request.onerror = (event) => reject(event.target.error);
+    });
+}
+
+async function saveMasterToIDB_wh(dataBarang) {
+    try {
+        const db = await openMasterDB_wh();
+        const tx = db.transaction("master_store", "readwrite");
+        const store = tx.objectStore("master_store");
+        store.put(dataBarang, "master_barang_data");
+        return tx.complete;
+    } catch (e) {
+        console.error("Gagal menyimpan master ke IndexedDB:", e);
+    }
+}
+
+async function getMasterFromIDB_wh() {
+    try {
+        const db = await openMasterDB_wh();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction("master_store", "readonly");
+            const store = tx.objectStore("master_store");
+            const request = store.get("master_barang_data");
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    } catch (e) {
+        console.error("Gagal membaca master dari IndexedDB:", e);
+        return null;
+    }
+}
+
+// ==========================================
+// 2. FUNGSI LOAD MASTER BARANG (Menggunakan IndexedDB)
+// ==========================================
 async function loadMasterBarang() {
-    const cacheKey = 'wh_cache_master_barang';
-    
     try {
         console.log("Mulai memuat master barang...");
         
-        // Jika offline, langsung ambil dari localStorage
         if (!navigator.onLine) {
             throw new Error("Offline mode");
         }
@@ -1904,23 +1941,23 @@ async function loadMasterBarang() {
         
         if (dataFromServer) {
             window.masterData = dataFromServer;
-            // Simpan salinan ke localStorage
-            localStorage.setItem(cacheKey, JSON.stringify(dataFromServer));
+            // Simpan ke IndexedDB (Aman dari batas kuota localStorage)
+            await saveMasterToIDB_wh(dataFromServer);
             console.log("Master data berhasil dimuat dari server. Jumlah item:", Object.keys(window.masterData).length);
         } else {
             console.warn("Master data kosong atau tidak ditemukan.");
         }
     } catch (error) {
-        console.warn("Gagal memuat master barang dari server, mencoba memuat dari storage lokal...", error.message);
+        console.warn("Gagal memuat master barang dari server, mencoba memuat dari IndexedDB lokal...", error.message);
         
-        // Fallback membaca dari localStorage
-        const localMaster = localStorage.getItem(cacheKey);
+        // Fallback membaca dari IndexedDB
+        const localMaster = await getMasterFromIDB_wh();
         if (localMaster) {
-            window.masterData = JSON.parse(localMaster);
-            console.log("Master data berhasil dimuat dari cache lokal. Jumlah item:", Object.keys(window.masterData).length);
+            window.masterData = localMaster;
+            console.log("Master data berhasil dimuat dari IndexedDB lokal. Jumlah item:", Object.keys(window.masterData).length);
         } else {
             window.masterData = {};
-            console.error("Master data lokal tidak ditemukan.");
+            console.error("Master data lokal tidak ditemukan di IndexedDB.");
         }
     }
 }
