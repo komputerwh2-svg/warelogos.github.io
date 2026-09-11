@@ -286,7 +286,6 @@ function tutupSetelan() {
 }
 
 
-// Fungsi utilitas untuk menghitung ukuran string/data dalam format Bytes, KB, atau MB
 function formatUkuranData(data) {
     if (!data) return "0 B";
     const stringData = typeof data === 'string' ? data : JSON.stringify(data);
@@ -296,13 +295,11 @@ function formatUkuranData(data) {
     return (bytes / (1024 * 1024)).toFixed(2) + " MB";
 }
 
-// Buka Modal Manager Database
 function bukaModalDatabase() {
     const modal = document.getElementById('modal-database-manager');
     if (modal) {
         modal.classList.remove('hidden');
-        renderDataLokalModal();
-        muatDataFirebaseManager();
+        muatDataManajemenDatabaseTerpadu();
     } else {
         console.error("Elemen modal-database-manager tidak ditemukan di HTML!");
     }
@@ -313,7 +310,168 @@ function tutupModalDatabaseManager() {
     if (modal) modal.classList.add('hidden');
 }
 
-// Perbaikan Fungsi Download Satuan untuk Firestore
+async function muatDataManajemenDatabaseTerpadu() {
+    const container = document.getElementById('list-db-lokal');
+    const statusBadge = document.getElementById('lokal-sync-status');
+    if (!container) return;
+    
+    container.innerHTML = '<div class="text-xs text-slate-400 text-center py-6">Memindai dan menyelaraskan data lokal & server...</div>';
+
+    try {
+        const daftarKey = [
+            "master_barang", "master_blok", "master_driver", "master_nominal", 
+            "master_tujuan", "stok_blok", "stok_lebih", "stok_tukar", 
+            "stok_wh2", "stok_wh3", "transaksi_ongkir", "muat_wh3"
+        ];
+
+        const rtdb = window.getRTDB();
+        const db = window.getFirestore();
+        let htmlContent = "";
+        let totalItemLokalGlobal = 0;
+        let totalItemSinkronGlobal = 0;
+
+        for (const key of daftarKey) {
+            let countLokal = 0;
+            let ukuranLokalStr = "0 B";
+            let waktuLokal = localStorage.getItem(key + "_timestamp") || "Belum ada";
+            let dataLokalRaw = localStorage.getItem(key);
+            
+            if (dataLokalRaw) {
+                ukuranLokalStr = formatUkuranData(dataLokalRaw);
+                try {
+                    const parsed = JSON.parse(dataLokalRaw);
+                    countLokal = Array.isArray(parsed) ? parsed.filter(Boolean).length : Object.keys(parsed).length;
+                } catch (e) {
+                    countLokal = 0;
+                }
+            }
+            if (countLokal > 0) totalItemLokalGlobal += countLokal;
+
+            let countServer = 0;
+            let ukuranServerStr = "0 B";
+            let waktuServer = "-";
+            let sourceType = "rtdb";
+            let targetKeyDownload = key;
+
+            try {
+                if (key === "muat_wh3") {
+                    sourceType = "firestore";
+                    const dateDocsSnap = await db.collection("muat_wh3").get();
+                    const allData = {};
+                    for (const dateDoc of dateDocsSnap.docs) {
+                        const dateKey = dateDoc.id;
+                        const subColSnap = await db.collection("muat_wh3").doc(dateKey).collection("datatujuan").get();
+                        allData[dateKey] = {};
+                        subColSnap.forEach(subDoc => {
+                            allData[dateKey][subDoc.id] = subDoc.data();
+                            countServer++;
+                        });
+                    }
+                    ukuranServerStr = formatUkuranData(allData);
+                    waktuServer = "Realtime Active";
+                } else if (key === "master_barang") {
+                    let fsSnapshot = await db.collection("master_barang").get();
+                    if (!fsSnapshot.empty) {
+                        sourceType = "firestore_master";
+                        const docsList = {};
+                        fsSnapshot.forEach(doc => {
+                            docsList[doc.id] = doc.data();
+                            countServer++;
+                        });
+                        ukuranServerStr = formatUkuranData(docsList);
+                        waktuServer = "Realtime Active";
+                    } else {
+                        const snapshot = await rtdb.ref(key).once('value');
+                        const val = snapshot.val();
+                        if (val) {
+                            ukuranServerStr = formatUkuranData(val);
+                            countServer = Array.isArray(val) ? val.filter(Boolean).length : Object.keys(val).length;
+                        }
+                        const metaSnap = await rtdb.ref(key + "_meta/last_updated").once('value');
+                        waktuServer = metaSnap.val() || localStorage.getItem(key + "_timestamp") || "Aktif";
+                    }
+                } else {
+                    sourceType = "rtdb";
+                    const snapshot = await rtdb.ref(key).once('value');
+                    const val = snapshot.val();
+                    if (val) {
+                        ukuranServerStr = formatUkuranData(val);
+                        countServer = Array.isArray(val) ? val.filter(Boolean).length : Object.keys(val).length;
+                    }
+                    const metaSnap = await rtdb.ref(key + "_meta/last_updated").once('value');
+                    waktuServer = metaSnap.val() || localStorage.getItem(key + "_timestamp") || "Aktif";
+                }
+            } catch (err) {
+                console.warn(`Gagal memuat server untuk ${key}:`, err);
+                waktuServer = localStorage.getItem(key + "_timestamp") || "Aktif";
+            }
+
+            let statusBadgeHtml = '';
+            let isSinkron = (countLokal === countServer && countLokal > 0);
+            
+            if (isSinkron) {
+                totalItemSinkronGlobal++;
+                statusBadgeHtml = `<span class="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full border border-emerald-200 flex items-center gap-1"><i class="fa-solid fa-check"></i> Sinkron</span>`;
+            } else if (countLokal === 0) {
+                statusBadgeHtml = `<span class="text-[10px] font-bold px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full border border-rose-200">Lokal Kosong</span>`;
+            } else {
+                statusBadgeHtml = `<span class="text-[10px] font-bold px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full border border-amber-200">Perlu Update</span>`;
+            }
+
+            htmlContent += `
+                <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col lg:flex-row justify-between items-start lg:items-center text-xs shadow-sm gap-4 hover:bg-slate-100/60 transition">
+                    <!-- Info Modul & Nama Key -->
+                    <div class="w-full lg:w-1/4">
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-slate-800 text-sm">${key}</span>
+                            ${statusBadgeHtml}
+                        </div>
+                        <span class="text-[11px] text-slate-400 block mt-0.5">Sumber: ${sourceType.toUpperCase()}</span>
+                    </div>
+
+                    <!-- Perbandingan Data (Lokal vs Server) -->
+                    <div class="grid grid-cols-2 gap-4 w-full lg:w-2/4 bg-white p-3 rounded-lg border border-slate-200">
+                        <div class="border-r pr-2">
+                            <span class="text-[10px] text-slate-400 block font-bold uppercase">LOKAL (Perangkat)</span>
+                            <span class="font-bold text-slate-700 text-sm">${countLokal} item</span>
+                            <span class="text-[10px] font-mono text-slate-500 block">${ukuranLokalStr}</span>
+                            <span class="text-[10px] text-blue-600 block mt-1 truncate" title="${waktuLokal}"><i class="fa-regular fa-clock"></i> ${waktuLokal}</span>
+                        </div>
+                        <div class="pl-1">
+                            <span class="text-[10px] text-slate-400 block font-bold uppercase">SERVER (Cloud)</span>
+                            <span class="font-bold text-slate-700 text-sm">${countServer} item</span>
+                            <span class="text-[10px] font-mono text-slate-500 block">${ukuranServerStr}</span>
+                            <span class="text-[10px] text-orange-600 block mt-1 truncate" title="${waktuServer}"><i class="fa-regular fa-clock"></i> ${waktuServer}</span>
+                        </div>
+                    </div>
+
+                    <!-- Tombol Aksi Satuan -->
+                    <div class="w-full lg:w-auto flex justify-end">
+                        <button onclick="downloadDataFirebaseKeLokal('${sourceType}', '${targetKeyDownload}')" class="w-full lg:w-auto px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm">
+                            <i class="fa-solid fa-cloud-arrow-down"></i> Tarik Data
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        container.innerHTML = htmlContent;
+
+        if (statusBadge) {
+            if (totalItemLokalGlobal > 0) {
+                statusBadge.textContent = `Sinkron (${totalItemSinkronGlobal}/${daftarKey.length} Modul)`;
+                statusBadge.className = "text-xs bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full font-bold";
+            } else {
+                statusBadge.textContent = "Belum Ada Data Lokal";
+                statusBadge.className = "text-xs bg-rose-100 text-rose-700 px-3 py-1 rounded-full font-bold";
+            }
+        }
+    } catch (err) {
+        console.error("Gagal memuat manajemen database terpadu:", err);
+        if (container) container.innerHTML = '<div class="text-xs text-rose-500 text-center py-6">Gagal menyelaraskan data dari server Firebase.</div>';
+    }
+}
+
 async function downloadDataFirebaseKeLokal(sourceType, targetKey) {
     try {
         if (typeof miuiAlert === 'function') {
@@ -355,9 +513,7 @@ async function downloadDataFirebaseKeLokal(sourceType, targetKey) {
         if (dataToSave) {
             localStorage.setItem(targetKey, JSON.stringify(dataToSave));
             localStorage.setItem(targetKey + "_timestamp", waktuServer);
-            
-            await renderDataLokalModal();
-            await muatDataFirebaseManager();
+            await muatDataManajemenDatabaseTerpadu();
 
             if (typeof miuiAlert === 'function') {
                 miuiAlert('Berhasil', `Data ${targetKey} berhasil disinkronkan ke lokal!`, 'success');
@@ -370,206 +526,6 @@ async function downloadDataFirebaseKeLokal(sourceType, targetKey) {
     }
 }
 
-// Render Sisi Kiri: Deteksi otomatis penyimpanan lokal perangkat & waktu simpannya (dilengkapi badge ukuran data KB/MB)
-async function renderDataLokalModal() {
-    const container = document.getElementById('list-db-lokal');
-    const statusBadge = document.getElementById('lokal-sync-status');
-    if (!container) return;
-    container.innerHTML = '<div class="text-xs text-slate-400 text-center py-4">Memindai penyimpanan lokal...</div>';
-
-    try {
-        const keys = [
-            "master_barang", "master_blok", "master_driver", "master_nominal", 
-            "master_tujuan", "stok_blok", "stok_lebih", "stok_tukar", 
-            "stok_wh2", "stok_wh3", "transaksi_ongkir", "muat_wh3"
-        ];
-        let htmlContent = "";
-        let totalEntriLokal = 0;
-
-        for (const key of keys) {
-            let count = 0;
-            let statusTersedia = false;
-            let waktuLokal = localStorage.getItem(key + "_timestamp") || "-";
-            let ukuranStr = "0 B";
-
-            try {
-                const localData = localStorage.getItem(key);
-                if (localData) {
-                    ukuranStr = formatUkuranData(localData);
-                    const parsed = JSON.parse(localData);
-                    count = Array.isArray(parsed) ? parsed.filter(Boolean).length : Object.keys(parsed).length;
-                    if (count > 0) statusTersedia = true;
-                }
-            } catch (e) {}
-
-            if (statusTersedia) {
-                totalEntriLokal += count;
-            }
-
-            htmlContent += `
-                <div class="p-3 bg-slate-50 border rounded-lg flex justify-between items-center text-xs shadow-sm">
-                    <div>
-                        <div class="flex items-center gap-1.5">
-                            <span class="font-bold text-slate-800 text-sm">${key}</span>
-                            <span class="text-[9px] font-mono px-1.5 py-0.5 bg-slate-200 text-slate-700 rounded font-bold">${ukuranStr}</span>
-                        </div>
-                        <span class="text-[11px] text-slate-500 block">Jumlah item: ${count} entri</span>
-                        <span class="text-[10px] text-blue-600 font-medium block mt-0.5"><i class="fa-regular fa-clock"></i> Update Lokal: ${waktuLokal}</span>
-                    </div>
-                    <span class="text-[11px] font-semibold px-2.5 py-1 rounded-md ${statusTersedia ? 'text-emerald-700 bg-emerald-50 border border-emerald-200' : 'text-slate-400 bg-slate-100'}">
-                        ${statusTersedia ? 'Tersedia' : 'Kosong'}
-                    </span>
-                </div>
-            `;
-        }
-
-        container.innerHTML = htmlContent;
-
-        if (statusBadge) {
-            if (totalEntriLokal > 0) {
-                statusBadge.textContent = "Sinkron / Aktif";
-                statusBadge.className = "text-xs bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full font-bold";
-            } else {
-                statusBadge.textContent = "Belum Ada Data";
-                statusBadge.className = "text-xs bg-rose-100 text-rose-700 px-3 py-1 rounded-full font-bold";
-            }
-        }
-    } catch (e) {
-        if (container) container.innerHTML = '<div class="text-xs text-rose-500 text-center py-4">Gagal memindai data lokal.</div>';
-    }
-}
-
-// Render Sisi Kanan: Firebase dengan Timestamp Server, Tombol Ambil, & Badge Ukuran Data (KB/MB)
-async function muatDataFirebaseManager() {
-    const container = document.getElementById('list-db-firebase');
-    if (!container) return;
-    container.innerHTML = '<div class="text-xs text-slate-400 text-center py-4">Menghubungkan ke server Firebase...</div>';
-
-    try {
-        const rtdb = window.getRTDB();
-        const db = window.getFirestore();
-        let htmlContent = "";
-
-        const rtdbKeys = [
-            "master_barang", "master_blok", "master_driver", "master_nominal", 
-            "master_tujuan", "stok_blok", "stok_lebih", "stok_tukar", 
-            "stok_wh2", "stok_wh3", "transaksi_ongkir"
-        ];
-
-        for (const key of rtdbKeys) {
-            let count = 0;
-            let waktuServer = "-";
-            let ukuranStr = "0 B";
-            try {
-                const snapshot = await rtdb.ref(key).once('value');
-                const val = snapshot.val();
-                if (val) {
-                    ukuranStr = formatUkuranData(val);
-                    count = Array.isArray(val) ? val.filter(Boolean).length : Object.keys(val).length;
-                }
-                const metaSnap = await rtdb.ref(key + "_meta/last_updated").once('value');
-                waktuServer = metaSnap.val() || new Date().toLocaleString('id-ID');
-            } catch (e) {
-                count = 0;
-            }
-
-            htmlContent += `
-                <div class="p-3 bg-slate-50 border rounded-lg flex justify-between items-center text-xs shadow-sm">
-                    <div>
-                        <div class="flex items-center gap-1.5">
-                            <span class="font-bold text-slate-800 text-sm">RTDB: ${key}</span>
-                            <span class="text-[9px] font-mono px-1.5 py-0.5 bg-slate-200 text-slate-700 rounded font-bold">${ukuranStr}</span>
-                        </div>
-                        <span class="text-[11px] text-slate-500 block">Total data: ${count} entri</span>
-                        <span class="text-[10px] text-orange-600 font-medium block mt-0.5"><i class="fa-regular fa-clock"></i> Server: ${waktuServer}</span>
-                    </div>
-                    <button onclick="downloadDataFirebaseKeLokal('rtdb', '${key}')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-semibold transition flex items-center gap-1 shadow">
-                        <i class="fa-solid fa-download"></i> Ambil
-                    </button>
-                </div>
-            `;
-        }
-
-        // 1. Perbaikan Pembacaan Firestore: master_barang (menyesuaikan path bank_data -> master_barang)
-        let masterBarangCount = 0;
-        let masterBarangUkuranStr = "0 B";
-        try {
-            // Mengambil dari bank_data -> dokumen -> collection master_barang, atau langsung root collection master_barang
-            let fsSnapshot = await db.collection("master_barang").get();
-            if (fsSnapshot.empty) {
-                // Coba fallback jika strukturnya berada di dalam root bank_data
-                fsSnapshot = await db.collection("bank_data").doc("master_barang").collection("items").get();
-            }
-            masterBarangCount = fsSnapshot.size;
-            const mbDocsList = {};
-            fsSnapshot.forEach(doc => {
-                mbDocsList[doc.id] = doc.data();
-            });
-            masterBarangUkuranStr = formatUkuranData(mbDocsList);
-        } catch (e) {
-            masterBarangCount = 0;
-        }
-
-        htmlContent += `
-            <div class="p-3 bg-slate-50 border rounded-lg flex justify-between items-center text-xs shadow-sm">
-                <div>
-                    <div class="flex items-center gap-1.5">
-                        <span class="font-bold text-slate-800 text-sm">Firestore: master_barang</span>
-                        <span class="text-[9px] font-mono px-1.5 py-0.5 bg-slate-200 text-slate-700 rounded font-bold">${masterBarangUkuranStr}</span>
-                    </div>
-                    <span class="text-[11px] text-slate-500 block">Total dokumen: ${masterBarangCount} dokumen</span>
-                    <span class="text-[10px] text-orange-600 font-medium block mt-0.5"><i class="fa-regular fa-clock"></i> Server: Realtime Active</span>
-                </div>
-                <button onclick="downloadDataFirebaseKeLokal('firestore_master', 'master_barang')" class="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-xs font-semibold transition flex items-center gap-1 shadow">
-                    <i class="fa-solid fa-download"></i> Ambil
-                </button>
-            </div>
-        `;
-
-        // 2. Perbaikan Pembacaan Firestore: muat_wh3 (menelusuri dokumen tanggal dan sub-collection datatujuan)
-        let firestoreCount = 0;
-        let firestoreUkuranStr = "0 B";
-        const allMuatWh3Data = {};
-        try {
-            const dateDocsSnap = await db.collection("muat_wh3").get();
-            for (const dateDoc of dateDocsSnap.docs) {
-                const dateKey = dateDoc.id; // Contoh: 20260714
-                const subColSnap = await db.collection("muat_wh3").doc(dateKey).collection("datatujuan").get();
-                
-                allMuatWh3Data[dateKey] = {};
-                subColSnap.forEach(subDoc => {
-                    allMuatWh3Data[dateKey][subDoc.id] = subDoc.data();
-                    firestoreCount++;
-                });
-            }
-            firestoreUkuranStr = formatUkuranData(allMuatWh3Data);
-        } catch (e) {
-            firestoreCount = 0;
-        }
-
-        htmlContent += `
-            <div class="p-3 bg-slate-50 border rounded-lg flex justify-between items-center text-xs shadow-sm">
-                <div>
-                    <div class="flex items-center gap-1.5">
-                        <span class="font-bold text-slate-800 text-sm">Firestore: muat_wh3</span>
-                        <span class="text-[9px] font-mono px-1.5 py-0.5 bg-slate-200 text-slate-700 rounded font-bold">${firestoreUkuranStr}</span>
-                    </div>
-                    <span class="text-[11px] text-slate-500 block">Total sub-dokumen: ${firestoreCount} entri</span>
-                    <span class="text-[10px] text-orange-600 font-medium block mt-0.5"><i class="fa-regular fa-clock"></i> Server: Realtime Active</span>
-                </div>
-                <button onclick="downloadDataFirebaseKeLokal('firestore', 'muat_wh3')" class="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-xs font-semibold transition flex items-center gap-1 shadow">
-                    <i class="fa-solid fa-download"></i> Ambil
-                </button>
-            </div>
-        `;
-
-        container.innerHTML = htmlContent;
-    } catch (err) {
-        container.innerHTML = '<div class="text-xs text-rose-500 text-center py-4">Gagal memuat data dari server Firebase.</div>';
-    }
-}
-
-// Perbaikan Sinkronisasi Penuh agar Timestamp ikut tersalin otomatis
 async function jalankanSinkronisasiPenuh() {
     try {
         if (typeof miuiAlert === 'function') {
@@ -586,14 +542,12 @@ async function jalankanSinkronisasiPenuh() {
         const db = window.getFirestore();
         const waktuSekarang = new Date().toLocaleString('id-ID');
 
-        // 1. Download semua dari RTDB beserta timestamp-nya
         for (const key of rtdbKeys) {
             try {
                 const snapshot = await rtdb.ref(key).once('value');
                 const val = snapshot.val();
                 if (val) {
                     localStorage.setItem(key, JSON.stringify(val));
-                    
                     const metaSnap = await rtdb.ref(key + "_meta/last_updated").once('value');
                     const sTime = metaSnap.val() || waktuSekarang;
                     localStorage.setItem(key + "_timestamp", sTime);
@@ -603,7 +557,6 @@ async function jalankanSinkronisasiPenuh() {
             }
         }
 
-        // 2. Download dari Firestore (muat_wh3)
         try {
             const snapshot = await db.collection("muat_wh3").get();
             const docsList = {};
@@ -616,9 +569,7 @@ async function jalankanSinkronisasiPenuh() {
             console.error("Gagal download Firestore muat_wh3", err);
         }
 
-        // Refresh tampilan kiri & kanan modal
-        await muatDataFirebaseManager();
-        await renderDataLokalModal();
+        await muatDataManajemenDatabaseTerpadu();
 
         if (typeof miuiAlert === 'function') {
             miuiAlert('Berhasil', 'Semua data database berhasil disinkronkan ke perangkat!', 'success');
@@ -630,84 +581,99 @@ async function jalankanSinkronisasiPenuh() {
     }
 }
 
-// Fitur Auto-Sinkronisasi Latar Belakang (Background Auto-Sync) setiap 5 menit
-async function initBackgroundAutoSync() {
-    setInterval(async () => {
-        try {
-            const rtdb = window.getRTDB();
-            if (!rtdb) return;
-            
-            const rtdbKeys = [
-                "master_barang", "master_blok", "master_driver", "master_nominal", 
-                "master_tujuan", "stok_blok", "stok_lebih", "stok_tukar", 
-                "stok_wh2", "stok_wh3", "transaksi_ongkir"
-            ];
-
-            let adaPembaruan = false;
-            for (const key of rtdbKeys) {
-                const metaSnap = await rtdb.ref(key + "_meta/last_updated").once('value');
-                const serverTime = metaSnap.val();
-                const localTime = localStorage.getItem(key + "_timestamp");
-
-                // Jika server memiliki waktu baru dan berbeda dengan lokal, tarik otomatis di latar belakang
-                if (serverTime && serverTime !== localTime) {
-                    const snapshot = await rtdb.ref(key).once('value');
-                    const val = snapshot.val();
-                    if (val) {
-                        localStorage.setItem(key, JSON.stringify(val));
-                        localStorage.setItem(key + "_timestamp", serverTime);
-                        adaPembaruan = true;
-                    }
-                }
-            }
-
-            if (adaPembaruan) {
-                console.log("Auto-sync background: Data lokal berhasil diperbarui secara otomatis.");
-                // Update UI lokal jika modal sedang terbuka
-                if (typeof renderDataLokalModal === 'function') {
-                    renderDataLokalModal();
-                }
-            }
-        } catch (err) {
-            console.error("Background sync error:", err);
-        }
-    }, 5 * 60 * 1000); // Cek setiap 5 menit
-}
-
-// Jalankan auto-sync saat aplikasi dimuat
-document.addEventListener("DOMContentLoaded", () => {
-    initBackgroundAutoSync();
-});
-
-async function cekStatusDatabaseSetelan() {
-    const infoEl = document.getElementById('info-status-db');
-    const dotEl = document.getElementById('menu-dot-db');
-    if (!infoEl) return;
+async function perbaruiIndikatorMenuDb() {
+    const infoText = document.getElementById('info-status-db');
+    const dotIndicator = document.getElementById('menu-dot-db');
+    if (!infoText || !dotIndicator) return;
 
     try {
-        const lastSync = await getFromLocalDevice("last_sync_time");
-        const master = await getFromLocalDevice("master_barang");
-        
-        if (master) {
-            infoEl.textContent = `Tersimpan lokal (${lastSync})`;
-            infoEl.className = "text-[10px] text-emerald-600 block font-medium";
-            if (dotEl) dotEl.className = "w-2.5 h-2.5 rounded-full bg-emerald-500";
-        } else {
-            infoEl.textContent = "Data lokal belum ada, klik untuk download.";
-            infoEl.className = "text-[10px] text-rose-500 block font-medium";
-            if (dotEl) dotEl.className = "w-2.5 h-2.5 rounded-full bg-rose-500";
+        const daftarKey = [
+            "master_barang", "master_blok", "master_driver", "master_nominal", 
+            "master_tujuan", "stok_blok", "stok_lebih", "stok_tukar", 
+            "stok_wh2", "stok_wh3", "transaksi_ongkir", "muat_wh3"
+        ];
+
+        let totalLokalAda = 0;
+        let totalSinkron = 0;
+        let totalModul = daftarKey.length;
+
+        // Cek langsung ke server Firebase (RTDB / Firestore) untuk mencocokkan status sinkronisasi
+        const rtdb = window.getRTDB();
+        const db = window.getFirestore();
+
+        for (const key of daftarKey) {
+            const dataLokal = localStorage.getItem(key);
+            let countLokal = 0;
+            if (dataLokal) {
+                try {
+                    const parsed = JSON.parse(dataLokal);
+                    countLokal = Array.isArray(parsed) ? parsed.filter(Boolean).length : Object.keys(parsed).length;
+                    if (countLokal > 0) totalLokalAda++;
+                } catch (e) {}
+            }
+
+            // Hitung jumlah item di server untuk perbandingan akurat
+            try {
+                let countServer = 0;
+                if (key === "muat_wh3" && db) {
+                    const dateDocsSnap = await db.collection("muat_wh3").get();
+                    for (const dateDoc of dateDocsSnap.docs) {
+                        const subColSnap = await db.collection("muat_wh3").doc(dateDoc.id).collection("datatujuan").get();
+                        countServer += subColSnap.size;
+                    }
+                } else if (key === "master_barang" && db) {
+                    const fsSnapshot = await db.collection("master_barang").get();
+                    if (!fsSnapshot.empty) {
+                        countServer = fsSnapshot.size;
+                    } else if (rtdb) {
+                        const snapshot = await rtdb.ref(key).once('value');
+                        const val = snapshot.val();
+                        if (val) countServer = Array.isArray(val) ? val.filter(Boolean).length : Object.keys(val).length;
+                    }
+                } else if (rtdb) {
+                    const snapshot = await rtdb.ref(key).once('value');
+                    const val = snapshot.val();
+                    if (val) countServer = Array.isArray(val) ? val.filter(Boolean).length : Object.keys(val).length;
+                }
+
+                // Jika jumlah item lokal dan server sama (dan > 0), anggap sinkron
+                if (countLokal > 0 && countLokal === countServer) {
+                    totalSinkron++;
+                }
+            } catch (err) {
+                // Jika gagal cek server, fallback ke status lokal
+                if (countLokal > 0) totalSinkron++;
+            }
         }
-    } catch (e) {
-        infoEl.textContent = "Status tidak tersedia";
-        if (dotEl) dotEl.className = "w-2.5 h-2.5 rounded-full bg-gray-400";
+
+        if (totalLokalAda === 0) {
+            infoText.textContent = "Belum ada data lokal tersimpan";
+            dotIndicator.className = "w-2.5 h-2.5 rounded-full bg-rose-500";
+        } else if (totalSinkron === totalModul) {
+            infoText.textContent = "Data sudah sinkron semua";
+            dotIndicator.className = "w-2.5 h-2.5 rounded-full bg-emerald-500";
+        } else if (totalLokalAda < totalModul || totalSinkron < totalModul) {
+            infoText.textContent = "Ada data belum sinkron";
+            dotIndicator.className = "w-2.5 h-2.5 rounded-full bg-amber-500";
+        } else {
+            infoText.textContent = `${totalLokalAda}/${totalModul} Modul tersimpan lokal`;
+            dotIndicator.className = "w-2.5 h-2.5 rounded-full bg-amber-500";
+        }
+    } catch (err) {
+        infoText.textContent = "Gagal memindai status database";
+        dotIndicator.className = "w-2.5 h-2.5 rounded-full bg-slate-400";
     }
 }
 
+// Panggil fungsi ini saat halaman selesai dimuat atau ketika modal ditutup
+document.addEventListener("DOMContentLoaded", () => {
+    perbaruiIndikatorMenuDb();
+});
+
 window.bukaModalDatabase = bukaModalDatabase;
 window.tutupModalDatabaseManager = tutupModalDatabaseManager;
-window.muatDataFirebaseManager = muatDataFirebaseManager;
+window.muatDataManajemenDatabaseTerpadu = muatDataManajemenDatabaseTerpadu;
 window.jalankanSinkronisasiPenuh = jalankanSinkronisasiPenuh;
-window.cekStatusDatabaseSetelan = cekStatusDatabaseSetelan;
 window.downloadDataFirebaseKeLokal = downloadDataFirebaseKeLokal;
 
 // =========================================================================
