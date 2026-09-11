@@ -1599,10 +1599,57 @@ async function loadStokData() {
     }
 }
 
-// Variabel penyimpan referensi listener agar tidak menumpuk
+// ==========================================
+// HELPER INDEXEDDB KHUSUS STOK WH-3
+// ==========================================
+function openStokWH3DB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open("WarehouseStokWH3DB", 1);
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains("stok_wh3_store")) {
+                db.createObjectStore("stok_wh3_store");
+            }
+        };
+        request.onsuccess = (event) => resolve(event.target.result);
+        request.onerror = (event) => reject(event.target.error);
+    });
+}
+
+async function saveStokWH3ToIDB(dataStok) {
+    try {
+        const db = await openStokWH3DB();
+        const tx = db.transaction("stok_wh3_store", "readwrite");
+        const store = tx.objectStore("stok_wh3_store");
+        store.put(dataStok, "stok_wh3_all_data");
+        return tx.complete;
+    } catch (e) {
+        console.error("Gagal menyimpan stok WH-3 ke IndexedDB:", e);
+    }
+}
+
+async function getStokWH3FromIDB() {
+    try {
+        const db = await openStokWH3DB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction("stok_wh3_store", "readonly");
+            const store = tx.objectStore("stok_wh3_store");
+            const request = store.get("stok_wh3_all_data");
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    } catch (e) {
+        console.error("Gagal membaca stok WH-3 dari IndexedDB:", e);
+        return null;
+    }
+}
+
+// ==========================================
+// FUNGSI LOAD STOK WH-3 (Menggunakan IndexedDB)
+// ==========================================
 let wh3DataListener = null;
 
-function loadStokDatawh3() {
+async function loadStokDatawh3() {
     const dateInput = document.getElementById('select-tanggal-wh3');
     const tanggal = dateInput ? dateInput.value : null;
 
@@ -1613,8 +1660,18 @@ function loadStokDatawh3() {
     const mode = radioChecked ? radioChecked.value : "STOK WH-3";
     
     const formattedDate = tanggal.replace(/-/g, '');
-    const cacheKey = 'cached_stok_wh3';
     
+    // 1. FAST-LOAD LOKAL: Tampilkan data kilat dari IndexedDB agar tabel langsung muncul saat dibuka
+    const localStok = await getStokWH3FromIDB();
+    if (localStok && !window.currentStokData) {
+        window.currentStokData = localStok;
+        const localKey = Object.keys(localStok).find(k => k.includes(`stokwh3_${formattedDate}`));
+        if (localKey) {
+            renderTabelwh3(localStok[localKey], mode, localKey);
+            console.log("Data Stok WH-3 dimuat kilat dari IndexedDB lokal.");
+        }
+    }
+
     // Path referensi spesifik ke database Firebase Anda
     const dbRef = firebase.database().ref(`stok_wh3`);
 
@@ -1623,13 +1680,13 @@ function loadStokDatawh3() {
         dbRef.off('value', wh3DataListener);
     }
 
-    // Pasang onValue: Hanya berjalan otomatis saat Firebase mendeteksi adanya data masuk/berubah
-    wh3DataListener = dbRef.on('value', (snapshot) => {
+    // Pasang onValue: Sinkronisasi real-time dari Firebase
+    wh3DataListener = dbRef.on('value', async (snapshot) => {
         const allData = snapshot.val();
         
         if (allData) {
-            // SIMPAN KE LOCALSTORAGE (Caching Lokal WH-3)
-            localStorage.setItem(cacheKey, JSON.stringify(allData));
+            // SIMPAN KE INDEXEDDB (Aman dari batas kuota localStorage)
+            await saveStokWH3ToIDB(allData);
         }
         
         window.currentStokData = allData;
@@ -1648,19 +1705,19 @@ function loadStokDatawh3() {
 
         // Render tabel otomatis seketika saat ada perubahan data di server
         renderTabelwh3(allData[key], mode, key);
-        console.log("Data Stok WH-3 diperbarui secara real-time dari Firebase.");
-    }, (error) => {
-        console.error("Gagal mendengarkan perubahan data, mencoba memuat dari cache lokal...", error);
+        // console.log("Data Stok WH-3 diperbarui secara real-time dari Firebase.");
+    }, async (error) => {
+        console.error("Gagal mendengarkan perubahan data, mencoba memuat dari IndexedDB lokal...", error);
         
-        // FALLBACK: Ambil dari localStorage jika offline/gagal fetch dari Firebase
-        const cachedData = localStorage.getItem(cacheKey);
-        if (cachedData) {
-            const allData = JSON.parse(cachedData);
-            window.currentStokData = allData;
+        // FALLBACK: Ambil dari IndexedDB jika offline/gagal koneksi dari Firebase
+        const fallbackStok = await getStokWH3FromIDB();
+        if (fallbackStok) {
+            window.currentStokData = fallbackStok;
             
-            const key = Object.keys(allData).find(k => k.includes(`stokwh3_${formattedDate}`));
+            const key = Object.keys(fallbackStok).find(k => k.includes(`stokwh3_${formattedDate}`));
             if (key) {
-                renderTabelwh3(allData[key], mode, key);
+                renderTabelwh3(fallbackStok[key], mode, key);
+                console.log("Data Stok WH-3 berhasil dimuat dari IndexedDB (Fallback Mode).");
                 return;
             }
         }
@@ -1968,26 +2025,18 @@ async function renderTabelwh3(dataStok, mode, key) {
 
     window.dataStokTerkini = dataStok;
 
-    // Ambil master_barang dengan dukungan cache localStorage untuk offline mode
+    // Ambil master_barang langsung dari cache/IndexedDB lokal agar proses kilat tanpa fetch jaringan
     let masterBarang = {};
     const cacheKeyMaster = 'wh_cache_master_barang';
-
-    try {
-        if (!navigator.onLine) {
-            throw new Error("Offline");
-        }
-        const response = await fetch("https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/master_barang.json");
-        if (!response.ok) throw new Error("Gagal mengambil master barang");
-        masterBarang = await response.json() || {};
-        localStorage.setItem(cacheKeyMaster, JSON.stringify(masterBarang));
-    } catch (e) {
-        const localMaster = localStorage.getItem(cacheKeyMaster);
-        if (localMaster) {
+    const localMaster = localStorage.getItem(cacheKeyMaster);
+    if (localMaster) {
+        try {
             masterBarang = JSON.parse(localMaster);
+        } catch (e) {
+            masterBarang = {};
         }
     }
 
-    tbody.innerHTML = "";
     let no = 1;
     let totalSelisih = 0; // Inisialisasi total selisih untuk header
 
@@ -2058,7 +2107,9 @@ async function renderTabelwh3(dataStok, mode, key) {
         }
     }
 
-    // --- 2. RENDER BARIS TABEL ---
+    // --- 2. RENDER BARIS TABEL (Menggunakan Array Buffer untuk Performa Cepat) ---
+    let rowsHTML = "";
+
     sortedEntries.forEach(([kode, item]) => {
         const blok = parseInt(item.blok) || 0;
         const bosnet = parseInt(item.bosnet) || 0;
@@ -2094,7 +2145,7 @@ async function renderTabelwh3(dataStok, mode, key) {
         const bRak = detailRak.beceran_rak ? `<br><small style="color: gray;">(${detailRak.beceran_rak})</small>` : '';
         const uRak = detailRak.utuhan_rak ? `<br><small style="color: gray;">(${detailRak.utuhan_rak})</small>` : '';
 
-        tbody.innerHTML += `
+        rowsHTML += `
             <tr class="hover:bg-gray-50 border-b text-[15px]">
                 <td class="py-2 px-2">${no++}</td>
                 <td class="py-2 px-2 whitespace-nowrap font-bold text-orange-600 cursor-pointer hover:underline" onclick="bukaModalAdmin('EDIT_DB_WH3', '${kode}')" title="Klik untuk Edit Database Firebase">${kode}</td>
@@ -2109,6 +2160,9 @@ async function renderTabelwh3(dataStok, mode, key) {
             </tr>
         `;
     });
+
+    // Masukkan ke DOM sekali jalan agar render bebas lag / nge-freeze
+    tbody.innerHTML = rowsHTML;
 }
 
 window.bukaModalEditDatabaseWH3 = function(kode) {
