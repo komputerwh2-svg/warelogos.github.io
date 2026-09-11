@@ -471,57 +471,60 @@
         </div>
     </div>
 
-    <!-- Modal Manajemen & Sinkronisasi Database -->
-    <div id="modal-database-manager" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh]">
+    <!-- Modal Manajemen & Sinkronisasi Database (Full Fullscreen) -->
+    <div id="modal-database-manager" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-0">
+        <div class="bg-white w-full h-full overflow-hidden flex flex-col shadow-none">
             <!-- Header Modal -->
-            <div class="bg-gradient-to-r from-slate-800 to-slate-900 text-white px-6 py-4 flex justify-between items-center border-b">
-                <div class="flex items-center space-x-2">
-                    <i class="fa-solid fa-database text-emerald-400"></i>
-                    <h3 class="font-bold text-lg">Kontrol & Sinkronisasi Database (Lokal vs Firebase)</h3>
+            <div class="bg-gradient-to-r from-slate-800 to-slate-900 text-white px-6 py-4 flex justify-between items-center border-b shadow-md">
+                <div class="flex items-center space-x-3">
+                    <i class="fa-solid fa-database text-emerald-400 text-xl"></i>
+                    <div>
+                        <h3 class="font-bold text-lg">Kontrol & Sinkronisasi Database</h3>
+                        <p class="text-xs text-slate-400">Manajemen Perbandingan & Sinkronisasi Data Lokal vs Firebase Cloud</p>
+                    </div>
                 </div>
-                <button onclick="tutupModalDatabaseManager()" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
+                <button onclick="tutupModalDatabaseManager()" class="text-slate-400 hover:text-white text-3xl font-bold px-3">&times;</button>
             </div>
 
             <!-- Body: Split View (Kiri: Lokal, Kanan: Firebase) -->
-            <div class="grid grid-cols-2 gap-4 p-6 bg-slate-50 flex-1 overflow-y-auto">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 md:p-6 bg-slate-100 flex-1 overflow-y-auto">
                 <!-- Sisi Kiri: Database Lokal Perangkat -->
-                <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200 flex flex-col">
-                    <div class="flex justify-between items-center mb-3 pb-2 border-b">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+                    <div class="flex justify-between items-center mb-3 pb-3 border-b">
                         <span class="font-bold text-slate-700 text-sm flex items-center gap-2">
-                            <i class="fa-solid fa-mobile-screen text-blue-600"></i> Perangkat Lokal (IndexedDB)
+                            <i class="fa-solid fa-mobile-screen text-blue-600"></i> Perangkat Lokal (LocalStorage)
                         </span>
-                        <span id="lokal-sync-status" class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">Memuat...</span>
+                        <span id="lokal-sync-status" class="text-xs bg-slate-100 text-slate-600 px-3 py-1 rounded-full font-semibold">Memuat...</span>
                     </div>
-                    <div class="flex-1 overflow-y-auto max-h-[50vh] space-y-2" id="list-db-lokal">
-                        <div class="text-xs text-slate-400 text-center py-4">Memindai data lokal...</div>
+                    <div class="flex-1 overflow-y-auto max-h-[75vh] space-y-2.5 pr-1" id="list-db-lokal">
+                        <div class="text-xs text-slate-400 text-center py-8">Memindai data lokal...</div>
                     </div>
                 </div>
 
                 <!-- Sisi Kanan: Database Firebase (RTDB & Firestore) -->
-                <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200 flex flex-col">
-                    <div class="flex justify-between items-center mb-3 pb-2 border-b">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+                    <div class="flex justify-between items-center mb-3 pb-3 border-b">
                         <span class="font-bold text-slate-700 text-sm flex items-center gap-2">
                             <i class="fa-solid fa-cloud text-orange-500"></i> Server Firebase (Cloud)
                         </span>
-                        <button onclick="muatDataFirebaseManager()" class="text-[11px] text-blue-600 hover:underline flex items-center gap-1 font-semibold">
+                        <button onclick="muatDataFirebaseManager()" class="text-xs text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1.5 font-semibold bg-blue-50 px-3 py-1.5 rounded-md transition">
                             <i class="fa-solid fa-rotate"></i> Refresh Cloud
                         </button>
                     </div>
-                    <div class="flex-1 overflow-y-auto max-h-[50vh] space-y-2" id="list-db-firebase">
-                        <div class="text-xs text-slate-400 text-center py-4">Klik 'Refresh Cloud' atau buka modal untuk memuat data server.</div>
+                    <div class="flex-1 overflow-y-auto max-h-[75vh] space-y-2.5 pr-1" id="list-db-firebase">
+                        <div class="text-xs text-slate-400 text-center py-8">Klik 'Refresh Cloud' atau buka modal untuk memuat data server.</div>
                     </div>
                 </div>
             </div>
 
             <!-- Footer Modal -->
-            <div class="bg-slate-100 px-6 py-3 flex justify-between items-center border-t">
-                <span class="text-xs text-slate-500">
-                    <b>Catatan:</b> Jika waktu simpan berbeda, lakukan sinkronisasi untuk memperbarui data perangkat.
+            <div class="bg-white px-6 py-4 flex flex-col md:flex-row justify-between items-center border-t gap-3 shadow-inner">
+                <span class="text-xs text-slate-500 text-center md:text-left">
+                    <b>Catatan:</b> Periksa waktu pembaruan (*timestamp*) pada masing-masing item untuk mendeteksi data terbaru.
                 </span>
-                <div class="flex space-x-2">
-                    <button onclick="tutupModalDatabaseManager()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-lg transition">Tutup</button>
-                    <button onclick="jalankanSinkronisasiPenuh()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center gap-2">
+                <div class="flex space-x-3 w-full md:w-auto justify-end">
+                    <button onclick="tutupModalDatabaseManager()" class="px-5 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition">Tutup</button>
+                    <button onclick="jalankanSinkronisasiPenuh()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md transition flex items-center justify-center gap-2">
                         <i class="fa-solid fa-cloud-arrow-down"></i> Sinkronkan Semua Data
                     </button>
                 </div>
