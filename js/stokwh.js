@@ -2216,7 +2216,7 @@ async function renderTabelwh3(dataStok, mode, key) {
             <tr class="hover:bg-gray-50 border-b text-[15px]">
                 <td class="py-2 px-2">${no++}</td>
                 <td class="py-2 px-2 whitespace-nowrap font-bold text-orange-600 cursor-pointer hover:underline" onclick="bukaModalAdmin('EDIT_DB_WH3', '${kode}')" title="Klik untuk Edit Database Firebase">${kode}</td>
-                <td class="py-2 px-2 font-bold text-orange-600 cursor-pointer">${f(qa)}</td>
+                <td class="py-2 px-2 font-bold text-orange-600">${f(qa)}</td>
                 <td class="py-2 px-2 font-bold text-emerald-600">${f(blok)}</td>
                 <td class="py-2 px-2 font-bold text-slate-600">${f(bosnet)}</td>
                 <td class="py-2 px-2">${pak}</td>
@@ -4840,17 +4840,19 @@ function tutupModalTukarFisikWH3() {
     }
 }
 
-// Fungsi Memetakan Data ke 3 Panel (Plus, Minus, & QA) Berdasarkan Tanggal Aktif
+// Fungsi Memetakan Data ke Panel Stok Lebih (+) & Stok Kurang (-) Berdasarkan Tanggal Aktif (Terurut & Terintegrasi QA)
 function muatDataPanelTukarFisik() {
     const containerPlus = document.getElementById('container-list-plus');
     const containerMinus = document.getElementById('container-list-minus');
     const selectAsalPlus = document.getElementById('select-asal-plus');
     const selectTujuanMinus = document.getElementById('select-tujuan-minus');
 
+    if (!containerPlus || !containerMinus) return;
+
     containerPlus.innerHTML = '';
     containerMinus.innerHTML = '';
-    selectAsalPlus.innerHTML = '<option value="">-- Pilih Stok Lebih (+) --</option>';
-    selectTujuanMinus.innerHTML = '<option value="">-- Pilih Target Kurang (-) --</option>';
+    if (selectAsalPlus) selectAsalPlus.innerHTML = '<option value="">-- Pilih Stok Lebih (+) --</option>';
+    if (selectTujuanMinus) selectTujuanMinus.innerHTML = '<option value="">-- Pilih Target Kurang (-) --</option>';
 
     // Ambil tanggal aktif dari input tanggal WH-3 (format YYYY-MM-DD diubah ke YYYYMMDD)
     const dateInput = document.getElementById('select-tanggal-wh3');
@@ -4866,6 +4868,45 @@ function muatDataPanelTukarFisik() {
     let totalQtyPlus = 0;   // Variabel akumulasi total Qty Plus
     let totalQtyMinus = 0;  // Variabel akumulasi total Qty Minus
 
+    let optionsPlusHTML = '<option value="">-- Pilih Stok Lebih (+) --</option>';
+    let optionsTujuanHTML = '<option value="">-- Pilih Target Kurang (-) --</option>';
+
+    // --- LOGIKA SORTIR SESUAI TABEL UTAMA STOK WH-3 ---
+    const polaUtama = ["CRR", "CRR EA", "THR EA", "THR", "MRMR", "MRR", "MJR HJ", "MJR", "MOB4A", "MOR2A EA", "MOR2A EB", "MOR2A", "MP", "PDR", "MTR3A", "PR-PKT", "PR-CUP", "MRSR", "LTGR", "MTGR", "MEB", "MOL", "MRL", "MTL", "ISEL"];
+    
+    const getSortScore = (kode) => {
+        kode = kode.toUpperCase();
+        for (let i = 0; i < polaUtama.length; i++) {
+            if (kode.includes(polaUtama[i])) {
+                if (polaUtama[i] === "MOR2A" && (kode.includes("MOR2A EA") || kode.includes("MOR2A EB"))) continue;
+                if (polaUtama[i] === "THR" && kode.includes("THR EA")) continue;
+                if (polaUtama[i] === "MJR" && kode.includes("MJR HJ")) continue;
+                if (polaUtama[i] === "CRR" && kode.includes("CRR EA")) continue;
+                return i + 1;
+            }
+        }
+        return 999;
+    };
+    
+    const getVarianScore = (kode) => {
+        kode = kode.toUpperCase();
+        if (kode.includes("ZC")) return 1;
+        if (kode.includes("SSL")) return 2;
+        if (kode.includes("SLO")) return 3;
+        if (kode.includes("TDS")) return 4;
+        if (kode.includes("BAG")) return 5;
+        if (kode.includes("WRG")) return 6;
+        if (kode.includes("GTG")) return 7;
+        if (kode.includes("DRC")) return 8;
+        return 0;
+    };
+
+    const getAngkaAkhir = (kode) => {
+        const match = kode.match(/\d+/g);
+        if (!match) return 999;
+        return parseInt(match.join('').slice(-4)) || 999;
+    };
+
     // Akses data stok terkini yang tersimpan di window atau dari variabel global
     if (typeof window.currentStokData !== 'undefined' && window.currentStokData !== null) {
         // Cari key yang sesuai dengan tanggal aktif (misal: stokwh3_20260822)
@@ -4874,19 +4915,35 @@ function muatDataPanelTukarFisik() {
         if (keyAktif && window.currentStokData[keyAktif]) {
             const dailyData = window.currentStokData[keyAktif];
 
-            Object.entries(dailyData).forEach(([kode, item]) => {
+            // Urutkan entries data berdasarkan aturan sort score
+            const sortedEntries = Object.entries(dailyData).sort((a, b) => {
+                const scoreA1 = getSortScore(a[0]), scoreB1 = getSortScore(b[0]);
+                if (scoreA1 !== scoreB1) return scoreA1 - scoreB1;
+                const scoreA2 = getVarianScore(a[0]), scoreB2 = getVarianScore(b[0]);
+                if (scoreA2 !== scoreB2) return scoreA2 - scoreB2;
+                return getAngkaAkhir(a[0]) - getAngkaAkhir(b[0]);
+            });
+
+            sortedEntries.forEach(([kode, item]) => {
+                if (!item || typeof item !== 'object') return;
+
                 const bosnet = parseInt(item.bosnet) || 0;
+                const qa = parseInt(item.qa) || 0;
                 const blok = parseInt(item.blok) || 0;
                 const beceran = parseInt(item.beceran) || 0;
                 const utuhan = parseInt(item.utuhan) || 0;
+                const namaBarang = item.nama || kode;
                 
                 // Hitung fisik sesuai aturan (PR-PKT vs Barang Biasa)
                 const fisik = kode.includes("PR-PKT") ? (beceran + utuhan) : (blok + beceran + utuhan);
-                const selisih = fisik - bosnet;
+                
+                // Ambil selisih bawaan atau hitung otomatis (Fisik - [Bosnet + QA])
+                const selisih = (item.selisih !== undefined && item.selisih !== null) ? parseInt(item.selisih) || 0 : (fisik - (bosnet + qa));
 
                 const isPaket = kode.includes("PR-PKT");
                 const satuan = isPaket ? "PKT" : "KRT";
 
+                // --- 1. STOK LEBIH (+) (Selisih > 0) ---
                 if (selisih > 0) {
                     countPlus++;
                     totalQtyPlus += selisih; // Tambahkan ke total akumulasi Qty Plus
@@ -4896,30 +4953,43 @@ function muatDataPanelTukarFisik() {
                         <div class="p-2.5 text-xs bg-emerald-50/50 rounded-lg border border-emerald-100 flex justify-between items-center">
                             <div>
                                 <b class="text-slate-700">${kode}</b>
+                                <div class="text-[10px] text-slate-500 truncate max-w-[180px]">${namaBarang}</div>
                                 <div class="text-emerald-700 font-bold mt-0.5">+${selisih} ${satuan}</div>
                             </div>
-                            <span class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">Sumber (+)</span>
+                            <span class="text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded font-bold">Fisik: +${selisih} ${satuan}</span>
                         </div>`;
                     
-                    // Masukkan ke Dropdown Asal (+)
-                    selectAsalPlus.innerHTML += `<option value="${kode}">${kode} (+${selisih} ${satuan})</option>`;
+                    optionsPlusHTML += `<option value="${kode}">[+${selisih} ${satuan}] ${kode}</option>`;
                 } 
+                // --- 2. STOK KURANG (-) (Selisih < 0, mencakup efek QA otomatis & fisik murni) ---
                 else if (selisih < 0) {
                     countMinus++;
                     totalQtyMinus += Math.abs(selisih); // Tambahkan nilai absolut ke total akumulasi Qty Minus
                     
-                    // Render ke Panel Stok Kurang (-)
+                    // Buat Badge Dinamis menggantikan "Target (-)"
+                    let badgeInfoHTML = '';
+                    let infoDropdownText = '';
+
+                    if (qa !== 0) {
+                        badgeInfoHTML = `<span class="text-[10px] bg-rose-200 text-rose-900 px-2 py-0.5 rounded font-bold">QA: ${Math.abs(qa)} ${satuan}</span>`;
+                        infoDropdownText = `(QA: ${qa} ${satuan})`;
+                    } else {
+                        badgeInfoHTML = `<span class="text-[10px] bg-rose-200 text-rose-900 px-2 py-0.5 rounded font-bold">Fisik: ${selisih} ${satuan}</span>`;
+                        infoDropdownText = `(Fisik : ${selisih} ${satuan})`;
+                    }
+
+                    // Render ke Panel Stok Kurang (-) dengan badge info baru di sebelah kanan
                     containerMinus.innerHTML += `
                         <div class="p-2.5 text-xs bg-rose-50/50 rounded-lg border border-rose-100 flex justify-between items-center">
                             <div>
                                 <b class="text-slate-700">${kode}</b>
+                                <div class="text-[10px] text-slate-500 truncate max-w-[180px]">${namaBarang}</div>
                                 <div class="text-rose-700 font-bold mt-0.5">${selisih} ${satuan}</div>
                             </div>
-                            <span class="text-[10px] bg-rose-100 text-rose-800 px-2 py-0.5 rounded font-bold">Target (-)</span>
+                            ${badgeInfoHTML}
                         </div>`;
                     
-                    // Masukkan ke Dropdown Tujuan (-)
-                    selectTujuanMinus.innerHTML += `<option value="${kode}">${kode} (${selisih} ${satuan})</option>`;
+                    optionsTujuanHTML += `<option value="${kode}">[${selisih} ${satuan}] ${kode} ${infoDropdownText}</option>`;
                 }
             });
         }
@@ -4934,29 +5004,29 @@ function muatDataPanelTukarFisik() {
     }
 
     // Update Badge Counter Panel Plus & Minus dengan menyertakan Total Qty
-    document.getElementById('badge-total-plus').innerText = `${countPlus} Item / + ${totalQtyPlus} krt`;
-    document.getElementById('badge-total-minus').innerText = `${countMinus} Item / - ${totalQtyMinus} krt`;
+    const badgePlus = document.getElementById('badge-total-plus');
+    const badgeMinus = document.getElementById('badge-total-minus');
+    
+    if (badgePlus) badgePlus.innerText = `${countPlus} Item / + ${totalQtyPlus} krt`;
+    if (badgeMinus) badgeMinus.innerText = `${countMinus} Item / - ${totalQtyMinus} krt`;
 
-    // Muat data Panel QA Manual serta masukkan ke opsi pilihan tujuan
-    muatDataQaManual();
+    // Update Dropdown Form Eksekusi Pertukaran
+    if (selectAsalPlus) selectAsalPlus.innerHTML = optionsPlusHTML;
+    if (selectTujuanMinus) selectTujuanMinus.innerHTML = optionsTujuanHTML;
 }
 
 // Fungsi Helper untuk Mendapatkan Koneksi RTDB yang Pasti Berjalan
 function getDbRef() {
-    // Jika menggunakan Firebase Namespaced (v8 / compat) dengan URL spesifik
     if (typeof firebase !== 'undefined') {
         try {
-            // Coba ambil instance berdasarkan URL RTDB Anda
             return firebase.database("https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/");
         } catch (e) {
-            // Fallback ke default database jika sudah terinisialisasi
             if (typeof firebase.database === 'function') {
                 return firebase.database();
             }
         }
     }
     
-    // Jika variabel db global sudah berupa objek database reference ber-method .ref()
     if (typeof db !== 'undefined' && db && typeof db.ref === 'function') {
         return db;
     }
@@ -4968,211 +5038,91 @@ function getDbRef() {
     throw new Error("Koneksi Firebase Realtime Database tidak ditemukan.");
 }
 
-// Fungsi Menampilkan / Mengelola Input Manual Stok QA
-function muatDataQaManual() {
-    const containerQa = document.getElementById('container-list-qa');
-    const selectTujuanMinus = document.getElementById('select-tujuan-minus');
-    
-    if (!containerQa) return;
+// Fungsi Sinkronisasi Data Stok WH3 di RTDB berdasarkan Tanggal Aktif
+function sinkronisasiDatabaseStokWH3(kodeAsal, kodeTujuan) {
+    const dateInput = document.getElementById('select-tanggal-wh3');
+    const tanggalAktif = dateInput ? dateInput.value.replace(/-/g, '') : null;
 
-    containerQa.innerHTML = `
-        <div class="mb-3 p-2 bg-amber-50 border border-amber-200 rounded-lg">
-            <div class="text-[10px] font-bold text-amber-900 mb-1">Tambah Stok QA Manual (Sistem Bonset):</div>
-            <div class="flex gap-1.5">
-                <input type="text" id="input-kode-qa" placeholder="Kode Barang" class="w-1/2 text-xs text-slate-700 bg-white border border-amber-300 rounded px-2 py-1 uppercase">
-                <input type="number" id="input-qty-qa" placeholder="Qty (-)" class="w-1/4 text-xs text-slate-700 bg-white border border-amber-300 rounded px-2 py-1" value="-1">
-                <button onclick="tambahDataQaManual()" class="w-1/4 bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold rounded px-2 py-1">Tambah</button>
-            </div>
-        </div>
-        <div id="list-item-qa" class="space-y-2"></div>
-    `;
-
-    const listItemQa = document.getElementById('list-item-qa');
-
-    try {
-        const dbConn = getDbRef();
-        dbConn.ref('stok_tukar/qa_manual').once('value').then((snapshot) => {
-            const dataQaObj = snapshot.val() || {};
-            const keys = Object.keys(dataQaObj);
-            listItemQa.innerHTML = '';
-            
-            let totalQtyQa = 0; 
-            let countItem = 0;
-
-            if (keys.length === 0) {
-                listItemQa.innerHTML = `<div class="text-center text-[10px] text-slate-400 py-2">Belum ada data QA manual.</div>`;
-            } else {
-                keys.forEach((key) => {
-                    const item = dataQaObj[key];
-                    countItem++;
-                    const qtyVal = parseInt(item.qty) || 0;
-                    totalQtyQa += Math.abs(qtyVal);
-
-                    listItemQa.innerHTML += `
-                        <div class="p-2 text-xs bg-amber-50/50 rounded-lg border border-amber-100 flex justify-between items-center">
-                            <div>
-                                <b class="text-slate-700">${item.kode}</b>
-                                <div class="text-amber-700 font-bold mt-0.5">QA (${item.qty})</div>
-                            </div>
-                            <button onclick="hapusDataQaManual('${key}')" class="text-red-500 hover:text-red-700 text-[10px] font-bold px-1.5 py-0.5">Hapus</button>
-                        </div>`;
-                    
-                    if (selectTujuanMinus) {
-                        selectTujuanMinus.innerHTML += `<option value="${item.kode}">[QA] ${item.kode} (${item.qty})</option>`;
-                    }
-                });
-            }
-
-            const badgeQa = document.getElementById('badge-total-qa');
-            if (badgeQa) {
-                badgeQa.innerText = `${countItem} Item / -${totalQtyQa} krt`;
-            }
-        }).catch((err) => {
-            console.error("Gagal membaca database QA:", err);
-        });
-    } catch (e) {
-        console.error("Error getDbRef:", e.message);
-    }
-}
-
-// Fungsi Tambah QA Manual ke RTDB dengan Key Kustom (Kode_Timestamp)
-function tambahDataQaManual() {
-    const kode = document.getElementById('input-kode-qa').value.trim().toUpperCase();
-    const qty = document.getElementById('input-qty-qa').value;
-    
-    if (!kode) {
-        if (typeof miuiAlert === 'function') miuiAlert("Masukkan kode barang QA terlebih dahulu!");
-        else alert("Masukkan kode barang QA terlebih dahulu!");
+    if (!tanggalAktif) {
+        console.warn("Tanggal aktif WH-3 tidak ditemukan untuk sinkronisasi.");
         return;
     }
 
-    const timestamp = Date.now();
-    // Membuat key custom yang mudah dibaca: KODE_TIMESTAMP (spasi/karakter khusus diganti underscore)
-    const safeKode = kode.replace(/[^a-zA-Z0-9]/g, '_');
-    const customKey = `${safeKode}_${timestamp}`;
+    const dbConn = getDbRef();
+    // Cari path node database sesuai tanggal aktif (misal: stokwh3_20260822)
+    const nodePath = `stokwh3_${tanggalAktif}`;
 
-    try {
-        const dbConn = getDbRef();
-        dbConn.ref('stok_tukar/qa_manual/' + customKey).set({
-            kode: kode,
-            qty: parseInt(qty) || -1,
-            timestamp: timestamp
-        }).then(() => {
-            // Bersihkan input setelah berhasil
-            const inputKode = document.getElementById('input-kode-qa');
-            if (inputKode) inputKode.value = '';
-
-            if (typeof muatDataPanelTukarFisik === 'function') {
-                muatDataPanelTukarFisik();
-            } else {
-                muatDataQaManual();
-            }
-        }).catch((error) => {
-            if (typeof miuiAlert === 'function') miuiAlert("Gagal menyimpan data QA: " + error.message);
-            else alert("Gagal menyimpan data QA: " + error.message);
-        });
-    } catch (e) {
-       miuiAlert(e.message);
-    }
-}
-
-// Fungsi Hapus QA Manual dari RTDB berdasarkan Key Kustom
-function hapusDataQaManual(firebaseKey) {
-    if (confirm("Yakin ingin menghapus data QA manual ini?")) {
-        try {
-            const dbConn = getDbRef();
-            dbConn.ref('stok_tukar/qa_manual/' + firebaseKey).remove().then(() => {
-                if (typeof muatDataPanelTukarFisik === 'function') {
-                    muatDataPanelTukarFisik();
-                } else {
-                    muatDataQaManual();
-                }
-            }).catch((error) => {
-                if (typeof miuiAlert === 'function') miuiAlert("Gagal menghapus data: " + error.message);
-                else alert("Gagal menghapus data: " + error.message);
-            });
-        } catch (e) {
-            miuiAlert(e.message);
-        }
-    }
-}
-
-async function sinkronisasiDatabaseStokWH3(kodeAsal, kodeTujuan) {
-    try {
-        const dbConn = getDbRef();
-        
-        let tanggalAktif = "20260824"; 
-        const dateInput = document.getElementById('select-tanggal-wh3');
-        if (dateInput && dateInput.value) {
-            let cleanVal = dateInput.value.replace(/[^0-9]/g, '');
-            if (cleanVal.length === 8) {
-                tanggalAktif = cleanVal;
-            }
-        }
-
-        const namaNodeTanggal = `stokwh3_${tanggalAktif}`;
-        const refStokTanggal = dbConn.ref(`stok_wh3/${namaNodeTanggal}`);
-
-        const snapshot = await refStokTanggal.once('value');
-        const dataStok = snapshot.val();
-
-        if (!dataStok) {
-            console.error(`Node stok_wh3/${namaNodeTanggal} tidak ditemukan di database!`);
+    dbConn.ref(nodePath).once('value').then((snapshot) => {
+        if (!snapshot.exists()) {
+            console.warn("Data stok untuk tanggal aktif tidak ditemukan di RTDB.");
             return;
         }
 
-        // 1. Kurangi Qty Beceran Barang Asal (+) karena fisik diambil untuk pertukaran
-        if (dataStok[kodeAsal]) {
-            let beceranAsal = Number(dataStok[kodeAsal].beceran || 0);
-            beceranAsal = Math.max(0, beceranAsal - 1);
-            await refStokTanggal.child(`${kodeAsal}/beceran`).set(beceranAsal);
-            console.log(`Beceran barang asal (+) ${kodeAsal} dikurangi menjadi: ${beceranAsal}`);
+        const dataHarian = snapshot.val();
+        let updates = {};
+
+        // Update Barang Asal (+) : Kurangi kolom beceran sebanyak 1 krt
+        if (dataHarian[kodeAsal]) {
+            let beceranAsal = parseInt(dataHarian[kodeAsal].beceran) || 0;
+            let blokAsal = parseInt(dataHarian[kodeAsal].blok) || 0;
+            let utuhanAsal = parseInt(dataHarian[kodeAsal].utuhan) || 0;
+            let bosnetAsal = parseInt(dataHarian[kodeAsal].bosnet) || 0;
+            let qaAsal = parseInt(dataHarian[kodeAsal].qa) || 0;
+
+            // Kurangi beceran (pastikan tidak kurang dari 0)
+            let beceranBaruAsal = Math.max(0, beceranAsal - 1);
+            updates[`${nodePath}/${kodeAsal}/beceran`] = beceranBaruAsal;
+
+            // Hitung ulang total dan selisih baru untuk barang asal
+            let fisikBaruAsal = kodeAsal.includes("PR-PKT") ? (beceranBaruAsal + utuhanAsal) : (blokAsal + beceranBaruAsal + utuhanAsal);
+            let totalBaruAsal = fisikBaruAsal; // Atau sesuaikan dengan rumus total di sistem Anda
+            let selisihBaruAsal = fisikBaruAsal - (bosnetAsal + qaAsal);
+
+            updates[`${nodePath}/${kodeAsal}/total`] = totalBaruAsal;
+            updates[`${nodePath}/${kodeAsal}/selisih`] = selisihBaruAsal;
         }
 
-        // 2. Tambah Bosnet Barang Tujuan (- / QA) di Tabel Utama
-        if (dataStok[kodeTujuan]) {
-            let bosnetTujuan = Number(dataStok[kodeTujuan].bosnet || 0);
-            bosnetTujuan += 1;
-            await refStokTanggal.child(`${kodeTujuan}/bosnet`).set(bosnetTujuan);
-            console.log(`Bosnet barang tujuan (-) ${kodeTujuan} ditambah menjadi: ${bosnetTujuan}`);
-        } else {
-            const dataBaruTujuan = {
-                bosnet: 1,
-                beceran: 0,
-                blok: 0,
-                kode: kodeTujuan,
-                nama: kodeTujuan,
-                detail_rak: {
-                    keterangan: "HASIL TUKAR FISIK",
-                    kode: kodeTujuan
-                }
-            };
-            await refStokTanggal.child(kodeTujuan).set(dataBaruTujuan);
-            console.log(`Barang tujuan ${kodeTujuan} belum ada, dibuat baru dengan bosnet: 1`);
+        // Update Barang Tujuan (-) : Tambahkan kolom beceran sebanyak 1 krt
+        if (dataHarian[kodeTujuan]) {
+            let beceranTujuan = parseInt(dataHarian[kodeTujuan].beceran) || 0;
+            let blokTujuan = parseInt(dataHarian[kodeTujuan].blok) || 0;
+            let utuhanTujuan = parseInt(dataHarian[kodeTujuan].utuhan) || 0;
+            let bosnetTujuan = parseInt(dataHarian[kodeTujuan].bosnet) || 0;
+            let qaTujuan = parseInt(dataHarian[kodeTujuan].qa) || 0;
+
+            // Tambah beceran
+            let beceranBaruTujuan = beceranTujuan + 1;
+            updates[`${nodePath}/${kodeTujuan}/beceran`] = beceranBaruTujuan;
+
+            // Hitung ulang total dan selisih baru untuk barang tujuan
+            let fisikBaruTujuan = kodeTujuan.includes("PR-PKT") ? (beceranBaruTujuan + utuhanTujuan) : (blokTujuan + beceranBaruTujuan + utuhanTujuan);
+            let totalBaruTujuan = fisikBaruTujuan;
+            let selisihBaruTujuan = fisikBaruTujuan - (bosnetTujuan + qaTujuan);
+
+            updates[`${nodePath}/${kodeTujuan}/total`] = totalBaruTujuan;
+            updates[`${nodePath}/${kodeTujuan}/selisih`] = selisihBaruTujuan;
         }
 
-        // 3. Hapus data dari stok_tukar/qa_manual jika kode tersebut ada di dalamnya
-        const refQaManual = dbConn.ref('stok_tukar/qa_manual');
-        const snapQa = await refQaManual.once('value');
-        const dataQa = snapQa.val();
-        
-        if (dataQa) {
-            Object.keys(dataQa).forEach(async (key) => {
-                let item = dataQa[key];
-                if (key.startsWith(kodeAsal) || key.startsWith(kodeTujuan) || item.kode === kodeAsal || item.kode === kodeTujuan) {
-                    await dbConn.ref(`stok_tukar/qa_manual/${key}`).remove();
-                    console.log(`Berhasil membersihkan data QA manual untuk: ${key}`);
+        // Kirim update batch ke Firebase RTDB
+        if (Object.keys(updates).length > 0) {
+            dbConn.ref().update(updates).then(() => {
+                console.log("Sinkronisasi stok fisik berhasil diterapkan ke RTDB.");
+                // Perbarui juga data di cache window jika ada
+                if (typeof window.currentStokData !== 'undefined' && window.currentStokData[nodePath]) {
+                    if (window.currentStokData[nodePath][kodeAsal]) {
+                        window.currentStokData[nodePath][kodeAsal].beceran = Math.max(0, (parseInt(window.currentStokData[nodePath][kodeAsal].beceran) || 0) - 1);
+                    }
+                    if (window.currentStokData[nodePath][kodeTujuan]) {
+                        window.currentStokData[nodePath][kodeTujuan].beceran = (parseInt(window.currentStokData[nodePath][kodeTujuan].beceran) || 0) + 1;
+                    }
                 }
+            }).catch(err => {
+                console.error("Gagal melakukan update database stok:", err);
             });
         }
-
-        // Refresh tampilan panel dan tabel
-        if (typeof muatDataStokWH3 === 'function') muatDataStokWH3();
-        if (typeof muatDataPanelTukarFisik === 'function') muatDataPanelTukarFisik();
-
-    } catch (error) {
-        console.error("Error saat sinkronisasi database stok WH-3:", error);
-    }
+    }).catch(err => {
+        console.error("Gagal membaca database untuk sinkronisasi:", err);
+    });
 }
 
 // Fungsi Utama Eksekusi Pertukaran Fisik
@@ -5188,8 +5138,8 @@ function eksekusiTukarFisik() {
     }
 
     if (!keteranganRak) {
-        if (typeof miuiAlert === 'function') miuiAlert("Mohon isi keterangan / lokasi rak (Contoh: Ambil Rak 14 A 24)!");
-        else alert("Mohon isi keterangan / lokasi rak (Contoh: Ambil Rak 14 A 24)!");
+        if (typeof miuiAlert === 'function') miuiAlert("Mohon isi keterangan / lokasi rak (Contoh: Rak 14.A.24)!");
+        else alert("Mohon isi keterangan / lokasi rak (Contoh: Rak 14.A.24)!");
         return;
     }
 
@@ -5210,9 +5160,11 @@ function eksekusiTukarFisik() {
 
     try {
         const dbConn = getDbRef();
-        // 1. Simpan Riwayat Tukar ke RTDB
+        
+        // 1. Simpan Riwayat Tukar ke RTDB (stok_tukar/riwayat)
         dbConn.ref('stok_tukar/riwayat/' + customKey).set(dataBaru).then(() => {
-            // 2. Jalankan Sinkronisasi Stok RTDB Tanggal Aktif
+            
+            // 2. Jalankan Sinkronisasi / Perubahan Data Stok Langsung di RTDB Tanggal Aktif
             if (typeof sinkronisasiDatabaseStokWH3 === 'function') {
                 sinkronisasiDatabaseStokWH3(asalPlus, tujuanMinus);
             }
@@ -5220,7 +5172,7 @@ function eksekusiTukarFisik() {
             if (typeof miuiAlert === 'function') miuiAlert("Pertukaran fisik berhasil diproses dan disinkronkan dengan database utama!");
             else alert("Pertukaran fisik berhasil diproses dan disinkronkan dengan database utama!");
             
-            // Bersihkan input keterangan
+            // Bersihkan input keterangan rak
             document.getElementById('input-keterangan-rak').value = '';
             
             // 3. UPDATE / REFRESH OTOMATIS PANEL ATAS DAN TABEL RIWAYAT
@@ -5229,6 +5181,10 @@ function eksekusiTukarFisik() {
             }
             if (typeof renderTabelRiwayatTukar === 'function') {
                 renderTabelRiwayatTukar();
+            }
+            // Refresh tabel utama stok WH-3 jika fungsi tersedia
+            if (typeof muatDataStokWH3 === 'function') {
+                muatDataStokWH3();
             }
 
         }).catch((error) => {
