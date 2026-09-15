@@ -282,7 +282,6 @@ function bukaSetelan() {
 function tutupSetelan() {
     const pageSetelan = document.getElementById('subpage-setelan');
     if (pageSetelan) pageSetelan.classList.add('hidden');
-    window.kembaliKeHalamanUtama();
 }
 
 
@@ -1019,7 +1018,6 @@ function tutupSubPageRekapBlok() {
     if (typeof resetFormTransaksi === 'function') {
         resetFormTransaksi();
     }
-    window.kembaliKeHalamanUtama();
     console.log("Subpage ditutup, semua area UI telah dikunci dan di-reset.");
 }
 
@@ -1098,7 +1096,6 @@ function tutupSubPageStokWH() {
     if (subpage) {
         subpage.classList.add('translate-x-full');
     }
-    window.kembaliKeHalamanUtama();
 }
 
 window.bukaSubPageStokWH = bukaSubPageStokWH;
@@ -1161,7 +1158,6 @@ window.tutupSubPageMuatWH3 = function() {
     if (subpage) {
         subpage.classList.add('translate-x-full');
     }
-    window.kembaliKeHalamanUtama();
 };
 
 // console.log("Modul Muat WH-3 dimuat.");
@@ -1216,7 +1212,6 @@ function tutupSubPageOngkir() {
     if (typeof window.resetFormOngkir === 'function') {
         window.resetFormOngkir();
     }
-    window.kembaliKeHalamanUtama();
     console.log("Subpage Ongkir ditutup.");
 }
 
@@ -1309,7 +1304,6 @@ function tutupSubPageBankData() {
         subPage.classList.remove("translate-x-0");
         subPage.classList.add("translate-x-full");
     }
-    window.kembaliKeHalamanUtama();
 }
 
 // EKSPOS KE WINDOW GLOBAL SCOPE

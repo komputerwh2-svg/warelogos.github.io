@@ -30,13 +30,18 @@ function simpanAntreanOfflineKeStorage(antrean) {
 
 // Fungsi pembantu untuk memasukkan request gagal/offline ke antrean
 window.simpanKeAntreanOffline = function(url, method, payload, deskripsi) {
+    // VALIDASI: Pastikan URL ada dan benar, cegah masuk jika null atau undefined
+    if (!url || url === "null" || url.trim() === "") {
+        console.warn(`[Offline Queue] Pengiriman dicegah karena URL tidak valid: ${url}`);
+        return; 
+    }
+
     const antrean = getAntreanOffline();
     
     antrean.push({
-        // PERBAIKAN DI SINI: bungkus angka 36 dengan .toString(36)
         id: 'sync_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
         url: url,
-        method: method,
+        method: method || 'PUT', // Default method
         payload: payload,
         deskripsi: deskripsi || 'Aksi Offline',
         timestamp: new Date().toISOString()
@@ -64,6 +69,15 @@ window.prosesBackgroundSync = async function() {
     // Ambil item pertama dari antrean (FIFO: First In, First Out)
     const itemSync = antrean[0];
 
+    // PENGAMAN TAMBAHAN: Jika di dalam queue ada antrean dengan URL null/rusak, langsung hapus (skip) dari antrean
+    if (!itemSync.url || itemSync.url === "null") {
+        console.warn(`[Background Sync] Ditemukan antrean rusak dengan URL null (${itemSync.deskripsi}). Menghapus dari antrean...`);
+        antrean.shift();
+        simpanAntreanOfflineKeStorage(antrean);
+        setTimeout(prosesBackgroundSync, 100); // Lanjut cek item berikutnya
+        return;
+    }
+
     try {
         let opsiFetch = {
             method: itemSync.method,
@@ -84,7 +98,6 @@ window.prosesBackgroundSync = async function() {
             antrean.shift();
             simpanAntreanOfflineKeStorage(antrean);
 
-            // Beritahu pengguna secara halus via miuiAlert jika diperlukan atau biarkan senyap di background
             if (antrean.length === 0) {
                 if (typeof miuiAlert === 'function') {
                     miuiAlert("Semua data offline berhasil disinkronkan ke server!");
@@ -97,7 +110,14 @@ window.prosesBackgroundSync = async function() {
                 setTimeout(prosesBackgroundSync, 500);
             }
         } else {
-            console.warn(`[Background Sync] Gagal menyinkronkan ${itemSync.deskripsi}, server merespons tidak OK. Mencoba lagi nanti.`);
+            console.warn(`[Background Sync] Gagal menyinkronkan ${itemSync.deskripsi}, server merespons HTTP ${response.status}.`);
+            // Jika error parah seperti 405 Method Not Allowed atau 400, lebih baik kita skip dan hapus agar tidak tersangkut berulang-ulang
+            if (response.status === 405 || response.status === 400 || response.status === 404) {
+                 console.error(`[Background Sync] URL atau Data bermasalah. Menghapus item dari antrean untuk mencegah perulangan tak berujung.`);
+                 antrean.shift();
+                 simpanAntreanOfflineKeStorage(antrean);
+                 setTimeout(prosesBackgroundSync, 500);
+            }
         }
     } catch (err) {
         console.error(`[Background Sync] Kesalahan jaringan saat sinkronisasi ${itemSync.deskripsi}:`, err.message);
@@ -117,7 +137,11 @@ function updateIndikatorOfflineUI() {
         badgeEl.id = 'offline-queue-badge';
         badgeEl.style.cssText = "position: fixed; bottom: 20px; right: 20px; background: #e74c3c; color: white; padding: 10px 15px; border-radius: 8px; z-index: 9999; font-size: 12px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.2); cursor: pointer;";
         badgeEl.onclick = () => {
-            miuiAlert(`Ada ${antrean.length} perubahan data dalam antrean offline yang menunggu sinkronisasi.`);
+            if(typeof miuiAlert === 'function'){
+               miuiAlert(`Ada ${antrean.length} perubahan data dalam antrean offline yang menunggu sinkronisasi.`);
+            } else {
+               alert(`Ada ${antrean.length} perubahan data dalam antrean offline yang menunggu sinkronisasi.`);
+            }
         };
         document.body.appendChild(badgeEl);
     }
@@ -950,81 +974,61 @@ async function prosesUploadWH2() {
 }
 
 async function prosesUploadWH3() {
-    console.log("Tombol upload WH-3 ditekan!"); 
-    const fileInput = document.getElementById('file-input-wh3');
-    const files = fileInput.files;
+    console.log("Tombol upload WH-3 / QA ditekan!"); 
+    const files = document.getElementById('file-input-wh3').files;
     
     if (files.length === 0) {
-        miuiAlert("Harap pilih file Excel (Bosnet)!");
+        miuiAlert("Harap pilih minimal file WH-3 (BOSNET) dan/atau QA!");
         return;
     }
 
-    const fileBosnet = files[0];
-    
-    // Ambil tanggal dari nama file, contoh: "Stock_20260627"
     const getTanggalFromFilename = (filename) => {
         const match = filename.match(/Stock_(\d{8})/i);
         return match ? match[1] : null;
     };
 
-    const tgl = getTanggalFromFilename(fileBosnet.name);
+    // Cari file berdasarkan penanda nama 'wh3' dan 'qa' secara fleksibel
+    const fileWh3 = Array.from(files).find(f => f.name.toLowerCase().includes('wh3'));
+    const fileQa = Array.from(files).find(f => f.name.toLowerCase().includes('qa'));
+
+    if (!fileWh3 && !fileQa) {
+        miuiAlert("Pastikan nama file memiliki penanda 'wh3' atau 'qa'!");
+        return;
+    }
+
+    const sampleFile = fileWh3 || fileQa;
+    const tgl = getTanggalFromFilename(sampleFile.name);
+    
     if (!tgl) {
         miuiAlert("Format nama file harus mengandung 'Stock_YYYYMMDD'!");
         return;
     }
 
-    // URL Firebase untuk WH-3
     const uniqueId = `stokwh3_${tgl}`;
     const url = `${DB_FIREBASE_URL}stok_wh3/${uniqueId}.json`;
     
     try {
-        // Cek status koneksi atau lakukan fetch dengan penanganan offline queue
         if (!navigator.onLine) {
             throw new Error("Offline");
         }
 
         const checkResponse = await fetch(url);
-        const existingData = await checkResponse.json();
+        const existingData = checkResponse.ok ? await checkResponse.json() : null;
         const isUpdate = existingData !== null;
 
         if (isUpdate) {
             miuiConfirm(
-                "Data audit untuk tanggal tersebut sudah ada. Apakah Anda ingin meng-UPDATE data?",
-                () => eksekusiUploadWH3(fileBosnet, url, true),
-                () => console.log("Upload wh3 dibatalkan.")
+                `Data audit tanggal ${tgl} sudah ada. Apakah Anda ingin meng-UPDATE data WH-3 & QA tersebut?`,
+                () => eksekusiUploadWH3Gabungan(fileWh3, fileQa, url, true),
+                () => console.log("Upload dibatalkan.")
             );
         } else {
-            eksekusiUploadWH3(fileBosnet, url, false);
+            eksekusiUploadWH3Gabungan(fileWh3, fileQa, url, false);
         }
 
     } catch (error) {
-        console.warn("Kendala jaringan atau offline terdeteksi pada WH-3, memasukkan ke antrean background queue...");
-        
-        // Membaca isi file Bosnet sebagai teks/base64 agar aman disimpan dalam localStorage
-        const bacaFileSebagaiTeks = (file) => {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = reject;
-                reader.readAsText(file);
-            });
-        };
-
-        try {
-            const dataBosnetContent = await bacaFileAsTeks(fileBosnet);
-
-            const payloadData = {
-                fileBosnetName: fileBosnet.name,
-                fileBosnetContent: dataBosnetContent,
-                isUpdate: false
-            };
-
-            simpanKeAntreanOffline(url, 'PUT', payloadData, `Upload Stok WH-3 Tanggal ${tgl}`);
-            miuiAlert("Koneksi terputus. Data WH-3 berhasil dimasukkan ke antrean offline dan akan diunggah otomatis saat online kembali.");
-        } catch (errBaca) {
-            console.error("Gagal membaca file WH-3 untuk antrean offline:", errBaca);
-            miuiAlert("Gagal memproses file dan mengecek data server WH-3.");
-        }
+        console.warn("Kendala jaringan / offline terdeteksi:", error.message);
+        eksekusiUploadWH3Gabungan(fileWh3, fileQa, url, false);
     }
 }
 
@@ -1129,20 +1133,14 @@ async function eksekusiUpload(fileWh2, fileWms, url, isUpdate) {
     }
 }
 
-async function eksekusiUploadWH3(fileBosnet, url, isUpdate) {
+async function eksekusiUploadWH3Gabungan(fileWh3, fileQa, url, isUpdate) {
     try {
-        console.log("Memproses data WH-3 dan mengambil stok blok terkini...");
-        const dataBosnet = await bacaExcelDinamis(fileBosnet, "Produk");
-        
-        // 1. Ambil data Stok Blok terbaru dari Firebase dengan pengecekan koneksi
-        if (!navigator.onLine) {
-            throw new Error("Koneksi internet terputus (Offline)");
-        }
+        console.log("Memproses file WH-3 dan QA secara bersamaan...");
 
-        const resBlok = await fetch(`https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/stok_blok.json`);
-        const dataBlokFirebase = await resBlok.json() || {};
+        // 1. Ambil data Stok Blok terbaru dari Firebase
+        const resBlok = await fetch(`${DB_FIREBASE_URL}stok_blok.json`);
+        const dataBlokFirebase = resBlok.ok ? await resBlok.json() || {} : {};
         
-        // Buat mapping agregat blok sementara
         const agregatBlok = {};
         Object.values(dataBlokFirebase).forEach(blokItem => {
             Object.entries(blokItem).forEach(([kode, dataTanggal]) => {
@@ -1153,98 +1151,165 @@ async function eksekusiUploadWH3(fileBosnet, url, isUpdate) {
             });
         });
 
-        // 2. Tarik data lama untuk mempertahankan fisik (beceran/utuhan)
+        // 2. Tarik data lama dari Firebase agar data fisik & properti sebelumnya aman
         const responseLama = await fetch(url);
-        const dataLama = await responseLama.json() || {};
+        const dataLama = responseLama.ok ? await responseLama.json() || {} : {};
 
-        let stokAudit = {};
+        // Mulai dengan menyalin data lama yang sudah bersih sebelumnya
+        let stokAudit = JSON.parse(JSON.stringify(dataLama));
+        let jumlahBarisQaTerbaca = 0;
 
-        dataBosnet.forEach(row => {
-            const kode = row[1] ? String(row[1]).trim().toUpperCase() : null; 
-            if (!kode || kode === "PRODUK") return;
+        // 3. Proses File WH-3 (Bosnet) jika ada
+        if (fileWh3) {
+            const dataBosnet = await bacaExcelDinamis(fileWh3, "Produk");
+            dataBosnet.forEach((row) => {
+                const kode = row[1] ? String(row[1]).trim().toUpperCase() : null; 
+                if (!kode || kode === "PRODUK") return;
 
-            const rawBosnetValue = row[9] ? String(row[9]).trim() : "0/0/0/0";
-            const parts = rawBosnetValue.split('/').map(p => parseInt(p) || 0);
+                const rawBosnetValue = row[9] ? String(row[9]).trim() : "0/0/0/0";
+                const parts = rawBosnetValue.split('/').map(p => parseInt(p) || 0);
 
-            const bosnet = parts[0] || 0;
-            const ball = parts[1] || 0;
-            const rtg = parts[2] || 0;
+                const bosnet = parts[0] || 0;
+                const ball = parts[1] || 0;
+                const rtg = parts[2] || 0;
 
-            // FILTER YANG DIPERBAIKI:
-            // Baris hanya akan di-skip jika semua komponen stok bernilai 0
-            if (bosnet === 0 && ball === 0 && rtg === 0) return;
+                const nama = row[2] || ""; 
+                const formattedPak = `${ball > 0 ? ball : "-"} | ${rtg > 0 ? rtg : "-"}`;
+                const dataLamaItem = stokAudit[kode] || {};
 
-            const nama = row[2] || ""; 
-            const formattedPak = `${ball > 0 ? ball : "-"} | ${rtg > 0 ? rtg : "-"}`;
-            const dataLamaItem = dataLama[kode] || {};
+                const blok = agregatBlok[kode] || dataLamaItem.blok || 0;
+                const beceran = dataLamaItem.beceran || 0;
+                const utuhan = dataLamaItem.utuhan || 0;
+                const qa = dataLamaItem.qa || 0;
 
-            const blok = agregatBlok[kode] || 0;
-            const beceran = dataLamaItem.beceran || 0;
-            const utuhan = dataLamaItem.utuhan || 0;
-            const totalFisik = blok + beceran + utuhan;
+                // FILTER SEPERTI VERSI LAMA: Skip jika semua komponen di baris ini benar-benar 0
+                // Tapi pastikan juga jika item lama di database sudah punya stok fisik/QA, jangan dihapus sembarangan
+                if (bosnet === 0 && ball === 0 && rtg === 0 && blok === 0 && beceran === 0 && utuhan === 0 && qa === 0) {
+                    delete stokAudit[kode]; // Bersihkan jika memang kosong melompong
+                    return;
+                }
 
-            stokAudit[kode] = {
-                kode: kode,
-                nama: nama,
-                bosnet: bosnet,
-                pak_format: formattedPak,
-                blok: blok,
-                beceran: beceran, 
-                utuhan: utuhan,  
-                total: totalFisik,
-                selisih: totalFisik - bosnet,
-                keterangan: dataLamaItem.keterangan || "BELUM DIHITUNG",
-                detail_rak: dataLamaItem.detail_rak || { beceran_rak: "", utuhan_rak: "" }
-            };
+                let existingItem = stokAudit[kode] || {
+                    kode: kode,
+                    nama: nama,
+                    bosnet: 0,
+                    qa: 0,
+                    pak_format: "-",
+                    blok: 0,
+                    beceran: 0,
+                    utuhan: 0,
+                    total: 0,
+                    selisih: 0,
+                    keterangan: dataLamaItem.keterangan || "BELUM DIHITUNG",
+                    detail_rak: dataLamaItem.detail_rak || { beceran_rak: "", utuhan_rak: "" }
+                };
+
+                if (nama) existingItem.nama = nama;
+                existingItem.bosnet = bosnet;
+                existingItem.pak_format = formattedPak;
+                existingItem.blok = blok;
+                
+                const totalFisik = blok + existingItem.beceran + existingItem.utuhan;
+                existingItem.total = totalFisik;
+                existingItem.selisih = totalFisik - (existingItem.bosnet + existingItem.qa);
+
+                stokAudit[kode] = existingItem;
+            });
+        }
+
+        // 4. Proses File QA jika ada
+        if (fileQa) {
+            const dataQaFile = await bacaExcelDinamis(fileQa, "Produk");
+            dataQaFile.forEach((row) => {
+                const kode = row[1] ? String(row[1]).trim().toUpperCase() : null; 
+                if (!kode || kode === "PRODUK") return;
+
+                // Hanya ambil dari kolom kuantitas (misal index 9, atau sesuaikan kolom qty QA Anda)
+                const rawQaVal = row[9] ? String(row[9]).trim() : "0";
+                const partsQa = rawQaVal.split('/').map(p => parseInt(p) || 0);
+                const qtyVal = partsQa[0] || 0;
+
+                if (qtyVal > 0) {
+                    jumlahBarisQaTerbaca++;
+                }
+
+                const nama = row[2] || ""; 
+                const dataLamaItem = stokAudit[kode] || {};
+
+                const blok = agregatBlok[kode] || dataLamaItem.blok || 0;
+                const beceran = dataLamaItem.beceran || 0;
+                const utuhan = dataLamaItem.utuhan || 0;
+                const bosnet = dataLamaItem.bosnet || 0;
+
+                // Jika nilai QA dan komponen lainnya 0, hapus dari list agar bersih
+                if (qtyVal === 0 && bosnet === 0 && blok === 0 && beceran === 0 && utuhan === 0) {
+                    delete stokAudit[kode];
+                    return;
+                }
+
+                let existingItem = stokAudit[kode] || {
+                    kode: kode,
+                    nama: nama,
+                    bosnet: 0,
+                    qa: 0,
+                    pak_format: "-",
+                    blok: 0,
+                    beceran: 0,
+                    utuhan: 0,
+                    total: 0,
+                    selisih: 0,
+                    keterangan: dataLamaItem.keterangan || "BELUM DIHITUNG",
+                    detail_rak: dataLamaItem.detail_rak || { beceran_rak: "", utuhan_rak: "" }
+                };
+
+                if (nama) existingItem.nama = nama;
+                existingItem.qa = qtyVal;
+                existingItem.blok = blok;
+
+                const totalFisik = blok + existingItem.beceran + existingItem.utuhan;
+                existingItem.total = totalFisik;
+                existingItem.selisih = totalFisik - (existingItem.bosnet + existingItem.qa);
+
+                stokAudit[kode] = existingItem;
+            });
+        }
+
+        // Final safety cleanup: pastikan tidak ada data yang isinya 0 semua lolos ke database
+        let stokAuditBersih = {};
+        Object.entries(stokAudit).forEach(([kode, item]) => {
+            const bsn = parseInt(item.bosnet) || 0;
+            const qa = parseInt(item.qa) || 0;
+            const blk = parseInt(item.blok) || 0;
+            const bcr = parseInt(item.beceran) || 0;
+            const uth = parseInt(item.utuhan) || 0;
+
+            if (bsn > 0 || qa > 0 || blk > 0 || bcr > 0 || uth > 0) {
+                stokAuditBersih[kode] = item;
+            }
         });
 
-        // 3. Upload ke Firebase
+        // 5. Upload hasil akhir yang sudah bersih ke Firebase via PUT
         const response = await fetch(url, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(stokAudit)
+            body: JSON.stringify(stokAuditBersih)
         });
 
         if (!response.ok) {
-            throw new Error("Gagal menyimpan data WH-3 ke server (Response not OK).");
+            throw new Error(`Gagal menyimpan data ke server (Status: ${response.status})`);
         }
 
-        miuiAlert("Data WH-3 berhasil disimpan!");
+        miuiAlert(`Data WH-3 & QA berhasil disimpan! (${jumlahBarisQaTerbaca} baris QA terbaca, data kosong dibersihkan).`);
         tutupModalUploadWH3();
         resetFileInputwh3();
         isDropdownInitializedWH3 = false; 
         await initDropdownsWH3(); 
 
     } catch (error) {
-        console.warn("Gagal terhubung ke server atau offline pada WH-3, memasukkan ke antrean background queue...", error.message);
-        
-        // Karena membutuhkan pembacaan file untuk offline queue, baca fileBosnet terlebih dahulu
-        const bacaFileSebagaiTeks = (file) => {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = reject;
-                reader.readAsText(file);
-            });
-        };
-
-        try {
-            const dataBosnetContent = await bacaFileSebagaiTeks(fileBosnet);
-            const payloadData = {
-                fileBosnetName: fileBosnet.name,
-                fileBosnetContent: dataBosnetContent,
-                isUpdate: isUpdate
-            };
-
-            simpanKeAntreanOffline(url, 'PUT', payloadData, `Upload Final Stok WH-3`);
-            
-            miuiAlert("Koneksi terputus saat pengiriman WH-3. Data telah dimasukkan ke antrean offline dan akan disinkronkan otomatis saat online.");
-            tutupModalUploadWH3();
-            resetFileInputwh3();
-        } catch (errBaca) {
-            console.error("Gagal memproses file WH-3 untuk antrean offline:", errBaca);
-            miuiAlert("Gagal memproses file: " + error.message);
-        }
+        console.warn("Gagal memproses file WH-3/QA:", error.message);
+        miuiAlert("Gagal memproses file: " + error.message);
+        tutupModalUploadWH3();
+        resetFileInputwh3();
     }
 }
 
@@ -2088,11 +2153,12 @@ async function renderTabelwh3(dataStok, mode, key) {
     sortedEntries.forEach(([kode, item]) => {
         const blok = parseInt(item.blok) || 0;
         const bosnet = parseInt(item.bosnet) || 0;
+        const qa = parseInt(item.qa) || 0;
         const beceran = parseInt(item.beceran) || 0;
         const utuhan = parseInt(item.utuhan) || 0;
         
         let fisik = kode.includes("PR-PKT") ? (beceran + utuhan) : (blok + beceran + utuhan);
-        totalSelisih += (fisik - bosnet);
+        totalSelisih += (fisik - (bosnet + qa));
     });
 
     // Update Elemen Status di Header (WH-3)
@@ -2113,17 +2179,18 @@ async function renderTabelwh3(dataStok, mode, key) {
     sortedEntries.forEach(([kode, item]) => {
         const blok = parseInt(item.blok) || 0;
         const bosnet = parseInt(item.bosnet) || 0;
+        const qa = parseInt(item.qa) || 0;
         const beceran = parseInt(item.beceran) || 0;
         const utuhan = parseInt(item.utuhan) || 0;
         
         let pak = item.pak_format || "-";
         if (pak === "0 | 0" || pak === "0") pak = "-";
 
-        if (!((blok !== 0 || bosnet !== 0 || beceran !== 0 || utuhan !== 0) || pak !== "-")) return;
+        if (!((blok !== 0 || bosnet !== 0 || qa !== 0 || beceran !== 0 || utuhan !== 0) || pak !== "-")) return;
 
         // Logika Fisik 
         let totalFisik = kode.includes("PR-PKT") ? (beceran + utuhan) : (blok + beceran + utuhan);
-        const selisih = totalFisik - bosnet;
+        const selisih = totalFisik - (bosnet + qa);
         
         // Tentukan Satuan otomatis (PKT untuk paket, KRT untuk barang biasa)
         const isPaket = kode.includes("PR-PKT");
@@ -2149,11 +2216,12 @@ async function renderTabelwh3(dataStok, mode, key) {
             <tr class="hover:bg-gray-50 border-b text-[15px]">
                 <td class="py-2 px-2">${no++}</td>
                 <td class="py-2 px-2 whitespace-nowrap font-bold text-orange-600 cursor-pointer hover:underline" onclick="bukaModalAdmin('EDIT_DB_WH3', '${kode}')" title="Klik untuk Edit Database Firebase">${kode}</td>
-                <td class="py-2 px-2">${f(blok)}</td>
-                <td class="py-2 px-2">${f(bosnet)}</td>
+                <td class="py-2 px-2 font-bold text-orange-600 cursor-pointer">${f(qa)}</td>
+                <td class="py-2 px-2 font-bold text-emerald-600">${f(blok)}</td>
+                <td class="py-2 px-2 font-bold text-slate-600">${f(bosnet)}</td>
                 <td class="py-2 px-2">${pak}</td>
-                <td class="py-2 px-2 whitespace-nowrap font-bold text-blue-600 cursor-pointer hover:underline" onclick="bukaModalInputRak('${kode}')" title="Klik untuk Input Rak Beceran">${f(beceran)} ${bRak}</td>
-                <td class="py-2 px-2 whitespace-nowrap font-bold text-green-600 cursor-pointer hover:underline" onclick="bukaModalLihatRak('${kode}', event)" title="Klik untuk Lihat Rak Utuhan">${f(utuhan)} ${uRak}</td>
+                <td class="py-2 px-2 whitespace-nowrap font-bold cursor-pointer hover:underline" onclick="bukaModalInputRak('${kode}')" title="Klik untuk Input Rak Beceran">${f(beceran)} ${bRak}</td>
+                <td class="py-2 px-2 whitespace-nowrap font-bold cursor-pointer hover:underline" onclick="bukaModalLihatRak('${kode}', event)" title="Klik untuk Lihat Rak Utuhan">${f(utuhan)} ${uRak}</td>
                 <td class="py-2 px-2 font-bold">${f(totalFisik)}</td>
                 <td class="py-2 px-2 ${kelasWarnaSelisih}">${selisih === 0 ? "-" : selisih.toLocaleString()}</td>
                 <td class="py-2 px-2 whitespace-nowrap ${warnaKet} font-bold cursor-pointer hover:underline" onclick="bukaModalEditKeterangan('${kode}', '${keterangan === "-" ? "" : keterangan}')" title="Klik untuk Edit Keterangan">${keterangan}</td>
@@ -2206,14 +2274,18 @@ window.bukaModalEditDatabaseWH3 = function(kode) {
                     <input type="text" id="db-nama" value="${item.nama || ''}" class="w-full mt-1 border rounded px-2 py-1.5 text-[13px] text-gray-800 font-bold bg-gray-100" readonly>
                 </div>
 
-                <div class="grid grid-cols-2 gap-3">
+                <div class="grid grid-cols-3 gap-2">
                     <div>
                         <label class="text-[12px] font-bold text-gray-800 uppercase">Blok</label>
                         <input type="number" id="db-blok" value="${item.blok || 0}" class="w-full mt-1 border rounded px-2 py-1.5 text-[13px] text-gray-800 font-bold">
                     </div>
                     <div>
                         <label class="text-[12px] font-bold text-gray-800 uppercase">Bosnet</label>
-                        <input type="number" id="db-bosnet" value="${item.bosnet || 0}" class="w-full mt-1 border rounded px-2 py-1.5 text-[13px] text-gray-800 font-bold">
+                        <input type="number" id="db-bosnet" value="${item.bosnet || 0}" oninput="hitungOtomatisModalEdit()" class="w-full mt-1 border rounded px-2 py-1.5 text-[13px] text-gray-800 font-bold">
+                    </div>
+                    <div>
+                        <label class="text-[12px] font-bold text-gray-800 uppercase text-orange-600">QA</label>
+                        <input type="number" id="db-qa" value="${item.qa || 0}" oninput="hitungOtomatisModalEdit()" class="w-full mt-1 border border-orange-300 rounded px-2 py-1.5 text-[13px] text-orange-600 font-bold bg-orange-50">
                     </div>
                 </div>
 
@@ -2230,12 +2302,12 @@ window.bukaModalEditDatabaseWH3 = function(kode) {
 
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="text-[12px] font-bold text-gray-800 uppercase">Total</label>
-                        <input type="number" id="db-total" value="${item.total || 0}" class="w-full mt-1 border rounded px-2 py-1.5 text-[13px] text-gray-800 font-bold">
+                        <label class="text-[12px] font-bold text-gray-800 uppercase">Total (Fisik)</label>
+                        <input type="number" id="db-total" value="${item.total || 0}" oninput="hitungOtomatisModalEdit()" class="w-full mt-1 border rounded px-2 py-1.5 text-[13px] text-gray-800 font-bold">
                     </div>
                     <div>
                         <label class="text-[12px] font-bold text-gray-800 uppercase">Selisih</label>
-                        <input type="number" id="db-selisih" value="${item.selisih || 0}" class="w-full mt-1 border rounded px-2 py-1.5 text-[13px] text-gray-800 font-bold">
+                        <input type="number" id="db-selisih" value="${item.selisih || 0}" class="w-full mt-1 border rounded px-2 py-1.5 text-[13px] text-gray-800 font-bold bg-gray-100" readonly>
                     </div>
                 </div>
 
@@ -2246,11 +2318,11 @@ window.bukaModalEditDatabaseWH3 = function(kode) {
 
                 <div>
                     <label class="text-[12px] font-bold text-gray-800 uppercase">Keterangan</label>
-                    <input type="text" id="db-keterangan" value="${item.keterangan || 'SESUAI'}" class="w-full mt-1 border rounded px-2 py-1.5 text-[13px] text-gray-800 font-bold">
+                    <input type="text" id="db-keterangan" value="${item.keterangan || 'SESUAI'}" class="w-full mt-1 border rounded px-2 py-1.5 text-[13px] text-gray-800 font-bold bg-gray-100" readonly>
                 </div>
             </form>
 
-            <!-- Footer Tombol Aksi (Simpan & Hapus Data Rose) -->
+            <!-- Footer Tombol Aksi -->
             <div class="px-4 py-3 bg-gray-50 flex gap-2">
                 <button type="submit" form="form-edit-db-wh3" class="flex-1 py-3 bg-orange-500 text-white font-black text-sm rounded-lg hover:bg-orange-600 transition-all shadow-lg">SIMPAN DATA</button>
                 <button type="button" onclick="konfirmasiHapusDatabaseWH3('${tanggal}', '${kode}')" class="flex-1 py-3 bg-rose-600 text-white font-black text-sm rounded-lg hover:bg-rose-700 transition-all shadow-lg">HAPUS DATA</button>
@@ -2261,18 +2333,71 @@ window.bukaModalEditDatabaseWH3 = function(kode) {
     modal.style.display = 'flex';
 };
 
+// Fungsi pendukung untuk auto-kalkulasi langsung di dalam modal saat nilai Bosnet, QA, atau Total diubah
+window.hitungOtomatisModalEdit = function() {
+    const bosnet = parseFloat(document.getElementById('db-bosnet').value) || 0;
+    const qa = parseFloat(document.getElementById('db-qa').value) || 0;
+    const totalFisik = parseFloat(document.getElementById('db-total').value) || 0;
+
+    // Rumus: Total Fisik dikurangi (Bosnet + QA)
+    const selisih = totalFisik - (bosnet + qa);
+    document.getElementById('db-selisih').value = selisih;
+
+    const isPaket = document.getElementById('form-edit-db-wh3').innerHTML.includes("PR-PKT") || false; 
+    // Menggunakan cek sederhana satuan
+    let keterangan = "SESUAI";
+    if (selisih > 0) {
+        keterangan = `STOK LEBIH ${selisih} KRT`;
+    } else if (selisih < 0) {
+        keterangan = `STOK KURANG ${Math.abs(selisih)} KRT`;
+    }
+    document.getElementById('db-keterangan').value = keterangan;
+};
+
 window.simpanEditDatabaseWH3 = async function(event, tanggal, kode) {
     event.preventDefault();
 
+    // 1. Ambil nilai input dari form, termasuk QA
+    const blok = parseInt(document.getElementById('db-blok').value) || 0;
+    const bosnet = parseInt(document.getElementById('db-bosnet').value) || 0;
+    const qa = parseInt(document.getElementById('db-qa') ? document.getElementById('db-qa').value : 0) || 0;
+    const beceran = parseInt(document.getElementById('db-beceran').value) || 0;
+    const utuhan = parseInt(document.getElementById('db-utuhan').value) || 0;
+    const totalFisik = parseInt(document.getElementById('db-total').value) || 0;
+
+    // 2. Hitung ulang selisih berdasarkan rumus baru: Total Fisik - (Bosnet + QA)
+    const totalPengurang = bosnet + qa;
+    const selisih = totalFisik - totalPengurang;
+
+    // 3. Tentukan satuan otomatis (PKT untuk paket, KRT untuk barang biasa)
+    const isPaket = kode.includes("PR-PKT");
+    const satuan = isPaket ? "PKT" : "KRT";
+
+    // 4. Buat atau perbarui keterangan otomatis secara dinamis
+    let keterangan = "SESUAI";
+    if (selisih > 0) {
+        keterangan = `STOK LEBIH ${selisih} ${satuan}`;
+    } else if (selisih < 0) {
+        keterangan = `STOK KURANG ${Math.abs(selisih)} ${satuan}`;
+    } else {
+        // Jika form modal menyediakan input keterangan manual dan pengguna mengisinya, bisa dipertahankan, atau biarkan SESUAI
+        const manualKet = document.getElementById('db-keterangan') ? document.getElementById('db-keterangan').value.trim() : "";
+        if (manualKet && manualKet !== "-") {
+            keterangan = manualKet;
+        }
+    }
+
+    // 5. Susun objek data yang akan dikirim ke Firebase
     const updatedData = {
-        blok: parseInt(document.getElementById('db-blok').value) || 0,
-        bosnet: parseInt(document.getElementById('db-bosnet').value) || 0,
-        beceran: parseInt(document.getElementById('db-beceran').value) || 0,
-        utuhan: parseInt(document.getElementById('db-utuhan').value) || 0,
-        total: parseInt(document.getElementById('db-total').value) || 0,
-        selisih: parseInt(document.getElementById('db-selisih').value) || 0,
+        blok: blok,
+        bosnet: bosnet,
+        qa: qa,
+        beceran: beceran,
+        utuhan: utuhan,
+        total: totalFisik,
+        selisih: selisih,
         pak_format: document.getElementById('db-pak').value.trim(),
-        keterangan: document.getElementById('db-keterangan').value.trim()
+        keterangan: keterangan
     };
 
     const url = `https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/stok_wh3/stokwh3_${tanggal}/${kode}.json`;
@@ -2293,6 +2418,8 @@ window.simpanEditDatabaseWH3 = async function(event, tanggal, kode) {
             document.getElementById('modal-edit-db-wh3').style.display = 'none';
             if (typeof muatDataStokWH3 === 'function') {
                 muatDataStokWH3();
+            } else if (typeof loadStokDatawh3 === 'function') {
+                loadStokDatawh3();
             } else {
                 location.reload();
             }
@@ -2508,7 +2635,7 @@ async function renderSelisihWH3(allData) {
     };
 
     // --- PROSES DATA ---
-    const dates = Object.keys(allData)
+    const dates = Object.keys(allData || {})
         .filter(k => k.startsWith('stokwh3_'))
         .map(k => k.replace('stokwh3_', ''))
         .sort();
@@ -2522,12 +2649,23 @@ async function renderSelisihWH3(allData) {
         totalPerTgl[tgl] = 0;
         const dailyData = allData[`stokwh3_${tgl}`] || {};
         Object.entries(dailyData).forEach(([kode, item]) => {
+            if (!item || typeof item !== 'object') return;
+
             const bosnet = parseInt(item.bosnet) || 0;
+            const qa = parseInt(item.qa) || 0; // Menambahkan variabel QA agar sinkron
             const blok = parseInt(item.blok) || 0;
             const beceran = parseInt(item.beceran) || 0;
             const utuhan = parseInt(item.utuhan) || 0;
+            
             const fisik = kode.includes("PR-PKT") ? (beceran + utuhan) : (blok + beceran + utuhan);
-            const selisih = fisik - bosnet;
+            
+            // Ambil dari RTDB jika ada, atau hitung dengan rumus (fisik - (bosnet + qa))
+            let selisih = 0;
+            if (item.selisih !== undefined && item.selisih !== null) {
+                selisih = parseInt(item.selisih) || 0;
+            } else {
+                selisih = fisik - (bosnet + qa);
+            }
             
             if (selisih !== 0) {
                 kodeSelisih.add(kode);
@@ -2578,7 +2716,7 @@ async function renderSelisihWH3(allData) {
             <td class="sticky-col-kode py-2 px-3 font-bold text-slate-800 whitespace-nowrap border-r">${kode}</td>`;
         
         dates.forEach(tgl => {
-            const val = dataMatriks[kode][tgl] || 0;
+            const val = dataMatriks[kode] && dataMatriks[kode][tgl] ? dataMatriks[kode][tgl] : 0;
             const warna = val > 0 ? "text-blue-600" : (val < 0 ? "text-red-600" : "text-gray-300");
             rowHtml += `<td class="py-2 px-4 text-center font-bold ${warna} whitespace-nowrap">${val === 0 ? "-" : val}</td>`;
         });
@@ -2776,7 +2914,7 @@ async function simpanRak() {
         utuhanVal = rakArray.length * qtyPerRak;
     }
 
-    // 3. Kalkulasi Total & Selisih menggunakan angka murni `beceranVal`
+    // 3. Ambil data item harian untuk mendapatkan nilai bosnet dan qa
     const dataHarian = window.currentStokData[`stokwh3_${tanggal}`];
     const item = dataHarian ? dataHarian[kode] : null;
     
@@ -2786,8 +2924,15 @@ async function simpanRak() {
         return;
     }
 
+    const bosnetVal = parseInt(item.bosnet) || 0;
+    const qaVal = parseInt(item.qa) || 0; // Ambil nilai QA yang tersimpan
+
+    // Kalkulasi Total Fisik
     const totalVal = (parseInt(item.blok) || 0) + beceranVal + utuhanVal;
-    const selisihVal = totalVal - (parseInt(item.bosnet) || 0);
+    
+    // RUMUS BARU: Total dikurangi (Bosnet + QA)
+    const totalPengurang = bosnetVal + qaVal;
+    const selisihVal = totalVal - totalPengurang;
 
     // 4. Logika Keterangan Otomatis
     const satuan = isPaket ? "PKT" : "KRT";
@@ -2808,7 +2953,7 @@ async function simpanRak() {
             throw new Error("Offline");
         }
 
-        // Sistem di balik layar murni membaca angka dari field `beceran`
+        // Kirim pembaruan utama termasuk selisih yang sudah memperhitungkan QA
         const responseUtama = await fetch(urlUtama, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
@@ -2836,7 +2981,7 @@ async function simpanRak() {
 
         if (!responseRak.ok) throw new Error("Gagal memperbarui detail rak.");
 
-        console.log("Data berhasil disimpan dengan pemisahan sistem dan tampilan");
+        console.log("Data berhasil disimpan dengan pemisahan sistem dan tampilan (memperhitungkan QA)");
         miuiAlert("Data rak berhasil disimpan!");
         tutupModalRak();
         loadStokDatawh3();
@@ -2864,7 +3009,7 @@ async function simpanRak() {
         
         tutupModalRak();
         
-        // Refresh tampilan lokal jika fungsi tersedia agar UI langsung merespons perubahan
+        // Refresh tampilan lokal jika fungsi tersedia
         if (typeof loadStokDatawh3 === 'function') {
             loadStokDatawh3();
         }
@@ -3160,7 +3305,7 @@ async function simpanDataFisikHP() {
 
     const dataHarian = window.currentStokData[`stokwh3_${tanggal}`];
     
-    // CEK APAKAH ITEM SUDAH ADA. JIKA BELUM, BUAT STRUKTUR DATA BARU (DEFAULT BOSNET 0)
+    // CEK APAKAH ITEM SUDAH ADA. JIKA BELUM, BUAT STRUKTUR DATA BARU (DEFAULT BOSNET & QA 0)
     let item = dataHarian[kode];
     let isNewItem = false;
 
@@ -3170,6 +3315,7 @@ async function simpanDataFisikHP() {
             kode: kode,
             nama: (window.masterData && window.masterData[kode]) ? window.masterData[kode].NAMA : "STOK BOSNET TIDAK ADA / BARANG SUDAH HABIS",
             bosnet: 0,
+            qa: 0,
             blok: 0,
             beceran: 0,
             utuhan: 0,
@@ -3258,13 +3404,17 @@ async function simpanDataFisikHP() {
         }
     }
 
-    // 3. Kalkulasi Total Keseluruhan & Selisih (Bosnet dianggap 0 jika barang baru)
+    // 3. Kalkulasi Total Keseluruhan & Selisih (Memperhitungkan Bosnet & QA)
     const blokVal = parseInt(item.blok) || 0;
-    const bosnetVal = parseInt(item.bosnet) || 0; // Bernilai 0 untuk data baru
+    const bosnetVal = parseInt(item.bosnet) || 0; 
+    const qaVal = parseInt(item.qa) || 0; // Ambil nilai QA yang sudah ada
     const isPaket = kode.includes("PR-PKT");
 
     const totalVal = (isPaket ? 0 : blokVal) + finalBeceranVal + finalUtuhanVal;
-    const selisihVal = totalVal - bosnetVal; // Karena bosnet 0, selisih otomatis bernilai positif sebesar total fisik
+    
+    // Rumus Selisih Baru: Total Fisik - (Bosnet + QA)
+    const totalPengurang = bosnetVal + qaVal;
+    const selisihVal = totalVal - totalPengurang; 
 
     // 4. Logika Keterangan Otomatis
     const satuan = isPaket ? "PKT" : "KRT";
@@ -3284,12 +3434,13 @@ async function simpanDataFisikHP() {
             throw new Error("Offline");
         }
 
-        // Jika item baru, kita inisialisasi data utamanya dulu secara lengkap
+        // Jika item baru, kita inisialisasi data utamanya dulu secara lengkap (termasuk qa: 0)
         if (isNewItem) {
             const payloadDataBaru = {
                 kode: kode,
                 nama: item.nama,
                 bosnet: 0,
+                qa: 0,
                 blok: 0,
                 beceran: finalBeceranVal,
                 utuhan: finalUtuhanVal,
@@ -3365,7 +3516,7 @@ async function simpanDataFisikHP() {
         };
         dataHarian[kode] = item;
 
-        console.log("Data fisik HP berhasil disimpan (Auto-Create/Update):", { kode, finalBeceranVal, finalRakBeceran });
+        console.log("Data fisik HP berhasil disimpan (Auto-Create/Update dengan QA):", { kode, finalBeceranVal, finalRakBeceran });
 
         // KOSONGKAN FORM INPUT (Reset input field agar siap untuk input berikutnya)
         const inputQtyBeceran = document.getElementById('hp-qty-beceran');
@@ -3396,6 +3547,7 @@ async function simpanDataFisikHP() {
             kode: kode,
             nama: item.nama,
             bosnet: 0,
+            qa: 0,
             blok: 0,
             beceran: finalBeceranVal,
             utuhan: finalUtuhanVal,
@@ -3664,20 +3816,32 @@ function bukaModalEditKeterangan(kode, ketLama) {
 async function simpanKeteranganManual() {
     const kode = window.currentKode;
     const ketBaru = document.getElementById('inputKeterangan').value.toUpperCase();
+    const finalKet = ketBaru || "OK";
     const dateInput = document.getElementById('select-tanggal-wh3');
     const tanggal = dateInput ? dateInput.value.replace(/-/g, '') : null;
 
     if (!tanggal) return;
 
     const url = `https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/stok_wh3/stokwh3_${tanggal}/${kode}.json`;
-    const updateData = { keterangan: ketBaru || "OK" };
+    const updateData = { keterangan: finalKet };
+
+    // 1. UPDATE STATE LOKAL SEBELUM RENDER (PENTING AGAR UI LANGSUNG BERUBAH)
+    if (!window.currentStokData) window.currentStokData = {};
+    if (!window.currentStokData[`stokwh3_${tanggal}`]) {
+        window.currentStokData[`stokwh3_${tanggal}`] = {};
+    }
+    const dataHarian = window.currentStokData[`stokwh3_${tanggal}`];
+    
+    if (dataHarian[kode]) {
+        dataHarian[kode].keterangan = finalKet; // Perbarui data di memori lokal
+    }
 
     try {
         if (!navigator.onLine) {
             throw new Error("Offline");
         }
 
-        // Hanya update field keterangan saja
+        // Hanya update field keterangan saja ke Firebase
         const response = await fetch(url, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
@@ -3686,23 +3850,30 @@ async function simpanKeteranganManual() {
 
         if (!response.ok) throw new Error("Gagal menyimpan keterangan ke server.");
 
-        console.log("Keterangan berhasil diupdate");
+        console.log("Keterangan berhasil diupdate ke server dan lokal.");
         document.getElementById('modalEditKet').classList.add('hidden');
         
-        // Refresh tampilan tabel
-        loadStokDatawh3(); 
+        // Refresh tampilan tabel / rekap
+        if (typeof renderTabelStokWH3 === 'function') {
+            renderTabelStokWH3();
+        } else if (typeof loadStokDatawh3 === 'function') {
+            loadStokDatawh3(); 
+        } 
+
     } catch (error) {
         console.warn("Koneksi terputus/offline saat menyimpan keterangan, memasukkan ke antrean background queue...", error.message);
         
         // Simpan ke antrean offline dengan method PATCH
         simpanKeAntreanOffline(url, 'PATCH', updateData, `Edit Keterangan Produk ${kode} (${tanggal})`);
         
-        miuiAlert("Koneksi terputus. Perubahan keterangan berhasil dimasukkan ke antrean offline dan akan disinkronkan otomatis saat online.");
+        miuiAlert("Koneksi terputus. Perubahan keterangan disimpan secara lokal & dimasukkan ke antrean offline.");
         
         document.getElementById('modalEditKet').classList.add('hidden');
         
-        // Refresh lokal jika fungsi tersedia agar UI langsung responsif
-        if (typeof loadStokDatawh3 === 'function') {
+        // Refresh tampilan tabel secara lokal
+        if (typeof renderTabelStokWH3 === 'function') {
+            renderTabelStokWH3();
+        } else if (typeof loadStokDatawh3 === 'function') {
             loadStokDatawh3();
         }
     }
