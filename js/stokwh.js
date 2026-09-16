@@ -3191,13 +3191,40 @@ function filterSaranKodeHP(keyword) {
     const dataStok = window.dataStokTerkini || {};
     const listKode = Object.keys(dataStok);
 
-    // Filter berdasarkan keyword ketikan user (bisa mencocokkan kode atau nama barang)
+    const kw = keyword.toLowerCase().trim();
+
+    // Fungsi helper untuk pencocokan karakter berurutan (Subsequence Match)
+    // Contoh: kw = "cr01" akan cocok dengan target = "crr4a01"
+    const isSubsequence = (query, target) => {
+        let i = 0, j = 0;
+        while (i < query.length && j < target.length) {
+            if (query[i] === target[j]) {
+                i++;
+            }
+            j++;
+        }
+        return i === query.length;
+    };
+
+    // Filter berdasarkan keyword (Kode dengan Subsequence atau Nama Barang mencakup keyword)
     const filtered = listKode.filter(kode => {
         const item = dataStok[kode] || {};
+        
+        // --- 1. FILTER: Abaikan jika total stok sudah 0 atau kosong ---
+        const blokVal = Number(item.blok) || 0;
+        const beceranVal = Number(item.beceran) || 0;
+        const utuhanVal = Number(item.utuhan) || 0;
+        const totalStored = Number(item.total) || (blokVal + beceranVal + utuhanVal);
+        
+        if (totalStored <= 0) {
+            return false; // Lewati barang yang totalnya sudah 0 / habis
+        }
+
         const namaBarang = (item.nama || '').toLowerCase();
         const k = kode.toLowerCase();
-        const kw = keyword.toLowerCase();
-        return k.includes(kw) || namaBarang.includes(kw);
+
+        // Cocokkan apakah kodenya memenuhi pola subsequence atau nama barang mengandung keyword
+        return isSubsequence(kw, k) || k.includes(kw) || namaBarang.includes(kw);
     });
 
     if (filtered.length === 0) {
