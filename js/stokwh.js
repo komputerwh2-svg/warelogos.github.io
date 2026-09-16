@@ -3923,7 +3923,6 @@ async function exportTabelKeExcelWH3() {
         mmFile = bln;
         ddFile = tgl;
 
-        // Konversi ke objek Date untuk mendapatkan nama hari berdasarkan tanggal yang dipilih
         const dateObj = new Date(`${thn}-${bln}-${tgl}`);
         const hariList = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
         const namaHariPilih = !isNaN(dateObj.getTime()) ? hariList[dateObj.getDay()] : '';
@@ -3943,7 +3942,7 @@ async function exportTabelKeExcelWH3() {
             return;
         }
 
-        // --- 3. POLA SORTIR DATA ---
+        // --- 3. POLA SORTIR & FILTER DATA ---
         const polaUtama = ["CRR", "CRR EA", "THR EA", "THR", "MRMR", "MRR", "MJR HJ", "MJR", "MOB4A", "MOR2A EA", "MOR2A EB", "MOR2A", "MP", "PDR", "MTR3A", "PR-PKT", "PR-CUP", "MRSR", "LTGR", "MTGR", "MEB", "MOL", "MRL", "MTL", "ISEL"];
         
         const getSortScore = (kode) => {
@@ -3965,13 +3964,30 @@ async function exportTabelKeExcelWH3() {
             return match ? parseInt(match.join('').slice(-4)) || 999 : 999;
         };
 
-        const sortedEntries = Object.entries(dailyData).sort((a, b) => {
+        const filteredEntries = Object.entries(dailyData).filter(([kode, item]) => {
+            return item && (
+                (item.total !== undefined && item.total !== "" && item.total !== null) ||
+                (item.bosnet !== undefined && item.bosnet !== "" && item.bosnet !== null) ||
+                (item.utuhan !== undefined && item.utuhan !== "" && item.utuhan !== null) ||
+                (item.beceran !== undefined && item.beceran !== "" && item.beceran !== null) ||
+                (item.selisih !== undefined && item.selisih !== "" && item.selisih !== null && item.selisih !== 0) ||
+                (item.qa !== undefined && item.qa !== "" && item.qa !== null) ||
+                (item.blok !== undefined && item.blok !== "" && item.blok !== null)
+            );
+        });
+
+        if (filteredEntries.length === 0) {
+            miuiAlert("Belum ada data stok yang lengkap untuk diexport!");
+            return;
+        }
+
+        const sortedEntries = filteredEntries.sort((a, b) => {
             const sA = getSortScore(a[0]), sB = getSortScore(b[0]);
             if (sA !== sB) return sA - sB;
             return getAngkaAkhir(a[0]) - getAngkaAkhir(b[0]);
         });
 
-        // --- FORMAT NAMA FILE (BERDASARKAN TANGGAL DATA + JAM SIMPAN SAAT INI) ---
+        // --- FORMAT NAMA FILE ---
         const now = new Date();
         const jam = String(now.getHours()).padStart(2, '0');
         const menit = String(now.getMinutes()).padStart(2, '0');
@@ -3992,15 +4008,14 @@ async function exportTabelKeExcelWH3() {
                 th, td { border: 0.5pt solid windowtext; padding: 3px 5px; text-align: center; vertical-align: middle; white-space: nowrap; mso-number-format:"\\@"; }
                 th { background-color: #f2f2f2; font-weight: bold; }
                 .text-left { text-align: left; }
-                .text-nama { text-align: left; font-size: 4pt; } /* Ukuran font khusus nama barang */
-                .text-rak { text-align: left; font-size: 8pt; } /* Ukuran font khusus rak */
+                .text-nama { text-align: left; font-size: 4pt; } 
+                .text-rak { text-align: left; font-size: 8pt; } 
                 .title { font-size: 12pt; font-weight: bold; text-align: left; border: none; padding-bottom: 8px; white-space: nowrap; text-transform: uppercase;}
                 
-                /* Kelas Warna untuk Selisih */
                 .text-merah { color: #FF0000; font-weight: bold; }
                 .text-hijau { color: #008000; font-weight: bold; }
+                .row-total { background-color: #e6e6e6; font-weight: bold; }
 
-                /* Lebar Kolom Presisi Excel */
                 .col-no { width: 35px; }
                 .col-kode { width: 110px; }
                 .col-blok { width: 45px; }
@@ -4013,48 +4028,39 @@ async function exportTabelKeExcelWH3() {
                 .col-qty-uth { width: 65px; }
                 .col-total { width: 65px; }
                 .col-selisih { width: 65px; }
+                .col-qa { width: 50px; }
             </style>
         </head>
         <body>
             <table>
                 <colgroup>
-                    <col class="col-no">
-                    <col class="col-kode">
-                    <col class="col-blok">
-                    <col class="col-nama">
-                    <col class="col-bosnet">
-                    <col class="col-pak">
-                    <col class="col-qty-bcr">
-                    <col class="col-rak-bcr">
-                    <col class="col-rak-uth">
-                    <col class="col-qty-uth">
-                    <col class="col-total">
-                    <col class="col-selisih">
+                    <col class="col-no"><col class="col-kode"><col class="col-blok"><col class="col-nama">
+                    <col class="col-bosnet"><col class="col-pak"><col class="col-qty-bcr"><col class="col-rak-bcr">
+                    <col class="col-rak-uth"><col class="col-qty-uth"><col class="col-total"><col class="col-selisih"><col class="col-qa">
                 </colgroup>
                 <tr>
-                    <td colspan="12" class="title">${titleText}</td>
+                    <td colspan="13" class="title">${titleText}</td>
                 </tr>
                 <tr>
-                    <th>NO</th>
-                    <th>KODE</th>
-                    <th>BLOK</th>
-                    <th>NAMA</th>
-                    <th>BOSNET</th>
-                    <th>PAK</th>
-                    <th>BECERAN</th>
-                    <th>RAK BECER</th>
-                    <th>RAK UTUHAN</th>
-                    <th>UTUHAN</th>
-                    <th>TOTAL</th>
-                    <th>SELISIH</th>
+                    <th>NO</th><th>KODE</th><th>BLOK</th><th>NAMA</th><th>BOSNET</th><th>PAK</th>
+                    <th>BECERAN</th><th>RAK BECER</th><th>RAK UTUHAN</th><th>UTUHAN</th>
+                    <th>TOTAL</th><th>SELISIH</th><th>QA</th>
                 </tr>
         `;
 
-        // --- 5. PETAKAN DATA DAN BERSIHKAN NILAI NOL MENJADI KOSONG ---
         const formatNilai = (val) => {
             if (val === undefined || val === null || val === 0 || val === "0" || val === "- | -") return "";
             return val;
         };
+
+        // Variabel penampung total bawah
+        let grandTotalBlok = 0;
+        let grandTotalBosnet = 0;
+        let grandTotalBeceran = 0;
+        let grandTotalUtuhan = 0;
+        let grandTotalStok = 0;
+        let grandTotalSelisih = 0;
+        let grandTotalQa = 0;
 
         sortedEntries.forEach(([kode, item], index) => {
             let no = index + 1;
@@ -4067,20 +4073,48 @@ async function exportTabelKeExcelWH3() {
             let rakBeceran = item.detail_rak && item.detail_rak.beceran_rak ? item.detail_rak.beceran_rak : "";
             let rakUtuhan = item.detail_rak && item.detail_rak.utuhan_rak ? item.detail_rak.utuhan_rak : "";
             let qtyUtuhan = formatNilai(item.utuhan);
-            let totalStok = formatNilai(item.total);
+            let qaVal = formatNilai(item.qa);
             
-            // Logika Warna Kolom Selisih
-            let selisihVal = Number(item.selisih);
-            let selisihHtmlClass = "";
-            let selisihDisplay = "";
+            // --- PARSING NILAI KE ANGKA UNTUK PERHITUNGAN & AKUMULASI ---
+            let blokNum = Number(blok) || 0;
+            let bVal = Number(qtyBeceran) || 0;
+            let uVal = Number(qtyUtuhan) || 0;
+            let qVal = Number(qaVal) || 0;
+            let bosnetNum = Number(bosnet) || 0;
 
-            if (!isNaN(selisihVal) && item.selisih !== undefined && item.selisih !== "" && item.selisih !== 0) {
-                selisihDisplay = item.selisih;
-                if (selisihVal < 0) {
-                    selisihHtmlClass = "text-merah"; // Merah jika minus
-                } else if (selisihVal > 0) {
-                    selisihHtmlClass = "text-hijau"; // Hijau jika plus
+            // Akumulasi ke Grand Total
+            grandTotalBlok += blokNum;
+            grandTotalBosnet += bosnetNum;
+            grandTotalBeceran += bVal;
+            grandTotalUtuhan += uVal;
+            grandTotalQa += qVal;
+
+            // --- RUMUS 1: TOTAL = Blok + Beceran + Utuhan ---
+            let sumTotal = blokNum + bVal + uVal;
+            let totalStok = sumTotal > 0 ? sumTotal : (formatNilai(item.total) !== "" ? Number(item.total) : "");
+            let totalNum = Number(totalStok) || 0;
+            grandTotalStok += totalNum;
+
+            // --- RUMUS 2: SELISIH = Total - (Bosnet + QA) ---
+            let selisihDisplay = "";
+            let selisihHtmlClass = "";
+
+            if (totalNum > 0 || bosnetNum > 0 || qVal > 0) {
+                let calculatedSelisih = totalNum - (bosnetNum + qVal);
+                selisihDisplay = calculatedSelisih !== 0 ? calculatedSelisih : "";
+                grandTotalSelisih += calculatedSelisih;
+                
+                if (calculatedSelisih < 0) {
+                    selisihHtmlClass = "text-merah"; 
+                } else if (calculatedSelisih > 0) {
+                    selisihHtmlClass = "text-hijau"; 
                 }
+            } else if (item.selisih !== undefined && item.selisih !== "" && item.selisih !== 0) {
+                selisihDisplay = item.selisih;
+                let sVal = Number(item.selisih) || 0;
+                grandTotalSelisih += sVal;
+                if (sVal < 0) selisihHtmlClass = "text-merah";
+                else if (sVal > 0) selisihHtmlClass = "text-hijau";
             }
 
             html += `
@@ -4095,19 +4129,34 @@ async function exportTabelKeExcelWH3() {
                     <td class="text-rak">${rakBeceran}</td>
                     <td class="text-rak">${rakUtuhan}</td>
                     <td>${qtyUtuhan}</td>
-                    <td>${totalStok}</td>
+                    <td>${totalStok !== "" ? totalStok : ""}</td>
                     <td class="${selisihHtmlClass}">${selisihDisplay}</td>
+                    <td>${qaVal}</td>
                 </tr>
             `;
         });
 
+        // --- TAMBAHKAN BARIS TOTAL DI BAGIAN BAWAH ---
         html += `
-            </table>
-        </body>
-        </html>
+            <tr class="row-total">
+                <td colspan="2" style="text-align: right; font-weight: bold;">TOTAL</td>
+                <td>${grandTotalBlok !== 0 ? grandTotalBlok : ""}</td>
+                <td></td>
+                <td>${grandTotalBosnet !== 0 ? grandTotalBosnet : ""}</td>
+                <td></td>
+                <td>${grandTotalBeceran !== 0 ? grandTotalBeceran : ""}</td>
+                <td></td>
+                <td></td>
+                <td>${grandTotalUtuhan !== 0 ? grandTotalUtuhan : ""}</td>
+                <td>${grandTotalStok !== 0 ? grandTotalStok : ""}</td>
+                <td class="${grandTotalSelisih < 0 ? 'text-merah' : (grandTotalSelisih > 0 ? 'text-hijau' : '')}">${grandTotalSelisih !== 0 ? grandTotalSelisih : ""}</td>
+                <td>${grandTotalQa !== 0 ? grandTotalQa : ""}</td>
+            </tr>
         `;
 
-        // --- 6. PROSES DOWNLOAD FILE .XLS ---
+        html += `</table></body></html>`;
+
+        // --- 5. PROSES DOWNLOAD FILE .XLS ---
         const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
