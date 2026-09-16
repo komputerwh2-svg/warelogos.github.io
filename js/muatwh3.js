@@ -3,34 +3,105 @@ console.log("Modul Muat WH-3 dimuat.");
 
 window.cacheMasterBarang = {};
 
+// ==========================================
+// HELPER INDEXEDDB KHUSUS MASTER BARANG
+// ==========================================
+function openMasterDB_wh() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open("WarehouseMasterDB", 1);
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains("master_store")) {
+                db.createObjectStore("master_store");
+            }
+        };
+        request.onsuccess = (event) => resolve(event.target.result);
+        request.onerror = (event) => reject(event.target.error);
+    });
+}
+
+async function saveMasterToIDB_wh(dataBarang) {
+    try {
+        const db = await openMasterDB_wh();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction("master_store", "readwrite");
+            const store = tx.objectStore("master_store");
+            store.put(dataBarang, "master_barang_data");
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => reject(tx.error);
+        });
+    } catch (e) {
+        console.error("Gagal menyimpan master ke IndexedDB:", e);
+    }
+}
+
+async function getMasterFromIDB_wh() {
+    try {
+        const db = await openMasterDB_wh();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction("master_store", "readonly");
+            const store = tx.objectStore("master_store");
+            const request = store.get("master_barang_data");
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    } catch (e) {
+        console.error("Gagal membaca master dari IndexedDB:", e);
+        return null;
+    }
+}
+
+// ==========================================
+// FUNGSI LOAD MASTER BARANG (Dengan IndexedDB Cache)
+// ==========================================
 window.loadMasterBarang = async function() {
     try {
+        // 1. Cek terlebih dahulu di IndexedDB Lokal agar instan
+        const localMaster = await getMasterFromIDB_wh();
+        if (localMaster && Object.keys(localMaster).length > 0) {
+            window.cacheMasterBarang = localMaster;
+            console.log("Master Barang dimuat secara instan dari IndexedDB lokal. Jumlah item:", Object.keys(localMaster).length);
+            return; // Selesai, super cepat tanpa tunggu server!
+        }
+
+        // 2. Jika di IndexedDB kosong, ambil dari Firestore
         const db = window.getFirestore ? window.getFirestore() : window.db;
-        
-        // 1. Coba ambil dari Firestore terlebih dahulu
         const docRef = db.collection("bank_data").doc("master_barang");
         const doc = await docRef.get();
 
         if (doc.exists) {
-            window.cacheMasterBarang = doc.data();
-            console.log("Master Barang dimuat dari Firestore.");
+            const firestoreData = doc.data();
+            window.cacheMasterBarang = firestoreData;
+            await saveMasterToIDB_wh(firestoreData);
+            console.log("Master Barang dimuat dari Firestore dan disimpan ke IndexedDB.");
         } else {
-            // 2. Jika tidak ada di Firestore, ambil dari RTDB (fallback)
+            // 3. Jika tidak ada di Firestore, ambil dari RTDB (fallback)
             if (!window.rtdb) throw new Error("RTDB tidak tersedia");
             
             const snapshot = await window.rtdb.ref('master_barang').once('value');
-            const data = snapshot.val();
+            const dataRtdb = snapshot.val();
             
-            if (data) {
-                window.cacheMasterBarang = data;
-                // 3. Sinkronkan ke Firestore
-                await docRef.set(data, { merge: true });
-                console.log("Master Barang dimuat dari RTDB dan disinkronkan ke Firestore.");
+            if (dataRtdb) {
+                window.cacheMasterBarang = dataRtdb;
+                // Sinkronkan ke Firestore & IndexedDB
+                await docRef.set(dataRtdb, { merge: true });
+                await saveMasterToIDB_wh(dataRtdb);
+                console.log("Master Barang dimuat dari RTDB dan disinkronkan ke Firestore & IndexedDB.");
+            } else {
+                throw new Error("Data master barang kosong di server.");
             }
         }
     } catch (error) {
         console.error("Gagal memuat master barang:", error);
         
+        // Coba sekali lagi fallback terakhir membaca dari IndexedDB jika online gagal
+        const fallbackLocal = await getMasterFromIDB_wh();
+        if (fallbackLocal && Object.keys(fallbackLocal).length > 0) {
+            window.cacheMasterBarang = fallbackLocal;
+            console.log("Menggunakan fallback IndexedDB karena gagal koneksi server.");
+            return;
+        }
+
         // Deteksi apakah error disebabkan oleh izin akses / masa kedaluwarsa Firestore
         if (error.code === 'permission-denied' || (error.message && error.message.includes('Missing or insufficient permissions'))) {
             window.miuiAlert("Masa aktif akses ke database telah habis, silakan hubungi developer untuk membeli masa aktif aksesnya.");
@@ -131,18 +202,230 @@ window.gantiModulMuatWH3 = function(mode) {
     }
 };
 
+// Variabel global untuk menyimpan data lengkap libur dari API (tanggal & nama)
+window.cacheDataLiburLengkap = [];
+
 window.getHariLiburNasional = async function() {
-    // API publik gratis untuk daftar hari libur Indonesia (ID) tahun 2026
+    let liburApiObj = [];
     const url = "https://date.nager.at/api/v3/PublicHolidays/2026/ID";
 
     try {
         const response = await fetch(url);
-        const data = await response.json();
-        // Mengembalikan array tanggal libur (format YYYY-MM-DD)
-        return data.map(item => item.date);
+        if (response.ok) {
+            const data = await response.json();
+            // Data dari API Nager.at berupa array objek: { date, localName, name, ... }
+            liburApiObj = data.map(item => ({
+                date: item.date,
+                name: item.localName || item.name
+            }));
+            localStorage.setItem('wh3_api_libur_obj_cache', JSON.stringify(liburApiObj));
+        }
     } catch (error) {
-        console.error("Gagal ambil data libur:", error);
-        return []; // Jika gagal, sistem tetap berjalan normal (hanya cek hari Minggu)
+        console.warn("Gagal ambil data libur dari API, menggunakan cache:", error);
+        try {
+            const cached = localStorage.getItem('wh3_api_libur_obj_cache');
+            if (cached) liburApiObj = JSON.parse(cached);
+        } catch (e) {}
+    }
+
+    // Ambil libur manual dari localStorage
+    let liburManual = [];
+    try {
+        liburManual = JSON.parse(localStorage.getItem('wh3_custom_libur') || "[]");
+    } catch (e) {}
+
+    // Format libur manual menjadi objek juga agar seragam
+    const manualObj = liburManual.map(tgl => ({
+        date: tgl,
+        name: "Libur Manual / Koreksi Kustom"
+    }));
+
+    // Gabungkan (prioritaskan manual jika tanggal sama)
+    const mapGabungan = new Map();
+    [...liburApiObj, ...manualObj].forEach(item => {
+        mapGabungan.set(item.date, item);
+    });
+
+    // Ubah kembali jadi array terurut berdasarkan tanggal
+    window.cacheDataLiburLengkap = Array.from(mapGabungan.values()).sort((a, b) => a.date.localeCompare(b.date));
+    
+    // Ambil array tanggal saja untuk fungsi validasi kerja sistem
+    const arrayTanggalOnly = window.cacheDataLiburLengkap.map(i => i.date);
+
+    // Perbarui tampilan info di header & modal
+    renderInfoLiburTerdekat(window.cacheDataLiburLengkap);
+
+    return arrayTanggalOnly;
+};
+
+// Fungsi untuk memperbarui tampilan teks di header & daftar lengkap di dalam modal
+function renderInfoLiburTerdekat(daftarObjek) {
+    const elInfoHeader = document.getElementById('info-libur-terdekat');
+    const elListSemuaLibur = document.getElementById('list-semua-libur-container');
+    
+    const hariIniStr = new Date().toISOString().split('T')[0];
+    
+    // 1. Cari libur terdekat untuk header & sorotan (tanggal >= hari ini)
+    const liburMendatang = daftarObjek.find(item => item.date >= hariIniStr);
+
+    if (liburMendatang && elInfoHeader) {
+        const d = new Date(liburMendatang.date);
+        const formatTglHeader = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+        elInfoHeader.innerText = `${formatTglHeader} (${liburMendatang.name})`;
+    } else if (elInfoHeader) {
+        elInfoHeader.innerText = "Tidak ada jadwal";
+    }
+
+    // 2. Render daftar SEMUA hari libur ke dalam modal popover
+    if (elListSemuaLibur) {
+        if (!daftarObjek || daftarObjek.length === 0) {
+            elListSemuaLibur.innerHTML = `<div class="text-zinc-500 text-center py-2">Tidak ada data hari libur.</div>`;
+            return;
+        }
+
+        elListSemuaLibur.innerHTML = daftarObjek.map(item => {
+            const parts = item.date.split('-');
+            const formatDMY = `${parts[2]}-${parts[1]}-${parts[0]}`;
+            
+            // Tandai baris libur terdekat dengan ID unik
+            const isTerdekat = (item.date === liburMendatang?.date);
+            const highlightClass = isTerdekat ? 'bg-orange-950/40 border-orange-500/50 text-orange-200' : 'bg-zinc-900 border-zinc-800 text-zinc-300';
+            const idAttr = isTerdekat ? 'id="item-libur-terdekat-aktif"' : '';
+
+            return `
+                <div ${idAttr} class="flex justify-between items-center px-2 py-1.5 rounded border ${highlightClass}">
+                    <div>
+                        <span class="font-bold text-orange-400 font-mono">${formatDMY}</span>
+                        <span class="block text-[10px] text-zinc-400">${item.name}</span>
+                    </div>
+                    ${isTerdekat ? '<span class="text-[9px] bg-orange-600 text-white px-1.5 py-0.5 rounded font-bold">Terdekat</span>' : ''}
+                </div>
+            `;
+        }).join('');
+    }
+}
+
+// Panggil fungsi ini saat halaman/sub-page Muat WH-3 dibuka
+document.addEventListener("DOMContentLoaded", () => {
+    if (typeof window.getHariLiburNasional === 'function') {
+        window.getHariLiburNasional();
+    }
+});
+// Atau jika dimuat via fungsi transisi halaman Anda, panggil langsung:
+if (typeof window.getHariLiburNasional === 'function') {
+    window.getHariLiburNasional();
+}
+
+// Membuka Popover Kustom di dekat tombol ubah
+window.bukaEditorLiburManual = function() {
+    const modal = document.getElementById('modal-popover-libur');
+    if (modal) {
+        modal.classList.toggle('hidden');
+        if (!modal.classList.contains('hidden')) {
+            renderListLiburManual();
+            
+            // Gulir otomatis ke hari libur terdekat setelah modal terbuka
+            setTimeout(() => {
+                const elTarget = document.getElementById('item-libur-terdekat-aktif');
+                const container = document.getElementById('list-semua-libur-container');
+                if (elTarget && container) {
+                    // Mengatur posisi scroll kontainer agar tepat menyorot ke elemen target
+                    container.scrollTop = elTarget.offsetTop - container.offsetTop - 10;
+                }
+            }, 50);
+        }
+    }
+};
+
+// Membuka Popover Kustom di dekat tombol ubah
+window.bukaEditorLiburManual = function() {
+    const modal = document.getElementById('modal-popover-libur');
+    if (modal) {
+        modal.classList.toggle('hidden');
+        if (!modal.classList.contains('hidden')) {
+            renderListLiburManual();
+        }
+    }
+};
+
+window.tutupEditorLiburManual = function() {
+    const modal = document.getElementById('modal-popover-libur');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+};
+
+// Render daftar libur manual yang sudah disimpan ke dalam list modal
+function renderListLiburManual() {
+    const container = document.getElementById('list-libur-manual-container');
+    if (!container) return;
+
+    let liburManual = [];
+    try {
+        liburManual = JSON.parse(localStorage.getItem('wh3_custom_libur') || "[]");
+    } catch (e) {
+        liburManual = [];
+    }
+
+    if (liburManual.length === 0) {
+        container.innerHTML = `<div class="text-zinc-500 text-center py-2">Belum ada tanggal libur manual.</div>`;
+        return;
+    }
+
+    container.innerHTML = liburManual.sort().map(tgl => `
+        <div class="flex justify-between items-center bg-zinc-900 px-2 py-1 rounded border border-zinc-800">
+            <span class="text-orange-300 font-mono">${tgl}</span>
+            <button onclick="hapusLiburManualItem('${tgl}')" class="text-red-400 hover:text-red-300 px-1.5 py-0.5 rounded text-[10px]" title="Hapus">
+                <i class="fa-solid fa-trash"></i> Hapus
+            </button>
+        </div>
+    `).join('');
+}
+
+// Tambah tanggal dari input date picker agar tidak keliru format
+window.tambahLiburManualItem = function() {
+    const inputDate = document.getElementById('input-tambah-libur-date');
+    if (!inputDate || !inputDate.value) {
+        window.miuiAlert("Silakan pilih tanggal terlebih dahulu!");
+        return;
+    }
+
+    const tglPilih = inputDate.value; // Format otomatis YYYY-MM-DD dari date picker
+    let liburManual = [];
+    try {
+        liburManual = JSON.parse(localStorage.getItem('wh3_custom_libur') || "[]");
+    } catch (e) {
+        liburManual = [];
+    }
+
+    if (!liburManual.includes(tglPilih)) {
+        liburManual.push(tglPilih);
+        localStorage.setItem('wh3_custom_libur', JSON.stringify(liburManual));
+        inputDate.value = "";
+        renderListLiburManual();
+        if (typeof window.getHariLiburNasional === 'function') {
+            window.getHariLiburNasional();
+        }
+        window.miuiAlert(`Tanggal ${tglPilih} berhasil ditambahkan ke libur manual.`);
+    } else {
+        window.miuiAlert("Tanggal tersebut sudah ada dalam daftar libur manual.");
+    }
+};
+
+// Hapus item dari daftar libur manual
+window.hapusLiburManualItem = function(tgl) {
+    let liburManual = [];
+    try {
+        liburManual = JSON.parse(localStorage.getItem('wh3_custom_libur') || "[]");
+    } catch (e) {
+        return;
+    }
+
+    liburManual = liburManual.filter(item => item !== tgl);
+    localStorage.setItem('wh3_custom_libur', JSON.stringify(liburManual));
+    renderListLiburManual();
+    if (typeof window.getHariLiburNasional === 'function') {
+        window.getHariLiburNasional();
     }
 };
 
