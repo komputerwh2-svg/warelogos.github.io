@@ -43,6 +43,23 @@ body {
     scroll-snap-type: none;
 }
 
+
+/* Custom Scrollbar Minimalis ala MIUI v5 */
+.miui-custom-scroll::-webkit-scrollbar {
+    width: 5px;
+}
+.miui-custom-scroll::-webkit-scrollbar-track {
+    background: #09090b; /* zinc-950 */
+    border-radius: 4px;
+}
+.miui-custom-scroll::-webkit-scrollbar-thumb {
+    background: #ea580c; /* orange-600 */
+    border-radius: 4px;
+}
+.miui-custom-scroll::-webkit-scrollbar-thumb:hover {
+    background: #c2410c; /* orange-700 */
+}
+
 /* =========================================================================
    2. HTC DIGITAL FLIP CLOCK ARCHITECTURE STYLING
    ========================================================================= */
