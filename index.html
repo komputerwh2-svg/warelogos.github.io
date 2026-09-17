@@ -834,7 +834,7 @@
             </div>
 
             <!-- BAGIAN KANAN: PANEL HISTORI ALA KOMENTAR DENGAN PANAH PENUNJUK -->
-            <div class="relative bg-[#e4e4e4] w-full max-w-[310px] rounded-[12px] overflow-hidden shadow-2xl border border-[#b2b2b2] flex flex-col font-sans text-slate-800">
+            <div class="relative bg-[#e4e4e4] w-full max-w-[370px] rounded-[14px] overflow-hidden shadow-2xl border border-[#b2b2b2] flex flex-col font-sans text-slate-800">
                 
                 <!-- Segitiga Penunjuk di Sisi Kiri (Menghadap ke Form Utama) -->
                 <div class="hidden md:block absolute -left-[7px] top-12 w-0 h-0 border-t-[7px] border-t-transparent border-b-[7px] border-b-transparent border-r-[7px] border-r-[#e4e4e4] z-10"></div>
@@ -848,8 +848,8 @@
                     <button onclick="muatHistoriPalet()" class="text-slate-600 hover:text-orange-600 text-xs transition-transform active:rotate-180" title="Muat Ulang Histori"><i class="fa-solid fa-rotate"></i></button>
                 </div>
 
-                <!-- List Konten Riwayat (Bisa Di-scroll) -->
-                <div id="containerHistoriPalet" class="p-2.5 flex flex-col gap-2 max-h-[350px] overflow-y-auto bg-[#ededed]">
+                <!-- List Konten Riwayat dengan Custom Scrollbar MIUI v5 -->
+                <div id="containerHistoriPalet" class="p-2.5 flex flex-col gap-2 max-h-[350px] overflow-y-auto bg-[#ededed] miui-custom-scroll">
                     <div class="text-center text-xs text-slate-500 py-6 italic">Memuat histori data...</div>
                 </div>
 
@@ -943,7 +943,10 @@
                             </div>
                             <div>
                                 <label class="text-[10px] font-bold text-slate-600 uppercase">Lokasi:</label>
-                                <input type="text" id="ba_lokasi" value="WH-2" class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs font-bold shadow-inner">
+                                <select id="ba_lokasi" onchange="handleLokasiChange()" class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs font-bold shadow-inner">
+                                    <option value="WH-2" selected>WH-2</option>
+                                    <option value="WH-1">WH-1</option>
+                                </select>
                             </div>
                         </div>
 
