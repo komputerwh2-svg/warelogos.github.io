@@ -2216,7 +2216,6 @@ async function renderTabelwh3(dataStok, mode, key) {
             <tr class="hover:bg-gray-50 border-b text-[15px]">
                 <td class="py-2 px-2">${no++}</td>
                 <td class="py-2 px-2 whitespace-nowrap font-bold text-orange-600 cursor-pointer hover:underline" onclick="bukaModalAdmin('EDIT_DB_WH3', '${kode}')" title="Klik untuk Edit Database Firebase">${kode}</td>
-                <td class="py-2 px-2 font-bold text-orange-600">${f(qa)}</td>
                 <td class="py-2 px-2 font-bold text-emerald-600">${f(blok)}</td>
                 <td class="py-2 px-2 font-bold text-slate-600">${f(bosnet)}</td>
                 <td class="py-2 px-2">${pak}</td>
@@ -2225,6 +2224,7 @@ async function renderTabelwh3(dataStok, mode, key) {
                 <td class="py-2 px-2 font-bold">${f(totalFisik)}</td>
                 <td class="py-2 px-2 ${kelasWarnaSelisih}">${selisih === 0 ? "-" : selisih.toLocaleString()}</td>
                 <td class="py-2 px-2 whitespace-nowrap ${warnaKet} font-bold cursor-pointer hover:underline" onclick="bukaModalEditKeterangan('${kode}', '${keterangan === "-" ? "" : keterangan}')" title="Klik untuk Edit Keterangan">${keterangan}</td>
+                <td class="py-2 px-2 font-bold text-orange-700">${f(qa)}</td>
             </tr>
         `;
     });
@@ -3194,7 +3194,6 @@ function filterSaranKodeHP(keyword) {
     const kw = keyword.toLowerCase().trim();
 
     // Fungsi helper untuk pencocokan karakter berurutan (Subsequence Match)
-    // Contoh: kw = "cr01" akan cocok dengan target = "crr4a01"
     const isSubsequence = (query, target) => {
         let i = 0, j = 0;
         while (i < query.length && j < target.length) {
@@ -3206,19 +3205,17 @@ function filterSaranKodeHP(keyword) {
         return i === query.length;
     };
 
-    // Filter berdasarkan keyword (Kode dengan Subsequence atau Nama Barang mencakup keyword)
+    // Filter berdasarkan keyword
     const filtered = listKode.filter(kode => {
         const item = dataStok[kode] || {};
         
-        // --- 1. FILTER: Abaikan jika total stok sudah 0 atau kosong ---
-        const blokVal = Number(item.blok) || 0;
-        const beceranVal = Number(item.beceran) || 0;
-        const utuhanVal = Number(item.utuhan) || 0;
-        const totalStored = Number(item.total) || (blokVal + beceranVal + utuhanVal);
+        // --- 1. REVISI FILTER: Sembunyikan HANYA jika sudah tuntas/sama dengan Bosnet (misal status selesai atau nilai sisa tertentu) ---
+        // Jika properti menandakan sudah terpenuhi/selesai (sesuaikan dengan struktur data Anda, misal item.sudahSama atau item.sisa === 0 dan bukan data baru)
+        // Jika Anda ingin barang dengan nilai 0 (seperti data baru upload yang belum dihitung) TETAP MUNCUL, 
+        // kita pastikan kondisi filter <= 0 dihapus, atau diganti pengecekan status tuntas.
         
-        if (totalStored <= 0) {
-            return false; // Lewati barang yang totalnya sudah 0 / habis
-        }
+        // Contoh pengecekan jika item memiliki flag tuntas/selesai:
+        // if (item.isSelesai === true || item.tuntas === 1) { return false; }
 
         const namaBarang = (item.nama || '').toLowerCase();
         const k = kode.toLowerCase();
@@ -3296,11 +3293,21 @@ function filterSaranKodeHP(keyword) {
     }   
 }
 
-// Saat Salah Satu Saran Kode Dipilih
+// Saat Salah Satub Saran Kode Dipilih
 function pilihKodeHP(kode) {
-    document.getElementById('hp-kode-barang').value = kode;
-    document.getElementById('hp-saran-container').style.display = 'none';
-    updateJudulModalHP();
+    const inputKode = document.getElementById('hp-kode-barang');
+    if (inputKode) {
+        inputKode.value = kode;
+    }
+    
+    const container = document.getElementById('hp-saran-container');
+    if (container) {
+        container.style.display = 'none';
+        container.innerHTML = '';
+    }
+    
+    // Perbarui informasi di sebelah label KODE BARANG
+    updateInfoKodeTerpilihHP();
 }
 
 async function simpanDataFisikHP() {
@@ -3434,7 +3441,7 @@ async function simpanDataFisikHP() {
     // 3. Kalkulasi Total Keseluruhan & Selisih (Memperhitungkan Bosnet & QA)
     const blokVal = parseInt(item.blok) || 0;
     const bosnetVal = parseInt(item.bosnet) || 0; 
-    const qaVal = parseInt(item.qa) || 0; // Ambil nilai QA yang sudah ada
+    const qaVal = parseInt(item.qa) || 0; 
     const isPaket = kode.includes("PR-PKT");
 
     const totalVal = (isPaket ? 0 : blokVal) + finalBeceranVal + finalUtuhanVal;
@@ -3461,7 +3468,6 @@ async function simpanDataFisikHP() {
             throw new Error("Offline");
         }
 
-        // Jika item baru, kita inisialisasi data utamanya dulu secara lengkap (termasuk qa: 0)
         if (isNewItem) {
             const payloadDataBaru = {
                 kode: kode,
@@ -3492,7 +3498,6 @@ async function simpanDataFisikHP() {
             miuiAlert(`Info: Barang baru [ ${kode} ] ditambahkan ke stok sebagai temuan/lebih!`);
 
         } else {
-            // Jika sudah ada, gunakan PATCH untuk data utama dan detail rak
             const responseUtama = await fetch(`${baseUrl}.json`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
@@ -3543,9 +3548,7 @@ async function simpanDataFisikHP() {
         };
         dataHarian[kode] = item;
 
-        console.log("Data fisik HP berhasil disimpan (Auto-Create/Update dengan QA):", { kode, finalBeceranVal, finalRakBeceran });
-
-        // KOSONGKAN FORM INPUT (Reset input field agar siap untuk input berikutnya)
+        // KOSONGKAN FORM INPUT & LABEL INFORMASI KODE DI SEBELAHNYA
         const inputQtyBeceran = document.getElementById('hp-qty-beceran');
         const inputRakBeceran = document.getElementById('hp-rak-beceran');
         const inputRakUtuhan = document.getElementById('hp-rak-utuhan');
@@ -3555,21 +3558,24 @@ async function simpanDataFisikHP() {
         if (inputRakUtuhan) inputRakUtuhan.value = '';
         if (kodeInputEl) kodeInputEl.value = '';
 
+        // --- TAMBAHAN PENTING: RESET LABEL INFORMASI KODE TERPILIH DI SEBELAH LABEL ---
+        if (typeof updateInfoKodeTerpilihHP === 'function') {
+            updateInfoKodeTerpilihHP();
+        }
+
         // RESET JUDUL KEMBALI KE SEMULA
         const modalTitleEl = document.getElementById('hp-modal-title');
         if (modalTitleEl) {
             modalTitleEl.innerText = "INPUT FISIK GUDANG (MOBILE)";
         }
 
-        // Refresh tampilan tabel / rekap jika fungsi render tersedia di sistem Anda
         if (typeof renderTabelStokWH3 === 'function') {
             renderTabelStokWH3();
         }
 
     } catch (error) {
-        console.warn("Koneksi terputus/offline saat menyimpan data fisik HP, memasukkan ke antrean background queue...", error.message);
+        console.warn("Koneksi terputus/offline saat menyimpan data fisik HP...", error.message);
         
-        // Payload gabungan untuk antrean offline
         const payloadDataOffline = isNewItem ? {
             kode: kode,
             nama: item.nama,
@@ -3602,9 +3608,8 @@ async function simpanDataFisikHP() {
         const methodType = isNewItem ? 'PUT' : 'PATCH';
         simpanKeAntreanOffline(`${baseUrl}.json`, methodType, payloadDataOffline, `Simpan Fisik HP Produk ${kode} (${tanggal})`);
         
-        miuiAlert("Koneksi terputus. Data fisik HP berhasil dimasukkan ke antrean offline dan akan disinkronkan otomatis saat online.");
+        miuiAlert("Koneksi terputus. Data fisik HP berhasil dimasukkan ke antrean offline.");
 
-        // Tetap perbarui state lokal dan bersihkan input agar UX tetap nyaman secara offline
         item.beceran = finalBeceranVal;
         item.utuhan = finalUtuhanVal;
         item.total = totalVal;
@@ -3626,6 +3631,11 @@ async function simpanDataFisikHP() {
         if (inputRakUtuhan) inputRakUtuhan.value = '';
         if (kodeInputEl) kodeInputEl.value = '';
 
+        // --- RESET JUGA DI JALUR OFFLINE ---
+        if (typeof updateInfoKodeTerpilihHP === 'function') {
+            updateInfoKodeTerpilihHP();
+        }
+
         const modalTitleEl = document.getElementById('hp-modal-title');
         if (modalTitleEl) {
             modalTitleEl.innerText = "INPUT FISIK GUDANG (MOBILE)";
@@ -3637,16 +3647,41 @@ async function simpanDataFisikHP() {
     }
 }
 
-// Fungsi untuk memperbarui panel riwayat terakhir di modal HP
-function updatePanelRiwayatHP(tipe, kode, rak, qty) {
-    const elRiwayat = document.getElementById('teks-riwayat-terakhir');
-    if (!elRiwayat) return;
+// Simpan riwayat sementara dalam array memori sesi
+window.riwayatInputHPList = window.riwayatInputHPList || [];
 
+// Fungsi untuk memperbarui panel multi-riwayat terakhir di modal HP
+function updatePanelRiwayatHP(tipe, kode, rak, qty) {
+    const elContainer = document.getElementById('container-multi-riwayat');
+    if (!elContainer) return;
+
+    // Buat objek data riwayat baru
+    let teksDetail = "";
     if (tipe === 'BECERAN') {
-        elRiwayat.innerHTML = `<span style="color:#f97316;">[BECERAN]</span> ${kode} &bull; Rak: ${rak || '-'} &bull; Qty: ${qty || 0}`;
+        teksDetail = `<span style="color:#f97316; font-weight:bold;">[BECERAN]</span> <b>${kode}</b> &bull; Rak: ${rak || '-'} &bull; Qty: ${qty || 0}`;
     } else {
-        elRiwayat.innerHTML = `<span style="color:#f97316;">[UTUHAN]</span> ${kode} &bull; Rak: ${rak || '-'}`;
+        teksDetail = `<span style="color:#f97316; font-weight:bold;">[UTUHAN]</span> <b>${kode}</b> &bull; Rak: ${rak || '-'}`;
     }
+
+    // Masukkan ke array riwayat
+    window.riwayatInputHPList.push(teksDetail);
+
+    // Batasi maksimal hanya menyimpan 3 riwayat terakhir
+    if (window.riwayatInputHPList.length > 3) {
+        window.riwayatInputHPList.shift(); // Buang yang paling lama (di atas) jika lebih dari 3
+    }
+
+    // Render ulang ke HTML
+    // Karena array tersimpan berurutan [terlama, ..., terbaru], maka urutannya sudah pas: 
+    // Indeks 0 (terlama) di atas, indeks terakhir (terbaru) di bawah.
+    elContainer.innerHTML = window.riwayatInputHPList.map((item, index) => {
+        // Berikan sedikit perbedaan opacity/pudar ekstra khusus untuk item paling atas (terlama)
+        const styleExtra = index === 0 ? 'opacity: 0.5;' : 'opacity: 1;';
+        return `<div style="padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.05); ${styleExtra}">${item}</div>`;
+    }).join('');
+
+    // Otomatis gulir ke baris riwayat terbaru (paling bawah)
+    elContainer.scrollTop = elContainer.scrollHeight;
 }
 
 // Fungsi untuk mereset form input pada modal HP tanpa menutup modalnya
@@ -3675,28 +3710,33 @@ function resetFormFisikHP() {
     console.log("Form input fisik HP berhasil di-reset.");
 }
 
-function updateJudulModalHP() {
-    const modalTitleEl = document.getElementById('hp-modal-title'); 
-    if (!modalTitleEl) return;
+// Fungsi untuk memperbarui informasi/label di sebelah "KODE BARANG"
+function updateInfoKodeTerpilihHP() {
+    const elInfo = document.getElementById('label-info-kode-terpilih');
+    if (!elInfo) return;
 
     const kodeInputEl = document.getElementById('hp-kode-barang');
     const kode = kodeInputEl ? kodeInputEl.value.trim().toUpperCase() : "";
+
+    if (!kode) {
+        elInfo.innerText = "";
+        return;
+    }
 
     const dateInput = document.getElementById('select-tanggal-wh3');
     const tanggal = dateInput ? dateInput.value.replace(/-/g, '') : null;
     const dataHarian = window.currentStokData && tanggal ? window.currentStokData[`stokwh3_${tanggal}`] : null;
 
-    // Cek apakah kode yang dimasukkan benar-benar ada/valid di data harian
+    // Cek apakah kode ada di data harian
     const item = dataHarian ? dataHarian[kode] : null;
 
-    // Jika kode kosong atau belum ada persis di data harian (masih ketikan setengah-setengah), 
-    // jangan tampilkan "Data tidak ditemukan", kembalikan saja ke judul default.
-    if (!kode || !item) {
-        modalTitleEl.innerText = "INPUT FISIK GUDANG (MOBILE)";
+    if (!item) {
+        // Jika kode diketik setengah-setengah/belum pas di data, tampilkan kodenya saja
+        elInfo.innerText = `[ ${kode} ]`;
         return;
     }
 
-    // Jika kode sudah lengkap dan valid, hitung selisih dan tampilkan di judul
+    // Jika kode sudah lengkap dan valid, hitung selisih dan satuannya
     const blok = parseInt(item.blok) || 0;
     const bosnet = parseInt(item.bosnet) || 0;
     const beceran = parseInt(item.beceran) || 0;
@@ -3706,7 +3746,8 @@ function updateJudulModalHP() {
     const selisih = totalFisik - bosnet;
     const satuan = kode.includes("PR-PKT") ? "PKT" : "KRT";
 
-    modalTitleEl.innerText = `INPUT: ${kode} : ${selisih} ${satuan}`;
+    // Tampilkan format sesuai permintaan: [ KODE : SELISIH SATUAN ]
+    elInfo.innerText = `STOK TERKINI =>  ${kode} : ${selisih} ${satuan}`;
 }
 
 // Buka Modal Admin (Universal untuk WH-2 & WH-3)
