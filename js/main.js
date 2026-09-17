@@ -1796,24 +1796,31 @@ async function muatHistoriPalet() {
                 : 'bg-white border-orange-400 shadow-sm';
 
             htmlContent += `
-                <div class="${cardBgClass} p-2.5 rounded-[8px] border flex flex-col gap-1 text-xs transition-all">
-                    <div class="flex items-center justify-between text-[11px] text-slate-600 font-semibold border-b border-slate-300/60 pb-1">
-                        <span><i class="fa-regular fa-clock mr-1"></i>${formatTgl} - ${waktu}</span>
-                        <div class="flex items-center gap-1.5">
-                            <span class="px-1.5 py-0.5 rounded text-[10px] font-black uppercase ${badgeColor}">${jenis}</span>
-                            <!-- Tombol Cetak Satuan -->
-                            <button onclick="cetakItemPalet('${id}')" class="w-5 h-5 flex items-center justify-center rounded bg-amber-100 text-amber-600 hover:bg-amber-600 hover:text-white transition-all shadow-sm" title="Cetak Surat Ini">
-                                <i class="fa-solid fa-print text-[10px]"></i>
-                            </button>
-                            <!-- Tombol Hapus -->
-                            <button onclick="hapusHistoriPalet('${id}')" class="w-5 h-5 flex items-center justify-center rounded bg-red-100 text-red-600 hover:bg-red-600 hover:text-white transition-all shadow-sm" title="Hapus Histori Ini">
-                                <i class="fa-solid fa-trash-can text-[10px]"></i>
-                            </button>
-                        </div>
+                <div class="relative mt-3.5">
+                    <!-- Label Baju (Badge di luar pojok kiri atas kotak) -->
+                    <div class="absolute -top-3.5 left-2 z-10 px-2.5 py-0.5 rounded-t-[5px] text-[10px] font-black uppercase tracking-wider shadow-sm border-t border-x ${badgeColor}">
+                        ${jenis}
                     </div>
-                    <div class="flex justify-between items-center pt-0.5">
-                        <span class="font-bold text-slate-800 uppercase"><i class="fa-solid fa-user-tag text-slate-400 mr-1"></i>${driver}</span>
-                        <span class="font-black text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-200">Total: ${total} Palet</span>
+
+                    <!-- Kotak Kartu Utama -->
+                    <div class="${cardBgClass} p-2.5 pt-3 rounded-[8px] border flex flex-col gap-1 text-xs transition-all shadow-sm">
+                        <div class="flex items-center justify-between text-[11px] text-slate-600 font-semibold border-b border-slate-300/60 pb-1">
+                            <span><i class="fa-regular fa-clock mr-1"></i>${formatTgl} - ${waktu}</span>
+                            <div class="flex items-center gap-1.5">
+                                <!-- Tombol Cetak Teks -->
+                                <button onclick="cetakItemPalet('${id}')" class="bg-blue-600 hover:bg-blue-700 text-white px-2 py-0.5 rounded-[4px] text-[10px] font-bold shadow transition-all">
+                                    Cetak
+                                </button>
+                                <!-- Tombol Hapus Teks -->
+                                <button onclick="hapusHistoriPalet('${id}')" class="bg-red-600 hover:bg-red-700 text-white px-2 py-0.5 rounded-[4px] text-[10px] font-bold shadow transition-all">
+                                    Hapus
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center pt-0.5">
+                            <span class="font-bold text-slate-800 uppercase"><i class="fa-solid fa-user-tag text-slate-400 mr-1"></i>${driver}</span>
+                            <span class="font-black text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-200">Total: ${total} Palet</span>
+                        </div>
                     </div>
                 </div>
             `;
@@ -2131,6 +2138,35 @@ window.bukaPopupItemBarang = function() {
     // Ubah panel kanan dari Riwayat menjadi Tabel Item Barang
     if (panelHistori) panelHistori.classList.add('hidden');
     if (panelTabel) panelTabel.classList.remove('hidden');
+
+    // === TAMBAHKAN PENGECEKAN LOKASI DI SINI ===
+    const lokasiVal = document.getElementById('ba_lokasi') ? document.getElementById('ba_lokasi').value : 'WH-2';
+    const inputKode = document.getElementById('ba_itemKode'); // Sesuaikan ID input kode barang Anda
+    const inputNama = document.getElementById('ba_itemNama'); // Sesuaikan ID input nama barang Anda
+
+    if (inputKode && inputNama) {
+        if (lokasiVal === 'WH-1') {
+            // MODE WH-1: Bebas ketik manual karena tidak ada di master barang
+            inputKode.removeAttribute('list'); // Lepas dari datalist master
+            inputKode.value = '';
+            inputKode.placeholder = "Ketik kode barang manual...";
+            
+            inputNama.removeAttribute('readonly'); // Buka kunci agar bisa diketik
+            inputNama.value = '';
+            inputNama.placeholder = "Ketik nama barang manual...";
+            inputNama.className = "w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs font-bold shadow-inner text-slate-700";
+        } else {
+            // MODE WH-2: Menggunakan daftar master barang sistem
+            inputKode.setAttribute('list', 'listMasterKodeBarang'); // Pasang kembali datalist master
+            inputKode.value = '';
+            inputKode.placeholder = "Pilih / Ketik Kode...";
+            
+            inputNama.setAttribute('readonly', 'true'); // Dikunci karena otomatis dari master
+            inputNama.value = '';
+            inputNama.placeholder = "Otomatis terisi...";
+            inputNama.className = "w-full bg-[#e6ffff] border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs font-bold shadow-inner text-slate-700";
+        }
+    }
 };
 
 // Fungsi untuk menutup popup form item barang & mengembalikan panel kanan ke riwayat
@@ -2265,6 +2301,46 @@ window.autofillDriverData = function(namaDriverInput) {
         }
     });
 };
+
+// Fungsi untuk merespon perubahan pilihan lokasi
+function handleLokasiChange() {
+    const lokasi = document.getElementById('ba_lokasi').value;
+    const containerKodeNama = document.getElementById('container-kode-nama-barang'); // Sesuaikan ID container pembungkus input barang Anda
+
+    if (lokasi === 'WH-1') {
+        // Ubah ke mode input manual bebas karena diluar master data WH-2
+        if (containerKodeNama) {
+            containerKodeNama.innerHTML = `
+                <div class="mb-2">
+                    <label class="text-[10px] font-bold text-slate-600 uppercase">Kode Barang (Manual):</label>
+                    <input type="text" id="input_kode_barang" placeholder="Ketik kode barang..." class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs shadow-inner">
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold text-slate-600 uppercase">Nama Barang (Manual):</label>
+                    <input type="text" id="input_nama_barang" placeholder="Ketik nama barang..." class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs shadow-inner">
+                </div>
+            `;
+        }
+    } else {
+        // Kembalikan ke mode master data / dropdown normal untuk WH-2
+        if (containerKodeNama) {
+            containerKodeNama.innerHTML = `
+                <div class="mb-2">
+                    <label class="text-[10px] font-bold text-slate-600 uppercase">Kode Barang:</label>
+                    <select id="input_kode_barang" class="w-full bg-white border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs shadow-inner">
+                        <!-- Opsi master data barang WH-2 Anda -->
+                    </select>
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold text-slate-600 uppercase">Nama Barang:</label>
+                    <input type="text" id="input_nama_barang" readonly placeholder="Otomatis terisi..." class="w-full bg-slate-100 border border-[#c8c8c8] rounded-[4px] py-1 px-2 text-xs shadow-inner">
+                </div>
+            `;
+        }
+    }
+}
+
+window.handleLokasiChange = handleLokasiChange;
 
 // Global variabel penampung data master barang untuk pencarian cepat
 let masterBarangCache = {};
@@ -2588,6 +2664,8 @@ window.muatHistoriBeritaAcara = async function() {
     const countLabel = document.getElementById('ba_historiCount');
     if (!container) return;
 
+    // Menambahkan kelas miui-custom-scroll untuk scrollbar kustom ala MIUI v5
+    container.className = "overflow-y-auto max-h-[380px] pr-1 flex flex-col gap-2 miui-custom-scroll";
     container.innerHTML = `<div class="text-center text-xs text-slate-500 py-3 italic">Memuat histori...</div>`;
 
     try {
@@ -2600,7 +2678,13 @@ window.muatHistoriBeritaAcara = async function() {
             return;
         }
 
-        const keys = Object.keys(data).reverse();
+        // Urutkan keys berdasarkan timestamp murni (Terbaru di atas / DESC)
+        const keys = Object.keys(data).sort((a, b) => {
+            const timeA = data[a].timestamp || 0;
+            const timeB = data[b].timestamp || 0;
+            return timeB - timeA; // Urutan Menurun: Terbaru ke Terlama
+        });
+
         if (countLabel) countLabel.innerText = `(${keys.length} Riwayat)`;
 
         let html = '';
@@ -2629,7 +2713,7 @@ window.muatHistoriBeritaAcara = async function() {
             const gabunganDriver = `${ekspedisiStr} - ${driverStr} - ${nopolStr}`;
 
             html += `
-            <div class="bg-orange-50 rounded-[8px] p-2.5 border border-orange-200 shadow-sm text-xs flex flex-col gap-1.5">
+            <div class="bg-orange-50 rounded-[8px] p-2.5 border border-orange-200 shadow-sm text-xs flex flex-col gap-1.5 shrink-0">
                 <div class="flex items-center justify-between border-b border-slate-100 pb-1">
                     <span class="font-bold text-orange-600">📄 ${item.nosurat || '-'}</span>
                     <span class="text-[10px] text-slate-700">${tgl}</span>
@@ -2647,7 +2731,7 @@ window.muatHistoriBeritaAcara = async function() {
                         <b>Driver:</b> ${gabunganDriver}
                     </div>
                     <div class="flex gap-1 shrink-0">
-                        <button onclick="window.cetakBeritaAcara('${key}')" class="bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded-[4px] text-[10px] font-bold shadow">Cetak</button>
+                        <button onclick="window.cetakBeritaAcara2Kali('${key}')" class="bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded-[4px] text-[10px] font-bold shadow">Cetak</button>
                         <button onclick="window.hapusBeritaAcara('${key}')" class="bg-red-500 hover:bg-red-600 text-white px-2.5 py-1 rounded-[4px] text-[10px] font-bold shadow">Hapus</button>
                     </div>
                 </div>
@@ -2668,6 +2752,49 @@ window.hapusBeritaAcara = async function(key) {
         window.muatHistoriBeritaAcara();
     } catch (e) {
         miuiAlert("Gagal menghapus data riwayat.");
+    }
+};
+
+window.cetakBeritaAcara2Kali = async function(key) {
+    if (!key) {
+        window.miuiAlert("Key Berita Acara tidak valid!");
+        return;
+    }
+
+    // Panggil modal progress universal jika ada
+    if (typeof window.showCetakProgress === 'function') {
+        window.showCetakProgress("Menyiapkan Dokumen Cetak (0/2)...");
+    }
+
+    try {
+        // Salinan ke-1
+        if (typeof window.showCetakProgress === 'function') {
+            window.showCetakProgress("Mengirim Salinan 1 Berita Acara (1/2)...");
+        }
+        await window.cetakBeritaAcara(key);
+        
+        // Jeda sejenak agar antrean cetak Firebase & browser stabil tidak bentrok
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        // Salinan ke-2
+        if (typeof window.showCetakProgress === 'function') {
+            window.showCetakProgress("Mengirim Salinan 2 Berita Acara (2/2)...");
+        }
+        await window.cetakBeritaAcara(key);
+
+        // Sembunyikan modal progress
+        if (typeof window.hideCetakProgress === 'function') {
+            window.hideCetakProgress();
+        }
+
+        window.miuiAlert("Berhasil mengirim 2 salinan Berita Acara ke antrean cetak!");
+
+    } catch (error) {
+        console.error("Gagal memproses cetak 2 salinan:", error);
+        if (typeof window.hideCetakProgress === 'function') {
+            window.hideCetakProgress();
+        }
+        window.miuiAlert("Terjadi kesalahan saat mencetak 2 salinan.");
     }
 };
 
