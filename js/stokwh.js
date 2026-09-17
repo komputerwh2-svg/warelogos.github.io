@@ -1544,6 +1544,10 @@ async function loadDataRekap() {
         const allDatarekap = await responserekap.json();
 
         if (allDatarekap) {
+            // PANGGIL DI SINI UNTUK MONITORING UKURAN DOWNLOAD DI WIDGET
+        if (typeof updateWidgetDownloadSize === 'function') {
+            updateWidgetDownloadSize(allData);
+        }
             // SIMPAN KE LOCALSTORAGE (Caching Lokal Rekap)
             localStorage.setItem(cacheKey, JSON.stringify(allDatarekap));
         }
@@ -1623,6 +1627,10 @@ async function loadStokData() {
         const allData = await response.json();
         
         if (allData) {
+            // PANGGIL DI SINI UNTUK MONITORING UKURAN DOWNLOAD DI WIDGET
+        if (typeof updateWidgetDownloadSize === 'function') {
+            updateWidgetDownloadSize(allData);
+        }
             // SIMPAN KE LOCALSTORAGE (Caching Lokal WH-2)
             localStorage.setItem(cacheKey, JSON.stringify(allData));
         }
@@ -1710,10 +1718,8 @@ async function getStokWH3FromIDB() {
 }
 
 // ==========================================
-// FUNGSI LOAD STOK WH-3 (Menggunakan IndexedDB)
+// FUNGSI LOAD STOK WH-3 (Dioptimalkan agar hemat kuota)
 // ==========================================
-let wh3DataListener = null;
-
 async function loadStokDatawh3() {
     const dateInput = document.getElementById('select-tanggal-wh3');
     const tanggal = dateInput ? dateInput.value : null;
@@ -1726,9 +1732,9 @@ async function loadStokDatawh3() {
     
     const formattedDate = tanggal.replace(/-/g, '');
     
-    // 1. FAST-LOAD LOKAL: Tampilkan data kilat dari IndexedDB agar tabel langsung muncul saat dibuka
+    // 1. FAST-LOAD LOKAL: Tampilkan data kilat dari IndexedDB agar tabel langsung muncul
     const localStok = await getStokWH3FromIDB();
-    if (localStok && !window.currentStokData) {
+    if (localStok) {
         window.currentStokData = localStok;
         const localKey = Object.keys(localStok).find(k => k.includes(`stokwh3_${formattedDate}`));
         if (localKey) {
@@ -1740,55 +1746,50 @@ async function loadStokDatawh3() {
     // Path referensi spesifik ke database Firebase Anda
     const dbRef = firebase.database().ref(`stok_wh3`);
 
-    // Hapus listener sebelumnya jika ada (agar tidak terjadi duplikasi event saat ganti tanggal)
-    if (wh3DataListener) {
-        dbRef.off('value', wh3DataListener);
-    }
-
-    // Pasang onValue: Sinkronisasi real-time dari Firebase
-    wh3DataListener = dbRef.on('value', async (snapshot) => {
+    try {
+        // MENGGUNAKAN .once('value') ATAU .get() AGAR HANYA MENGUNDUH SEKALI SAAT DIBUTUHKAN (HEMAT KUOTA)
+        console.log("Mengambil data terbaru dari Firebase...");
+        const snapshot = await dbRef.once('value');
         const allData = snapshot.val();
         
         if (allData) {
-            // SIMPAN KE INDEXEDDB (Aman dari batas kuota localStorage)
+            // PANGGIL DI SINI UNTUK MONITORING UKURAN DOWNLOAD DI WIDGET
+            if (typeof updateWidgetDownloadSize === 'function') {
+                updateWidgetDownloadSize(allData);
+            }
+            // SIMPAN KE INDEXEDDB
             await saveStokWH3ToIDB(allData);
-        }
-        
-        window.currentStokData = allData;
-        
-        if (!allData) {
-            tampilkanKosongwh3(tanggal);
-            return;
-        }
-
-        const key = Object.keys(allData).find(k => k.includes(`stokwh3_${formattedDate}`));
-        
-        if (!key) {
-            tampilkanKosongwh3(tanggal);
-            return;
-        }
-
-        // Render tabel otomatis seketika saat ada perubahan data di server
-        renderTabelwh3(allData[key], mode, key);
-        // console.log("Data Stok WH-3 diperbarui secara real-time dari Firebase.");
-    }, async (error) => {
-        console.error("Gagal mendengarkan perubahan data, mencoba memuat dari IndexedDB lokal...", error);
-        
-        // FALLBACK: Ambil dari IndexedDB jika offline/gagal koneksi dari Firebase
-        const fallbackStok = await getStokWH3FromIDB();
-        if (fallbackStok) {
-            window.currentStokData = fallbackStok;
+            window.currentStokData = allData;
             
-            const key = Object.keys(fallbackStok).find(k => k.includes(`stokwh3_${formattedDate}`));
+            const key = Object.keys(allData).find(k => k.includes(`stokwh3_${formattedDate}`));
+            
+            if (!key) {
+                tampilkanKosongwh3(tanggal);
+                return;
+            }
+
+            // Render tabel otomatis dari data server terbaru
+            renderTabelwh3(allData[key], mode, key);
+            console.log("Data Stok WH-3 berhasil diperbarui dari Firebase.");
+        } else {
+            tampilkanKosongwh3(tanggal);
+        }
+    } catch (error) {
+        console.error("Gagal mengambil data dari Firebase, menggunakan data lokal IndexedDB...", error);
+        
+        // FALLBACK: Jika offline atau gagal, gunakan data dari IndexedDB yang sudah ada
+        if (localStok) {
+            window.currentStokData = localStok;
+            const key = Object.keys(localStok).find(k => k.includes(`stokwh3_${formattedDate}`));
             if (key) {
-                renderTabelwh3(fallbackStok[key], mode, key);
-                console.log("Data Stok WH-3 berhasil dimuat dari IndexedDB (Fallback Mode).");
+                renderTabelwh3(localStok[key], mode, key);
+                console.log("Data Stok WH-3 dimuat dari IndexedDB (Fallback Mode).");
                 return;
             }
         }
         
         tampilkanKosongwh3(tanggal);
-    });
+    }
 }
 
 
@@ -4318,6 +4319,11 @@ window.bl_loadDropdownBarang = async function() {
         if (!dataBarang) {
             select.innerHTML = '<option value="">Data Kosong</option>';
             return;
+        }
+
+        // PANGGIL DI SINI UNTUK MONITORING UKURAN DOWNLOAD DI WIDGET
+        if (typeof updateWidgetDownloadSize === 'function') {
+            updateWidgetDownloadSize(allData);
         }
 
         // Simpan ke Cache Lokal (localStorage) agar bisa diakses saat offline

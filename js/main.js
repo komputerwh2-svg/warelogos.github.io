@@ -78,15 +78,17 @@ if (view) {
 }
 
 
-// --- AUTO-INJECT WIDGET KE HALAMAN ---
+// --- AUTO-INJECT WIDGET KE HALAMAN (Ditambah Indikator Ukuran Data) ---
 function injectWidgetOtomatis() {
     if (!document.getElementById('widget-latensi')) {
         const widget = document.createElement('div');
         widget.id = 'widget-latensi';
         widget.title = 'Geser ke kiri atau kanan';
+        widget.style.cssText = "display: flex; align-items: center; gap: 8px;"; // Memastikan tata letak rapi
         widget.innerHTML = `
             <span id="dot-latensi"></span>
             <span id="teks-latensi">-- ms</span>
+            <span id="teks-download-size" style="font-size: 11px; opacity: 0.8; border-left: 1px solid rgba(255,255,255,0.3); padding-left: 6px;" title="Estimasi data download dari Firebase">0 KB</span>
         `;
         document.body.appendChild(widget);
     }
@@ -179,6 +181,33 @@ async function cekDanUpdateLatensi() {
         widget.style.backgroundColor = '#7f1d1d';
     }
 }
+
+// --- FUNGSI GLOBAL UNTUK MENGUPDATE COUNTER DOWNLOAD SIZE DI WIDGET ---
+window.updateWidgetDownloadSize = function(jsonDataOrString) {
+    const sizeSpan = document.getElementById('teks-download-size');
+    if (!sizeSpan) return;
+
+    try {
+        // Hitung ukuran string dari data yang didownload
+        const stringData = typeof jsonDataOrString === 'string' ? jsonDataOrString : JSON.stringify(jsonDataOrString);
+        const bytes = new Blob([stringData]).size;
+
+        let displaySize = '';
+        if (bytes < 1024) {
+            displaySize = bytes + ' B';
+        } else if (bytes < 1024 * 1024) {
+            displaySize = (bytes / 1024).toFixed(1) + ' KB';
+        } else {
+            displaySize = (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+            // Beri warna mencolok jika download melebihi 1 MB dalam sekali tarik
+            sizeSpan.style.color = '#f87171'; 
+        }
+
+        sizeSpan.innerText = displaySize;
+    } catch (e) {
+        console.error("Gagal menghitung ukuran data download:", e);
+    }
+};
 
 document.addEventListener('DOMContentLoaded', initAppLatensi);
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
@@ -510,6 +539,11 @@ async function downloadDataFirebaseKeLokal(sourceType, targetKey) {
         }
 
         if (dataToSave) {
+            // --- UPDATE WIDGET UKURAN DOWNLOAD DI SINI ---
+            if (typeof updateWidgetDownloadSize === 'function') {
+                updateWidgetDownloadSize(dataToSave);
+            }
+
             localStorage.setItem(targetKey, JSON.stringify(dataToSave));
             localStorage.setItem(targetKey + "_timestamp", waktuServer);
             await muatDataManajemenDatabaseTerpadu();
@@ -519,6 +553,7 @@ async function downloadDataFirebaseKeLokal(sourceType, targetKey) {
             }
         }
     } catch (e) {
+        console.error(e);
         if (typeof miuiAlert === 'function') {
             miuiAlert('Gagal', `Gagal mengunduh data ${targetKey}.`, 'error');
         }
@@ -540,12 +575,15 @@ async function jalankanSinkronisasiPenuh() {
         const rtdb = window.getRTDB();
         const db = window.getFirestore();
         const waktuSekarang = new Date().toLocaleString('id-ID');
+        
+        let totalDownloadedData = {}; // Menampung gabungan data untuk dihitung ukurannya
 
         for (const key of rtdbKeys) {
             try {
                 const snapshot = await rtdb.ref(key).once('value');
                 const val = snapshot.val();
                 if (val) {
+                    totalDownloadedData[key] = val; // Masukkan ke akumulator
                     localStorage.setItem(key, JSON.stringify(val));
                     const metaSnap = await rtdb.ref(key + "_meta/last_updated").once('value');
                     const sTime = metaSnap.val() || waktuSekarang;
@@ -562,10 +600,16 @@ async function jalankanSinkronisasiPenuh() {
             snapshot.forEach(doc => {
                 docsList[doc.id] = doc.data();
             });
+            totalDownloadedData["muat_wh3"] = docsList; // Masukkan ke akumulator
             localStorage.setItem("muat_wh3", JSON.stringify(docsList));
             localStorage.setItem("muat_wh3_timestamp", waktuSekarang);
         } catch (err) {
             console.error("Gagal download Firestore muat_wh3", err);
+        }
+
+        // --- UPDATE WIDGET UKURAN TOTAL DOWNLOAD DI SINI ---
+        if (typeof updateWidgetDownloadSize === 'function') {
+            updateWidgetDownloadSize(totalDownloadedData);
         }
 
         await muatDataManajemenDatabaseTerpadu();
@@ -574,6 +618,7 @@ async function jalankanSinkronisasiPenuh() {
             miuiAlert('Berhasil', 'Semua data database berhasil disinkronkan ke perangkat!', 'success');
         }
     } catch (err) {
+        console.error(err);
         if (typeof miuiAlert === 'function') {
             miuiAlert('Gagal', 'Terjadi kesalahan saat sinkronisasi penuh.', 'error');
         }
@@ -819,6 +864,7 @@ function aktifkanCloudPrintEngine() {
     });
 }
 
+
 // =========================================================================
 // 6. SYSTEM COMPONENT: CUSTOM NOTIF miuiAlert ENGINE (MIUI V5 SPEC)
 // =========================================================================
@@ -910,6 +956,7 @@ window.tutupmiuiAlert = tutupmiuiAlert;
 window.requestAksesAplikasi = requestAksesAplikasi;
 window.cekLoginAdmin = cekLoginAdmin;
 window.closeModalAdmin = closeModalAdmin;
+window.aktifkanCloudPrintEngine = aktifkanCloudPrintEngine;
 
 // RUNNING ROBOT CLOUD PRINTER PADA LAYAR PC UTAMA KANTOR
 //document.addEventListener("DOMContentLoaded", () => {
@@ -1292,7 +1339,7 @@ function sinkronisasiSemuaDataMaster() {
     if (typeof window.muatDataNominal === "function") window.muatDataNominal();
     if (typeof window.muatDataTujuanDariFirebase === "function") window.muatDataTujuanDariFirebase();
     
-    console.log("Semua data master (Driver, Nominal, Tujuan) berhasil dimuat.");
+    //console.log("Semua data master (Driver, Nominal, Tujuan) berhasil dimuat.");
 }
 
 /**
