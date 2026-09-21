@@ -10,8 +10,8 @@
 <div id="subpage-stokwh" class="fixed inset-0 bg-[#f4f4f4] z-[60] translate-x-full transition-transform duration-300 ease-in-out flex flex-col font-sans select-none overflow-hidden">
 
     <div class="w-full h-auto min-h-[60px] flex items-center justify-between px-3 shadow-md relative z-10" 
-        style="background: linear-gradient(to bottom, #3c3c3c, #2a2a2a); border-bottom: 1px solid #1a1a1a;">
-            
+            style="background: linear-gradient(to bottom, #3c3c3c, #2a2a2a); border-bottom: 1px solid #1a1a1a;">
+                
         <div class="flex items-center py-2">
             <button onclick="tutupSubPageStokWH()" class="miui-btn-back flex items-center justify-center gap-1 px-3 py-1.5 rounded text-xs font-bold text-orange-400 shadow-inner">
                 <i class="fa-solid fa-chevron-left text-sm"></i>
@@ -20,31 +20,66 @@
             <h1 class="text-white font-semibold text-sm ml-3 tracking-wide drop-shadow-md">Stok Gudang WH-2 [Bosnet-WMS]</h1>
         </div>
 
-        <div class="flex items-center bg-black/35 p-1 rounded-xl border border-black/30 shadow-inner gap-0.5">
+        <!-- Bagian Kanan: Widget Latensi Tetap Aman + Arsitektur Data Atas-Bawah + Tombol Modul -->
+        <div class="flex items-center gap-2">
             
-            <label class="relative flex items-center justify-center px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider cursor-pointer transition-all select-none">
-                <input type="radio" name="rb-stok-wh" value="REKAP" checked onchange="gantiModulStokWH(this.value)" class="sr-only peer">
-                <span class="z-10 text-gray-400 peer-checked:text-white transition-colors">REKAP</span>
-                <div class="absolute inset-0 rounded-lg shadow-sm opacity-0 scale-95 peer-checked:opacity-100 peer-checked:scale-100 transition-all duration-200" style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #d95d00;"></div>
-            </label>
+            <!-- PANEL ARSITEKTUR DATA (Format Vertikal / Atas-Bawah yang Ringkas) -->
+            <div class="flex flex-col justify-center px-2 py-1 rounded-lg bg-black/40 border border-white/10 shadow-inner text-[10px] leading-tight">
+                
+                <!-- Baris 1: Master Data (Lokal Cache) -->
+                <div class="flex items-center gap-1.5 py-0.5">
+                    <i class="fa-solid fa-database text-emerald-400 text-[9px]"></i>
+                    <span class="text-gray-400">Master:</span>
+                    <span class="text-emerald-400 font-bold">Lokal [Cached]</span>
+                    <span class="text-gray-600">|</span>
+                    <span id="master-size-info" class="text-gray-300">- MB</span>
+                    <span class="text-gray-600">|</span>
+                    <span id="master-sync-time" class="text-gray-400 text-[9px]">Sync: -</span>
+                </div>
 
-            <label class="relative flex items-center justify-center px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider cursor-pointer transition-all select-none">
-                <input type="radio" name="rb-stok-wh" value="WH2" onchange="gantiModulStokWH(this.value)" class="sr-only peer">
-                <span class="z-10 text-gray-400 peer-checked:text-white transition-colors">WH-2</span>
-                <div class="absolute inset-0 rounded-lg shadow-sm opacity-0 scale-95 peer-checked:opacity-100 peer-checked:scale-100 transition-all duration-200" style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #d95d00;"></div>
-            </label>
+                <!-- Baris 2: Cloud / Stok Harian (Realtime Sync) -->
+                <div class="flex items-center gap-1.5 py-0.5 border-t border-white/5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse"></span>
+                    <span class="text-gray-400">Cloud:</span>
+                    <span class="text-sky-400 font-bold">Sync [Realtime]</span>
+                    <span class="text-gray-600">|</span>
+                    <span id="cloud-size-info" class="text-gray-300">- MB</span>
+                    <span class="text-gray-600">|</span>
+                    <span id="cloud-timestamp" class="text-gray-400 text-[9px]">Server: -</span>
+                </div>
 
-            <label class="relative flex items-center justify-center px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider cursor-pointer transition-all select-none">
-                <input type="radio" name="rb-stok-wh" value="WH3" onchange="gantiModulStokWH(this.value)" class="sr-only peer">
-                <span class="z-10 text-gray-400 peer-checked:text-white transition-colors">WH-3</span>
-                <div class="absolute inset-0 rounded-lg shadow-sm opacity-0 scale-95 peer-checked:opacity-100 peer-checked:scale-100 transition-all duration-200" style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #d95d00;"></div>
-            </label>
+            </div>
 
-            <label class="relative flex items-center justify-center px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider cursor-pointer transition-all select-none">
-                <input type="radio" name="rb-stok-wh" value="LEBIH" onchange="gantiModulStokWH(this.value)" class="sr-only peer">
-                <span class="z-10 text-gray-400 peer-checked:text-white transition-colors">LEBIH</span>
-                <div class="absolute inset-0 rounded-lg shadow-sm opacity-0 scale-95 peer-checked:opacity-100 peer-checked:scale-100 transition-all duration-200" style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #d95d00;"></div>
-            </label>
+            <!-- SEKAT PEMISAH -->
+            <div class="h-8 w-[1px] bg-white/20"></div>
+
+            <!-- KELOMPOK TOMBOL MODUL (REKAP, WH-2, WH-3, LEBIH) -->
+            <div class="flex items-center bg-black/35 p-1 rounded-xl border border-black/30 shadow-inner gap-0.5">
+                
+                <label class="relative flex items-center justify-center px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider cursor-pointer transition-all select-none">
+                    <input type="radio" name="rb-stok-wh" value="REKAP" checked onchange="gantiModulStokWH(this.value)" class="sr-only peer">
+                    <span class="z-10 text-gray-400 peer-checked:text-white transition-colors">REKAP</span>
+                    <div class="absolute inset-0 rounded-lg shadow-sm opacity-0 scale-95 peer-checked:opacity-100 peer-checked:scale-100 transition-all duration-200" style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #d95d00;"></div>
+                </label>
+
+                <label class="relative flex items-center justify-center px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider cursor-pointer transition-all select-none">
+                    <input type="radio" name="rb-stok-wh" value="WH2" onchange="gantiModulStokWH(this.value)" class="sr-only peer">
+                    <span class="z-10 text-gray-400 peer-checked:text-white transition-colors">WH-2</span>
+                    <div class="absolute inset-0 rounded-lg shadow-sm opacity-0 scale-95 peer-checked:opacity-100 peer-checked:scale-100 transition-all duration-200" style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #d95d00;"></div>
+                </label>
+
+                <label class="relative flex items-center justify-center px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider cursor-pointer transition-all select-none">
+                    <input type="radio" name="rb-stok-wh" value="WH3" onchange="gantiModulStokWH(this.value)" class="sr-only peer">
+                    <span class="z-10 text-gray-400 peer-checked:text-white transition-colors">WH-3</span>
+                    <div class="absolute inset-0 rounded-lg shadow-sm opacity-0 scale-95 peer-checked:opacity-100 peer-checked:scale-100 transition-all duration-200" style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #d95d00;"></div>
+                </label>
+
+                <label class="relative flex items-center justify-center px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider cursor-pointer transition-all select-none">
+                    <input type="radio" name="rb-stok-wh" value="LEBIH" onchange="gantiModulStokWH(this.value)" class="sr-only peer">
+                    <span class="z-10 text-gray-400 peer-checked:text-white transition-colors">LEBIH</span>
+                    <div class="absolute inset-0 rounded-lg shadow-sm opacity-0 scale-95 peer-checked:opacity-100 peer-checked:scale-100 transition-all duration-200" style="background: linear-gradient(to bottom, #ff8b00, #f36c00); border: 1px solid #d95d00;"></div>
+                </label>
+            </div>
         </div>
     </div>
 
