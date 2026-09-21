@@ -5,6 +5,81 @@ if (!statusBar) {
     console.log("Status bar tidak ditemukan, mungkin Anda sedang di halaman lain?");
 }
 
+// --- 1. FUNGSI UTILITY FORMAT UKURAN ---
+function formatUkuranData(data) {
+    if (!data) return "0 B";
+    const stringData = typeof data === 'string' ? data : JSON.stringify(data);
+    const bytes = new TextEncoder().encode(stringData).length;
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+}
+
+// --- 2. FUNGSI UTAMA STATUS BAR ARSITEKTUR ---
+function updateArsitekturStatusBar(masterDataRaw, masterTime, cloudDataRaw, cloudTime, isCloudSyncing = true) {
+    // A. Update Sisi Master Lokal
+    const masterSizeEl = document.getElementById('master-size-info');
+    if (masterSizeEl) {
+        masterSizeEl.innerText = masterDataRaw ? formatUkuranData(masterDataRaw) : "0 B";
+    }
+    
+    const masterTimeEl = document.getElementById('master-sync-time');
+    if (masterTimeEl) {
+        masterTimeEl.innerText = "Sync: " + (masterTime || "Belum ada");
+    }
+    
+    // B. Update Sisi Cloud / Server
+    const cloudSizeEl = document.getElementById('cloud-size-info');
+    if (cloudSizeEl) {
+        cloudSizeEl.innerText = cloudDataRaw ? formatUkuranData(cloudDataRaw) : "0 B";
+    }
+    
+    const cloudTimeEl = document.getElementById('cloud-timestamp');
+    if (cloudTimeEl) {
+        cloudTimeEl.innerText = "Server: " + (cloudTime || "Realtime");
+    }
+
+    // C. Indikator Visual Status Cloud
+    const cloudIcon = document.querySelector('.fa-cloud') || document.querySelector('.animate-pulse');
+    if (cloudIcon) {
+        const cloudStatusLabel = cloudIcon.nextElementSibling;
+        if (cloudStatusLabel) {
+            if (isCloudSyncing) {
+                cloudStatusLabel.innerHTML = `Cloud: <strong class="text-white">Sync [Realtime]</strong>`;
+            } else {
+                cloudStatusLabel.innerHTML = `Cloud: <strong class="text-amber-400">Offline [Cached]</strong>`;
+            }
+        }
+    }
+}
+
+// --- 3. FUNGSI TRIGGER OTOMATIS (PANGGIL INI SAAT HALAMAN/DATA DIMUAT) ---
+function refreshArsitekturStatusBarOtomatis() {
+    // Ambil data Master dari localStorage (sesuaikan key-nya, misal "master_barang")
+    const masterKey = "master_barang";
+    const dataMasterLokal = localStorage.getItem(masterKey);
+    const waktuMasterLokal = localStorage.getItem(masterKey + "_timestamp") || "Baru saja";
+
+    // Ambil data Cloud/Stok WH yang sedang aktif di localStorage
+    const cloudKey = "stok_wh3"; // atau disesuaikan dengan modul aktif saat ini
+    const dataCloudLokal = localStorage.getItem(cloudKey);
+    const waktuCloudServer = localStorage.getItem(cloudKey + "_timestamp") || "Realtime Active";
+
+    // Eksekusi fungsi update status bar
+    updateArsitekturStatusBar(
+        dataMasterLokal,
+        waktuMasterLokal,
+        dataCloudLokal,
+        waktuCloudServer,
+        true
+    );
+}
+
+// Jalankan otomatis saat dokumen selesai dimuat atau saat navigasi modul berganti
+document.addEventListener("DOMContentLoaded", () => {
+    refreshArsitekturStatusBarOtomatis();
+});
+
 // ==========================================
 // 4. BACKGROUND SYNC OTOMATIS & OFFLINE QUEUE
 // ==========================================
@@ -278,7 +353,7 @@ window.gantiModulStokWH = function(mode) {
         if (typeof initDropdownsRekap === 'function') {
             initDropdownsRekap();
         }
-        gantiModeRekap(moderekap); // Pastikan mode rekap diatur sesuai
+        //gantiModeRekap(moderekap); // Pastikan mode rekap diatur sesuai
         window.renderTabelRekap();
         console.log("Inisialisasi mode REKAP dipanggil");
     } else if (mode === 'WH2') {
@@ -3325,6 +3400,13 @@ async function simpanDataFisikHP() {
         return;
     }
 
+    // Pastikan master barang sudah dimuat ke memori
+    if (!window.masterData || Object.keys(window.masterData).length === 0) {
+        if (typeof loadMasterBarang === 'function') {
+            await loadMasterBarang();
+        }
+    }
+
     const dateInput = document.getElementById('select-tanggal-wh3');
     const tanggal = dateInput ? dateInput.value.replace(/-/g, '') : null;
     if (!tanggal) {
@@ -3334,13 +3416,14 @@ async function simpanDataFisikHP() {
 
     // Ambil data harian saat ini untuk item tersebut
     if (!window.currentStokData) window.currentStokData = {};
-    if (!window.currentStokData[`stokwh3_${tanggal}`]) {
-        window.currentStokData[`stokwh3_${tanggal}`] = {};
+    const keyStok = `stokwh3_${tanggal}`;
+    if (!window.currentStokData[keyStok]) {
+        window.currentStokData[keyStok] = {};
     }
 
-    const dataHarian = window.currentStokData[`stokwh3_${tanggal}`];
+    const dataHarian = window.currentStokData[keyStok];
     
-    // CEK APAKAH ITEM SUDAH ADA. JIKA BELUM, BUAT STRUKTUR DATA BARU (DEFAULT BOSNET & QA 0)
+    // CEK APAKAH ITEM SUDAH ADA. JIKA BELUM, BUAT STRUKTUR DATA BARU
     let item = dataHarian[kode];
     let isNewItem = false;
 
@@ -3390,7 +3473,7 @@ async function simpanDataFisikHP() {
         // Gabungkan Qty Angka Murni untuk sistem
         finalBeceranVal = (parseInt(item.beceran) || 0) + nilaiBaru;
 
-        // Gabungkan Teks Qty Tampilan (misal: "1" + "1" jadi "1 + 1")
+        // Gabungkan Teks Qty Tampilan
         if (finalRawBeceran && finalRawBeceran !== "0") {
             finalRawBeceran = `${finalRawBeceran} + ${inputQtyBeceranStr}`;
         } else {
@@ -3405,7 +3488,6 @@ async function simpanDataFisikHP() {
                 finalRakBeceran = inputRakBeceranStr;
             }
         }
-
     } 
     // 2. JIKA INPUT BERUPA UTUHAN
     else {
@@ -3439,15 +3521,13 @@ async function simpanDataFisikHP() {
         }
     }
 
-    // 3. Kalkulasi Total Keseluruhan & Selisih (Memperhitungkan Bosnet & QA)
+    // 3. Kalkulasi Total Keseluruhan & Selisih
     const blokVal = parseInt(item.blok) || 0;
     const bosnetVal = parseInt(item.bosnet) || 0; 
     const qaVal = parseInt(item.qa) || 0; 
     const isPaket = kode.includes("PR-PKT");
 
     const totalVal = (isPaket ? 0 : blokVal) + finalBeceranVal + finalUtuhanVal;
-    
-    // Rumus Selisih Baru: Total Fisik - (Bosnet + QA)
     const totalPengurang = bosnetVal + qaVal;
     const selisihVal = totalVal - totalPengurang; 
 
@@ -3461,43 +3541,45 @@ async function simpanDataFisikHP() {
         statusKeterangan = `STOK KURANG ${Math.abs(selisihVal)} ${satuan}`;
     }
 
+    // Bentuk objek data item yang diperbarui secara menyeluruh
+    const itemTerbaru = {
+        kode: kode,
+        nama: item.nama,
+        bosnet: bosnetVal,
+        qa: qaVal,
+        blok: blokVal,
+        beceran: finalBeceranVal,
+        utuhan: finalUtuhanVal,
+        total: totalVal,
+        selisih: selisihVal,
+        keterangan: statusKeterangan,
+        detail_rak: {
+            beceran_rak: finalRakBeceran,
+            utuhan_rak: finalRakUtuhan,
+            beceran_qty_teks: finalRawBeceran
+        }
+    };
+
+    // Langsung perbarui state global agar UI tabel langsung mendeteksi perubahan
+    dataHarian[kode] = itemTerbaru;
+    window.currentStokData[keyStok] = { ...dataHarian };
+
     const baseUrl = `https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/stok_wh3/stokwh3_${tanggal}/${kode}`;
 
-    // 5. Kirim Pembaruan / Data Baru ke Firebase dengan penanganan Offline Queue
+    // 5. Kirim ke Server / Firebase atau Antrean Offline
     try {
         if (!navigator.onLine) {
             throw new Error("Offline");
         }
 
         if (isNewItem) {
-            const payloadDataBaru = {
-                kode: kode,
-                nama: item.nama,
-                bosnet: 0,
-                qa: 0,
-                blok: 0,
-                beceran: finalBeceranVal,
-                utuhan: finalUtuhanVal,
-                total: totalVal,
-                selisih: selisihVal,
-                keterangan: statusKeterangan,
-                detail_rak: {
-                    beceran_rak: finalRakBeceran,
-                    utuhan_rak: finalRakUtuhan,
-                    beceran_qty_teks: finalRawBeceran
-                }
-            };
-
             const response = await fetch(`${baseUrl}.json`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payloadDataBaru)
+                body: JSON.stringify(itemTerbaru)
             });
-
             if (!response.ok) throw new Error("Gagal menyimpan data barang baru ke server.");
-
             miuiAlert(`Info: Barang baru [ ${kode} ] ditambahkan ke stok sebagai temuan/lebih!`);
-
         } else {
             const responseUtama = await fetch(`${baseUrl}.json`, {
                 method: "PATCH",
@@ -3510,7 +3592,6 @@ async function simpanDataFisikHP() {
                     keterangan: statusKeterangan
                 })
             });
-
             if (!responseUtama.ok) throw new Error("Gagal memperbarui data fisik HP utama.");
 
             const responseRak = await fetch(`${baseUrl}/detail_rak.json`, {
@@ -3522,129 +3603,45 @@ async function simpanDataFisikHP() {
                     beceran_qty_teks: finalRawBeceran
                 })
             });
-
             if (!responseRak.ok) throw new Error("Gagal memperbarui detail rak HP.");
         }
 
-        // AMBIL LANGSUNG NILAI MURNI DARI ELEMEN INPUT SAAT ITU JUGA
-        const inputKodeVal = kode ? kode : "";
-        const inputQtyVal = activeTipeHP === 'BECERAN' ? (document.getElementById('hp-qty-beceran') ? document.getElementById('hp-qty-beceran').value : "0") : "0";
-        const inputRakVal = activeTipeHP === 'BECERAN' 
-            ? (document.getElementById('hp-rak-beceran') ? document.getElementById('hp-rak-beceran').value : "") 
-            : (document.getElementById('hp-rak-utuhan') ? document.getElementById('hp-rak-utuhan').value : "");
-
-        // Update panel riwayat terakhir di modal HP
-        updatePanelRiwayatHP(activeTipeHP, inputKodeVal, inputRakVal, inputQtyVal);    
-
-        // Update juga state data lokal agar UI langsung sinkron tanpa perlu refresh ulang
-        item.beceran = finalBeceranVal;
-        item.utuhan = finalUtuhanVal;
-        item.total = totalVal;
-        item.selisih = selisihVal;
-        item.keterangan = statusKeterangan;
-        item.detail_rak = {
-            beceran_rak: finalRakBeceran,
-            utuhan_rak: finalRakUtuhan,
-            beceran_qty_teks: finalRawBeceran
-        };
-        dataHarian[kode] = item;
-
-        // KOSONGKAN FORM INPUT & LABEL INFORMASI KODE DI SEBELAHNYA
-        const inputQtyBeceran = document.getElementById('hp-qty-beceran');
-        const inputRakBeceran = document.getElementById('hp-rak-beceran');
-        const inputRakUtuhan = document.getElementById('hp-rak-utuhan');
-
-        if (inputQtyBeceran) inputQtyBeceran.value = '';
-        if (inputRakBeceran) inputRakBeceran.value = '';
-        if (inputRakUtuhan) inputRakUtuhan.value = '';
-        if (kodeInputEl) kodeInputEl.value = '';
-
-        // --- TAMBAHAN PENTING: RESET LABEL INFORMASI KODE TERPILIH DI SEBELAH LABEL ---
-        if (typeof updateInfoKodeTerpilihHP === 'function') {
-            updateInfoKodeTerpilihHP();
-        }
-
-        // RESET JUDUL KEMBALI KE SEMULA
-        const modalTitleEl = document.getElementById('hp-modal-title');
-        if (modalTitleEl) {
-            modalTitleEl.innerText = "INPUT FISIK GUDANG (MOBILE)";
-        }
-
-        if (typeof renderTabelStokWH3 === 'function') {
-            renderTabelStokWH3();
-        }
-
     } catch (error) {
-        console.warn("Koneksi terputus/offline saat menyimpan data fisik HP...", error.message);
-        
-        const payloadDataOffline = isNewItem ? {
-            kode: kode,
-            nama: item.nama,
-            bosnet: 0,
-            qa: 0,
-            blok: 0,
-            beceran: finalBeceranVal,
-            utuhan: finalUtuhanVal,
-            total: totalVal,
-            selisih: selisihVal,
-            keterangan: statusKeterangan,
-            detail_rak: {
-                beceran_rak: finalRakBeceran,
-                utuhan_rak: finalRakUtuhan,
-                beceran_qty_teks: finalRawBeceran
-            }
-        } : {
-            beceran: finalBeceranVal,
-            utuhan: finalUtuhanVal,
-            total: totalVal,
-            selisih: selisihVal,
-            keterangan: statusKeterangan,
-            detail_rak: {
-                beceran_rak: finalRakBeceran,
-                utuhan_rak: finalRakUtuhan,
-                beceran_qty_teks: finalRawBeceran
-            }
-        };
-
+        console.warn("Koneksi terputus/offline, masuk antrean offline...", error.message);
         const methodType = isNewItem ? 'PUT' : 'PATCH';
-        simpanKeAntreanOffline(`${baseUrl}.json`, methodType, payloadDataOffline, `Simpan Fisik HP Produk ${kode} (${tanggal})`);
-        
+        simpanKeAntreanOffline(`${baseUrl}.json`, methodType, itemTerbaru, `Simpan Fisik HP Produk ${kode} (${tanggal})`);
         miuiAlert("Koneksi terputus. Data fisik HP berhasil dimasukkan ke antrean offline.");
+    }
 
-        item.beceran = finalBeceranVal;
-        item.utuhan = finalUtuhanVal;
-        item.total = totalVal;
-        item.selisih = selisihVal;
-        item.keterangan = statusKeterangan;
-        item.detail_rak = {
-            beceran_rak: finalRakBeceran,
-            utuhan_rak: finalRakUtuhan,
-            beceran_qty_teks: finalRawBeceran
-        };
-        dataHarian[kode] = item;
+    // --- EKsekusi Pembaruan Antarmuka (UI) secara Instan ---
+    const inputKodeVal = kode ? kode : "";
+    const inputQtyVal = activeTipeHP === 'BECERAN' ? (document.getElementById('hp-qty-beceran')?.value || "0") : "0";
+    const inputRakVal = activeTipeHP === 'BECERAN' 
+        ? (document.getElementById('hp-rak-beceran')?.value || "") 
+        : (document.getElementById('hp-rak-utuhan')?.value || "");
 
-        const inputQtyBeceran = document.getElementById('hp-qty-beceran');
-        const inputRakBeceran = document.getElementById('hp-rak-beceran');
-        const inputRakUtuhan = document.getElementById('hp-rak-utuhan');
+    if (typeof updatePanelRiwayatHP === 'function') {
+        updatePanelRiwayatHP(activeTipeHP, inputKodeVal, inputRakVal, inputQtyVal);    
+    }
 
-        if (inputQtyBeceran) inputQtyBeceran.value = '';
-        if (inputRakBeceran) inputRakBeceran.value = '';
-        if (inputRakUtuhan) inputRakUtuhan.value = '';
-        if (kodeInputEl) kodeInputEl.value = '';
+    // Kosongkan form input
+    ['hp-qty-beceran', 'hp-rak-beceran', 'hp-rak-utuhan', 'hp-kode-barang'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
 
-        // --- RESET JUGA DI JALUR OFFLINE ---
-        if (typeof updateInfoKodeTerpilihHP === 'function') {
-            updateInfoKodeTerpilihHP();
-        }
+    if (typeof updateInfoKodeTerpilihHP === 'function') {
+        updateInfoKodeTerpilihHP();
+    }
 
-        const modalTitleEl = document.getElementById('hp-modal-title');
-        if (modalTitleEl) {
-            modalTitleEl.innerText = "INPUT FISIK GUDANG (MOBILE)";
-        }
+    const modalTitleEl = document.getElementById('hp-modal-title');
+    if (modalTitleEl) {
+        modalTitleEl.innerText = "INPUT FISIK GUDANG (MOBILE)";
+    }
 
-        if (typeof renderTabelStokWH3 === 'function') {
-            renderTabelStokWH3();
-        }
+    // Panggil ulang render tabel agar data langsung berubah di layar tanpa perlu refresh browser
+    if (typeof renderTabelwh3 === 'function') {
+        renderTabelwh3();
     }
 }
 

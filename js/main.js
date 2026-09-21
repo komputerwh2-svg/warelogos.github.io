@@ -1121,6 +1121,7 @@ function bukaSubPageStokWH() {
                     // Panggil fungsi inisialisasi utama yang kita buat tadi
                     if (typeof window.initApp === 'function') {
                         window.initApp(); 
+                    refreshArsitekturStatusBarOtomatis();
                     } else {
                         // Jika belum membuat initApp, panggil manual satu per satu:
                         console.log("Memulai inisialisasi dropdown...");
