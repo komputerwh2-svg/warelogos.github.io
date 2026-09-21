@@ -1611,7 +1611,7 @@ async function loadDataRekap() {
                      (moderekap === 'BARANG_LEBIH' ? 'stok_lebih.json' : 'stok_wh2.json');
     let keyPrefix = moderekap.includes('WH3') ? 'stokwh3_' : 'stokwh2wms_';
     
-    // Tentukan cache key yang unik berdasarkan file source
+    // Tentukan cache key
     const cacheKey = `cached_rekap_${sourceFile.replace('.json', '')}`;
 
     try {
@@ -1620,23 +1620,30 @@ async function loadDataRekap() {
 
         if (allDatarekap) {
             // PANGGIL DI SINI UNTUK MONITORING UKURAN DOWNLOAD DI WIDGET
-        if (typeof updateWidgetDownloadSize === 'function') {
-            updateWidgetDownloadSize(allData);
-        }
-            // SIMPAN KE LOCALSTORAGE (Caching Lokal Rekap)
-            localStorage.setItem(cacheKey, JSON.stringify(allDatarekap));
+            if (typeof updateWidgetDownloadSize === 'function') {
+                updateWidgetDownloadSize(allDatarekap);
+            }
+            
+            // SIMPAN KE LOCALSTORAGE (Hanya untuk file yang ukurannya kecil, hindari stok_wh3.json agar tidak quota exceeded)
+            if (!moderekap.includes('WH3')) {
+                try {
+                    localStorage.setItem(cacheKey, JSON.stringify(allDatarekap));
+                } catch (e) {
+                    console.warn("localStorage penuh, abaikan cache localStorage.");
+                }
+            }
         }
 
         // A. Handling untuk Barang Lebih
         if (moderekap === 'BARANG_LEBIH') {
-            await window.renderTabelBarangLebih(); // Panggil fungsi khusus
-            return; // PENTING: Berhenti di sini agar tidak memanggil renderTabelRekap
+            await window.renderTabelBarangLebih();
+            return;
         }
 
         // B. Handling untuk Selisih WH3
         if (moderekap === 'SELISIH_WH3') {
-            await renderSelisihWH3(allDatarekap); // Panggil fungsi khusus
-            return; // PENTING: Berhenti di sini
+            await renderSelisihWH3(allDatarekap);
+            return;
         }
 
         // C. Handling untuk Stok Harian (WH2/WH3)
@@ -1650,9 +1657,9 @@ async function loadDataRekap() {
         }
         
     } catch (error) {
-        console.error("Gagal memuat data dari server, mencoba memuat dari cache lokal...", error);
+        console.warn("Gagal memuat data dari server, mencoba memuat dari cache lokal...", error.message);
         
-        // FALLBACK: Ambil dari localStorage jika offline/gagal fetch
+        // FALLBACK: Ambil dari localStorage (jika ada)
         const cachedData = localStorage.getItem(cacheKey);
         if (cachedData) {
             const allDatarekap = JSON.parse(cachedData);
@@ -1663,9 +1670,9 @@ async function loadDataRekap() {
             }
 
             if (moderekap === 'SELISIH_WH3') {
-                await renderSelisihWH3(allDatarekap);
-                return;
-            }
+            await renderSelisihWH3(allDatarekap);
+            return;
+        }
 
             const formattedDaterekap = tanggalrekap.replace(/-/g, '');
             const keyrekap = Object.keys(allDatarekap || {}).find(k => k.includes(`${keyPrefix}${formattedDaterekap}`));
@@ -1676,7 +1683,15 @@ async function loadDataRekap() {
             }
         }
         
+        // Perbaikan: Gunakan fungsi tampilkanKosongRekap yang sudah terbukti ada
         tampilkanKosongRekap(tanggalrekap);
+    }
+}
+
+function tampilkanKosongRekap(tanggal) {
+    const tbody = document.getElementById('tabel-body-rekap');
+    if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-10 text-slate-400">Data untuk tanggal ${tanggal} tidak ditemukan, silakan ubah ke periode tanggal sebelumnya.</td></tr>`;
     }
 }
 
@@ -1876,14 +1891,15 @@ async function renderTabelRekap(dataStok, mode) {
 
     tbody.innerHTML = '';
     
-    // Konfigurasi hanya untuk data stok harian
+    // Konfigurasi kolom termasuk untuk SELISIH_WH3
     const config = {
         'WH2_SEBELUM': ['NO', 'KODE', 'BOSNET', 'WMS', 'SELISIH', 'KETERANGAN'],
         'WH2_SESUDAH': ['NO', 'KODE', 'BOSNET', 'WMS', 'SELISIH', 'KETERANGAN'],
-        'STOK_WH3': ['NO', 'KODE', 'BLOK', 'BOSNET', 'PAK', 'BECERAN', 'UTUHAN', 'TOTAL', 'SELISIH', 'KETERANGAN']
+        'STOK_WH3': ['NO', 'KODE', 'BLOK', 'BOSNET', 'PAK', 'BECERAN', 'UTUHAN', 'TOTAL', 'SELISIH', 'KETERANGAN'],
+        'SELISIH_WH3': ['NO', 'KODE', 'BLOK', 'BOSNET', 'PAK', 'BECERAN', 'UTUHAN', 'TOTAL', 'SELISIH', 'KETERANGAN']
     };
 
-    if (!config[mode]) return; // Jika mode bukan stok harian, hentikan proses
+    if (!config[mode]) return; // Jika mode tidak terdaftar, hentikan proses
 
     thead.innerHTML = `<tr>${config[mode].map(h => `<th class="py-3 px-4 text-left border-b bg-slate-100 uppercase">${h}</th>`).join('')}</tr>`;
 
@@ -1892,8 +1908,23 @@ async function renderTabelRekap(dataStok, mode) {
         return;
     }
 
+    // Jika mode adalah SELISIH_WH3, lakukan filtering terlebih dahulu agar hanya ambil data yang selisihnya !== 0
+    let entriesToRender = Object.entries(dataStok);
+    if (mode === 'SELISIH_WH3') {
+        entriesToRender = entriesToRender.filter(([kode, item]) => {
+            if (!item || typeof item !== 'object') return false;
+            const selisih = parseInt(item.selisih) || 0;
+            return selisih !== 0;
+        });
+
+        if (entriesToRender.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="${config[mode].length}" class="text-center py-10">Tidak ada data selisih pada tanggal ini (Semua Sesuai).</td></tr>`;
+            return;
+        }
+    }
+
     let i = 1;
-    Object.entries(dataStok).forEach(([kode, item]) => {
+    entriesToRender.forEach(([kode, item]) => {
         let row = `<tr><td class="py-2 px-3">${i++}</td><td><b>${kode}</b></td>`;
 
         if (mode.includes('WH2')) {
@@ -1903,7 +1934,7 @@ async function renderTabelRekap(dataStok, mode) {
             let badgeWH2 = selisihWH2 === 0 ? '<span style="background: #27ae60; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">SESUAI</span>' : '<span style="background: #c0392b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">SELISIH</span>';
             
             row += `<td>${b}</td><td>${w}</td><td>${selisihWH2}</td><td>${badgeWH2}</td>`;
-        } else if (mode === 'STOK_WH3') {
+        } else if (mode === 'STOK_WH3' || mode === 'SELISIH_WH3') {
             // Ambil rincian detail rak untuk tampilan multi-qty jika ada
             const detailRak = item.detail_rak || {};
             const bRak = detailRak.beceran_rak ? `<br><small style="color: gray;">(${detailRak.beceran_rak})</small>` : '';
@@ -1915,14 +1946,18 @@ async function renderTabelRekap(dataStok, mode) {
             if (ket.includes("KURANG")) badgeColor = "#c0392b"; // Merah
             else if (ket.includes("LEBIH")) badgeColor = "#d35400"; // Oranye
 
+            // Jika di mode SELISIH_WH3, kita buat angka selisihnya lebih menonjol (misal warna merah)
+            let selisihVal = item.selisih || 0;
+            let selisihDisplay = mode === 'SELISIH_WH3' ? `<span style="color: #c0392b; font-weight: bold;">${selisihVal}</span>` : selisihVal;
+
             row += `
-                <td>${item.blok || '-'}{item.nama ? '<br><small style="color: #666;">' + item.nama + '</small>' : ''}</td>
+                <td>${item.blok || '-'}</td>
                 <td>${item.bosnet || 0}</td>
                 <td>${item.pak || 0}</td>
                 <td>${item.beceran || 0} ${bRak}</td>
                 <td>${item.utuhan || 0} ${uRak}</td>
                 <td><b>${item.total || 0}</b></td>
-                <td>${item.selisih || 0}</td>
+                <td>${selisihDisplay}</td>
                 <td><span style="background: ${badgeColor}; color: white; padding: 3px 6px; border-radius: 4px; font-size: 11px;">${ket}</span></td>
             `;
         }
@@ -1930,6 +1965,7 @@ async function renderTabelRekap(dataStok, mode) {
         tbody.innerHTML += row + `</tr>`;
     });
 }
+
 
 function renderTabel(dataStok, mode, key) {
     const tbody = document.getElementById('tabel-body-wh2');
@@ -2018,13 +2054,6 @@ function renderTabel(dataStok, mode, key) {
             statusEl.innerText = "[ TERDAPAT SELISIH STOK: " + totalSelisih.toLocaleString() + " Karton]";
             statusEl.className = "ml-4 text-[15px] font-black text-red-600 uppercase tracking-wider";
         }
-    }
-}
-
-function tampilkanKosongRekap(tanggal) {
-    const tbody = document.getElementById('tabel-body-rekap');
-    if (tbody) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-10 text-slate-400">Data untuk tanggal ${tanggal} tidak ditemukan.</td></tr>`;
     }
 }
 
@@ -2968,6 +2997,11 @@ async function simpanRak() {
     const dateInput = document.getElementById('select-tanggal-wh3');
     const tanggal = dateInput ? dateInput.value.replace(/-/g, '') : null;
     
+    if (!tanggal) {
+        miuiAlert("Tanggal aktif tidak ditemukan!");
+        return;
+    }
+    
     // 1. Ambil input teks mentah untuk tampilan/multi-qty, lalu hitung totalnya untuk sistem
     const rawBeceranVal = document.getElementById('inputBeceran').value; 
     const beceranVal = hitungTotalBeceran(rawBeceranVal); // Hasil angka murni (misal: 21) untuk perhitungan sistem
@@ -2984,15 +3018,21 @@ async function simpanRak() {
 
     if (isPaket) {
         const jumlahKarton = parseInt(rakUtuhanVal) || 0;
-        utuhanVal = jumlahKarton * qtyPerRak;
+        utuhanVal = jumlahKarton * (qtyPerRak > 0 ? qtyPerRak : 1);
     } else {
         const rakArray = rakUtuhanVal.split('+').filter(r => r.trim() !== "");
-        utuhanVal = rakArray.length * qtyPerRak;
+        utuhanVal = rakArray.length * (qtyPerRak > 0 ? qtyPerRak : 1);
     }
 
     // 3. Ambil data item harian untuk mendapatkan nilai bosnet dan qa
-    const dataHarian = window.currentStokData[`stokwh3_${tanggal}`];
-    const item = dataHarian ? dataHarian[kode] : null;
+    if (!window.currentStokData) window.currentStokData = {};
+    const keyStok = `stokwh3_${tanggal}`;
+    if (!window.currentStokData[keyStok]) {
+        window.currentStokData[keyStok] = {};
+    }
+
+    const dataHarian = window.currentStokData[keyStok];
+    const item = dataHarian[kode];
     
     if (!item) {
         console.error("Data tidak ditemukan");
@@ -3001,12 +3041,13 @@ async function simpanRak() {
     }
 
     const bosnetVal = parseInt(item.bosnet) || 0;
-    const qaVal = parseInt(item.qa) || 0; // Ambil nilai QA yang tersimpan
+    const qaVal = parseInt(item.qa) || 0; 
+    const blokVal = parseInt(item.blok) || 0;
 
     // Kalkulasi Total Fisik
-    const totalVal = (parseInt(item.blok) || 0) + beceranVal + utuhanVal;
+    const totalVal = blokVal + beceranVal + utuhanVal;
     
-    // RUMUS BARU: Total dikurangi (Bosnet + QA)
+    // RUMUS: Total dikurangi (Bosnet + QA)
     const totalPengurang = bosnetVal + qaVal;
     const selisihVal = totalVal - totalPengurang;
 
@@ -3020,16 +3061,49 @@ async function simpanRak() {
         statusKeterangan = `STOK KURANG ${Math.abs(selisihVal)} ${satuan}`;
     }
 
+    // Bentuk objek data item terbaru
+    const itemTerbaru = {
+        ...item,
+        beceran: beceranVal,
+        utuhan: utuhanVal,
+        total: totalVal,
+        selisih: selisihVal,
+        keterangan: statusKeterangan,
+        detail_rak: {
+            beceran_rak: rakBeceranVal,
+            utuhan_rak: rakUtuhanVal,
+            beceran_qty_teks: rawBeceranVal
+        }
+    };
+
+    // --- PEMBARUAN INSTAN (UI & MEMORI LOKAL) SEBELUM FETCH SERVER ---
+    dataHarian[kode] = itemTerbaru;
+    window.currentStokData[keyStok] = { ...dataHarian };
+
+    // Tutup modal dan langsung render tabel agar responsif seketika
+    tutupModalRak();
+
+    if (typeof renderTabelwh3 === 'function') {
+        const modeAktif = document.querySelector('input[name="rb-mode-wh3"]:checked')?.value || "STOK WH-3";
+        renderTabelwh3(dataHarian, modeAktif, keyStok);
+    }
+
+    if (typeof saveStokWH3ToIDB === 'function') {
+        await saveStokWH3ToIDB(window.currentStokData);
+    }
+
+    miuiAlert("Data rak berhasil disimpan!");
+
     const urlUtama = `https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/stok_wh3/stokwh3_${tanggal}/${kode}.json`;
     const urlDetailRak = `https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/stok_wh3/stokwh3_${tanggal}/${kode}/detail_rak.json`;
 
-    // 5. Kirim ke Firebase dengan pengecekan koneksi & antrean offline
+    // 5. Kirim ke Firebase di latar belakang (Background Sync / Async Fetch)
     try {
         if (!navigator.onLine) {
             throw new Error("Offline");
         }
 
-        // Kirim pembaruan utama termasuk selisih yang sudah memperhitungkan QA
+        // Kirim pembaruan utama
         const responseUtama = await fetch(urlUtama, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
@@ -3044,7 +3118,7 @@ async function simpanRak() {
 
         if (!responseUtama.ok) throw new Error("Gagal memperbarui data utama rak.");
 
-        // Simpan teks multi-qty ke `detail_rak` khusus untuk tampilan antarmuka
+        // Simpan teks multi-qty ke `detail_rak`
         const responseRak = await fetch(urlDetailRak, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
@@ -3057,15 +3131,11 @@ async function simpanRak() {
 
         if (!responseRak.ok) throw new Error("Gagal memperbarui detail rak.");
 
-        console.log("Data berhasil disimpan dengan pemisahan sistem dan tampilan (memperhitungkan QA)");
-        miuiAlert("Data rak berhasil disimpan!");
-        tutupModalRak();
-        loadStokDatawh3();
+        console.log("Data berhasil disinkronkan ke server Firebase.");
 
     } catch (error) {
         console.warn("Koneksi terputus/offline saat menyimpan rak, memasukkan ke antrean background queue...", error.message);
         
-        // Payload gabungan untuk antrean offline
         const payloadData = {
             beceran: beceranVal, 
             utuhan: utuhanVal, 
@@ -3080,15 +3150,6 @@ async function simpanRak() {
         };
 
         simpanKeAntreanOffline(urlUtama, 'PATCH', payloadData, `Simpan Rak Produk ${kode} (${tanggal})`);
-        
-        miuiAlert("Koneksi terputus. Data rak berhasil dimasukkan ke antrean offline dan akan disinkronkan otomatis saat online kembali.");
-        
-        tutupModalRak();
-        
-        // Refresh tampilan lokal jika fungsi tersedia
-        if (typeof loadStokDatawh3 === 'function') {
-            loadStokDatawh3();
-        }
     }
 }
 
@@ -3613,7 +3674,7 @@ async function simpanDataFisikHP() {
         miuiAlert("Koneksi terputus. Data fisik HP berhasil dimasukkan ke antrean offline.");
     }
 
-    // --- EKsekusi Pembaruan Antarmuka (UI) secara Instan ---
+    // --- EKSEKUSI PEMBARUAN ANTARMUKA (UI) SECARA INSTAN ---
     const inputKodeVal = kode ? kode : "";
     const inputQtyVal = activeTipeHP === 'BECERAN' ? (document.getElementById('hp-qty-beceran')?.value || "0") : "0";
     const inputRakVal = activeTipeHP === 'BECERAN' 
@@ -3639,9 +3700,16 @@ async function simpanDataFisikHP() {
         modalTitleEl.innerText = "INPUT FISIK GUDANG (MOBILE)";
     }
 
-    // Panggil ulang render tabel agar data langsung berubah di layar tanpa perlu refresh browser
+    // SIMPAN JUGA KE INDEXEDDB LOKAL AGAR CACHE KILAT IKUT TERUPDATE
+    if (typeof saveStokWH3ToIDB === 'function' && window.currentStokData) {
+        await saveStokWH3ToIDB(window.currentStokData);
+    }
+
+    // --- PERBAIKAN DI SINI: Panggil ulang render dengan parameter yang lengkap ---
     if (typeof renderTabelwh3 === 'function') {
-        renderTabelwh3();
+        const modeAktif = document.querySelector('input[name="rb-mode-wh3"]:checked')?.value || "STOK WH-3";
+        renderTabelwh3(dataHarian, modeAktif, keyStok);
+        console.log("Tabel WH-3 berhasil diperbarui secara instan setelah simpan.");
     }
 }
 
