@@ -337,50 +337,58 @@ function muatDataDariCacheLokal() {
     }
 }
 
-// Fungsi ganti switch mode Stok WH (REKAP, WH-2, WH-3, LEBIH) dengan efek geser slider
 window.gantiModulStokWH = function(mode) {
     const slider = document.getElementById('slider-content-stokwh');
-    const btnFloatHP = document.getElementById('btnFloatingInputHP'); // Ambil elemen tombol floating HP
+    const btnFloatHP = document.getElementById('btnFloatingInputHP');
     
-    // Atur visibilitas tombol floating HP: HANYA muncul di mode WH3
+    // Cek apakah admin sudah terbuka dalam sesi ini
+    const isAdminUnlocked = sessionStorage.getItem('admin_unlocked') === 'true';
+
+    // Jika mode bukan REKAP dan belum unlock admin, tampilkan modal admin
+    if (mode !== 'REKAP' && !isAdminUnlocked) {
+        window.tempAdminAction = {
+            type: 'SWITCH_MODE',
+            mode: mode
+        };
+
+        const inputUserId = document.getElementById('admin-userid');
+        const inputPass = document.getElementById('admin-pass');
+        const modalAdmin = document.getElementById('modal-admin-stok');
+
+        if (inputUserId) inputUserId.value = '';
+        if (inputPass) inputPass.value = '';
+        if (modalAdmin) modalAdmin.classList.remove('hidden');
+        if (inputUserId) inputUserId.focus();
+
+        console.log(`Akses ke mode ${mode} dikunci, menunggu verifikasi admin...`);
+        return; 
+    }
+
+    // Eksekusi perpindahan slider (jika REKAP atau sudah unlock admin)
     if (btnFloatHP) {
         btnFloatHP.style.display = (mode === 'WH3') ? 'flex' : 'none';
     }
-    
+
     if (mode === 'REKAP') {
         slider.style.transform = 'translateX(0%)';
-        // Panggil inisialisasi REKAP yang baru kita buat
-        if (typeof initDropdownsRekap === 'function') {
-            initDropdownsRekap();
-        }
-        //gantiModeRekap(moderekap); // Pastikan mode rekap diatur sesuai
-        window.renderTabelRekap();
-        console.log("Inisialisasi mode REKAP dipanggil");
+        if (typeof initDropdownsRekap === 'function') initDropdownsRekap();
+        if (typeof window.renderTabelRekap === 'function') window.renderTabelRekap();
     } else if (mode === 'WH2') {
         slider.style.transform = 'translateX(-25%)';
-        // Kirim parameter 'WH2'
-        if (typeof initDropdowns === 'function') {
-            initDropdowns();
-        }
-        console.log("Inisialisasi mode WH-2 dipanggil");
+        if (typeof initDropdowns === 'function') initDropdowns();
     } else if (mode === 'WH3') {
         slider.style.transform = 'translateX(-50%)';
-        // Jika Anda punya fungsi khusus WH3
-        if (typeof initDropdownsWH3 === 'function') {
-            initDropdownsWH3();
-        }
-        console.log("Inisialisasi mode WH-3 dipanggil");
+        if (typeof initDropdownsWH3 === 'function') initDropdownsWH3();
     } else if (mode === 'LEBIH') {
         slider.style.transform = 'translateX(-75%)';
-        // TAMBAHKAN PEMANGGILAN INI:
-        if (!isLebihInitialized) {
+        if (typeof isLebihInitialized !== 'undefined' && !isLebihInitialized) {
             initBarangLebih();
             isLebihInitialized = true;
         }
-        window.bl_renderRiwayat();
-        window.renderTabelBarangLebih();
-        console.log("Inisialisasi mode LEBIH dipanggil");
+        if (typeof window.bl_renderRiwayat === 'function') window.bl_renderRiwayat();
+        if (typeof window.renderTabelBarangLebih === 'function') window.renderTabelBarangLebih();
     }
+    
     console.log("Stok Warehouse mode berpindah ke:", mode);
 };
 
@@ -982,69 +990,83 @@ async function prosesUploadWH2() {
         return;
     }
 
-    // 1. Cek keberadaan data untuk konfirmasi update
     const uniqueId = `stokwh2wms_${tglWh2}`;
     const url = `${DB_FIREBASE_URL}stok_wh2/${uniqueId}.json`;
     
+    // Cek status online secara eksplisit terlebih dahulu
+    if (!navigator.onLine) {
+        handleOfflineQueueWH2(fileWh2, fileWms, url, tglWh2);
+        return;
+    }
+
     try {
-        // Cek status koneksi atau lakukan fetch dengan penanganan offline queue
-        if (!navigator.onLine) {
-            throw new Error("Offline");
+        // Berikan timeout pada fetch agar tidak menggantung terlalu lama saat jaringan buruk
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // Timeout 10 detik
+
+        const checkResponse = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (!checkResponse.ok) {
+            throw new Error("Gagal terhubung ke server database.");
         }
 
-        const checkResponse = await fetch(url);
         const existingData = await checkResponse.json();
         const isUpdate = existingData !== null;
 
-        // 2. Jika data ada, gunakan miuiConfirm
         if (isUpdate) {
             miuiConfirm(
                 "Data untuk tanggal tersebut sudah ada. Apakah Anda ingin meng-UPDATE data tersebut?",
                 () => {
-                    // Jika "Ya", eksekusi upload
                     eksekusiUpload(fileWh2, fileWms, url, true);
                 },
                 () => {
-                    // Jika "Batal"
                     console.log("Upload dibatalkan oleh pengguna.");
                 }
             );
         } else {
-            // Jika data baru, langsung eksekusi
             eksekusiUpload(fileWh2, fileWms, url, false);
         }
 
     } catch (error) {
-        console.warn("Kendala jaringan atau offline terdeteksi, memasukkan ke antrean background queue...");
-        
-        // Membaca isi file secara asynchronous (misalnya dijadikan Base64 atau payload teks) agar bisa disimpan di localStorage
-        const bacaFileSebagaiTeks = (file) => {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = reject;
-                reader.readAsText(file);
-            });
+        console.warn("Kendala jaringan terdeteksi, mengalihkan ke penanganan aman / antrean offline...", error.message);
+        // Jika error karena jaringan/timeout, tanyakan apakah ingin mencoba ulang atau masuk antrean
+        handleOfflineQueueWH2(fileWh2, fileWms, url, tglWh2);
+    }
+}
+
+// Fungsi bantu untuk menangani pembacaan file aman saat offline/gagal jaringan
+async function handleOfflineQueueWH2(fileWh2, fileWms, url, tglWh2) {
+    const bacaFileSebagaiTeks = (file) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsText(file);
+        });
+    };
+
+    try {
+        const dataWh2Content = await bacaFileSebagaiTeks(fileWh2);
+        const dataWmsContent = await bacaFileSebagaiTeks(fileWms);
+
+        const payloadData = {
+            fileWh2Name: fileWh2.name,
+            fileWh2Content: dataWh2Content,
+            fileWmsName: fileWms.name,
+            fileWmsContent: dataWmsContent,
+            isUpdate: false 
         };
 
-        try {
-            const dataWh2Content = await bacaFileSebagaiTeks(fileWh2);
-            const dataWmsContent = await bacaFileSebagaiTeks(fileWms);
-
-            const payloadData = {
-                fileWh2Name: fileWh2.name,
-                fileWh2Content: dataWh2Content,
-                fileWmsName: fileWms.name,
-                fileWmsContent: dataWmsContent,
-                isUpdate: false // Default aman untuk offline
-            };
-
+        if (typeof simpanKeAntreanOffline === 'function') {
             simpanKeAntreanOffline(url, 'PUT', payloadData, `Upload Stok WH2 Tanggal ${tglWh2}`);
-            miuiAlert("Karingan terputus. Data berhasil dimasukkan ke antrean offline dan akan diunggah otomatis saat online kembali.");
-        } catch (errBaca) {
-            console.error("Gagal membaca file untuk antrean offline:", errBaca);
-            miuiAlert("Gagal memproses file dan mengecek data server.");
+            miuiAlert("Jaringan bermasalah. Data dimasukkan ke antrean offline untuk diproses kembali nanti.");
+        } else {
+            miuiAlert("Koneksi terputus dan sistem antrean offline tidak tersedia. Silakan coba beberapa saat lagi.");
         }
+    } catch (errBaca) {
+        console.error("Gagal membaca file:", errBaca);
+        miuiAlert("Gagal memproses file upload.");
     }
 }
 
@@ -1634,9 +1656,9 @@ async function loadDataRekap() {
             }
         }
 
-        // A. Handling untuk Barang Lebih
+        // A. Handling untuk Barang Lebih (Menggunakan fungsi khusus rekap)
         if (moderekap === 'BARANG_LEBIH') {
-            await window.renderTabelBarangLebih();
+            await window.renderTabelBarangLebihRekap();
             return;
         }
 
@@ -1665,7 +1687,7 @@ async function loadDataRekap() {
             const allDatarekap = JSON.parse(cachedData);
 
             if (moderekap === 'BARANG_LEBIH') {
-                await window.renderTabelBarangLebih();
+                await window.renderTabelBarangLebihRekap();
                 return;
             }
 
@@ -2153,6 +2175,85 @@ async function renderSelisihWH3Rekap(allData) {
     });
 }
 
+/**
+ * Fungsi untuk mengambil data Barang Lebih dan merendernya ke tabel rekap
+ */
+window.renderTabelBarangLebihRekap = async function() {
+    console.log("Memuat rekap barang lebih ke tabel rekap...");
+    const tbody = document.getElementById('tabel-body-rekap');
+    const thead = document.getElementById('thead-rekap');
+    if (!tbody || !thead) return;
+    
+    const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
+    const CACHE_KEY = "cache_rekap_stok_lebih";
+
+    // Set Header Tabel Rekap khusus Barang Lebih
+    thead.innerHTML = `
+        <tr>
+            <th class="py-3 px-3 text-center border-b bg-slate-100 uppercase">NO</th>
+            <th class="py-3 px-3 text-left border-b bg-slate-100 uppercase">KODE</th>
+            <th class="py-3 px-3 text-center border-b bg-slate-100 uppercase">QTY</th>
+            <th class="py-3 px-3 text-center border-b bg-slate-100 uppercase">EXP LAMA</th>
+            <th class="py-3 px-3 text-center border-b bg-slate-100 uppercase">EXP BARU</th>
+        </tr>
+    `;
+
+    const renderRekapHTML = (data) => {
+        tbody.innerHTML = ''; 
+        const listBarang = Object.entries(data).map(([kode, val]) => ({
+            kode,
+            ...val
+        })).filter(item => parseInt(item.qty) > 0);
+
+        if (listBarang.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-10 text-slate-400 text-[15px]">Stok kosong</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = listBarang.map((item, index) => {
+            return `
+                <tr class="hover:bg-slate-50 border-b border-slate-50 text-[15px]">
+                    <td class="py-2 px-3 text-center text-slate-500">${index + 1}</td>
+                    <td class="py-2 px-3 font-bold text-slate-900">${item.kode}</td>
+                    <td class="py-2 px-3 text-center font-bold text-orange-600">${item.qty}</td>
+                    <td class="py-2 px-3 text-center text-slate-500">${item.exp_lama || '-'}</td>
+                    <td class="py-2 px-3 text-center font-medium text-emerald-600">${item.exp_baru || '-'}</td>
+                </tr>
+            `;
+        }).join('');
+    };
+
+    try {
+        const response = await fetch(`${FIREBASE_URL}stok_lebih.json`);
+        const data = await response.json();
+
+        if (!data || Object.keys(data).length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-10 text-slate-400 text-[15px]">Belum ada data stok barang lebih</td></tr>`;
+            return;
+        }
+
+        localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+        renderRekapHTML(data);
+        console.log("Tabel rekap barang lebih berhasil diperbarui.");
+
+    } catch (e) {
+        console.warn("Gagal memuat rekap online, menggunakan cache lokal...", e);
+        const cachedData = localStorage.getItem(CACHE_KEY);
+
+        if (cachedData) {
+            try {
+                const data = JSON.parse(cachedData);
+                renderRekapHTML(data);
+                return;
+            } catch (err) {
+                console.error("Gagal parse cache rekap:", err);
+            }
+        }
+
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-10 text-red-500 text-[15px]">Gagal memuat data (Offline)</td></tr>`;
+    }
+};
+
 
 function renderTabel(dataStok, mode, key) {
     const tbody = document.getElementById('tabel-body-wh2');
@@ -2193,7 +2294,7 @@ function renderTabel(dataStok, mode, key) {
 
         const aksiContent = (mode === "SESUDAH") 
             ? `<td class="py-2 px-3">
-                <button onclick="bukaModalAdmin('${key}', '${kode}', ${stokBosnet}, ${stokWms})" 
+                <button onclick="bukaModalAdjust({ key: '${key}', kode: '${kode}', bosnet: ${stokBosnet}, wms: ${stokWms} })" 
                         class="bg-orange-500 text-white px-2 py-1 rounded text-[15px] hover:bg-orange-600">
                     Adjust Stok
                 </button>
@@ -4032,33 +4133,48 @@ function bukaModalAdmin(param1, kode, bosnet, wms) {
 }
 
 function tutupModalAdmin() {
-    document.getElementById('modal-admin-stok').classList.add('hidden');
-    document.getElementById('admin-userid').value = '';
-    document.getElementById('admin-pass').value = '';
+    const modalAdmin = document.getElementById('modal-admin-stok');
+    if (modalAdmin) modalAdmin.classList.add('hidden');
+    
+    const inputUserId = document.getElementById('admin-userid');
+    const inputPass = document.getElementById('admin-pass');
+    if (inputUserId) inputUserId.value = '';
+    if (inputPass) inputPass.value = '';
+
+    // Jika dibatalkan saat mencoba switch mode, pastikan slider dikembalikan ke REKAP (0%)
+    if (window.tempAdminAction && window.tempAdminAction.type === 'SWITCH_MODE') {
+        const slider = document.getElementById('slider-content-stokwh');
+        if (slider) {
+            slider.style.transform = 'translateX(0%)';
+        }
+        console.log("Akses dibatalkan, slider dikembalikan ke mode REKAP.");
+    }
+
     window.tempAdminAction = null;
 }
 
-// Cek Password Universal
 function cekAdmin() {
     const pass = document.getElementById('admin-pass').value;
     
-    // Ganti 'admin' dengan password yang Anda inginkan
-    if (pass === "admin") {
+    if (pass === "adminwh-2") {
         document.getElementById('modal-admin-stok').classList.add('hidden');
         document.getElementById('admin-userid').value = '';
         document.getElementById('admin-pass').value = '';
 
-        // Eksekusi berdasarkan aksi yang disimpan sebelumnya
+        // Tandai bahwa admin sudah terbuka selama sesi aplikasi ini belum ditutup
+        sessionStorage.setItem('admin_unlocked', 'true');
+
         if (window.tempAdminAction) {
             const action = window.tempAdminAction;
-            window.tempAdminAction = null; // Reset
+            window.tempAdminAction = null; 
 
             if (action.type === 'EDIT_DB_WH3') {
-                // Lanjut buka modal Edit Database Firebase WH-3 (Gaya MIUI v5)
                 bukaModalEditDatabaseWH3(action.kode);
             } else if (action.type === 'ADJUST_WH2') {
-                // Lanjut buka modal adjust stok WH-2 lama Anda
                 bukaModalAdjust(action.data);
+            } else if (action.type === 'SWITCH_MODE') {
+                // Panggil kembali fungsi gantiModulStokWH sekarang setelah status unlock tersimpan
+                gantiModulStokWH(action.mode);
             }
         }
     } else {
@@ -4130,6 +4246,47 @@ async function simpanAdjustStok() {
         }
     }
 }
+
+// Daftarkan event listener untuk perpindahan kolom atau menggunakan tombol Enter pada modal adjustment stok
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        const modal = document.getElementById('modal-adjust-stok');
+        
+        // Pastikan modal benar-benar ada dan tampil (tidak memiliki class 'hidden')
+        if (!modal || modal.classList.contains('hidden')) return;
+
+        e.preventDefault(); 
+
+        const activeElement = document.activeElement;
+        
+        // Alur urutan navigasi input Enter pada modal adjustment:
+        // 1. Input Stok Bosnet (adj-bosnet) -> pindah ke Stok WMS (adj-wms)
+        // 2. Input Stok WMS (adj-wms) -> langsung jalankan simpanAdjustStok()
+
+        switch (activeElement.id) {
+            case 'adj-bosnet':
+                const elWms = document.getElementById('adj-wms');
+                if (elWms) {
+                    elWms.focus();
+                    elWms.select(); // Otomatis select teks di dalam input agar mudah diketik ulang jika perlu
+                }
+                break;
+            case 'adj-wms':
+                if (typeof simpanAdjustStok === 'function') {
+                    simpanAdjustStok();
+                }
+                break;
+            default:
+                // Jika kursor berada di luar atau elemen lain, arahkan ke input bosnet
+                const elBosnet = document.getElementById('adj-bosnet');
+                if (elBosnet) {
+                    elBosnet.focus();
+                    elBosnet.select();
+                }
+                break;
+        }
+    }
+});
 
 // Fungsi untuk membuka modal
 function bukaModalEditKeterangan(kode, ketLama) {
