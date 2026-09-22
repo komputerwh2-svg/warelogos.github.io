@@ -1640,9 +1640,9 @@ async function loadDataRekap() {
             return;
         }
 
-        // B. Handling untuk Selisih WH3
+        // B. Handling untuk Selisih WH3 (Menampilkan Tabel Riwayat Selisih multi-tanggal di Rekap)
         if (moderekap === 'SELISIH_WH3') {
-            await renderSelisihWH3(allDatarekap);
+            await renderSelisihWH3Rekap(allDatarekap); // Panggil fungsi render riwayat khusus rekap
             return;
         }
 
@@ -1670,9 +1670,9 @@ async function loadDataRekap() {
             }
 
             if (moderekap === 'SELISIH_WH3') {
-            await renderSelisihWH3(allDatarekap);
-            return;
-        }
+                await renderSelisihWH3Rekap(allDatarekap); // Fungsi khusus untuk rekap
+                return;
+            }
 
             const formattedDaterekap = tanggalrekap.replace(/-/g, '');
             const keyrekap = Object.keys(allDatarekap || {}).find(k => k.includes(`${keyPrefix}${formattedDaterekap}`));
@@ -1683,7 +1683,6 @@ async function loadDataRekap() {
             }
         }
         
-        // Perbaikan: Gunakan fungsi tampilkanKosongRekap yang sudah terbukti ada
         tampilkanKosongRekap(tanggalrekap);
     }
 }
@@ -1895,8 +1894,7 @@ async function renderTabelRekap(dataStok, mode) {
     const config = {
         'WH2_SEBELUM': ['NO', 'KODE', 'BOSNET', 'WMS', 'SELISIH', 'KETERANGAN'],
         'WH2_SESUDAH': ['NO', 'KODE', 'BOSNET', 'WMS', 'SELISIH', 'KETERANGAN'],
-        'STOK_WH3': ['NO', 'KODE', 'BLOK', 'BOSNET', 'PAK', 'BECERAN', 'UTUHAN', 'TOTAL', 'SELISIH', 'KETERANGAN'],
-        'SELISIH_WH3': ['NO', 'KODE', 'BLOK', 'BOSNET', 'PAK', 'BECERAN', 'UTUHAN', 'TOTAL', 'SELISIH', 'KETERANGAN']
+        'STOK_WH3': ['NO', 'KODE', 'BLOK', 'BOSNET', 'PAK', 'BECERAN', 'UTUHAN', 'TOTAL', 'SELISIH', 'KETERANGAN', 'QA'],
     };
 
     if (!config[mode]) return; // Jika mode tidak terdaftar, hentikan proses
@@ -1904,16 +1902,31 @@ async function renderTabelRekap(dataStok, mode) {
     thead.innerHTML = `<tr>${config[mode].map(h => `<th class="py-3 px-4 text-left border-b bg-slate-100 uppercase">${h}</th>`).join('')}</tr>`;
 
     if (!dataStok || Object.keys(dataStok).length === 0) {
-        tbody.innerHTML = `<tr><td colspan="${config[mode].length}" class="text-center py-10">Data tidak ditemukan.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${config[mode].length}" class="text-center py-10">Sedang Memuat Data atau Data Tidak Ditemukan...</td></tr>`;
         return;
     }
+
+    // Fungsi helper untuk mengubah angka 0 atau kosong menjadi tanda strip "-"
+    const formatVal = (val) => {
+        const num = parseInt(val) || 0;
+        return num === 0 ? "-" : num;
+    };
 
     // Jika mode adalah SELISIH_WH3, lakukan filtering terlebih dahulu agar hanya ambil data yang selisihnya !== 0
     let entriesToRender = Object.entries(dataStok);
     if (mode === 'SELISIH_WH3') {
         entriesToRender = entriesToRender.filter(([kode, item]) => {
             if (!item || typeof item !== 'object') return false;
-            const selisih = parseInt(item.selisih) || 0;
+            
+            // Hitung ulang selisih secara dinamis (Fisik - (Bosnet + QA))
+            const bosnet = parseInt(item.bosnet) || 0;
+            const qa = parseInt(item.qa) || 0;
+            const blok = parseInt(item.blok) || 0;
+            const beceran = parseInt(item.beceran) || 0;
+            const utuhan = parseInt(item.utuhan) || 0;
+            const fisik = kode.includes("PR-PKT") ? (beceran + utuhan) : (blok + beceran + utuhan);
+            
+            let selisih = (item.selisih !== undefined && item.selisih !== null) ? (parseInt(item.selisih) || 0) : (fisik - (bosnet + qa));
             return selisih !== 0;
         });
 
@@ -1933,36 +1946,210 @@ async function renderTabelRekap(dataStok, mode) {
             let selisihWH2 = b - w;
             let badgeWH2 = selisihWH2 === 0 ? '<span style="background: #27ae60; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">SESUAI</span>' : '<span style="background: #c0392b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">SELISIH</span>';
             
-            row += `<td>${b}</td><td>${w}</td><td>${selisihWH2}</td><td>${badgeWH2}</td>`;
+            row += `<td>${formatVal(b)}</td><td>${formatVal(w)}</td><td>${formatVal(selisihWH2)}</td><td>${badgeWH2}</td>`;
         } else if (mode === 'STOK_WH3' || mode === 'SELISIH_WH3') {
             // Ambil rincian detail rak untuk tampilan multi-qty jika ada
             const detailRak = item.detail_rak || {};
             const bRak = detailRak.beceran_rak ? `<br><small style="color: gray;">(${detailRak.beceran_rak})</small>` : '';
             const uRak = detailRak.utuhan_rak ? `<br><small style="color: gray;">(${detailRak.utuhan_rak})</small>` : '';
 
-            // Warna badge keterangan WH-3
-            let badgeColor = "#27ae60"; // Hijau
-            const ket = item.keterangan || "-";
-            if (ket.includes("KURANG")) badgeColor = "#c0392b"; // Merah
-            else if (ket.includes("LEBIH")) badgeColor = "#d35400"; // Oranye
+            // --- HITUNG ULANG SELISIH & KETERANGAN AGAR SINKRON DENGAN QA ---
+            const bosnet = parseInt(item.bosnet) || 0;
+            const qa = parseInt(item.qa) || 0;
+            const blok = parseInt(item.blok) || 0;
+            const beceran = parseInt(item.beceran) || 0;
+            const utuhan = parseInt(item.utuhan) || 0;
+            const fisik = kode.includes("PR-PKT") ? (beceran + utuhan) : (blok + beceran + utuhan);
+            
+            let selisihVal = (item.selisih !== undefined && item.selisih !== null && item.selisih !== "") ? 
+                             (parseInt(item.selisih) || 0) : 
+                             (fisik - (bosnet + qa));
 
-            // Jika di mode SELISIH_WH3, kita buat angka selisihnya lebih menonjol (misal warna merah)
-            let selisihVal = item.selisih || 0;
-            let selisihDisplay = mode === 'SELISIH_WH3' ? `<span style="color: #c0392b; font-weight: bold;">${selisihVal}</span>` : selisihVal;
+            // Tentukan keterangan otomatis jika belum sinkron
+            let ket = item.keterangan || "";
+            if (!ket || ket === "BELUM DIHITUNG") {
+                if (selisihVal < 0) {
+                    ket = `STOK KURANG ${Math.abs(selisihVal)} KRT`; // atau sesuaikan format teks keterangan Anda
+                } else if (selisihVal > 0) {
+                    ket = `STOK LEBIH ${selisihVal} KRT`;
+                } else {
+                    ket = "SESUAI";
+                }
+            }
+
+            // Warna badge keterangan WH-3
+            let badgeColor = "#4de128"; // Stabilo
+            const upperKet = ket.toUpperCase();
+            if (upperKet.includes("KURANG")) badgeColor = "#c0392b"; // Merah
+            else if (upperKet.includes("LEBIH")) badgeColor = "#004b08"; // Hijau Tua
+
+            // Jika di mode SELISIH_WH3, kita buat angka selisihnya lebih menonjol (warna merah)
+            let selisihDisplay = mode === 'SELISIH_WH3' ? 
+                `<span style="color: #c0392b; font-weight: bold;">${formatVal(selisihVal)}</span>` : 
+                formatVal(selisihVal);
 
             row += `
                 <td>${item.blok || '-'}</td>
-                <td>${item.bosnet || 0}</td>
-                <td>${item.pak || 0}</td>
-                <td>${item.beceran || 0} ${bRak}</td>
-                <td>${item.utuhan || 0} ${uRak}</td>
-                <td><b>${item.total || 0}</b></td>
+                <td>${formatVal(item.bosnet)}</td>
+                <td>${formatVal(item.pak)}</td>
+                <td>${formatVal(item.beceran)} ${bRak}</td>
+                <td>${formatVal(item.utuhan)} ${uRak}</td>
+                <td><b>${formatVal(item.total)}</b></td>
                 <td>${selisihDisplay}</td>
                 <td><span style="background: ${badgeColor}; color: white; padding: 3px 6px; border-radius: 4px; font-size: 11px;">${ket}</span></td>
+                <td><span style="color: red; font-weight: bold; font-size: 13px;">${formatVal(item.qa)}</span></td>
             `;
         }
 
         tbody.innerHTML += row + `</tr>`;
+    });
+}
+
+async function renderSelisihWH3Rekap(allData) {
+    // Menggunakan ID tabel khusus untuk menu Rekap
+    const thead = document.getElementById('thead-rekap');
+    const tbody = document.getElementById('tabel-body-rekap');
+    if (!thead || !tbody) return;
+
+    // Salin logika pemrosesan data riwayat yang sama persis seperti renderSelisihWH3 asli
+    const polaUtama = ["CRR", "CRR EA", "THR EA", "THR", "MRMR", "MRR", "MJR HJ", "MJR", "MOB4A", "MOR2A EA", "MOR2A EB", "MOR2A", "MP", "PDR", "MTR3A", "PR-PKT", "PR-CUP", "MRSR", "LTGR", "MTGR", "MEB", "MEL", "MOL", "MRL", "MTL", "ISEL"];
+    const daftarKelompok = ["CRR", "MRR", "MOR", "MJR", "MP", "PDR", "DIY"];
+    const prefixDIY = ["MEB", "MEL", "MOL", "MRL", "MTL", "ISEL"];
+
+    const getSortScore = (kode) => {
+        kode = kode.toUpperCase();
+        for (let i = 0; i < polaUtama.length; i++) {
+            if (kode.includes(polaUtama[i])) {
+                if (polaUtama[i] === "MOR2A" && (kode.includes("MOR2A EA") || kode.includes("MOR2A EB"))) continue;
+                if (polaUtama[i] === "THR" && kode.includes("THR EA")) continue;
+                if (polaUtama[i] === "MJR" && kode.includes("MJR HJ")) continue;
+                if (polaUtama[i] === "CRR" && kode.includes("CRR EA")) continue;
+                return i + 1;
+            }
+        }
+        return 999;
+    };
+    const getVarianScore = (kode) => {
+        kode = kode.toUpperCase();
+        if (kode.includes("ZC")) return 1;
+        if (kode.includes("SSL")) return 2;
+        if (kode.includes("SLO")) return 3;
+        if (kode.includes("TDS")) return 4;
+        if (kode.includes("BAG")) return 5;
+        if (kode.includes("WRG")) return 6;
+        if (kode.includes("GTG")) return 7;
+        if (kode.includes("DRC")) return 8;
+        return 0;
+    };
+    const getAngkaAkhir = (kode) => {
+        const match = kode.match(/\d+/g);
+        return match ? parseInt(match.join('').slice(-4)) || 999 : 999;
+    };
+
+    const dates = Object.keys(allData || {})
+        .filter(k => k.startsWith('stokwh3_'))
+        .map(k => k.replace('stokwh3_', ''))
+        .sort();
+
+    let kodeSelisih = new Set();
+    let dataMatriks = {};
+    let totalPerTgl = {};
+    let rekapKelompok = {};
+    
+    dates.forEach(tgl => {
+        totalPerTgl[tgl] = 0;
+        const dailyData = allData[`stokwh3_${tgl}`] || {};
+        Object.entries(dailyData).forEach(([kode, item]) => {
+            if (!item || typeof item !== 'object') return;
+
+            const bosnet = parseInt(item.bosnet) || 0;
+            const qa = parseInt(item.qa) || 0;
+            const blok = parseInt(item.blok) || 0;
+            const beceran = parseInt(item.beceran) || 0;
+            const utuhan = parseInt(item.utuhan) || 0;
+            
+            const fisik = kode.includes("PR-PKT") ? (beceran + utuhan) : (blok + beceran + utuhan);
+            
+            let selisih = 0;
+            if (item.selisih !== undefined && item.selisih !== null) {
+                selisih = parseInt(item.selisih) || 0;
+            } else {
+                selisih = fisik - (bosnet + qa);
+            }
+            
+            if (selisih !== 0) {
+                kodeSelisih.add(kode);
+                if (!dataMatriks[kode]) dataMatriks[kode] = {};
+                dataMatriks[kode][tgl] = selisih;
+
+                totalPerTgl[tgl] += selisih;
+
+                const upperKode = kode.toUpperCase();
+                let prefix = prefixDIY.some(p => upperKode.startsWith(p)) ? "DIY" : (daftarKelompok.find(k => k !== "DIY" && upperKode.startsWith(k)) || "LAIN");
+
+                if (!rekapKelompok[prefix]) rekapKelompok[prefix] = {};
+                rekapKelompok[prefix][tgl] = (rekapKelompok[prefix][tgl] || 0) + selisih;
+            }
+        });
+    });
+
+    if (dates.length === 0 || kodeSelisih.size === 0) {
+        thead.innerHTML = `<tr><th class="py-3 px-4 text-left border-b bg-slate-100 uppercase">KETERANGAN</th></tr>`;
+        tbody.innerHTML = `<tr><td class="text-center py-10">Data riwayat selisih WH-3 tidak ditemukan.</td></tr>`;
+        return;
+    }
+
+    // --- RENDER HEADER ---
+    thead.innerHTML = `
+        <th class="py-3 px-3 text-center whitespace-nowrap bg-slate-200 border-r" style="position: sticky; left: 0px; top: 0px; z-index: 30; min-width: 45px; width: 45px;">NO</th>
+        <th class="py-3 px-3 text-left whitespace-nowrap bg-slate-200 border-r" style="position: sticky; left: 45px; top: 0px; z-index: 30; min-width: 110px;">KODE</th>` + 
+        dates.map(d => {
+            const dd = d.substring(6,8), mm = d.substring(4,6), yy = d.substring(2,4);
+            return `<th class="py-3 px-4 text-center bg-slate-100 whitespace-nowrap" style="position: sticky; top: 0px; z-index: 10;">${dd}/${mm}/${yy}</th>`;
+        }).join('');
+
+    // --- RENDER BODY ---
+    tbody.innerHTML = "";
+    let no = 1;
+
+    Array.from(kodeSelisih).sort((a, b) => {
+        const scoreA1 = getSortScore(a), scoreB1 = getSortScore(b);
+        if (scoreA1 !== scoreB1) return scoreA1 - scoreB1;
+        const scoreA2 = getVarianScore(a), scoreB2 = getVarianScore(b);
+        if (scoreA2 !== scoreB2) return scoreA2 - scoreB2;
+        return getAngkaAkhir(a) - getAngkaAkhir(b);
+    }).forEach(kode => {
+        let rowHtml = `<tr class="bg-white border-b hover:bg-gray-50">
+            <td class="py-2 px-3 text-center text-slate-600 border-r bg-white" style="position: sticky; left: 0px; z-index: 20; min-width: 45px; width: 45px;">${no++}</td>
+            <td class="py-2 px-3 font-bold text-slate-800 whitespace-nowrap border-r bg-white" style="position: sticky; left: 45px; z-index: 20; min-width: 110px;">${kode}</td>`;
+        
+        dates.forEach(tgl => {
+            const val = dataMatriks[kode] && dataMatriks[kode][tgl] ? dataMatriks[kode][tgl] : 0;
+            const warna = val > 0 ? "text-blue-600" : (val < 0 ? "text-red-600" : "text-gray-300");
+            rowHtml += `<td class="py-2 px-4 text-center font-bold ${warna} whitespace-nowrap">${val === 0 ? "-" : val}</td>`;
+        });
+        tbody.innerHTML += rowHtml + `</tr>`;
+    });
+
+    // --- RENDER TOTAL SELISIH GLOBAL ---
+    let totalGlobalRow = `<tr class="bg-orange-100 border-t-2 border-orange-500 font-black">
+        <td class="sticky-col-total py-2 px-3 text-right text-[16px] text-red-600 border-r" colspan="2" style="left: 0px; position: sticky;">TOTAL SELISIH :</td>`;
+    dates.forEach(tgl => {
+        const grandTotal = totalPerTgl[tgl] || 0;
+        totalGlobalRow += `<td class="py-2 px-4 text-[16px] text-center ${grandTotal !== 0 ? 'text-red-600' : 'text-gray-400'} whitespace-nowrap">${grandTotal === 0 ? "-" : grandTotal}</td>`;
+    });
+    tbody.innerHTML += totalGlobalRow + `</tr>`;
+
+    // --- RENDER REKAP KELOMPOK ---
+    daftarKelompok.forEach(kel => {
+        let kelRow = `<tr class="bg-gray-100 border-b hover:bg-gray-200 font-bold text-slate-700">
+            <td class="sticky-col-total py-2 px-3 text-right text-[14px] border-r" colspan="2" style="left: 0px; position: sticky;">SELISIH ${kel} :</td>`;
+        dates.forEach(tgl => {
+            const val = rekapKelompok[kel] ? (rekapKelompok[kel][tgl] || 0) : 0;
+            const warna = val !== 0 ? "text-gray-800" : "text-gray-400";
+            kelRow += `<td class="py-2 px-4 text-center ${warna} whitespace-nowrap">${val === 0 ? "-" : val}</td>`;
+        });
+        tbody.innerHTML += kelRow + `</tr>`;
     });
 }
 
@@ -2699,9 +2886,14 @@ function renderRakWH3(dataStok) {
     });
 }
 
-async function renderSelisihWH3(allData) {
-    const thead = document.getElementById('thead-selisih-wh3');
-    const tbody = document.getElementById('tabel-body-selisih-wh3');
+async function renderSelisihWH3(allData, tableIdPrefix = '') {
+    // Jika dipanggil dari Rekap, kita bisa berikan prefix atau target ID khusus,
+    // atau tentukan ID berdasarkan di mana fungsi ini dipanggil
+    const theadId = tableIdPrefix ? `thead-${tableIdPrefix}` : 'thead-selisih-wh3';
+    const tbodyId = tableIdPrefix ? `tabel-body-${tableIdPrefix}` : 'tabel-body-selisih-wh3';
+
+    const thead = document.getElementById(theadId);
+    const tbody = document.getElementById(tbodyId);
     if (!thead || !tbody) return;
 
     // --- FUNGSI SORTIR & KONFIGURASI ---
