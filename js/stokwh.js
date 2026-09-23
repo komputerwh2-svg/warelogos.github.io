@@ -2589,16 +2589,23 @@ async function renderTabelwh3(dataStok, mode, key) {
         const isPaket = kode.includes("PR-PKT");
         const satuan = isPaket ? "PKT" : "KRT";
 
-        // BUAT KETERANGAN OTOMATIS SECARA DINAMIS BERDASARKAN SELISIH
-        let keterangan = item.keterangan || "SESUAI";
-        if (selisih > 0) {
-            keterangan = `STOK LEBIH ${selisih} ${satuan}`;
-        } else if (selisih < 0) {
-            keterangan = `STOK KURANG ${Math.abs(selisih)} ${satuan}`;
+        // PRIORITASKAN KETERANGAN DARI DATABASE / EDIT MANUAL
+        let keterangan = item.keterangan;
+        
+        // Jika belum ada keterangan atau kosong, baru gunakan kalkulasi otomatis berdasarkan selisih
+        if (!keterangan || keterangan === "-") {
+            if (selisih > 0) {
+                keterangan = `STOK LEBIH ${selisih} ${satuan}`;
+            } else if (selisih < 0) {
+                keterangan = `STOK KURANG ${Math.abs(selisih)} ${satuan}`;
+            } else {
+                keterangan = "SESUAI";
+            }
         }
         
+        // Tentukan warna teks berdasarkan isi keterangan atau selisih
         let kelasWarnaSelisih = selisih > 0 ? "text-blue-600 font-bold" : (selisih < 0 ? "text-red-600 font-bold" : "text-green-600 font-bold");
-        let warnaKet = selisih > 0 ? "text-blue-600 font-bold" : (selisih < 0 ? "text-red-600 font-bold" : "text-green-600 font-bold");
+        let warnaKet = keterangan.includes("KURANG") ? "text-red-600 font-bold" : (keterangan.includes("LEBIH") ? "text-blue-600 font-bold" : "text-green-600 font-bold");
 
         // Ambil rincian detail rak untuk tampilan multi-qty (jika ada)
         const detailRak = item.detail_rak || {};
@@ -2608,7 +2615,7 @@ async function renderTabelwh3(dataStok, mode, key) {
         rowsHTML += `
             <tr class="hover:bg-gray-50 border-b text-[15px]">
                 <td class="py-2 px-2">${no++}</td>
-                <td class="py-2 px-2 whitespace-nowrap font-bold text-orange-600 cursor-pointer hover:underline" onclick="bukaModalAdmin('EDIT_DB_WH3', '${kode}')" title="Klik untuk Edit Database Firebase">${kode}</td>
+                <td class="py-2 px-2 whitespace-nowrap font-bold text-orange-600 cursor-pointer hover:underline" onclick="bukaModalEditDatabaseWH3('${kode}')" title="Klik untuk Edit Database Firebase">${kode}</td>
                 <td class="py-2 px-2 font-bold text-emerald-600">${f(blok)}</td>
                 <td class="py-2 px-2 font-bold text-slate-600">${f(bosnet)}</td>
                 <td class="py-2 px-2">${pak}</td>
@@ -2911,10 +2918,10 @@ function renderRakWH3(dataStok) {
 
     if (!dataStok || typeof dataStok !== 'object') return;
 
-    // --- FUNGSI FORMAT RAK ---
+    // --- FUNGSI FORMAT RAK (Gunakan teks asli tanpa mengubah huruf/menyisipkan C) ---
     const formatRakV2 = (str) => {
         if (!str) return "";
-        return str.replace(/(\d+)([A-Za-z]+)(\d+)/g, "$1 C $3");
+        return str.trim(); // Cukup kembalikan teks aslinya
     };
 
     // --- SORTIR DATA (Agar sinkron dengan Tabel Stok & konsisten dengan v3.6.1) ---
@@ -2968,19 +2975,25 @@ function renderRakWH3(dataStok) {
 
         const dr = item.detail_rak || {};
         
-        // Memproses format rak dengan formatRakV2
-        const rakBeceran = dr.beceran_rak ? formatRakV2(dr.beceran_rak) : "-";
+        // Ambil kuantiti dan teks rak langsung dari detail_rak agar sinkron dengan inputan modal rak
+        const qtyBeceran = dr.beceran_qty_teks || item.beceran;
+        const rawRakBeceran = dr.beceran_rak || "";
+        const rakBeceran = rawRakBeceran ? formatRakV2(rawRakBeceran) : "-";
         
+        const qtyUtuhan = dr.utuhan_qty_teks || item.utuhan;
         const rawUtuhan = dr.utuhan_rak || "";
         const rakUtuhan = rawUtuhan ? rawUtuhan.split('+').map(part => formatRakV2(part.trim())).join(' + ') : "-";
         
+        // Jika tidak ada data rak sama sekali dan kuantiti kosong/0, lewati baris kosong jika diinginkan
+        if (!qtyBeceran && !qtyUtuhan && rawRakBeceran === "" && rawUtuhan === "") return;
+
         tbody.innerHTML += `
             <tr class="hover:bg-gray-50 border-b text-[15px]">
                 <td class="py-3 px-3 text-slate-600">${no++}</td>
                 <td class="py-3 px-3 font-bold text-slate-800">${kode}</td>
-                <td class="py-3 px-3 font-bold text-slate-800">${f(item.beceran)}</td>
+                <td class="py-3 px-3 font-bold text-slate-800">${f(qtyBeceran)}</td>
                 <td class="py-3 px-3 text-slate-800 font-bold uppercase">${rakBeceran}</td>
-                <td class="py-3 px-3 text-slate-800 font-bold">${f(item.utuhan)}</td>
+                <td class="py-3 px-3 text-slate-800 font-bold">${f(qtyUtuhan)}</td>
                 <td class="py-3 px-3 text-slate-800 font-bold uppercase">${rakUtuhan}</td>
             </tr>
         `;
@@ -3463,10 +3476,10 @@ function bukaModalLihatRak(kode, event) {
     
     if (!item) return;
 
-    // Fungsi pemformatan rak
+    // --- FUNGSI FORMAT RAK (Gunakan teks asli tanpa mengubah huruf/menyisipkan C) ---
     const formatRakV2 = (str) => {
         if (!str) return "";
-        return str.replace(/(\d+)([A-Za-z]+)(\d+)/g, "$1 C $3");
+        return str.trim(); // Cukup kembalikan teks aslinya
     };
 
     const detail = item.detail_rak || {};
@@ -4308,23 +4321,24 @@ async function simpanKeteranganManual() {
     const url = `https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/stok_wh3/stokwh3_${tanggal}/${kode}.json`;
     const updateData = { keterangan: finalKet };
 
-    // 1. UPDATE STATE LOKAL SEBELUM RENDER (PENTING AGAR UI LANGSUNG BERUBAH)
+    // 1. UPDATE STATE LOKAL SECARA AMAN
     if (!window.currentStokData) window.currentStokData = {};
-    if (!window.currentStokData[`stokwh3_${tanggal}`]) {
-        window.currentStokData[`stokwh3_${tanggal}`] = {};
-    }
-    const dataHarian = window.currentStokData[`stokwh3_${tanggal}`];
+    const keyNode = `stokwh3_${tanggal}`;
     
-    if (dataHarian[kode]) {
-        dataHarian[kode].keterangan = finalKet; // Perbarui data di memori lokal
+    if (!window.currentStokData[keyNode]) {
+        window.currentStokData[keyNode] = {};
     }
+    if (!window.currentStokData[keyNode][kode]) {
+        window.currentStokData[keyNode][kode] = {};
+    }
+    window.currentStokData[keyNode][kode].keterangan = finalKet;
 
     try {
         if (!navigator.onLine) {
             throw new Error("Offline");
         }
 
-        // Hanya update field keterangan saja ke Firebase
+        // Kirim perubahan ke Firebase menggunakan PATCH
         const response = await fetch(url, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
@@ -4336,28 +4350,24 @@ async function simpanKeteranganManual() {
         console.log("Keterangan berhasil diupdate ke server dan lokal.");
         document.getElementById('modalEditKet').classList.add('hidden');
         
-        // Refresh tampilan tabel / rekap
+        // 2. RENDER ULANG TABEL STOK WH-3 SECARA LANGSUNG
         if (typeof renderTabelStokWH3 === 'function') {
-            renderTabelStokWH3();
+            renderTabelStokWH3(); // Render ulang tabel menggunakan data lokal yang sudah diperbarui
         } else if (typeof loadStokDatawh3 === 'function') {
-            loadStokDatawh3(); 
-        } 
+            await loadStokDatawh3();
+        }
 
     } catch (error) {
         console.warn("Koneksi terputus/offline saat menyimpan keterangan, memasukkan ke antrean background queue...", error.message);
         
-        // Simpan ke antrean offline dengan method PATCH
         simpanKeAntreanOffline(url, 'PATCH', updateData, `Edit Keterangan Produk ${kode} (${tanggal})`);
         
         miuiAlert("Koneksi terputus. Perubahan keterangan disimpan secara lokal & dimasukkan ke antrean offline.");
         
         document.getElementById('modalEditKet').classList.add('hidden');
         
-        // Refresh tampilan tabel secara lokal
         if (typeof renderTabelStokWH3 === 'function') {
             renderTabelStokWH3();
-        } else if (typeof loadStokDatawh3 === 'function') {
-            loadStokDatawh3();
         }
     }
 }
@@ -4691,16 +4701,13 @@ window.initBarangLebih = async function() {
     }
 };
 
-/**
- * Fungsi Load Dropdown Khusus Barang Lebih dengan Cache Lokal & Fallback Offline
- * Menggunakan ID: 'bl_tx_kode'
- */
 window.bl_loadDropdownBarang = async function() {
     const select = document.getElementById('bl_tx_kode');
     if (!select) return;
 
     const FIREBASE_URL = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/";
     const CACHE_KEY = "cache_master_barang_bl";
+    const GLOBAL_CACHE_KEY = "wh_cache_master_barang"; // Sinkron dengan modul lain
 
     // Helper untuk render data ke elemen select
     const renderDropdown = (dataBarang) => {
@@ -4735,18 +4742,16 @@ window.bl_loadDropdownBarang = async function() {
             return;
         }
 
-        // PANGGIL DI SINI UNTUK MONITORING UKURAN DOWNLOAD DI WIDGET
-        if (typeof updateWidgetDownloadSize === 'function') {
-            updateWidgetDownloadSize(allData);
-        }
-
         // Simpan ke Cache Lokal (localStorage) agar bisa diakses saat offline
         localStorage.setItem(CACHE_KEY, JSON.stringify(dataBarang));
+        localStorage.setItem(GLOBAL_CACHE_KEY, JSON.stringify(dataBarang)); // Sinkronisasi cache global
         renderDropdown(dataBarang);
 
     } catch (e) {
         console.warn("Koneksi gagal, mencoba memuat dari cache lokal...", e);
-        const cachedData = localStorage.getItem(CACHE_KEY);
+        
+        // Coba ambil dari cache modul LEBIH atau cache global master barang
+        const cachedData = localStorage.getItem(CACHE_KEY) || localStorage.getItem(GLOBAL_CACHE_KEY);
         
         if (cachedData) {
             try {
