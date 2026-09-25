@@ -1196,7 +1196,7 @@ function bukaSubPageMuatWH3() {
         })
         .catch(error => {
             console.error(error);
-            alert("Sistem Gagal Memuat Template Muat WH-3!");
+            miuiAlert("Sistem Gagal Memuat Template Muat WH-3!");
         });
 }
 
@@ -1212,6 +1212,69 @@ window.tutupSubPageMuatWH3 = function() {
 
 window.bukaSubPageMuatWH3 = bukaSubPageMuatWH3;
 window.tutupSubPageMuatWH3 = tutupSubPageMuatWH3;
+
+
+
+// Fungsi untuk membuka subpage DO Trobel
+function bukaSubPageDoTrobel() {
+    // 1. Tentukan kontenernya (pastikan ada <div id="subpage-do-trobel-container"></div> di index.html Anda)
+    const container = document.getElementById('subpage-do-trobel-container'); 
+    
+    if (!container) {
+        console.error("Wadah 'subpage-do-trobel-container' tidak ditemukan di index.html!");
+        return;
+    }
+
+    const subpage = document.getElementById('subpage-do-trobel');
+
+    // Jika sudah ada (sudah pernah di-fetch), langsung buka
+    if (subpage) {
+        subpage.classList.remove('translate-x-full');
+        return;
+    }
+
+    // 2. Fetch file HTML subpage DO Trobel
+    fetch('apps/do-trobel.html') 
+        .then(response => {
+            if (!response.ok) throw new Error("Gagal mengambil file apps/do-trobel.html");
+            return response.text();
+        })
+        .then(htmlContent => {
+            container.innerHTML = htmlContent;
+
+            // 3. Suntikkan script JS-nya
+            const script = document.createElement('script');
+            script.src = "js/do-trobel.js"; 
+            
+            script.onload = () => {
+                // Panggil fungsi inisialisasi modul DO Trobel
+                if (typeof window.initDoTrobel === 'function') {
+                    window.initDoTrobel();
+                }
+                
+                const elemenBaru = document.getElementById('subpage-do-trobel');
+                if (elemenBaru) {
+                    elemenBaru.classList.remove('translate-x-full');
+                }
+            };
+            document.body.appendChild(script);
+        })
+        .catch(error => {
+            console.error(error);
+            miuiAlert("Sistem Gagal Memuat Template DO Trobel!");
+        });
+}
+
+// Fungsi untuk menutup subpage DO Trobel
+window.tutupSubPageDoTrobel = function() {
+    const subpage = document.getElementById('subpage-do-trobel');
+    if (subpage) {
+        subpage.classList.add('translate-x-full');
+    }
+};
+
+window.bukaSubPageDoTrobel = bukaSubPageDoTrobel;
+window.tutupSubPageDoTrobel = tutupSubPageDoTrobel;
 
 
 
