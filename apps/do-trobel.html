@@ -1,0 +1,312 @@
+<div id="subpage-do-trobel" class="fixed inset-0 bg-[#f4f4f4] z-[60] translate-x-full transition-transform duration-300 ease-in-out flex flex-col font-sans select-none overflow-hidden">
+    
+    <!-- Header -->
+    <div class="w-full h-auto min-h-[60px] flex items-center justify-between px-3 shadow-md relative z-10" 
+        style="background: linear-gradient(to bottom, #3c3c3c, #2a2a2a); border-bottom: 1px solid #1a1a1a;">
+            
+        <!-- Kontainer Utama Header -->
+        <div class="flex flex-wrap items-center gap-4 py-2 px-3 rounded-lg">
+            <!-- Bagian Kiri: Tombol Kembali & Judul -->
+            <div class="flex items-center gap-4">
+                <button onclick="tutupSubPageDoTrobel()" class="miui-btn-back flex items-center justify-center gap-1 px-3 py-1.5 rounded text-xs font-bold text-orange-400 shadow-inner">
+                    <i class="fa-solid fa-chevron-left text-sm"></i>
+                    <span>Kembali</span>
+                </button>
+
+                <div class="h-8 w-[1px] bg-white/10 mx-1"></div>
+
+                <h1 class="text-white font-bold text-[14px] ml-3 tracking-wide drop-shadow-md">
+                    DO Trobel & Klaim Barang Kurang
+                    <span id="display-waktu-trobel" class="text-orange-500 font-bold text-[14px] ml-3 tracking-wide drop-shadow-md"></span>
+                </h1>
+            </div>
+        </div>
+
+        <div class="flex items-center bg-black/35 p-1 rounded-xl border border-black/30 shadow-inner gap-0.5">
+            <!-- Grup Tombol Tab Slider: TROBEL & KLAIM -->
+            <div class="flex items-center gap-1 ml-auto">
+                <!-- Tab 1: TROBEL -->
+                <label class="relative flex items-center justify-center px-4 py-2 rounded-lg text-[11px] font-black uppercase cursor-pointer transition-all">
+                    <input type="radio" name="rb-do-trobel" value="TROBEL" checked onchange="gantiModulDoTrobel(this.value)" class="sr-only peer">
+                    <span class="z-10 text-gray-300 peer-checked:text-white transition-colors">DO TROBEL</span>
+                    <div class="absolute inset-0 rounded-lg shadow-md opacity-0 scale-95 peer-checked:opacity-100 peer-checked:scale-100 transition-all duration-200" style="background: linear-gradient(to bottom, #ff8b00, #f36c00);"></div>
+                </label>
+
+                <!-- Tab 2: KLAIM -->
+                <label class="relative flex items-center justify-center px-4 py-2 rounded-lg text-[11px] font-black uppercase cursor-pointer transition-all">
+                    <input type="radio" name="rb-do-trobel" value="KLAIM" onchange="gantiModulDoTrobel(this.value)" class="sr-only peer">
+                    <span class="z-10 text-gray-300 peer-checked:text-white transition-colors">KLAIM KURANG</span>
+                    <div class="absolute inset-0 rounded-lg shadow-md opacity-0 scale-95 peer-checked:opacity-100 peer-checked:scale-100 transition-all duration-200" style="background: linear-gradient(to bottom, #ff8b00, #f36c00);"></div>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slider Main Content Area (2 Slide: TROBEL & KLAIM) -->
+    <div class="flex-1 overflow-x-hidden overflow-y-auto bg-[#f4f4f4]">
+        <div id="slider-content-do-trobel" class="flex flex-nowrap w-[200%] transition-transform duration-500 ease-in-out" style="transform: translateX(0%);">
+            
+            <!-- ================= SLIDE 1: TROBEL ================= -->
+            <div class="w-1/2 flex-shrink-0 p-4 space-y-4 overflow-y-auto max-h-full">
+                
+                <!-- Panel Atas: Input Form DO Trobel (2 Kolom) -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-orange-500 space-y-4">
+                    <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider mb-2">Form Input DO Trobel</h3>
+                    
+                    <!-- Grid Utama 2 Kolom -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        
+                        <!-- KOLOM KIRI: Identitas DO & Item Barang -->
+                        <div class="bg-slate-50 p-4 rounded-xl border border-orange-200 space-y-3">
+                            <h4 class="text-[11px] font-black text-orange-600 uppercase tracking-wide">1. Identitas DO & Item Barang</h4>
+                            
+                            <!-- Baris 1: Tanggal DO & No. DN/DO -->
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">Tanggal DO</label>
+                                    <input type="date" id="trobel-tgl-do" class="w-full p-2 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">No. DN / DO</label>
+                                    <input type="text" id="trobel-no-dn" list="list-template-dn-do" placeholder="DN-HO001-..." class="w-full p-2 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white uppercase">
+                                    <datalist id="list-template-dn-do">
+                                        <option value="DN-HO001-">
+                                        <option value="DO-HO001-">
+                                    </datalist>
+                                </div>
+                            </div>
+
+                            <!-- Baris 2: Tujuan & Keterangan -->
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">Tujuan</label>
+                                    <input type="text" id="trobel-tujuan" list="list-master-tujuan" placeholder="Pilih atau ketik tujuan..." class="w-full p-2 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white uppercase">
+                                    <datalist id="list-master-tujuan">
+                                        <!-- Data tujuan dimuat dinamis -->
+                                    </datalist>
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">Keterangan</label>
+                                    <input type="text" id="trobel-keterangan" list="list-template-ket-trobel" placeholder="Pilih / ketik..." class="w-full p-2 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white uppercase">
+                                    <datalist id="list-template-ket-trobel">
+                                        <option value="TIDAK CUKUP">
+                                        <option value="REVISI DO/DIBATALKAN">
+                                        <option value="TERTUKAR RASA">
+                                        <option value="BELUM DIMUAT">
+                                        <option value="BARANG KURANG">
+                                    </datalist>
+                                </div>
+                            </div>
+
+                            <!-- Bagian Input Kode Barang, Qty, & Tombol Tambah Item -->
+                            <div class="p-3 bg-orange-50/60 rounded-xl border border-orange-200 space-y-2">
+                                <div class="grid grid-cols-12 gap-2 items-end">
+                                    <div class="col-span-7">
+                                        <div class="flex items-center gap-1.5 mb-1">
+                                            <label class="text-[9px] font-black text-slate-500 uppercase">Kode Barang</label>
+                                            <span id="trobel-nama-barang-display" class="text-[10px] font-black text-orange-600 uppercase truncate" title=""></span>
+                                        </div>
+                                        <input type="text" id="trobel-kode" list="listMasterKodeBarang" oninput="handlePilihKodeBarangTrobel(this.value)" placeholder="Pilih / ketik..." class="w-full p-1.5 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white uppercase">
+                                        <datalist id="listMasterKodeBarang">
+                                            <!-- Data kode barang dimuat dinamis -->
+                                        </datalist>
+                                    </div>
+                                    <div class="col-span-3">
+                                        <label class="text-[9px] font-black text-slate-500 uppercase block mb-1">Qty</label>
+                                        <input type="number" id="trobel-qty" placeholder="Jumlah..." class="w-full p-1.5 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white">
+                                    </div>
+                                    <div class="col-span-2">
+                                        <button type="button" onclick="tambahItemTrobelKeList()" class="w-full h-[34px] bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-black text-[11px] uppercase flex items-center justify-center gap-1 shadow transition" title="Tambah Item ke List">
+                                            <i class="fa-solid fa-plus text-[10px]"></i> Tambah
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Container Daftar Item Sementara (Multi-Item) -->
+                                <div class="mt-2">
+                                    <div class="text-[10px] font-black text-slate-600 uppercase mb-1">Daftar Item Trobel:</div>
+                                    <div id="container-list-item-trobel" class="max-h-28 overflow-y-auto space-y-1 bg-white p-2 rounded-lg border border-orange-200 text-[11px]">
+                                        <div class="text-slate-400 italic text-center py-1">Belum ada item ditambahkan</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- KOLOM KANAN: Info Proses -->
+                        <div class="bg-slate-50 p-4 rounded-xl border border-orange-200 space-y-3 flex flex-col justify-between">
+                            <div class="space-y-3">
+                                <h4 class="text-[11px] font-black text-orange-600 uppercase tracking-wide">2. Info Proses Penyelesaian</h4>
+                                
+                                <!-- Baris 1: Tanggal Proses & No. DN Retur (2 Kolom) -->
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">Tanggal Proses</label>
+                                        <input type="date" id="trobel-tgl-proses" class="w-full p-2 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">No. DN Retur</label>
+                                        <input type="text" id="trobel-no-dn-retur" placeholder="No Retur..." class="w-full p-2 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white uppercase">
+                                    </div>
+                                </div>
+
+                                <!-- Baris 2: No. ID Bosnet & Keterangan Proses (2 Kolom) -->
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">No. ID Bosnet</label>
+                                        <input type="text" id="trobel-id-bosnet" placeholder="ID Bosnet..." class="w-full p-2 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">Keterangan Proses</label>
+                                        <input type="text" id="trobel-ket-proses" list="list-template-ket-proses" placeholder="Pilih / ketik proses..." class="w-full p-2 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white uppercase">
+                                        <datalist id="list-template-ket-proses">
+                                            <option value="RETUR MASUK STOK WH">
+                                            <option value="DIKIRIM ULANG [DRIVER: , IKUT DO-HO001-]">
+                                        </datalist>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex justify-end pt-2">
+                                <button onclick="simpanDoTrobel()" class="w-full bg-orange-600 hover:bg-orange-700 text-white px-5 py-2.5 rounded-xl font-black text-xs uppercase shadow transition">
+                                    <i class="fa-solid fa-save mr-1.5"></i> Simpan Data Trobel
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Panel Bawah: Riwayat Trobel -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-orange-500">
+                    <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider mb-3">Riwayat DO Trobel</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-[11px]">
+                            <thead>
+                                <tr class="bg-orange-100 text-slate-700 uppercase font-black">
+                                    <th class="p-2 border text-center">NO</th>
+                                    <th class="p-2 border">TGL DO</th>
+                                    <th class="p-2 border">TUJUAN</th>
+                                    <th class="p-2 border">NO. DN/DO</th>
+                                    <th class="p-2 border">KODE</th>
+                                    <th class="p-2 border">QTY</th>
+                                    <th class="p-2 border">KETERANGAN</th>
+                                    <th class="p-2 border">TGL PROSES</th>
+                                    <th class="p-2 border">NO. DN RETUR</th>
+                                    <th class="p-2 border">NO. ID BOSNET</th>
+                                    <th class="p-2 border">KET. PROSES</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabel-riwayat-trobel-body">
+                                <!-- Data Riwayat Trobel dirender dinamis -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= SLIDE 2: KLAIM ================= -->
+            <div class="w-1/2 flex-shrink-0 p-4 space-y-4 overflow-y-auto max-h-full">
+                
+                <!-- Grid Atas: Panel Input Klaim (Kiri) & Viewer Foto Bukti (Kanan) -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                    
+                    <!-- Panel Input Klaim & Tombol Tambah Foto (Kiri - 7 Kolom) -->
+                    <div class="lg:col-span-7 bg-white p-5 rounded-2xl shadow-sm border border-orange-500 flex flex-col justify-between space-y-4">
+                        <div class="space-y-3">
+                            <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider mb-2">Form Input Klaim</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">Tanggal DO</label>
+                                    <input type="date" id="klaim-tgl-do" class="w-full p-2 text-xs font-bold border border-orange-300 rounded-lg bg-white">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">No. DO / DN</label>
+                                    <input type="text" id="klaim-no-do" placeholder="No DO/DN..." class="w-full p-2 text-xs font-bold border border-orange-300 rounded-lg bg-white">
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">Tujuan</label>
+                                    <input type="text" id="klaim-tujuan" placeholder="Nama tujuan..." class="w-full p-2 text-xs font-bold border border-orange-300 rounded-lg bg-white">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">Kode Barang</label>
+                                    <input type="text" id="klaim-kode" placeholder="Kode..." class="w-full p-2 text-xs font-bold border border-orange-300 rounded-lg bg-white">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">Qty</label>
+                                    <input type="number" id="klaim-qty" placeholder="Qty..." class="w-full p-2 text-xs font-bold border border-orange-300 rounded-lg bg-white">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">Keterangan Klaim</label>
+                                <textarea id="klaim-keterangan" rows="2" placeholder="Alasan atau detail klaim..." class="w-full p-2 text-xs font-bold border border-orange-300 rounded-lg bg-white resize-none"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Tombol Tambah Foto & Simpan Data di Panel Kiri -->
+                        <div class="flex flex-col sm:flex-row gap-2 pt-2 border-t border-slate-100">
+                            <label class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 px-3 rounded-xl font-black text-[11px] uppercase text-center block cursor-pointer transition shadow">
+                                <i class="fa-solid fa-camera mr-1.5"></i> Tambah Foto Bukti Klaim
+                                <input type="file" id="klaim-input-foto" accept="image/*" class="hidden" multiple onchange="handleTambahFotoKlaim(event)">
+                            </label>
+                            <button onclick="simpanDataKlaim()" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white py-2.5 px-3 rounded-xl font-black text-[11px] uppercase shadow transition">
+                                <i class="fa-solid fa-save mr-1.5"></i> Simpan Data Klaim
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Panel Viewer Foto Bukti Terpilih dengan Navigasi Panah (Kanan - 5 Kolom) -->
+                    <div class="lg:col-span-5 bg-white p-5 rounded-2xl shadow-sm border border-orange-500 flex flex-col justify-between">
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider">Foto Bukti Klaim Terpilih</h3>
+                                <span id="info-indeks-foto" class="text-[10px] font-bold text-slate-400">0 / 0</span>
+                            </div>
+
+                            <!-- Container Viewer Foto dengan Tombol Navigasi Panah -->
+                            <div id="container-viewer-foto" class="w-full h-44 bg-slate-900 rounded-xl border border-orange-300 flex items-center justify-center relative overflow-hidden shadow-inner">
+                                <span class="text-xs text-slate-400 font-medium text-center px-4">Klik salah satu riwayat di bawah untuk melihat foto bukti</span>
+                                
+                                <!-- Tombol Navigasi Kiri / Kanan (Dirender dinamis jika foto > 1) -->
+                                <button onclick="geserFotoKlaim(-1)" id="btn-prev-foto" class="hidden absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black text-white w-8 h-8 rounded-full flex items-center justify-center transition shadow">
+                                    <i class="fa-solid fa-chevron-left text-xs"></i>
+                                </button>
+                                <button onclick="geserFotoKlaim(1)" id="btn-next-foto" class="hidden absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black text-white w-8 h-8 rounded-full flex items-center justify-center transition shadow">
+                                    <i class="fa-solid fa-chevron-right text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-3 text-center">
+                            <span id="label-status-foto" class="text-[10px] text-slate-400 italic">Belum ada foto yang ditampilkan</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel Bawah: Riwayat Klaim -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-orange-500">
+                    <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider mb-3">Riwayat Klaim</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-[11px]">
+                            <thead>
+                                <tr class="bg-orange-100 text-slate-700 uppercase font-black">
+                                    <th class="p-2 border text-center">NO</th>
+                                    <th class="p-2 border">TGL DO</th>
+                                    <th class="p-2 border">NO. DO/DN</th>
+                                    <th class="p-2 border">TUJUAN</th>
+                                    <th class="p-2 border">KODE</th>
+                                    <th class="p-2 border">QTY</th>
+                                    <th class="p-2 border">KETERANGAN KLAIM</th>
+                                    <th class="p-2 border text-center">FOTO BUKTI</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabel-riwayat-klaim-body">
+                                <!-- Data Riwayat Klaim dirender dinamis -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
