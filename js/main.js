@@ -1277,6 +1277,67 @@ window.bukaSubPageDoTrobel = bukaSubPageDoTrobel;
 window.tutupSubPageDoTrobel = tutupSubPageDoTrobel;
 
 
+// Fungsi untuk membuka subpage Aplikasi Mutasi
+function bukaSubPageMutasi() {
+    // 1. Tentukan kontenernya (pastikan ada <div id="subpage-mutasi-container"></div> di index.html Anda)
+    const container = document.getElementById('subpage-mutasi-container'); 
+    
+    if (!container) {
+        console.error("Wadah 'subpage-mutasi-container' tidak ditemukan di index.html!");
+        return;
+    }
+
+    const subpage = document.getElementById('subpage-mutasi');
+
+    // Jika sudah ada (sudah pernah di-fetch), langsung buka
+    if (subpage) {
+        subpage.classList.remove('translate-x-full');
+        return;
+    }
+
+    // 2. Fetch file HTML subpage Mutasi
+    fetch('apps/mutasi.html') 
+        .then(response => {
+            if (!response.ok) throw new Error("Gagal mengambil file apps/mutasi.html");
+            return response.text();
+        })
+        .then(htmlContent => {
+            container.innerHTML = htmlContent;
+
+            // 3. Suntikkan script JS-nya
+            const script = document.createElement('script');
+            script.src = "js/mutasi.js"; 
+            
+            script.onload = () => {
+                // Panggil fungsi inisialisasi modul Mutasi
+                if (typeof window.initMutasi === 'function') {
+                    window.initMutasi();
+                }
+                
+                const elemenBaru = document.getElementById('subpage-mutasi');
+                if (elemenBaru) {
+                    elemenBaru.classList.remove('translate-x-full');
+                }
+            };
+            document.body.appendChild(script);
+        })
+        .catch(error => {
+            console.error(error);
+            miuiAlert("Sistem Gagal Memuat Template Aplikasi Mutasi!");
+        });
+}
+
+// Fungsi untuk menutup subpage Mutasi
+window.tutupSubPageMutasi = function() {
+    const subpage = document.getElementById('subpage-mutasi');
+    if (subpage) {
+        subpage.classList.add('translate-x-full');
+    }
+};
+
+window.bukaSubPageMutasi = bukaSubPageMutasi;
+window.tutupSubPageMutasi = tutupSubPageMutasi;
+
 
 // =========================================================================
 // ENGINE SUB-PAGE DYNAMIC LOADING: ONGKIR
