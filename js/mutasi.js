@@ -28,8 +28,27 @@ function filterWmsReportData() {
     const keywordBarang = document.getElementById('filter-kode-barang')?.value.trim().toUpperCase() || '';
     const keywordRakNo = document.getElementById('filter-rak-no')?.value.trim() || '';
 
-    // Filter data sesuai input pengguna
-    const filteredData = wmsGlobalData.filter(item => {
+    // Salin data sebelum diurutkan agar data global tetap aman
+    let sortedData = [...wmsGlobalData];
+
+    // --- LOGIKA PENGURUTAN (SORTING) ---
+    sortedData.sort((a, b) => {
+        const stokA = Number(a.QTY_STOK ?? a.STOK ?? a.stok ?? 0);
+        const stokB = Number(b.QTY_STOK ?? b.STOK ?? b.stok ?? 0);
+
+        // 1. Urutkan berdasarkan stok terkecil ke terbesar
+        if (stokA !== stokB) {
+            return stokA - stokB;
+        }
+
+        // 2. Jika stok sama, urutkan berdasarkan expdate terdekat ke terlama
+        const expA = a.EXPDATE || a.expdate || '9999-12-31';
+        const expB = b.EXPDATE || b.expdate || '9999-12-31';
+        return expA.localeCompare(expB);
+    });
+
+    // Filter data sesuai input pengguna dari data yang sudah terurut
+    const filteredData = sortedData.filter(item => {
         const kodeLokasi = String(item.LOKASI_PALET || item.KODE_LOKASI || item.kode_lokasi || '').trim().toUpperCase();
         const kodeBarang = String(item.KODE || item.kode || '').toUpperCase();
 
