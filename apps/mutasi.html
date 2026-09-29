@@ -105,7 +105,11 @@
                 <div class="flex flex-col gap-2 pb-3 border-b border-slate-100">
                     <div class="flex justify-between items-center mb-3">
                         <div>
-                            <h3 class="font-bold text-sm text-slate-700">WMS REPORT - 10.10.1.90</h3>
+                            <div class="flex items-center gap-2">
+                                <h3 class="font-bold text-sm text-slate-700">WMS REPORT </h3>
+                                <!-- Badge Indikator Status & Jumlah Data -->
+                                <span id="firebase-badge" class="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded-full font-semibold"></span>
+                            </div>
                             <span id="wms-last-update" class="text-[10px] text-slate-400">Update Data WMS Terakhir: -</span>
                         </div>
                         <button onclick="refreshWmsData()" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded shadow flex items-center gap-1 transition">
@@ -162,8 +166,6 @@
                                 <th class="p-2 border">KODE</th>
                                 <th class="p-2 border text-center">STOK</th>
                                 <th class="p-2 border text-center">EXPDATE</th>
-                                <th class="p-2 border">BARCODE</th>
-                                <th class="p-2 border">NAMA</th>
                             </tr>
                         </thead>
                         <tbody id="tabel-wms-report-body">
