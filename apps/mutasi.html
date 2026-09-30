@@ -28,145 +28,173 @@
     <div class="flex-1 flex flex-row overflow-hidden bg-[#f4f4f4] p-4 gap-4">
         
         <!-- ================= KOLOM KIRI: FORM MUTASI PERSIS 100% SEPERTI APLIKASI LAMA ================= -->
-<div class="w-1/2 flex flex-col space-y-3 overflow-y-auto max-h-full pr-1 text-xs font-sans">
-    
-    <!-- 1. Panel Atas: Import Semua File FDN Disini -->
-    <div class="bg-slate-100 p-3 rounded-xl border border-slate-300 shadow-sm space-y-2">
-        <div class="text-[10px] font-bold text-slate-700 uppercase border-b border-slate-200 pb-1">
-            Import Semua File FDN Disini
+        <div class="w-1/2 flex flex-col space-y-3 overflow-y-auto max-h-full pr-1 text-xs font-sans">
+            
+            <!-- 1. Panel Atas: Import File FDN & Tanggal Muat -->
+            <div class="bg-slate-100 p-3 rounded-xl border border-slate-300 shadow-sm space-y-2">
+                <div class="text-[10px] font-bold text-slate-700 uppercase border-b border-slate-200 pb-1">
+                    Import Semua File FDn Disini
+                </div>
+                
+                <div class="grid grid-cols-12 gap-2 items-stretch">
+                    <!-- Kolom Kiri: Input Tanggal Muat, Tombol Import FDN, & Statistik -->
+                    <div class="col-span-5 flex flex-col justify-between space-y-1.5">
+                        <!-- Tanggal Muat dengan Format Visual DD MMMM YYYY -->
+                        <div class="space-y-0.5 relative">
+                            <span class="text-[9px] font-bold text-slate-600 block uppercase">Pilih Tanggal Muat</span>
+                            
+                            <!-- Input tersembunyi untuk dibaca sistem/database (Format: YYYY-MM-DD) -->
+                            <input type="hidden" id="input-tgl-muat" value="">
+                            
+                            <!-- Kotak tampilan visual untuk pengguna (Format: 01 Oktober 2026) -->
+                            <div class="relative">
+                                <input type="text" id="display-tgl-muat" readonly placeholder="Pilih tanggal..." class="w-full p-1 bg-white border border-slate-300 rounded font-bold text-[10px] text-slate-800 shadow-sm cursor-pointer pr-6">
+                                <span class="absolute right-1.5 top-1 text-slate-400 text-[10px] pointer-events-none">📅</span>
+                                
+                                <!-- Input date asli yang transparan di atasnya agar fungsionalitas kalender bawaan tetap jalan -->
+                                <input type="date" id="trigger-tgl-muat" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onchange="updateFormatTanggal(this.value)">
+                            </div>
+                        </div>
+
+                        <!-- Input file tersembunyi dengan dukungan multi-file -->
+                        <input type="file" id="file-fdn-input" accept=".txt" multiple style="display: none;" onchange="handleImportFdnFiles(event)">
+
+                        <!-- Tombol Import FDN -->
+                        <div>
+                            <button type="button" onclick="document.getElementById('file-fdn-input').click();" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-1 px-1.5 rounded font-black text-[10px] uppercase shadow text-center border border-emerald-600">
+                                IMPORT FDN
+                            </button>
+                        </div>
+
+                        <!-- Label & 3 Kolom Statistik Bawah -->
+                        <div class="pt-0.5">     
+                            <div class="grid grid-cols-3 gap-1">
+                                <div>
+                                    <span class="text-[9px] text-slate-600 block text-center font-bold">Total FDN</span>
+                                    <input type="text" id="tot-fdn" readonly value="0" class="w-full text-center p-1 bg-white border border-slate-300 rounded font-bold text-[10px] text-slate-900 shadow-sm">
+                                </div>
+                                <div>
+                                    <span class="text-[9px] text-slate-600 block text-center font-bold">Tujuan</span>
+                                    <input type="text" id="tot-tujuan" readonly value="0" class="w-full text-center p-1 bg-white border border-slate-300 rounded font-bold text-[10px] text-slate-900 shadow-sm">
+                                </div>
+                                <div>
+                                    <span class="text-[9px] text-slate-600 block text-center font-bold">Total</span>
+                                    <input type="text" id="tot-keseluruhan" readonly value="0" class="w-full text-center p-1 bg-white border border-slate-300 rounded font-black text-[10px] text-slate-900 shadow-sm">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Kolom Kanan: Kotak Teks Preview FDN yang Luas -->
+                    <div class="col-span-7 flex flex-col">
+                        <span class="text-[9px] font-bold text-slate-600 block uppercase mb-0.5">Daftar Nomor FDn / Tujuan</span>
+                        <div id="fdn-preview-text" class="w-full h-full bg-white border border-slate-300 rounded p-2 overflow-y-auto text-[10px] font-mono text-slate-700 shadow-inner min-h-[110px]">
+                            <div class="text-slate-900 shadow-sm">Belum ada data FDN diimport...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Panel Tengah: Form Ambil Rak (Layout Grid Berdampingan seperti Aplikasi Lama) -->
+            <div class="bg-slate-100 p-3 rounded-xl border border-slate-300 shadow-sm space-y-2">
+                <div class="text-[10px] font-bold text-slate-700 uppercase border-b border-slate-200 pb-1">
+                    Form Ambil Rak
+                </div>
+
+                <div class="grid grid-cols-12 gap-2">
+                    <!-- Sisi Kiri Form Isian -->
+                    <div class="col-span-7 space-y-2">
+                        <div class="flex items-center space-x-2">
+                            <label class="w-16 text-[11px] font-bold text-slate-700 flex-shrink-0">Kode</label>
+                            <select id="mutasi-kode" class="w-full p-1 text-xs font-bold border border-slate-300 rounded bg-white">
+                                <option value="">Pilih Kode...</option>
+                            </select>
+                        </div>
+
+                        <div class="flex items-center space-x-2">
+                            <label class="w-16 text-[11px] font-bold text-slate-700 flex-shrink-0">Rak</label>
+                            <input type="text" id="mutasi-lokasi" placeholder="Pilih rak..." class="w-full p-1 text-xs font-bold border border-slate-300 rounded bg-white uppercase">
+                            <span class="bg-rose-500 text-white font-black text-[10px] px-2 py-1 rounded shadow-sm text-center flex-shrink-0">WH3</span>
+                        </div>
+
+                        <div class="flex items-center space-x-2">
+                            <label class="w-16 text-[11px] font-bold text-slate-700 flex-shrink-0">QTY Ambil</label>
+                            <input type="number" id="mutasi-qty" class="w-full p-1 text-xs font-bold border border-slate-300 rounded bg-white text-center">
+                        </div>
+
+                        <div class="flex items-center space-x-2">
+                            <label class="w-16 text-[11px] font-bold text-slate-700 flex-shrink-0">QTY Stok</label>
+                            <input type="text" id="mutasi-stok-gudang" readonly class="w-full p-1 text-xs font-bold border border-slate-300 rounded bg-white text-center text-slate-600">
+                        </div>
+
+                        <div class="flex items-center space-x-2 pt-1">
+                            <label class="w-20 text-[10px] font-bold text-slate-700 flex-shrink-0">Sisa Input :</label>
+                            <input type="text" id="summary-kurang" readonly value="0" class="w-full p-1 text-center bg-white border border-slate-300 rounded font-black text-xs text-slate-800">
+                        </div>
+                    </div>
+
+                    <!-- Sisi Kanan: Kotak Kebutuhan Ambil, Ambil, Kurang (Warna Cyan Khas) -->
+                    <div class="col-span-5 bg-cyan-100/80 p-2 rounded-lg border border-cyan-300 flex flex-col justify-between space-y-1.5 shadow-inner">
+                        <div>
+                            <span class="text-[9px] font-bold text-cyan-900 uppercase block mb-0.5">Kebutuhan Ambil</span>
+                            <div id="summary-kebutuhan" class="text-[11px] font-bold text-slate-800 bg-white p-1 rounded border border-cyan-200 text-center truncate">belum ada data</div>
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] font-bold text-cyan-900">Ambil :</span>
+                            <span id="summary-ambil" class="w-20 text-xs font-bold text-slate-800 bg-white p-1 rounded border border-cyan-200 text-center block">-</span>
+                        </div>
+
+                        <div>
+                            <span class="text-[10px] font-bold text-cyan-900 block mb-0.5">Kurang :</span>
+                            <div id="summary-kurang-bawah" class="text-base font-black text-slate-900 bg-white py-1 rounded border border-cyan-200 text-center shadow-sm">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tombol Aksi Kontrol Rak (Warna Pastel Khas Aplikasi Lama) -->
+                <div class="grid grid-cols-5 gap-1 pt-2">
+                    <button type="button" onclick="tambahItemMutasiList()" class="bg-emerald-300 hover:bg-emerald-400 text-slate-900 border border-emerald-500 py-1.5 px-0.5 rounded font-black text-[9px] uppercase shadow-sm text-center">
+                        TAMBAH RAK
+                    </button>
+                    <button type="button" onclick="hapusItemMutasiList()" class="bg-rose-300 hover:bg-rose-400 text-slate-900 border border-rose-500 py-1.5 px-0.5 rounded font-black text-[9px] uppercase shadow-sm text-center">
+                        HAPUS RAK
+                    </button>
+                    <button type="button" onclick="undoMutasiList()" class="bg-amber-200 hover:bg-amber-300 text-slate-900 border border-amber-400 py-1.5 px-0.5 rounded font-black text-[9px] uppercase shadow-sm text-center">
+                        UNDO
+                    </button>
+                    <button type="button" onclick="rakBaruMutasi()" class="bg-emerald-200 hover:bg-emerald-300 text-slate-900 border border-emerald-400 py-1.5 px-0.5 rounded font-black text-[9px] uppercase shadow-sm text-center">
+                        RAK BARU
+                    </button>
+                    <button type="button" onclick="arsipFileMutasi()" class="bg-emerald-200 hover:bg-emerald-300 text-slate-900 border border-emerald-400 py-1.5 px-0.5 rounded font-black text-[9px] uppercase shadow-sm text-center">
+                        ARSIP FILE
+                    </button>
+                </div>
+
+                <!-- 3. Tabel Daftar Rak Terpilih -->
+                <div class="bg-white border border-slate-300 rounded shadow-sm overflow-hidden mt-1">
+                    <div class="max-h-44 overflow-y-auto">
+                        <table class="w-full text-left border-collapse text-[11px]">
+                            <thead class="sticky top-0 bg-slate-200 text-slate-700 font-black text-[10px] uppercase">
+                                <tr>
+                                    <th class="p-1.5 border border-slate-300 text-center w-8">NO</th>
+                                    <th class="p-1.5 border border-slate-300">KODE</th>
+                                    <th class="p-1.5 border border-slate-300 w-20">RAK</th>
+                                    <th class="p-1.5 border border-slate-300 text-center w-12">AMBIL</th>
+                                    <th class="p-1.5 border border-slate-300 text-center w-12">STOK</th>
+                                    <th class="p-1.5 border border-slate-300 text-center w-12">SISA</th>
+                                </tr>
+                            </thead>
+                            <tbody id="container-list-mutasi">
+                                <tr>
+                                    <td colspan="6" class="p-4 text-center text-slate-400 italic">Belum ada rak ditambahkan</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="grid grid-cols-12 gap-2 items-center">
-            <div class="col-span-5 flex flex-col space-y-1.5">
-                <button type="button" onclick="triggerFdnBaru()" class="bg-emerald-500 hover:bg-emerald-600 text-white py-1.5 px-2 rounded font-black text-[10px] uppercase shadow text-center border border-emerald-600">
-                    FDN BARU
-                </button>
-                <button type="button" onclick="triggerImportFdn()" class="bg-emerald-500 hover:bg-emerald-600 text-white py-1.5 px-2 rounded font-black text-[10px] uppercase shadow text-center border border-emerald-600">
-                    IMPORT FDN
-                </button>
-            </div>
-            <!-- Kotak Teks Preview FDN & Tujuan -->
-            <div class="col-span-7 bg-white border border-slate-300 rounded p-1.5 h-16 overflow-y-auto text-[10px] font-mono text-slate-700 shadow-inner">
-                <div id="fdn-preview-text" class="text-slate-400 italic">Belum ada file FDN diimport...</div>
-            </div>
-        </div>
-
-        <!-- Baris Statistik FDN dan Total -->
-        <div class="grid grid-cols-12 gap-2 pt-1 items-center">
-            <div class="col-span-3">
-                <span class="text-[9px] text-slate-500 block">Tot FDN</span>
-                <input type="text" id="tot-fdn" readonly value="0" class="w-full text-center p-1 bg-white border border-slate-300 rounded font-bold text-[11px]">
-            </div>
-            <div class="col-span-3">
-                <span class="text-[9px] text-slate-500 block">Tujuan</span>
-                <input type="text" id="tot-tujuan" readonly value="0" class="w-full text-center p-1 bg-white border border-slate-300 rounded font-bold text-[11px]">
-            </div>
-            <div class="col-span-6 flex items-center justify-end space-x-2 pt-3">
-                <span class="text-[10px] font-black text-slate-700 uppercase">Total</span>
-                <input type="text" id="tot-keseluruhan" readonly value="119" class="w-20 text-center p-1 bg-white border border-slate-300 rounded font-black text-xs text-slate-900 shadow-sm">
-            </div>
-        </div>
-    </div>
-
-    <!-- 2. Panel Tengah: Form Ambil Rak (Layout Grid Berdampingan seperti Aplikasi Lama) -->
-    <div class="bg-slate-100 p-3 rounded-xl border border-slate-300 shadow-sm space-y-2">
-        <div class="text-[10px] font-bold text-slate-700 uppercase border-b border-slate-200 pb-1">
-            Form Ambil Rak
-        </div>
-
-        <div class="grid grid-cols-12 gap-2">
-            <!-- Sisi Kiri Form Isian -->
-            <div class="col-span-7 space-y-2">
-                <div class="flex items-center space-x-2">
-                    <label class="w-16 text-[11px] font-bold text-slate-700 flex-shrink-0">Kode</label>
-                    <select id="mutasi-kode" class="w-full p-1 text-xs font-bold border border-slate-300 rounded bg-white">
-                        <option value="">Pilih Kode...</option>
-                    </select>
-                </div>
-
-                <div class="flex items-center space-x-2">
-                    <label class="w-16 text-[11px] font-bold text-slate-700 flex-shrink-0">Rak</label>
-                    <input type="text" id="mutasi-lokasi" placeholder="Pilih rak..." class="w-full p-1 text-xs font-bold border border-slate-300 rounded bg-white uppercase">
-                    <span class="bg-rose-500 text-white font-black text-[10px] px-2 py-1 rounded shadow-sm text-center flex-shrink-0">WH3</span>
-                </div>
-
-                <div class="flex items-center space-x-2">
-                    <label class="w-16 text-[11px] font-bold text-slate-700 flex-shrink-0">QTY Ambil</label>
-                    <input type="number" id="mutasi-qty" class="w-full p-1 text-xs font-bold border border-slate-300 rounded bg-white text-center">
-                </div>
-
-                <div class="flex items-center space-x-2">
-                    <label class="w-16 text-[11px] font-bold text-slate-700 flex-shrink-0">QTY Stok</label>
-                    <input type="text" id="mutasi-stok-gudang" readonly class="w-full p-1 text-xs font-bold border border-slate-300 rounded bg-white text-center text-slate-600">
-                </div>
-
-                <div class="flex items-center space-x-2 pt-1">
-                    <label class="w-20 text-[10px] font-bold text-slate-700 flex-shrink-0">Sisa Input :</label>
-                    <input type="text" id="summary-kurang" readonly value="0" class="w-full p-1 text-center bg-white border border-slate-300 rounded font-black text-xs text-slate-800">
-                </div>
-            </div>
-
-            <!-- Sisi Kanan: Kotak Kebutuhan Ambil, Ambil, Kurang (Warna Cyan Khas) -->
-            <div class="col-span-5 bg-cyan-100/80 p-2 rounded-lg border border-cyan-300 flex flex-col justify-between space-y-1.5 shadow-inner">
-                <div>
-                    <span class="text-[9px] font-bold text-cyan-900 uppercase block mb-0.5">Kebutuhan Ambil</span>
-                    <div id="summary-kebutuhan" class="text-[11px] font-bold text-slate-800 bg-white p-1 rounded border border-cyan-200 text-center truncate">belum ada data</div>
-                </div>
-
-                <div class="flex items-center justify-between">
-                    <span class="text-[10px] font-bold text-cyan-900">Ambil :</span>
-                    <span id="summary-ambil" class="w-20 text-xs font-bold text-slate-800 bg-white p-1 rounded border border-cyan-200 text-center block">-</span>
-                </div>
-
-                <div>
-                    <span class="text-[10px] font-bold text-cyan-900 block mb-0.5">Kurang :</span>
-                    <div id="summary-kurang-bawah" class="text-base font-black text-slate-900 bg-white py-1 rounded border border-cyan-200 text-center shadow-sm">0</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tombol Aksi Kontrol Rak (Warna Pastel Khas Aplikasi Lama) -->
-        <div class="grid grid-cols-5 gap-1 pt-2">
-            <button type="button" onclick="tambahItemMutasiList()" class="bg-emerald-300 hover:bg-emerald-400 text-slate-900 border border-emerald-500 py-1.5 px-0.5 rounded font-black text-[9px] uppercase shadow-sm text-center">
-                TAMBAH RAK
-            </button>
-            <button type="button" onclick="hapusItemMutasiList()" class="bg-rose-300 hover:bg-rose-400 text-slate-900 border border-rose-500 py-1.5 px-0.5 rounded font-black text-[9px] uppercase shadow-sm text-center">
-                HAPUS RAK
-            </button>
-            <button type="button" onclick="undoMutasiList()" class="bg-amber-200 hover:bg-amber-300 text-slate-900 border border-amber-400 py-1.5 px-0.5 rounded font-black text-[9px] uppercase shadow-sm text-center">
-                UNDO
-            </button>
-            <button type="button" onclick="rakBaruMutasi()" class="bg-emerald-200 hover:bg-emerald-300 text-slate-900 border border-emerald-400 py-1.5 px-0.5 rounded font-black text-[9px] uppercase shadow-sm text-center">
-                RAK BARU
-            </button>
-            <button type="button" onclick="arsipFileMutasi()" class="bg-emerald-200 hover:bg-emerald-300 text-slate-900 border border-emerald-400 py-1.5 px-0.5 rounded font-black text-[9px] uppercase shadow-sm text-center">
-                ARSIP FILE
-            </button>
-        </div>
-
-        <!-- 3. Tabel Daftar Rak Terpilih -->
-        <div class="bg-white border border-slate-300 rounded shadow-sm overflow-hidden mt-1">
-            <div class="max-h-44 overflow-y-auto">
-                <table class="w-full text-left border-collapse text-[11px]">
-                    <thead class="sticky top-0 bg-slate-200 text-slate-700 font-black text-[10px] uppercase">
-                        <tr>
-                            <th class="p-1.5 border border-slate-300 text-center w-8">NO</th>
-                            <th class="p-1.5 border border-slate-300">KODE</th>
-                            <th class="p-1.5 border border-slate-300 w-20">RAK</th>
-                            <th class="p-1.5 border border-slate-300 text-center w-12">AMBIL</th>
-                            <th class="p-1.5 border border-slate-300 text-center w-12">STOK</th>
-                            <th class="p-1.5 border border-slate-300 text-center w-12">SISA</th>
-                        </tr>
-                    </thead>
-                    <tbody id="container-list-mutasi">
-                        <tr>
-                            <td colspan="6" class="p-4 text-center text-slate-400 italic">Belum ada rak ditambahkan</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
 
         <!-- ================= KOLOM KANAN: WMS REPORT LIVE READER ================= -->
         <div class="w-1/2 flex flex-col space-y-4 overflow-y-auto max-h-full pl-1">
