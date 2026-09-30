@@ -1,17 +1,96 @@
+// Array nama bulan dalam Bahasa Indonesia untuk format visual
+const namaBulanIndo = [
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni", 
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+];
+
+function formatTanggalIndonesia(dateString) {
+    if (!dateString) return "";
+    const parts = dateString.split("-");
+    if (parts.length !== 3) return dateString;
+    
+    const tahun = parts[0];
+    const bulanIndex = parseInt(parts[1], 10) - 1;
+    const hari = parts[2];
+    
+    const namaBulan = namaBulanIndo[bulanIndex] || "";
+    return `${parseInt(hari, 10)} ${namaBulan} ${tahun}`;
+}
+
+function updateFormatTanggal(isoDateStr) {
+    if (!isoDateStr) return;
+    
+    // 1. Simpan format sistem ke hidden input (untuk database YYYY-MM-DD)
+    const hiddenInput = document.getElementById('input-tgl-muat');
+    if (hiddenInput) hiddenInput.value = isoDateStr;
+    
+    // 2. Ubah tampilan visual ke format DD MMMM YYYY
+    const displayInput = document.getElementById('display-tgl-muat');
+    if (displayInput) displayInput.value = formatTanggalIndonesia(isoDateStr);
+    
+    // Sinkronkan juga nilai pada trigger input date transparan
+    const triggerInput = document.getElementById('trigger-tgl-muat');
+    if (triggerInput && triggerInput.value !== isoDateStr) {
+        triggerInput.value = isoDateStr;
+    }
+}
+
+// Fungsi untuk mengambil dan menghitung hari kerja berikutnya dengan melompati Minggu & Libur Nasional
+async function getNextWorkingDateSmart() {
+    // Ambil daftar libur online (menggunakan fungsi WH3 yang sudah ada atau fallback)
+    let daftarLibur = [];
+    if (typeof window.getHariLiburNasional === 'function') {
+        try {
+            daftarLibur = await window.getHariLiburNasional();
+        } catch (e) {
+            console.warn("Gagal memuat libur online, menggunakan data standar:", e);
+        }
+    }
+    
+    // Fallback libur standar jika API offline
+    if (!daftarLibur || daftarLibur.length === 0) {
+        daftarLibur = [
+            '2026-01-01', '2026-01-16', '2026-02-17', '2026-03-19', '2026-03-21', 
+            '2026-05-01', '2026-05-14', '2026-05-27', '2026-05-31', '2026-06-01', 
+            '2026-08-17', '2026-09-28', '2026-12-25'
+        ];
+    }
+
+    let currentDate = new Date();
+    // Set mulai dari hari esok (+1 hari dari hari ini)
+    currentDate.setDate(currentDate.getDate() + 1);
+    
+    while (true) {
+        const dayOfWeek = currentDate.getDay(); // 0 = Minggu
+        const dateString = currentDate.toISOString().split('T')[0];
+        
+        // Validasi: bukan hari Minggu DAN bukan hari libur nasional
+        if (dayOfWeek !== 0 && !daftarLibur.includes(dateString)) {
+            return dateString;
+        }
+        
+        // Lanjut ke hari berikutnya jika libur atau Minggu
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+}
+
+// Inisialisasi Otomatis saat Modul Muat / Mutasi Dibuka
+window.initMutasi = async function() {
+    // Hitung tanggal besok dengan mengecek libur nasional & hari minggu
+    const nextWorkingDay = await getNextWorkingDateSmart();
+    
+    // Terapkan ke sistem dan tampilan visual
+    updateFormatTanggal(nextWorkingDay);
+    
+    console.log("Modul Mutasi & Tanggal Muat Otomatis Berhasil Diinisialisasi:", nextWorkingDay);
+    if (typeof refreshWmsData === 'function') {
+        refreshWmsData();
+    }
+};
+
 // Array global untuk menyimpan data cache
 let wmsGlobalData = [];
 let listRakMutasiTemp = [];
-
-// Inisialisasi Modul Mutasi
-window.initMutasi = function() {
-    console.log("Modul Mutasi Berhasil Diinisialisasi");
-    refreshWmsData();
-};
-
-// Fungsi utama untuk memuat data dari Firebase Realtime Database
-async function loadWmsReportData() {
-    await refreshWmsData();
-}
 
 // Fungsi untuk merender data dengan dukungan filter pencarian real-time dan Rak No
 function filterWmsReportData() {
@@ -191,6 +270,158 @@ async function refreshWmsData() {
         }
     }
 }
+
+
+// Fungsi utama untuk menangani banyak file yang dipilih sekaligus
+async function handleImportFdnFiles(event) {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    let successCount = 0;
+    let failCount = 0;
+
+    // Loop melalui setiap file yang dipilih menggunakan Promise.all agar berjalan efisien
+    const promises = Array.from(files).map(async (file) => {
+        try {
+            const textContent = await readFileAsync(file);
+            await parseAndSaveFdn(textContent);
+            successCount++;
+        } catch (error) {
+            console.error(`Gagal memproses file ${file.name}:`, error);
+            failCount++;
+        }
+    });
+
+    await Promise.all(promises);
+
+    miuiAlert(`Proses Impor Selesai!\nBerhasil: ${successCount} file\nGagal: ${failCount} file`);
+    
+    // Reset input file
+    event.target.value = '';
+}
+
+// Helper untuk membaca file teks secara asinkron
+function readFileAsync(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = (e) => reject(e);
+        reader.readAsText(file);
+    });
+}
+
+// Fungsi parser dan penyimpanan ke Firestore dengan fitur Update / Tambah Data
+async function parseAndSaveFdn(fileContent) {
+    const lines = fileContent.split('\n');
+    let dariGudangRaw = '', nomorDokumen = '', tanggal = '', tujuanRaw = '';
+    let items = [];
+
+    // 1. Parsing Header dan Baris Item secara presisi
+    lines.forEach(line => {
+        // Ambil Gudang
+        if (line.includes('DARI GUDANG')) {
+            const parts = line.split(':');
+            if (parts.length > 1) dariGudangRaw = parts[1].trim().split(/\s{2,}/)[0];
+        }
+        
+        // KOREKSI UTAMA NOMOR DOKUMEN: Gunakan lastIndexOf agar tidak tercampur teks sebelah kiri
+        if (line.includes('NOMOR DOKUMEN')) {
+            const lastIndex = line.lastIndexOf('NOMOR DOKUMEN');
+            const subStr = line.substring(lastIndex);
+            const parts = subStr.split(':');
+            if (parts.length > 1) {
+                nomorDokumen = parts[1].trim().split(/\s{2,}/)[0];
+            }
+        }
+        
+        // Ambil Tanggal
+        if (line.includes('TANGGAL')) {
+            const match = line.match(/TANGGAL\s*:\s*([0-9\/]+)/);
+            if (match) tanggal = match[1].trim();
+        }
+        
+        // Ambil Tujuan
+        if (line.includes('TUJUAN')) {
+            const lastIndex = line.lastIndexOf('TUJUAN');
+            const subStr = line.substring(lastIndex);
+            const parts = subStr.split(':');
+            if (parts.length > 1) {
+                tujuanRaw = parts[1].trim().split(/\s{2,}/)[0];
+            }
+        }
+
+        // Parsing baris produk tabel
+        const trimmed = line.trim();
+        if (/^\d+\s+[A-Z0-9]+/.test(trimmed)) {
+            const tokens = trimmed.split(/\s+/);
+            if (tokens.length >= 2) {
+                const qtyToken = tokens.find(t => /^\d+\/\d+\/\d+\/\d+$/.test(t));
+                if (qtyToken) {
+                    const kode = tokens[1];
+                    const qtyParts = qtyToken.split('/').map(Number);
+                    
+                    const krt = qtyParts[0] || 0; // Qty Utama (Karton)
+                    const bal = qtyParts[1] || 0;
+                    const rtg = qtyParts[2] || 0;
+                    const pcs = qtyParts[3] || 0;
+
+                    // Simpan lengkap nilai sub-nya ke Firestore
+                    items.push({
+                        kode: kode,
+                        qty_utama: krt,
+                        sub: {
+                            bal: bal,
+                            rtg: rtg,
+                            pcs: pcs
+                        }
+                    });
+                }
+            }
+        }
+    });
+
+    if (!tanggal || !nomorDokumen || !tujuanRaw) {
+        throw new Error("Format file FDN tidak valid atau header (Tanggal/No Dokumen/Tujuan) tidak lengkap.");
+    }
+
+    // 2. Format Gudang (WH-2 atau WH-3)
+    let dariGudang = "WH-2";
+    if (dariGudangRaw.includes("WH-2 HO NON WMS") || dariGudangRaw.includes("WH-3")) {
+        dariGudang = "WH-3";
+    }
+
+    // 3. Format Tujuan & Nomor Dokumen untuk ID Firestore (<singkatan_tujuan>_<5_digit_terakhir>)
+    let formattedTujuan = tujuanRaw.replace('STOCK POINT', 'SP').replace(/[^a-zA-Z0-9]/g, '_').trim();
+    formattedTujuan = formattedTujuan.replace(/_+/g, '_');
+
+    // Ambil 5 angka terakhir dari nomor dokumen (contoh: DN-HO001-2609-75636 -> 75636)[cite: 7, 14]
+    const docNumberDigits = nomorDokumen.replace(/\D/g, '');
+    const last5Digits = docNumberDigits.slice(-5);
+    
+    const docIdTujuan = `${formattedTujuan}_${last5Digits}`; // Hasil: SP_KEBUMEN_75636
+
+    // 4. Format ID Tanggal (DD/MM/YYYY -> YYYYMMDD)[cite: 14]
+    const [d, m, y] = tanggal.split('/');
+    const docIdTanggal = `${y}${m}${d}`;
+
+    // 5. Simpan / Perbarui ke Firestore
+    const tanggalDocRef = db.collection('muat_fdn').doc(docIdTanggal);
+    const tujuanDocRef = tanggalDocRef.collection('datatujuan').doc(docIdTujuan);
+
+    await tujuanDocRef.set({
+        meta: {
+            dari_gudang: dariGudang,
+            nomor_dokumen: nomorDokumen,
+            tanggal: tanggal,
+            tujuan: tujuanRaw,
+            updated_at: new Date().toISOString()
+        },
+        data: items
+    }, { merge: true });
+
+    console.log(`Sukses menyimpan FDN dengan ID: ${docIdTujuan}`);
+}
+
 
 // Fungsi Placeholder untuk menambah rak ke list mutasi di sebelah kiri
 function tambahItemMutasiList() {
