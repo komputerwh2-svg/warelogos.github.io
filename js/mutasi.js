@@ -17,72 +17,43 @@ function formatTanggalIndonesia(dateString) {
     return `${parseInt(hari, 10)} ${namaBulan} ${tahun}`;
 }
 
-function updateFormatTanggal(isoDateStr) {
-    if (!isoDateStr) return;
-    
-    // 1. Simpan format sistem ke hidden input (untuk database YYYY-MM-DD)
-    const hiddenInput = document.getElementById('input-tgl-muat');
-    if (hiddenInput) hiddenInput.value = isoDateStr;
-    
-    // 2. Ubah tampilan visual ke format DD MMMM YYYY
-    const displayInput = document.getElementById('display-tgl-muat');
-    if (displayInput) displayInput.value = formatTanggalIndonesia(isoDateStr);
-    
-    // Sinkronkan juga nilai pada trigger input date transparan
-    const triggerInput = document.getElementById('trigger-tgl-muat');
-    if (triggerInput && triggerInput.value !== isoDateStr) {
-        triggerInput.value = isoDateStr;
-    }
+// Fungsi untuk memformat tanggal visual dan memuat data FDN dari Firestore
+async function updateFormatTanggal(dateString) {
+    if (!dateString) return;
+
+    // 1. Simpan nilai mentah ke input hidden (format: YYYY-MM-DD)
+    document.getElementById('input-tgl-muat').value = dateString;
+
+    // 2. Ubah format untuk tampilan visual menggunakan fungsi Indonesia (contoh: 1 Oktober 2026)
+    const formattedVisual = formatTanggalIndonesia(dateString);
+    document.getElementById('display-tgl-muat').value = formattedVisual;
+
+    // 3. Konversi format YYYY-MM-DD menjadi YYYYMMDD untuk ID Firestore (contoh: 20261001)
+    const firestoreDateId = dateString.replace(/-/g, '');
+
+    // 4. Muat daftar FDN ke kotak preview sebelah kanan
+    await renderDaftarFdnToPreview(firestoreDateId);
 }
 
-// Fungsi untuk mengambil dan menghitung hari kerja berikutnya dengan melompati Minggu & Libur Nasional
-async function getNextWorkingDateSmart() {
-    // Ambil daftar libur online (menggunakan fungsi WH3 yang sudah ada atau fallback)
-    let daftarLibur = [];
-    if (typeof window.getHariLiburNasional === 'function') {
-        try {
-            daftarLibur = await window.getHariLiburNasional();
-        } catch (e) {
-            console.warn("Gagal memuat libur online, menggunakan data standar:", e);
-        }
-    }
-    
-    // Fallback libur standar jika API offline
-    if (!daftarLibur || daftarLibur.length === 0) {
-        daftarLibur = [
-            '2026-01-01', '2026-01-16', '2026-02-17', '2026-03-19', '2026-03-21', 
-            '2026-05-01', '2026-05-14', '2026-05-27', '2026-05-31', '2026-06-01', 
-            '2026-08-17', '2026-09-28', '2026-12-25'
-        ];
-    }
-
-    let currentDate = new Date();
-    // Set mulai dari hari esok (+1 hari dari hari ini)
-    currentDate.setDate(currentDate.getDate() + 1);
-    
-    while (true) {
-        const dayOfWeek = currentDate.getDay(); // 0 = Minggu
-        const dateString = currentDate.toISOString().split('T')[0];
-        
-        // Validasi: bukan hari Minggu DAN bukan hari libur nasional
-        if (dayOfWeek !== 0 && !daftarLibur.includes(dateString)) {
-            return dateString;
-        }
-        
-        // Lanjut ke hari berikutnya jika libur atau Minggu
-        currentDate.setDate(currentDate.getDate() + 1);
-    }
-}
-
-// Inisialisasi Otomatis saat Modul Muat / Mutasi Dibuka
+// Inisialisasi Otomatis saat Modul Muat / Mutasi Dibuka (Menampilkan Tanggal Hari Ini)
 window.initMutasi = async function() {
-    // Hitung tanggal besok dengan mengecek libur nasional & hari minggu
-    const nextWorkingDay = await getNextWorkingDateSmart();
+    // Ambil tanggal hari ini dalam format YYYY-MM-DD
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const todayString = `${year}-${month}-${day}`;
     
     // Terapkan ke sistem dan tampilan visual
-    updateFormatTanggal(nextWorkingDay);
+    await updateFormatTanggal(todayString);
     
-    console.log("Modul Mutasi & Tanggal Muat Otomatis Berhasil Diinisialisasi:", nextWorkingDay);
+    // Sinkronkan juga nilai pada elemen input date asli jika ada
+    const triggerInput = document.getElementById('trigger-tgl-muat');
+    if (triggerInput) {
+        triggerInput.value = todayString;
+    }
+
+    console.log("Modul Mutasi diinisialisasi dengan tanggal hari ini:", todayString);
     if (typeof refreshWmsData === 'function') {
         refreshWmsData();
     }
@@ -158,8 +129,8 @@ function filterWmsReportData() {
         html += `
             <tr class="border-b hover:bg-slate-50 text-xs">
                 <td class="p-2 border text-center font-semibold text-slate-500">${index + 1}</td>
-                <td class="p-2 border font-semibold text-slate-700">${lok}</td>
-                <td class="p-2 border font-bold text-blue-600">${kode}</td>
+                <td class="p-2 border font-semibold text-orange-700">${lok}</td>
+                <td class="p-2 border font-bold text-orange-600">${kode}</td>
                 <td class="p-2 border text-center text-slate-700 font-bold">${stok}</td>
                 <td class="p-2 border text-center text-slate-500">${exp}</td>
             </tr>
@@ -254,7 +225,7 @@ async function refreshWmsData() {
 
             // 2. Badge Firebase di kanan atas
             if (badge) {
-                badge.className = "bg-emerald-100 text-emerald-700 text-[10px] px-2 py-0.5 rounded-full font-semibold";
+                badge.className = "bg-orange-100 text-orange-700 text-[10px] px-2 py-0.5 rounded-full font-semibold";
                 badge.innerText = `Firebase: ${wmsGlobalData.length} Item (Pembaruan terakhir: ${serverSyncTime})`;
             }
         }
@@ -279,12 +250,17 @@ async function handleImportFdnFiles(event) {
 
     let successCount = 0;
     let failCount = 0;
+    let latestImportedDateId = null; // Menyimpan ID tanggal (YYYYMMDD) dari file terakhir yang diimpor
 
     // Loop melalui setiap file yang dipilih menggunakan Promise.all agar berjalan efisien
     const promises = Array.from(files).map(async (file) => {
         try {
             const textContent = await readFileAsync(file);
-            await parseAndSaveFdn(textContent);
+            // Tangkap nilai tanggal (YYYYMMDD) yang dikembalikan oleh parseAndSaveFdn
+            const parsedDateId = await parseAndSaveFdn(textContent);
+            if (parsedDateId) {
+                latestImportedDateId = parsedDateId;
+            }
             successCount++;
         } catch (error) {
             console.error(`Gagal memproses file ${file.name}:`, error);
@@ -295,6 +271,20 @@ async function handleImportFdnFiles(event) {
     await Promise.all(promises);
 
     miuiAlert(`Proses Impor Selesai!\nBerhasil: ${successCount} file\nGagal: ${failCount} file`);
+
+    // Jika ada file yang berhasil diimpor, otomatis sesuaikan tanggal di UI dan render preview-nya
+    if (latestImportedDateId) {
+        // Ubah format dari YYYYMMDD menjadi YYYY-MM-DD agar cocok dengan input type="date"
+        const formattedDateInput = `${latestImportedDateId.substring(0, 4)}-${latestImportedDateId.substring(4, 6)}-${latestImportedDateId.substring(6, 8)}`;
+        
+        const inputTanggalElem = document.getElementById('input-tanggal-muat');
+        if (inputTanggalElem) {
+            inputTanggalElem.value = formattedDateInput;
+        }
+
+        // Render ulang preview daftar FDN sesuai tanggal file yang baru diimpor
+        await renderDaftarFdnToPreview(latestImportedDateId);
+    }
     
     // Reset input file
     event.target.value = '';
@@ -310,7 +300,7 @@ function readFileAsync(file) {
     });
 }
 
-// Fungsi parser dan penyimpanan ke Firestore dengan fitur Update / Tambah Data
+// Fungsi parser dan penyimpanan ke Firestore dengan fitur Update / Tambah Data (Uppercase Otomatis)
 async function parseAndSaveFdn(fileContent) {
     const lines = fileContent.split('\n');
     let dariGudangRaw = '', nomorDokumen = '', tanggal = '', tujuanRaw = '';
@@ -340,24 +330,26 @@ async function parseAndSaveFdn(fileContent) {
             if (match) tanggal = match[1].trim();
         }
         
-        // Ambil Tujuan
+        // Ambil Tujuan (Dipaksa UPPERCASE agar seragam)
         if (line.includes('TUJUAN')) {
             const lastIndex = line.lastIndexOf('TUJUAN');
             const subStr = line.substring(lastIndex);
             const parts = subStr.split(':');
             if (parts.length > 1) {
-                tujuanRaw = parts[1].trim().split(/\s{2,}/)[0];
+                tujuanRaw = parts[1].trim().split(/\s{2,}/)[0].toUpperCase();
             }
         }
 
         // Parsing baris produk tabel
         const trimmed = line.trim();
-        if (/^\d+\s+[A-Z0-9]+/.test(trimmed)) {
+        if (/^\d+\s+[A-Za-z0-9]+/.test(trimmed)) {
             const tokens = trimmed.split(/\s+/);
             if (tokens.length >= 2) {
                 const qtyToken = tokens.find(t => /^\d+\/\d+\/\d+\/\d+$/.test(t));
                 if (qtyToken) {
-                    const kode = tokens[1];
+                    // PAKSA KODE PRODUK MENJADI HURUF KAPITAL (UPPERCASE) DISINI
+                    const kode = tokens[1].trim().toUpperCase();
+                    
                     const qtyParts = qtyToken.split('/').map(Number);
                     
                     const krt = qtyParts[0] || 0; // Qty Utama (Karton)
@@ -394,13 +386,13 @@ async function parseAndSaveFdn(fileContent) {
     let formattedTujuan = tujuanRaw.replace('STOCK POINT', 'SP').replace(/[^a-zA-Z0-9]/g, '_').trim();
     formattedTujuan = formattedTujuan.replace(/_+/g, '_');
 
-    // Ambil 5 angka terakhir dari nomor dokumen (contoh: DN-HO001-2609-75636 -> 75636)[cite: 7, 14]
+    // Ambil 5 angka terakhir dari nomor dokumen
     const docNumberDigits = nomorDokumen.replace(/\D/g, '');
     const last5Digits = docNumberDigits.slice(-5);
     
-    const docIdTujuan = `${formattedTujuan}_${last5Digits}`; // Hasil: SP_KEBUMEN_75636
+    const docIdTujuan = `${formattedTujuan}_${last5Digits}`;
 
-    // 4. Format ID Tanggal (DD/MM/YYYY -> YYYYMMDD)[cite: 14]
+    // 4. Format ID Tanggal (DD/MM/YYYY -> YYYYMMDD)
     const [d, m, y] = tanggal.split('/');
     const docIdTanggal = `${y}${m}${d}`;
 
@@ -420,6 +412,358 @@ async function parseAndSaveFdn(fileContent) {
     }, { merge: true });
 
     console.log(`Sukses menyimpan FDN dengan ID: ${docIdTujuan}`);
+    
+    const inputTanggalElem = document.getElementById('input-tanggal-muat');
+    const targetDateId = inputTanggalElem ? inputTanggalElem.value : docIdTanggal;
+    
+    await renderDaftarFdnToPreview(targetDateId);
+
+    // KEMBALIKAN NILAI TANGGAL AGAR DITANGKAP OLEH handleImportFdnFiles
+    return docIdTanggal;
+}
+
+// Fungsi untuk mengambil data dari sub-koleksi datatujuan dan menampilkannya ke #fdn-preview-text
+async function renderDaftarFdnToPreview(dateId) {
+    const previewContainer = document.getElementById('fdn-preview-text');
+    if (!previewContainer) return;
+
+    previewContainer.innerHTML = '<div class="text-slate-500 italic p-1">Memuat data FDN...</div>';
+
+    // Elemen statistik
+    const inputTotFdn = document.getElementById('tot-fdn');
+    const inputTotTujuan = document.getElementById('tot-tujuan');
+    const inputTotKeseluruhan = document.getElementById('tot-keseluruhan');
+
+    try {
+        const tujuanSnapshot = await db.collection('muat_fdn').doc(dateId).collection('datatujuan').get();
+
+        if (tujuanSnapshot.empty) {
+            previewContainer.innerHTML = '<div class="text-slate-900 shadow-sm">Belum ada data FDN diimport ditanggal ini...</div>';
+            if (inputTotFdn) inputTotFdn.value = '0';
+            if (inputTotTujuan) inputTotTujuan.value = '0';
+            if (inputTotKeseluruhan) inputTotKeseluruhan.value = '0';
+            return;
+        }
+
+        let totalFdnCount = 0;
+        let totalQtyKeseluruhan = 0;
+        const uniqueTujuanSet = new Set();
+        const groupedByTujuan = {};
+
+        tujuanSnapshot.forEach(doc => {
+            const data = doc.data();
+            const meta = data.meta || {};
+            let tujuan = meta.tujuan || 'TANPA TUJUAN';
+            
+            // Singkat "STOCK POINT" menjadi "SP"
+            tujuan = tujuan.replace('STOCK POINT', 'SP');
+            uniqueTujuanSet.add(tujuan);
+
+            const nomorDokumen = meta.nomor_dokumen || doc.id;
+            const docIdFirestore = doc.id; // Simpan ID dokumen Firestore (misal: SP_CILACAP_75642)
+            const gudang = meta.dari_gudang || 'WH-2';
+            
+            // Hitung item & total qty_utama
+            const items = data.data || [];
+            const itemCount = items.length;
+            
+            items.forEach(item => {
+                totalQtyKeseluruhan += Number(item.qty_utama || 0);
+            });
+
+            totalFdnCount++;
+
+            if (!groupedByTujuan[tujuan]) {
+                groupedByTujuan[tujuan] = {
+                    tujuan: tujuan,
+                    dokumenList: [],
+                    docIdList: [], // Menyimpan ID dokumen Firestore untuk modal
+                    gudangSet: new Set(),
+                    itemCounts: []
+                };
+            }
+            groupedByTujuan[tujuan].dokumenList.push(nomorDokumen);
+            groupedByTujuan[tujuan].docIdList.push(docIdFirestore);
+            groupedByTujuan[tujuan].gudangSet.add(gudang);
+            groupedByTujuan[tujuan].itemCounts.push(itemCount);
+        });
+
+        // Update nilai ke 3 kotak statistik di bawah
+        if (inputTotFdn) inputTotFdn.value = totalFdnCount;
+        if (inputTotTujuan) inputTotTujuan.value = uniqueTujuanSet.size;
+        if (inputTotKeseluruhan) inputTotKeseluruhan.value = totalQtyKeseluruhan;
+
+        let htmlContent = '<div class="space-y-1">';
+        let nomorUrut = 1;
+
+        // Render hasil grouping ke dalam HTML preview dengan format ringkas & interaktif
+        for (const key in groupedByTujuan) {
+            const group = groupedByTujuan[key];
+            
+            // Ambil 5 digit terakhir dari setiap nomor dokumen
+            const suffixes = group.dokumenList.map(doc => {
+                const digits = doc.replace(/\D/g, '');
+                return digits.length >= 5 ? digits.slice(-5) : doc;
+            });
+            
+            const formattedDoc = suffixes.join(' & ');
+            const primaryDocId = group.docIdList[0]; // Ambil ID utama untuk modal
+
+            // Format Gudang (misal: WH-2 atau WH-2 & WH-3)
+            const gudangArr = Array.from(group.gudangSet);
+            const gudangStr = gudangArr.length > 1 ? gudangArr.join(' & ') : (gudangArr[0] || 'WH-2');
+
+            // Format rincian item (Contoh: 10 + 1 item)
+            const itemCountStr = group.itemCounts.join(' + ');
+
+            htmlContent += `
+                <div onclick="openFdnDetailModalByTujuan('${dateId}', '${group.tujuan}')" 
+                     class="flex justify-between items-center bg-orange-50 hover:bg-orange-100 cursor-pointer p-1 rounded border border-slate-200 transition shadow-xs">
+                    <div>
+                        <span class="font-bold text-slate-800">${nomorUrut}.</span> 
+                        <span class="font-semibold text-orange-700">${formattedDoc}</span> 
+                        <span class="text-slate-600">→ ${group.tujuan} (${gudangStr})</span>
+                    </div>
+                    <span class="bg-orange-100 text-orange-800 text-[9px] px-1.5 py-0.5 rounded font-bold">
+                        (${itemCountStr} item)
+                    </span>
+                </div>
+            `;
+            nomorUrut++;
+        }
+
+        htmlContent += '</div>';
+        previewContainer.innerHTML = htmlContent;
+
+    } catch (error) {
+        console.error("Gagal memuat preview FDN:", error);
+        previewContainer.innerHTML = '<div class="text-red-500 p-1">Terjadi kesalahan saat memuat data.</div>';
+    }
+}
+
+// Variabel global sementara untuk menyimpan konteks modal aktif
+let activeModalContext = {
+    dateId: '',
+    matchedDocs: [] // Berisi array ID dokumen Firestore dan nomor dokumennya
+};
+
+// Modifikasi sedikit pada fungsi openFdnDetailModalByTujuan saat menyimpan data matchedDocs:
+async function openFdnDetailModalByTujuan(dateId, tujuanKey) {
+    const modal = document.getElementById('fdn-modal-detail');
+    const itemListContainer = document.getElementById('modal-item-list');
+    
+    // Sembunyikan dulu dropdown pilihan hapus saat modal baru dibuka
+    document.getElementById('container-pilih-hapus').classList.add('hidden');
+    document.getElementById('btn-hapus-fdn').classList.remove('hidden');
+
+    itemListContainer.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-500 italic">Memuat seluruh data item FDN...</td></tr>';
+    modal.classList.remove('hidden');
+
+    try {
+        const snapshot = await db.collection('muat_fdn').doc(dateId).collection('datatujuan').get();
+
+        if (snapshot.empty) {
+            alert("Data FDN tidak ditemukan di database!");
+            closeFdnModal();
+            return;
+        }
+
+        let matchedDocs = [];
+        let allItemsCombined = [];
+        let docNumbers = [];
+        let tanggalVal = '-';
+        let tujuanVal = '-';
+        let gudangSet = new Set();
+
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const meta = data.meta || {};
+            let currentTujuan = meta.tujuan || 'TANPA TUJUAN';
+            currentTujuan = currentTujuan.replace('STOCK POINT', 'SP');
+
+            if (currentTujuan === tujuanKey) {
+                const noDok = meta.nomor_dokumen || doc.id;
+                matchedDocs.push({
+                    firestoreId: doc.id,
+                    nomorDokumen: noDok
+                });
+                docNumbers.push(noDok);
+                
+                if (tanggalVal === '-') tanggalVal = meta.tanggal || '-';
+                if (tujuanVal === '-') tujuanVal = currentTujuan;
+                
+                const gudangAsal = meta.dari_gudang || 'WH-2';
+                gudangSet.add(gudangAsal);
+
+                const items = data.data || [];
+                items.forEach(item => {
+                    allItemsCombined.push({
+                        ...item,
+                        nomor_dokumen: noDok,
+                        dari_gudang: gudangAsal
+                    });
+                });
+            }
+        });
+
+        // Simpan ke konteks global modal
+        activeModalContext = {
+            dateId: dateId,
+            matchedDocs: matchedDocs
+        };
+
+        if (matchedDocs.length === 0) {
+            alert("Data tujuan tidak ditemukan.");
+            closeFdnModal();
+            return;
+        }
+
+        // Format tampilan nomor dokumen gabungan di header
+        let formattedDocNo = '';
+        if (docNumbers.length === 1) {
+            formattedDocNo = docNumbers[0];
+        } else {
+            const firstDoc = docNumbers[0];
+            const lastDashIdx = firstDoc.lastIndexOf('-');
+            const prefix = lastDashIdx !== -1 ? firstDoc.substring(0, lastDashIdx + 1) : '';
+            const suffixes = docNumbers.map(doc => {
+                const idx = doc.lastIndexOf('-');
+                return idx !== -1 ? doc.substring(idx + 1) : doc;
+            });
+            formattedDocNo = prefix + suffixes.join(' & ');
+        }
+
+        const gudangArr = Array.from(gudangSet);
+        const gudangStr = gudangArr.length > 1 ? gudangArr.join(' & ') : (gudangArr[0] || 'WH-2');
+
+        document.getElementById('modal-doc-no').innerText = formattedDocNo;
+        document.getElementById('modal-tanggal').innerText = tanggalVal;
+        document.getElementById('modal-tujuan').innerText = tujuanVal;
+        document.getElementById('modal-gudang').innerText = gudangStr;
+
+        // Render baris tabel 5 kolom
+        let rowsHtml = '';
+        allItemsCombined.forEach((item, index) => {
+            const sub = item.sub || {};
+            const bal = sub.bal !== undefined ? sub.bal : 0;
+            const rtg = sub.rtg !== undefined ? sub.rtg : 0;
+            const pcs = sub.pcs !== undefined ? sub.pcs : 0;
+            const jumlahStr = `${item.qty_utama || 0} / ${bal} / ${rtg} / ${pcs}`;
+
+            const docStr = item.nomor_dokumen;
+            const digits = docStr.replace(/\D/g, '');
+            const shortDoc = digits.length >= 5 ? digits.slice(-5) : docStr;
+
+            rowsHtml += `
+                <tr class="border-b border-slate-100 hover:bg-slate-50">
+                    <td class="p-2 text-center font-medium text-slate-500">${index + 1}</td>
+                    <td class="p-2 font-mono font-bold text-orange-600 uppercase">${item.kode}</td>
+                    <td class="p-2 font-mono">${jumlahStr}</td>
+                    <td class="p-2 font-mono font-semibold text-slate-700">${shortDoc}</td>
+                    <td class="p-2 text-center font-bold text-slate-800">${item.dari_gudang}</td>
+                </tr>
+            `;
+        });
+
+        itemListContainer.innerHTML = rowsHtml;
+
+    } catch (error) {
+        console.error("Gagal memuat detail gabungan FDN:", error);
+        itemListContainer.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-red-500">Gagal memuat data dari server.</td></tr>';
+    }
+}
+
+// Fungsi ketika tombol utama "Hapus FDN Ini" diklik
+function handleTombolHapusClick() {
+    const docs = activeModalContext.matchedDocs;
+    
+    if (docs.length === 1) {
+        // Jika hanya ada 1 FDN, langsung konfirmasi hapus dokumen tersebut
+        hapusFdnDocument(activeModalContext.dateId, docs[0].firestoreId);
+    } else if (docs.length > 1) {
+        // Jika ada lebih dari 1 FDN, tampilkan dropdown pilihan dan sembunyikan tombol utama
+        const selectElem = document.getElementById('select-fdn-to-delete');
+        selectElem.innerHTML = '';
+        
+        // Tambahkan opsi "Semua FDN" dan opsi satuan per nomor dokumen
+        let optionsHtml = `<option value="ALL">-- Hapus Semua (${docs.length} FDN) --</option>`;
+        docs.forEach(d => {
+            optionsHtml += `<option value="${d.firestoreId}">Hapus FDN: ${d.nomorDokumen}</option>`;
+        });
+        selectElem.innerHTML = optionsHtml;
+
+        document.getElementById('btn-hapus-fdn').classList.add('hidden');
+        document.getElementById('container-pilih-hapus').classList.remove('hidden');
+    }
+}
+
+// Fungsi untuk membatalkan pemilihan hapus
+function batalPilihHapus() {
+    document.getElementById('container-pilih-hapus').classList.add('hidden');
+    document.getElementById('btn-hapus-fdn').classList.remove('hidden');
+}
+
+// Fungsi untuk mengeksekusi penghapusan berdasarkan pilihan di dropdown
+async function eksekusiHapusPilihan() {
+    const selectElem = document.getElementById('select-fdn-to-delete');
+    const selectedVal = selectElem.value;
+    const dateId = activeModalContext.dateId;
+
+    if (selectedVal === "ALL") {
+        const allFirestoreIds = activeModalContext.matchedDocs.map(d => d.firestoreId);
+        await hapusGroupFdnDocuments(dateId, allFirestoreIds);
+    } else {
+        // Hapus spesifik satu dokumen FDN yang dipilih
+        if (!confirm(`Apakah Anda yakin ingin menghapus FDN yang dipilih ini?`)) return;
+        try {
+            await db.collection('muat_fdn').doc(dateId).collection('datatujuan').doc(selectedVal).delete();
+            miuiAlert("Data FDN berhasil dihapus.");
+            closeFdnModal();
+            renderDaftarFdnToPreview(dateId);
+        } catch (error) {
+            console.error("Gagal menghapus FDN satuan:", error);
+            miuiAlert("Terjadi kesalahan saat menghapus data.");
+        }
+    }
+}
+
+// Fungsi untuk menutup modal
+function closeFdnModal() {
+    const modal = document.getElementById('fdn-modal-detail');
+    if (modal) modal.classList.add('hidden');
+}
+
+// Fungsi helper hapus dokumen satuan
+async function hapusFdnDocument(dateId, docId) {
+    if (!confirm(`Apakah Anda yakin ingin menghapus FDN ini dari sistem?`)) return;
+    try {
+        await db.collection('muat_fdn').doc(dateId).collection('datatujuan').doc(docId).delete();
+        miuiAlert("Data FDN berhasil dihapus.");
+        closeFdnModal();
+        renderDaftarFdnToPreview(dateId);
+    } catch (error) {
+        console.error("Gagal menghapus FDN:", error);
+        miuiAlert("Terjadi kesalahan saat menghapus data.");
+    }
+}
+
+// Fungsi helper hapus sekumpulan dokumen FDN
+async function hapusGroupFdnDocuments(dateId, docIdArray) {
+    if (!confirm(`Apakah Anda yakin ingin menghapus seluruh (${docIdArray.length}) FDN pada tujuan ini?`)) return;
+    try {
+        const batch = db.batch();
+        docIdArray.forEach(docId => {
+            const docRef = db.collection('muat_fdn').doc(dateId).collection('datatujuan').doc(docId);
+            batch.delete(docRef);
+        });
+        await batch.commit();
+        miuiAlert("Semua data FDN pada tujuan ini berhasil dihapus.");
+        closeFdnModal();
+        renderDaftarFdnToPreview(dateId);
+    } catch (error) {
+        console.error("Gagal menghapus sekumpulan FDN:", error);
+        miuiAlert("Terjadi kesalahan saat menghapus data.");
+    }
 }
 
 
