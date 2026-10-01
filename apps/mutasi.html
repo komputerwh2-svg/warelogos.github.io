@@ -16,7 +16,6 @@
                 <div class="h-8 w-[1px] bg-white/10 mx-1"></div>
 
                 <h1 class="text-white font-bold text-[14px] ml-3 tracking-wide drop-shadow-md flex items-center gap-2">
-                    <i class="fa-solid fa-arrows-split-up-and-left text-orange-500"></i>
                     <span>Form Mutasi & WMS Report</span>
                     <span id="display-waktu-mutasi" class="text-orange-500 font-bold text-[14px] ml-3 tracking-wide drop-shadow-md"></span>
                 </h1>
@@ -31,8 +30,8 @@
         <div class="w-1/2 flex flex-col space-y-3 overflow-y-auto max-h-full pr-1 text-xs font-sans">
             
             <!-- 1. Panel Atas: Import File FDN & Tanggal Muat -->
-            <div class="bg-slate-100 p-3 rounded-xl border border-slate-300 shadow-sm space-y-2">
-                <div class="text-[10px] font-bold text-slate-700 uppercase border-b border-slate-200 pb-1">
+            <div class="bg-white p-3 rounded-xl border border-orange-500 shadow-sm space-y-2">
+                <div class="text-[10px] font-bold text-slate-700 uppercase border-b border-orange-200 pb-1">
                     Import Semua File FDn Disini
                 </div>
                 
@@ -48,11 +47,29 @@
                             
                             <!-- Kotak tampilan visual untuk pengguna (Format: 01 Oktober 2026) -->
                             <div class="relative">
-                                <input type="text" id="display-tgl-muat" readonly placeholder="Pilih tanggal..." class="w-full p-1 bg-white border border-slate-300 rounded font-bold text-[10px] text-slate-800 shadow-sm cursor-pointer pr-6">
+                                <input type="text" id="display-tgl-muat" readonly placeholder="Pilih tanggal..." class="w-full p-1 bg-white border border-orange-300 rounded font-bold text-[10px] text-slate-800 shadow-sm cursor-pointer pr-6">
                                 <span class="absolute right-1.5 top-1 text-slate-400 text-[10px] pointer-events-none">📅</span>
                                 
                                 <!-- Input date asli yang transparan di atasnya agar fungsionalitas kalender bawaan tetap jalan -->
                                 <input type="date" id="trigger-tgl-muat" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onchange="updateFormatTanggal(this.value)">
+                            </div>
+                        </div>
+
+                        <!-- Label & 3 Kolom Statistik Bawah -->
+                        <div class="pt-0.5">     
+                            <div class="grid grid-cols-3 gap-1">
+                                <div>
+                                    <span class="text-[9px] text-slate-600 block text-center font-bold">Total FDN</span>
+                                    <input type="text" id="tot-fdn" readonly value="0" class="w-full text-center p-1 bg-white border border-orange-300 rounded font-bold text-[10px] text-slate-900 shadow-sm">
+                                </div>
+                                <div>
+                                    <span class="text-[9px] text-slate-600 block text-center font-bold">Total Tujuan</span>
+                                    <input type="text" id="tot-tujuan" readonly value="0" class="w-full text-center p-1 bg-white border border-orange-300 rounded font-bold text-[10px] text-slate-900 shadow-sm">
+                                </div>
+                                <div>
+                                    <span class="text-[9px] text-slate-600 block text-center font-bold">Total Muat</span>
+                                    <input type="text" id="tot-keseluruhan" readonly value="0" class="w-full text-center p-1 bg-white border border-orange-300 rounded font-black text-[10px] text-slate-900 shadow-sm">
+                                </div>
                             </div>
                         </div>
 
@@ -61,43 +78,25 @@
 
                         <!-- Tombol Import FDN -->
                         <div>
-                            <button type="button" onclick="document.getElementById('file-fdn-input').click();" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-1 px-1.5 rounded font-black text-[10px] uppercase shadow text-center border border-emerald-600">
+                            <button type="button" onclick="document.getElementById('file-fdn-input').click();" class="w-full bg-orange-500 hover:bg-orange-600 text-white py-1 px-1.5 rounded font-black text-[10px] uppercase shadow text-center border border-orange-600">
                                 IMPORT FDN
                             </button>
                         </div>
-
-                        <!-- Label & 3 Kolom Statistik Bawah -->
-                        <div class="pt-0.5">     
-                            <div class="grid grid-cols-3 gap-1">
-                                <div>
-                                    <span class="text-[9px] text-slate-600 block text-center font-bold">Total FDN</span>
-                                    <input type="text" id="tot-fdn" readonly value="0" class="w-full text-center p-1 bg-white border border-slate-300 rounded font-bold text-[10px] text-slate-900 shadow-sm">
-                                </div>
-                                <div>
-                                    <span class="text-[9px] text-slate-600 block text-center font-bold">Tujuan</span>
-                                    <input type="text" id="tot-tujuan" readonly value="0" class="w-full text-center p-1 bg-white border border-slate-300 rounded font-bold text-[10px] text-slate-900 shadow-sm">
-                                </div>
-                                <div>
-                                    <span class="text-[9px] text-slate-600 block text-center font-bold">Total</span>
-                                    <input type="text" id="tot-keseluruhan" readonly value="0" class="w-full text-center p-1 bg-white border border-slate-300 rounded font-black text-[10px] text-slate-900 shadow-sm">
-                                </div>
-                            </div>
-                        </div>
                     </div>
 
-                    <!-- Kolom Kanan: Kotak Teks Preview FDN yang Luas -->
+                    <!-- Kolom Kanan: Kotak Teks Preview FDN dengan Ukuran Tetap & Scroll MIUI v5 -->
                     <div class="col-span-7 flex flex-col">
-                        <span class="text-[9px] font-bold text-slate-600 block uppercase mb-0.5">Daftar Nomor FDn / Tujuan</span>
-                        <div id="fdn-preview-text" class="w-full h-full bg-white border border-slate-300 rounded p-2 overflow-y-auto text-[10px] font-mono text-slate-700 shadow-inner min-h-[110px]">
-                            <div class="text-slate-900 shadow-sm">Belum ada data FDN diimport...</div>
+                        <span class="text-[9px] font-bold text-slate-600 block uppercase mb-0.5">Daftar Nomor FDn / Tujuan (Klik salah satu daftar untuk melihat detil surat)</span>
+                        <div id="fdn-preview-text" class="w-full h-[110px] max-h-[110px] bg-white border border-orange-300 rounded p-2 overflow-y-auto miui-custom-scroll text-[10px] font-mono text-slate-700 shadow-inner">
+                            <div class="text-slate-800 text-[10px]">Belum ada data FDN diimport ditanggal ini...</div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- 2. Panel Tengah: Form Ambil Rak (Layout Grid Berdampingan seperti Aplikasi Lama) -->
-            <div class="bg-slate-100 p-3 rounded-xl border border-slate-300 shadow-sm space-y-2">
-                <div class="text-[10px] font-bold text-slate-700 uppercase border-b border-slate-200 pb-1">
+            <div class="bg-white p-3 rounded-xl border border-orange-500 shadow-sm space-y-2">
+                <div class="text-[10px] font-bold text-slate-700 uppercase border-b border-orange-200 pb-1">
                     Form Ambil Rak
                 </div>
 
@@ -199,7 +198,7 @@
         <!-- ================= KOLOM KANAN: WMS REPORT LIVE READER ================= -->
         <div class="w-1/2 flex flex-col space-y-4 overflow-y-auto max-h-full pl-1">
             
-            <div class="bg-white p-5 rounded-2xl shadow-sm border border-blue-500 space-y-3 flex-1 flex flex-col">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-orange-500 space-y-3 flex-1 flex flex-col">
                 
                 <!-- Header WMS Report & 3 Filter Pencarian -->
                 <div class="flex flex-col gap-2 pb-3 border-b border-slate-100">
@@ -212,7 +211,7 @@
                             </div>
                             <span id="wms-last-update" class="text-[10px] text-slate-400">Update Data WMS Terakhir: -</span>
                         </div>
-                        <button onclick="refreshWmsData()" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded shadow flex items-center gap-1 transition">
+                        <button onclick="refreshWmsData()" class="px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded shadow flex items-center gap-1 transition">
                             <svg class="w-3 h-3 animate-spin-hover" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                             Update Data WMS
                         </button>
@@ -223,20 +222,20 @@
                         <!-- Kode Rak -->
                         <div class="col-span-4">
                             <label class="text-[10px] font-black text-slate-500 uppercase block mb-0.5">Kode Rak</label>
-                            <input type="text" id="filter-kode-rak" oninput="filterWmsReportData()" placeholder="Ketik kode rak..." class="w-full p-1.5 text-xs font-bold border border-blue-300 rounded-lg bg-slate-50 text-slate-800 uppercase">
+                            <input type="text" id="filter-kode-rak" oninput="filterWmsReportData()" placeholder="Ketik kode rak..." class="w-full p-1.5 text-xs font-bold border border-orange-300 rounded-lg bg-slate-50 text-slate-800 uppercase">
                         </div>
                         
                         <!-- Kode Barang -->
                         <div class="col-span-4">
                             <label class="text-[10px] font-black text-slate-500 uppercase block mb-0.5">Kode Barang</label>
-                            <input type="text" id="filter-kode-barang" oninput="filterWmsReportData()" placeholder="Ketik kode barang..." class="w-full p-1.5 text-xs font-bold border border-blue-300 rounded-lg bg-slate-50 text-slate-800 uppercase">
+                            <input type="text" id="filter-kode-barang" oninput="filterWmsReportData()" placeholder="Ketik kode barang..." class="w-full p-1.5 text-xs font-bold border border-orange-300 rounded-lg bg-slate-50 text-slate-800 uppercase">
                         </div>
 
                         <!-- Rak No (Dropdown 5 - 15) & Tombol Refresh -->
                         <div class="col-span-4 flex gap-1 items-end">
                             <div class="flex-1">
                                 <label class="text-[10px] font-black text-slate-500 uppercase block mb-0.5">Rak No</label>
-                                <select id="filter-rak-no" onchange="filterWmsReportData()" class="w-full p-1.5 text-xs font-bold border border-blue-300 rounded-lg bg-slate-50 text-slate-800 uppercase">
+                                <select id="filter-rak-no" onchange="filterWmsReportData()" class="w-full p-1.5 text-xs font-bold border border-orange-300 rounded-lg bg-slate-50 text-slate-800 uppercase">
                                     <option value="">-- Semua --</option>
                                     <option value="4">4</option>
                                     <option value="5">5</option>
@@ -275,6 +274,71 @@
                 </div>
             </div>
         </div>
+    </div>
 
+    <!-- Modal Detail & Preview FDN (Multi-Dokumen per Tujuan dengan Tabel Scrollable) -->
+    <div id="fdn-modal-detail" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-lg shadow-2xl w-11/12 max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+            <!-- Header Modal -->
+            <div class="bg-orange-600 text-white px-4 py-2.5 flex justify-between items-center">
+                <h3 class="font-bold text-xs uppercase tracking-wider">Detail Surat Jalan / FDN Gabungan</h3>
+                <button onclick="closeFdnModal()" class="text-white hover:text-orange-200 font-bold text-sm">✕</button>
+            </div>
+
+            <!-- Body Modal (Header Diam, Tabel yang Bisa Digulir) -->
+            <div class="p-4 text-xs flex flex-col flex-1 bg-slate-50 overflow-hidden space-y-3">
+                <!-- Informasi Meta / Header (Tetap Diam / Tidak Scroll) -->
+                <div class="bg-white p-3 rounded border border-slate-200 grid grid-cols-2 gap-2 text-[11px] shrink-0">
+                    <div><span class="font-semibold text-slate-500">No Dokumen :</span> <span id="modal-doc-no" class="font-bold text-orange-700"></span></div>
+                    <div><span class="font-semibold text-slate-500">Tanggal :</span> <span id="modal-tanggal" class="font-bold text-slate-800"></span></div>
+                    <div><span class="font-semibold text-slate-500">Tujuan :</span> <span id="modal-tujuan" class="font-bold text-orange-700"></span></div>
+                    <div><span class="font-semibold text-slate-500">Gudang :</span> <span id="modal-gudang" class="font-bold text-slate-800">Gabungan / Multi</span></div>
+                </div>
+
+                <!-- Tabel Item Barang dengan Scroll Khusus di Tabel -->
+                <div class="bg-white rounded border border-slate-200 flex-1 flex flex-col overflow-hidden">
+                    <div class="overflow-y-auto miui-custom-scroll flex-1 max-h-[50vh]">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="sticky top-0 bg-slate-100 z-10">
+                                <tr class="text-slate-600 text-[10px] border-b border-slate-200">
+                                    <th class="p-2 w-10 text-center">NO</th>
+                                    <th class="p-2">KODE PRODUK</th>
+                                    <th class="p-2">JUMLAH (KRT/BAL/RTG/PCS)</th>
+                                    <th class="p-2">NOMOR FDN</th>
+                                    <th class="p-2 w-20 text-center">GUDANG</th>
+                                </tr>
+                            </thead>
+                            <tbody id="modal-item-list" class="text-slate-700 text-[11px]">
+                                <!-- Item akan dimuat secara dinamis di sini -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Modal (Tombol Aksi: Hapus & Tutup) -->
+            <div class="bg-white px-4 py-2.5 border-t border-slate-200 flex justify-between items-center shrink-0">
+                <div class="flex items-center gap-2">
+                    <button id="btn-hapus-fdn" onclick="handleTombolHapusClick()" class="bg-red-500 hover:bg-red-600 text-white font-bold text-[10px] px-3 py-1.5 rounded shadow transition flex items-center gap-1">
+                        🗑️️ Hapus FDN Ini
+                    </button>
+                    <!-- Dropdown / Pilihan FDN jika lebih dari 1 -->
+                    <div id="container-pilih-hapus" class="hidden flex items-center gap-1.5">
+                        <select id="select-fdn-to-delete" class="text-[10px] border border-red-300 rounded px-2 py-1 bg-red-50 text-red-900 font-semibold focus:outline-none">
+                            <!-- Opsi FDN akan dimasukkan secara dinamis -->
+                        </select>
+                        <button onclick="eksekusiHapusPilihan()" class="bg-red-700 hover:bg-red-800 text-white font-bold text-[10px] px-2.5 py-1 rounded shadow transition">
+                            Konfirmasi Hapus
+                        </button>
+                        <button onclick="batalPilihHapus()" class="text-slate-500 hover:text-slate-700 font-bold text-[10px] px-1">
+                            ✕
+                        </button>
+                    </div>
+                </div>
+                <button onclick="closeFdnModal()" class="bg-slate-300 hover:bg-slate-400 text-slate-800 font-bold text-[10px] px-4 py-1.5 rounded shadow transition">
+                    Tutup
+                </button>
+            </div>
+        </div>
     </div>
 </div>
