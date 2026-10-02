@@ -94,94 +94,83 @@
                 </div>
             </div>
 
-            <!-- 2. Panel Tengah: Form Ambil Rak (Layout Grid Berdampingan seperti Aplikasi Lama) -->
+            <!-- 2. Panel Tengah: Form Ambil Rak Layout Ringkas 1 Baris -->
             <div class="bg-white p-3 rounded-xl border border-orange-500 shadow-sm space-y-2">
                 <div class="text-[10px] font-bold text-slate-700 uppercase border-b border-orange-200 pb-1">
                     Form Ambil Rak
                 </div>
 
-                <div class="grid grid-cols-12 gap-2">
-                    <!-- Sisi Kiri Form Isian -->
-                    <div class="col-span-7 space-y-2">
-                        <div class="flex items-center space-x-2">
-                            <label class="w-16 text-[11px] font-bold text-slate-700 flex-shrink-0">Kode</label>
-                            <select id="mutasi-kode" class="w-full p-1 text-xs font-bold border border-slate-300 rounded bg-white">
-                                <option value="">Pilih Kode...</option>
-                            </select>
-                        </div>
-
-                        <div class="flex items-center space-x-2">
-                            <label class="w-16 text-[11px] font-bold text-slate-700 flex-shrink-0">Rak</label>
-                            <input type="text" id="mutasi-lokasi" placeholder="Pilih rak..." class="w-full p-1 text-xs font-bold border border-slate-300 rounded bg-white uppercase">
-                            <span class="bg-rose-500 text-white font-black text-[10px] px-2 py-1 rounded shadow-sm text-center flex-shrink-0">WH3</span>
-                        </div>
-
-                        <div class="flex items-center space-x-2">
-                            <label class="w-16 text-[11px] font-bold text-slate-700 flex-shrink-0">QTY Ambil</label>
-                            <input type="number" id="mutasi-qty" class="w-full p-1 text-xs font-bold border border-slate-300 rounded bg-white text-center">
-                        </div>
-
-                        <div class="flex items-center space-x-2">
-                            <label class="w-16 text-[11px] font-bold text-slate-700 flex-shrink-0">QTY Stok</label>
-                            <input type="text" id="mutasi-stok-gudang" readonly class="w-full p-1 text-xs font-bold border border-slate-300 rounded bg-white text-center text-slate-600">
-                        </div>
-
-                        <div class="flex items-center space-x-2 pt-1">
-                            <label class="w-20 text-[10px] font-bold text-slate-700 flex-shrink-0">Sisa Input :</label>
-                            <input type="text" id="summary-kurang" readonly value="0" class="w-full p-1 text-center bg-white border border-slate-300 rounded font-black text-xs text-slate-800">
-                        </div>
+                <!-- Baris Utama Form Isian (1 Baris Memanjang) -->
+                <div class="grid grid-cols-12 gap-1.5 items-end">
+                    
+                    <!-- 1. Kode Barang (3 Kolom) -->
+                    <div class="col-span-3">
+                        <label class="block text-[10px] font-bold text-slate-700 mb-0.5">Kode Barang</label>
+                        <select id="mutasi-kode" class="w-full p-1.5 text-xs font-bold text-slate-900 border border-orange-300 rounded bg-white shadow-sm focus:outline-none focus:ring-1 focus:ring-orange-500">
+                            <option value="" class="text-slate-500">Pilih Kode...</option>
+                        </select>
                     </div>
 
-                    <!-- Sisi Kanan: Kotak Kebutuhan Ambil, Ambil, Kurang (Warna Cyan Khas) -->
-                    <div class="col-span-5 bg-cyan-100/80 p-2 rounded-lg border border-cyan-300 flex flex-col justify-between space-y-1.5 shadow-inner">
-                        <div>
-                            <span class="text-[9px] font-bold text-cyan-900 uppercase block mb-0.5">Kebutuhan Ambil</span>
-                            <div id="summary-kebutuhan" class="text-[11px] font-bold text-slate-800 bg-white p-1 rounded border border-cyan-200 text-center truncate">belum ada data</div>
-                        </div>
-
-                        <div class="flex items-center justify-between">
-                            <span class="text-[10px] font-bold text-cyan-900">Ambil :</span>
-                            <span id="summary-ambil" class="w-20 text-xs font-bold text-slate-800 bg-white p-1 rounded border border-cyan-200 text-center block">-</span>
-                        </div>
-
-                        <div>
-                            <span class="text-[10px] font-bold text-cyan-900 block mb-0.5">Kurang :</span>
-                            <div id="summary-kurang-bawah" class="text-base font-black text-slate-900 bg-white py-1 rounded border border-cyan-200 text-center shadow-sm">0</div>
-                        </div>
+                    <!-- 2. Rak / Lokasi (3 Kolom) -->
+                    <div class="col-span-3">
+                        <label class="block text-[10px] font-bold text-slate-700 mb-0.5">Rak / Lokasi</label>
+                        <input type="text" id="mutasi-lokasi" placeholder="Pilih WMS..." class="w-full p-1.5 text-xs font-bold border border-orange-300 text-slate-700 rounded bg-white uppercase">
                     </div>
+
+                    <!-- 3. Tombol WH3 (1 Kolom) - Diubah menjadi Tombol Interaktif -->
+                    <div class="col-span-1 flex justify-center">
+                        <button type="button" onclick="isiRakWh3()" class="bg-orange-500 hover:bg-orange-600 text-white font-black text-[9px] py-2 rounded shadow-sm text-center w-full block tracking-wider transition cursor-pointer" title="Klik untuk isi WH-3">
+                            WH3
+                        </button>
+                    </div>
+
+                    <!-- 4. QTY Stok (2 Kolom) -->
+                    <div class="col-span-2">
+                        <label class="block text-[10px] font-bold text-slate-700 mb-0.5">QTY Stok</label>
+                        <input type="text" id="mutasi-stok-gudang" placeholder="0" class="w-full p-1.5 text-xs font-bold border border-orange-300 rounded bg-slate-50 text-center text-slate-700">
+                    </div>
+
+                    <!-- 5. QTY Ambil (3 Kolom) -->
+                    <div class="col-span-3">
+                        <label class="block text-[10px] font-bold text-slate-700 mb-0.5">QTY Ambil</label>
+                        <input type="number" id="mutasi-qty" placeholder="0" class="w-full p-1.5 text-xs font-bold border border-orange-300 text-slate-700 rounded bg-white text-center">
+                    </div>
+
                 </div>
 
-                <!-- Tombol Aksi Kontrol Rak (Warna Pastel Khas Aplikasi Lama) -->
-                <div class="grid grid-cols-5 gap-1 pt-2">
-                    <button type="button" onclick="tambahItemMutasiList()" class="bg-emerald-300 hover:bg-emerald-400 text-slate-900 border border-emerald-500 py-1.5 px-0.5 rounded font-black text-[9px] uppercase shadow-sm text-center">
-                        TAMBAH RAK
-                    </button>
-                    <button type="button" onclick="hapusItemMutasiList()" class="bg-rose-300 hover:bg-rose-400 text-slate-900 border border-rose-500 py-1.5 px-0.5 rounded font-black text-[9px] uppercase shadow-sm text-center">
-                        HAPUS RAK
-                    </button>
-                    <button type="button" onclick="undoMutasiList()" class="bg-amber-200 hover:bg-amber-300 text-slate-900 border border-amber-400 py-1.5 px-0.5 rounded font-black text-[9px] uppercase shadow-sm text-center">
-                        UNDO
-                    </button>
-                    <button type="button" onclick="rakBaruMutasi()" class="bg-emerald-200 hover:bg-emerald-300 text-slate-900 border border-emerald-400 py-1.5 px-0.5 rounded font-black text-[9px] uppercase shadow-sm text-center">
-                        RAK BARU
-                    </button>
-                    <button type="button" onclick="arsipFileMutasi()" class="bg-emerald-200 hover:bg-emerald-300 text-slate-900 border border-emerald-400 py-1.5 px-0.5 rounded font-black text-[9px] uppercase shadow-sm text-center">
-                        ARSIP FILE
-                    </button>
+                <!-- Baris Bawah: Tombol Aksi & Info Sisa Belum Diinput -->
+                <div class="grid grid-cols-12 gap-2 items-center pt-1">
+                    
+                    <!-- Tombol Tambah Rak & Cetak (7 Kolom) -->
+                    <div class="col-span-7 grid grid-cols-2 gap-1.5">
+                        <button type="button" onclick="tambahItemMutasiList()" class="bg-orange-400 hover:bg-orange-500 text-slate-900 border border-orange-600 py-1.5 px-2 rounded font-black text-[10px] uppercase shadow-sm text-center transition">
+                            ➕ TAMBAH RAK
+                        </button>
+                        <button type="button" onclick="cetakArsipMutasi()" class="bg-orange-300 hover:bg-orange-400 text-slate-900 border border-orange-500 py-1.5 px-2 rounded font-black text-[10px] uppercase shadow-sm text-center transition">
+                            🖨️ CETAK / ARSIP
+                        </button>
+                    </div>
+
+                    <!-- Info Sisa Belum Diinput (5 Kolom) -->
+                    <div class="col-span-5 flex items-center space-x-1.5 bg-slate-50 px-2 py-1 rounded border border-orange-200">
+                        <span class="text-[9px] font-bold text-slate-700 whitespace-nowrap">QTY Belum Diinput:</span>
+                        <input type="text" id="summary-kurang" readonly value="0" class="w-full p-1 text-center bg-white border border-orange-300 rounded font-black text-xs text-slate-800">
+                    </div>
+
                 </div>
 
-                <!-- 3. Tabel Daftar Rak Terpilih -->
-                <div class="bg-white border border-slate-300 rounded shadow-sm overflow-hidden mt-1">
-                    <div class="max-h-44 overflow-y-auto">
-                        <table class="w-full text-left border-collapse text-[11px]">
-                            <thead class="sticky top-0 bg-slate-200 text-slate-700 font-black text-[10px] uppercase">
+                <!-- 3. Tabel Daftar Rak Terpilih dengan Scroll MIUI v5 & Baris Total -->
+                <div class="bg-white border border-orange-300 rounded shadow-sm overflow-hidden mt-1 flex flex-col">
+                    <div class="max-h-36 overflow-y-auto miui-scrollbar">
+                        <table class="w-full text-left border-collapse text-[11px] table-fixed">
+                            <thead class="sticky top-0 bg-slate-200 text-slate-700 font-black text-[10px] uppercase z-10">
                                 <tr>
-                                    <th class="p-1.5 border border-slate-300 text-center w-8">NO</th>
-                                    <th class="p-1.5 border border-slate-300">KODE</th>
-                                    <th class="p-1.5 border border-slate-300 w-20">RAK</th>
-                                    <th class="p-1.5 border border-slate-300 text-center w-12">AMBIL</th>
-                                    <th class="p-1.5 border border-slate-300 text-center w-12">STOK</th>
-                                    <th class="p-1.5 border border-slate-300 text-center w-12">SISA</th>
+                                    <th class="p-1.5 border border-orange-300 text-center w-10">NO</th>
+                                    <th class="p-1.5 border border-orange-300">KODE</th>
+                                    <th class="p-1.5 border border-orange-300 w-24">RAK</th>
+                                    <th class="p-1.5 border border-orange-300 text-center w-14">AMBIL</th>
+                                    <th class="p-1.5 border border-orange-300 text-center w-14">STOK</th>
+                                    <th class="p-1.5 border border-orange-300 text-center w-14">SISA</th>
                                 </tr>
                             </thead>
                             <tbody id="container-list-mutasi">
@@ -190,6 +179,13 @@
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                    <!-- Footer Baris Total -->
+                    <div class="bg-slate-100 border-t border-orange-300 px-2 py-1 flex justify-between items-center text-[11px] font-bold text-slate-700">
+                        <span class="uppercase tracking-wider">TOTAL AMBIL KESELURUHAN:</span>
+                        <span class="bg-orange-500 text-white px-2 py-0.5 rounded text-xs font-black">
+                            <span id="total-ambil-badge">0</span> Karton
+                        </span>
                     </div>
                 </div>
             </div>
@@ -316,16 +312,16 @@
                 </div>
             </div>
 
-            <!-- Footer Modal (Tombol Aksi: Hapus & Tutup) -->
+            <!-- Footer Modal (Tombol Aksi: Hapus, Total Muat, & Tutup) -->
             <div class="bg-white px-4 py-2.5 border-t border-slate-200 flex justify-between items-center shrink-0">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-3">
                     <button id="btn-hapus-fdn" onclick="handleTombolHapusClick()" class="bg-red-500 hover:bg-red-600 text-white font-bold text-[10px] px-3 py-1.5 rounded shadow transition flex items-center gap-1">
-                        🗑️️ Hapus FDN Ini
+                        🗑️ Hapus FDN Ini
                     </button>
                     <!-- Dropdown / Pilihan FDN jika lebih dari 1 -->
                     <div id="container-pilih-hapus" class="hidden flex items-center gap-1.5">
                         <select id="select-fdn-to-delete" class="text-[10px] border border-red-300 rounded px-2 py-1 bg-red-50 text-red-900 font-semibold focus:outline-none">
-                            <!-- Opsi FDN akan dimasukkan secara dinamis -->
+                            <!-- Opsi FDN -->
                         </select>
                         <button onclick="eksekusiHapusPilihan()" class="bg-red-700 hover:bg-red-800 text-white font-bold text-[10px] px-2.5 py-1 rounded shadow transition">
                             Konfirmasi Hapus
@@ -334,11 +330,73 @@
                             ✕
                         </button>
                     </div>
+                    <!-- Label Total Muat di sebelah kanan tombol hapus -->
+                    <div class="text-xs font-semibold text-slate-700 bg-orange-50 px-3 py-1 rounded border border-orange-200">
+                        TOTAL MUAT : <span id="modal-total-muat-val" class="font-bold text-orange-700">0</span>
+                    </div>
                 </div>
-                <button onclick="closeFdnModal()" class="bg-slate-300 hover:bg-slate-400 text-slate-800 font-bold text-[10px] px-4 py-1.5 rounded shadow transition">
-                    Tutup
-                </button>
             </div>
         </div>
     </div>
+
+    <!-- MODAL EDIT / HAPUS ITEM AMBIL RAK -->
+    <div id="modal-edit-rak" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-lg shadow-xl border border-orange-300 w-full max-w-md mx-4 overflow-hidden">
+            <!-- Header Modal -->
+            <div class="bg-orange-500 text-white px-4 py-2.5 flex justify-between items-center font-bold text-xs uppercase tracking-wider">
+                <span>Edit / Hapus Item Ambil Rak</span>
+                <button onclick="tutupModalEditRak()" class="text-white hover:text-orange-200 text-base font-black px-1.5">&times;</button>
+            </div>
+            
+            <!-- Body Modal -->
+            <div class="p-4 space-y-3 text-xs">
+                <!-- Hidden inputs untuk menyimpan ID dan Tanggal -->
+                <input type="hidden" id="edit-date-id">
+                <input type="hidden" id="edit-doc-id">
+
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Kode Barang</label>
+                    <input type="text" id="edit-kode" readonly class="w-full p-2 bg-slate-100 border border-slate-300 rounded font-bold text-orange-700">
+                </div>
+
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Lokasi Rak</label>
+                    <input type="text" id="edit-lokasi" class="w-full p-2 border border-orange-300 rounded focus:ring-1 focus:ring-orange-500 text-slate-700 font-bold">
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">QTY Stok Gudang</label>
+                        <input type="number" id="edit-qty-stok" class="w-full p-2 border border-slate-300 rounded bg-slate-50 text-slate-700 font-bold" oninput="hitungOtomatisSisaEdit()">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">QTY Ambil</label>
+                        <input type="number" id="edit-qty-ambil" class="w-full p-2 border border-orange-300 rounded font-black text-orange-600 font-bold" oninput="hitungOtomatisSisaEdit()">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">QTY Sisa (Stok - Ambil)</label>
+                    <input type="number" id="edit-qty-sisa" readonly class="w-full p-2 bg-slate-100 border border-slate-300 rounded font-bold text-slate-800">
+                </div>
+            </div>
+
+            <!-- Footer / Tombol Aksi -->
+            <div class="bg-slate-50 border-t border-slate-200 px-4 py-2.5 flex justify-between items-center">
+                <button onclick="hapusItemDariModal()" class="bg-red-500 hover:bg-red-600 text-white font-bold px-3 py-1.5 rounded shadow transition text-xs">
+                    🗑 Hapus Item
+                </button>
+                <div class="space-x-2">
+                    <button onclick="tutupModalEditRak()" class="bg-slate-300 hover:bg-slate-400 text-slate-700 font-bold px-3 py-1.5 rounded transition text-xs">
+                        Batal
+                    </button>
+                    <button onclick="simpanPerubahanItem()" class="bg-orange-500 hover:bg-orange-600 text-white font-bold px-4 py-1.5 rounded shadow transition text-xs">
+                        Simpan Perubahan
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
 </div>
