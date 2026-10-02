@@ -33,6 +33,16 @@ async function updateFormatTanggal(dateString) {
 
     // 4. Muat daftar FDN ke kotak preview sebelah kanan
     await renderDaftarFdnToPreview(firestoreDateId);
+
+    // 5. Sinkronkan dan perbarui dropdown kode pada Form Ambil Rak sesuai tanggal baru
+    if (typeof populateMutasiKodeDropdown === 'function') {
+        await populateMutasiKodeDropdown(firestoreDateId);
+    }
+
+    // 6. <--- TAMBAHKAN INI: Muat tabel daftar rak yang sudah dipilih untuk tanggal tersebut
+    if (typeof loadDataAmbilRak === 'function') {
+        loadDataAmbilRak(firestoreDateId);
+    }
 }
 
 // Inisialisasi Otomatis saat Modul Muat / Mutasi Dibuka (Menampilkan Tanggal Hari Ini)
@@ -44,13 +54,26 @@ window.initMutasi = async function() {
     const day = String(today.getDate()).padStart(2, '0');
     const todayString = `${year}-${month}-${day}`;
     
-    // Terapkan ke sistem dan tampilan visual
+    // Terapkan ke sistem dan tampilan visual (ini sudah otomatis memanggil updateFormatTanggal)
     await updateFormatTanggal(todayString);
     
     // Sinkronkan juga nilai pada elemen input date asli jika ada
     const triggerInput = document.getElementById('trigger-tgl-muat');
     if (triggerInput) {
         triggerInput.value = todayString;
+    }
+
+    // Format tanggal ke YYYYMMDD untuk mengambil data FDN
+    const dateId = `${year}${month}${day}`;
+    
+    // Panggil fungsi untuk mengisi dropdown kode berdasarkan tanggal hari ini
+    if (typeof populateMutasiKodeDropdown === 'function') {
+        await populateMutasiKodeDropdown(dateId);
+    }
+
+    // <--- TAMBAHKAN INI: Pastikan tabel rak terpilih juga dimuat saat inisialisasi awal
+    if (typeof loadDataAmbilRak === 'function') {
+        loadDataAmbilRak(dateId);
     }
 
     console.log("Modul Mutasi diinisialisasi dengan tanggal hari ini:", todayString);
@@ -126,8 +149,9 @@ function filterWmsReportData() {
         const stok = item.QTY_STOK ?? item.STOK ?? item.stok ?? 0;
         const exp = item.EXPDATE || item.expdate || '-';
 
+        // Tambahkan event onclick pada baris tabel untuk mengisi form di kiri secara otomatis
         html += `
-            <tr class="border-b hover:bg-slate-50 text-xs">
+            <tr class="border-b hover:bg-orange-50 cursor-pointer transition text-xs" onclick="pilihRakWms('${lok}', ${stok})">
                 <td class="p-2 border text-center font-semibold text-slate-500">${index + 1}</td>
                 <td class="p-2 border font-semibold text-orange-700">${lok}</td>
                 <td class="p-2 border font-bold text-orange-600">${kode}</td>
@@ -654,18 +678,36 @@ async function openFdnDetailModalByTujuan(dateId, tujuanKey) {
             const digits = docStr.replace(/\D/g, '');
             const shortDoc = digits.length >= 5 ? digits.slice(-5) : docStr;
 
+            // Tentukan styling baris: WH-3 diberi warna oranye, WH-2 tetap standar
+            const rowClass = item.dari_gudang === 'WH-3'
+                ? 'bg-orange-50 hover:bg-orange-100/60 border-b border-orange-100 text-orange-900 font-medium'
+                : 'border-b border-slate-100 hover:bg-slate-50 text-slate-700';
+
+            const gudangColClass = item.dari_gudang === 'WH-3'
+                ? 'p-2 text-center font-bold text-orange-600'
+                : 'p-2 text-center font-bold text-slate-700';
+
             rowsHtml += `
-                <tr class="border-b border-slate-100 hover:bg-slate-50">
+                <tr class="${rowClass}">
                     <td class="p-2 text-center font-medium text-slate-500">${index + 1}</td>
                     <td class="p-2 font-mono font-bold text-orange-600 uppercase">${item.kode}</td>
                     <td class="p-2 font-mono">${jumlahStr}</td>
-                    <td class="p-2 font-mono font-semibold text-slate-700">${shortDoc}</td>
-                    <td class="p-2 text-center font-bold text-slate-800">${item.dari_gudang}</td>
+                    <td class="p-2 font-mono font-semibold">${shortDoc}</td>
+                    <td class="${gudangColClass}">${item.dari_gudang}</td>
                 </tr>
             `;
         });
 
         itemListContainer.innerHTML = rowsHtml;
+
+    // Hitung total keseluruhan qty_utama dari semua item yang tergabung
+        let totalMuatKeseluruhan = 0;
+        allItemsCombined.forEach(item => {
+            totalMuatKeseluruhan += Number(item.qty_utama || 0);
+        });
+
+        // Tampilkan nilai Total Muat lengkap dengan satuan Karton di footer modal
+        document.getElementById('modal-total-muat-val').innerText = `${totalMuatKeseluruhan} Karton`;
 
     } catch (error) {
         console.error("Gagal memuat detail gabungan FDN:", error);
@@ -767,75 +809,424 @@ async function hapusGroupFdnDocuments(dateId, docIdArray) {
 }
 
 
-// Fungsi Placeholder untuk menambah rak ke list mutasi di sebelah kiri
-function tambahItemMutasiList() {
-    const kode = document.getElementById('mutasi-kode').value.trim().toUpperCase();
-    const lokasi = document.getElementById('mutasi-lokasi').value.trim().toUpperCase();
-    const qty = parseInt(document.getElementById('mutasi-qty').value) || 0;
+// 1. Fungsi untuk mengisi dropdown kode berdasarkan data FDN tanggal aktif
+async function populateMutasiKodeDropdown(dateId) {
+    const selectKode = document.getElementById('mutasi-kode');
+    if (!selectKode) return;
 
-    if (!kode || !lokasi || qty <= 0) {
-        if (typeof miuiAlert === 'function') {
-            miuiAlert('Kode Barang, Lokasi Rak, dan Qty Ambil wajib diisi dengan benar!');
-        }
-        return;
+    // Kosongkan opsi dropdown kecuali yang pertama
+    selectKode.innerHTML = '<option value="">Pilih Kode...</option>';
+
+    try {
+        // Ambil semua data tujuan dari koleksi muat_fdn pada tanggal tersebut (sesuaikan dengan struktur firestore Anda)
+        const tanggalRef = db.collection('muat_fdn').doc(dateId);
+        const tujuanSnapshot = await tanggalRef.collection('datatujuan').get();
+
+        const itemMap = new Map(); // Untuk menampung dan mengakumulasi data berdasarkan kode produk
+
+        tujuanSnapshot.forEach(doc => {
+            const docData = doc.data();
+            const items = docData.data || [];
+
+            items.forEach(item => {
+                const kode = item.kode.toUpperCase();
+                const qtyUtama = Number(item.qty_utama || 0);
+                const dariGudang = docData.meta?.dari_gudang || 'WH-2'; // Acuan gudang (WH-2 / WH-3)
+
+                if (itemMap.has(kode)) {
+                    // Jika kode sudah ada, akumulasikan qty_utamanya
+                    const existing = itemMap.get(kode);
+                    existing.totalQty += qtyUtama;
+                    // Jika ada salah satu yang WH-3, tandai bahwa item ini melibatkan WH-3
+                    if (dariGudang === 'WH-3') {
+                        existing.isWh3 = true;
+                    }
+                } else {
+                    itemMap.set(kode, {
+                        kode: kode,
+                        totalQty: qtyUtama,
+                        isWh3: (dariGudang === 'WH-3')
+                    });
+                }
+            });
+        });
+
+        // Ubah Map ke Array untuk diurutkan
+        let aggregatedItems = Array.from(itemMap.values());
+
+        // Pengurutan: Prioritaskan WH-3 terlebih dahulu (isWh3 = true di atas), kemudian urutkan berdasarkan abjad kode barang
+        aggregatedItems.sort((a, b) => {
+            if (a.isWh3 && !b.isWh3) return -1; // a (WH-3) didahulukan
+            if (!a.isWh3 && b.isWh3) return 1;  // b (WH-3) didahulukan
+            return a.kode.localeCompare(b.kode); // Jika sama-sama WH-3 atau WH-2, urutkan abjad kode
+        });
+
+        // Masukkan ke dalam elemen <select> dropdown
+        aggregatedItems.forEach(item => {
+            const option = document.createElement('option');
+            option.value = item.kode;
+            // Tampilkan informasi tambahan pada label opsi jika berasal dari WH-3 agar operator tahu
+            const labelGudang = item.isWh3 ? ' [WH-3]' : '';
+            option.textContent = `${item.kode} - ( ${item.totalQty} Krt ) ${labelGudang}`;
+            // Simpan data akumulasi pada atribut dataset agar mudah dipanggil saat dipilih
+            option.dataset.totalQty = item.totalQty;
+            option.dataset.isWh3 = item.isWh3;
+            
+            selectKode.appendChild(option);
+        });
+
+        console.log("Dropdown kode mutasi berhasil dimuat dan diurutkan.");
+
+    } catch (error) {
+        console.error("Gagal memuat data untuk dropdown mutasi:", error);
     }
-
-    listRakMutasiTemp.push({ kode, lokasi, qty });
-    renderListMutasiTemp();
-
-    // Reset input form kecil
-    document.getElementById('mutasi-qty').value = '';
 }
 
-// Render daftar rak sementara di form kiri
-function renderListMutasiTemp() {
-    const container = document.getElementById('container-list-mutasi');
-    if (!container) return;
+// 2. Event listener ketika pilihan dropdown Kode berubah
+document.getElementById('mutasi-kode').addEventListener('change', function() {
+    const selectedOption = this.options[this.selectedIndex];
+    const selectedKode = this.value;
+    const inputWmsBarang = document.getElementById('filter-kode-barang');
 
-    if (listRakMutasiTemp.length === 0) {
-        container.innerHTML = `<div class="text-slate-400 italic text-center py-1">Belum ada rak ditambahkan</div>`;
+    if (!selectedKode) {
+        if (inputWmsBarang) {
+            inputWmsBarang.value = "";
+            if (typeof filterWmsReportData === 'function') {
+                filterWmsReportData();
+            }
+        }
+        hitungSisaBelumDiinput();
         return;
     }
 
-    let html = '';
-    listRakMutasiTemp.forEach((item, idx) => {
-        html += `
-            <div class="flex justify-between items-center bg-white px-2.5 py-1.5 rounded-lg border border-orange-200">
-                <div>
-                    <span class="font-bold text-slate-800">${item.kode}</span> 
-                    <span class="text-slate-500 text-[10px]">(${item.lokasi})</span>
-                    <span class="ml-2 px-1.5 py-0.5 bg-orange-100 text-orange-800 rounded font-black text-[9px]">Ambil: ${item.qty}</span>
-                </div>
-                <button type="button" onclick="hapusItemMutasiTemp(${idx})" class="text-red-500 hover:text-red-700 px-1.5 py-0.5 text-xs font-bold" title="Hapus">
-                    <i class="fa-solid fa-trash"></i>
-                </button>
-            </div>
-        `;
+    // Otomatis isi kolom pencarian di WMS Report dan jalankan filternya
+    if (inputWmsBarang) {
+        inputWmsBarang.value = selectedKode;
+        if (typeof filterWmsReportData === 'function') {
+            filterWmsReportData();
+        }
+    }
+
+    // Panggil fungsi hitung sisa (otomatis menampilkan full total kebutuhan FDN karena tabel bawah masih kosong)
+    hitungSisaBelumDiinput();
+});
+
+// Fungsi untuk menangani klik pada baris tabel WMS Report
+function pilihRakWms(lokasi, stok) {
+    // 1. Isi input Rak / Lokasi di form sebelah kiri
+    const inputLokasi = document.getElementById('mutasi-lokasi');
+    if (inputLokasi) {
+        inputLokasi.value = lokasi;
+    }
+
+    // 2. Isi input QTY Stok di form sebelah kiri
+    const inputStok = document.getElementById('mutasi-stok-gudang');
+    if (inputStok) {
+        inputStok.value = stok;
+    }
+
+    // 3. Otomatis arahkan fokus kursor ke input QTY Ambil agar operator bisa langsung mengetik
+    const inputQtyAmbil = document.getElementById('mutasi-qty');
+    if (inputQtyAmbil) {
+        inputQtyAmbil.focus();
+        // Opsional: otomatis isi QTY Ambil dengan nilai stok jika ingin lebih cepat, atau kosongkan
+        // inputQtyAmbil.value = stok; 
+    }
+
+    console.log("Rak dipilih:", lokasi, "Stok:", stok);
+}
+
+// Fungsi untuk mengisi otomatis kolom Rak / Lokasi dengan teks "WH-3" dan memfokuskan ke QTY Stok
+function isiRakWh3() {
+    const inputLokasi = document.getElementById('mutasi-lokasi');
+    if (inputLokasi) {
+        inputLokasi.value = 'WH-3';
+        
+        // Berikan fokus ke QTY Stok terlebih dahulu untuk pengisian manual
+        const inputStok = document.getElementById('mutasi-stok-gudang');
+        if (inputStok) {
+            inputStok.removeAttribute('readonly'); // Pastikan bisa diisi jika diperlukan untuk item manual WH-3
+            inputStok.focus();
+            inputStok.select();
+        }
+    }
+}
+
+// Fungsi untuk menghitung QTY Belum Diinput berdasarkan Total Muat (tot-keseluruhan) dikurangi total QTY Ambil di tabel
+function hitungSisaBelumDiinput() {
+    const inputTotKeseluruhan = document.getElementById('tot-keseluruhan');
+    const inputSummaryKurang = document.getElementById('summary-kurang');
+    
+    if (!inputTotKeseluruhan || !inputSummaryKurang) return;
+
+    // 1. Ambil nilai Total Muat dari input id="tot-keseluruhan"
+    const totalMuat = Number(inputTotKeseluruhan.value || 0);
+
+    // 2. Hitung total keseluruhan QTY Ambil dari semua baris di tabel bawah
+    let totalSudahDiambil = 0;
+    const rows = document.querySelectorAll('#container-list-mutasi tr');
+    rows.forEach(row => {
+        // Kolom QTY Ambil berada di indeks ke-3 (sesuaikan dengan struktur baris tabel Anda)
+        const tdAmbil = row.cells[3]; 
+        if (tdAmbil) {
+            totalSudahDiambil += Number(tdAmbil.textContent || 0);
+        }
     });
-    container.innerHTML = html;
+
+    // 3. Hitung sisa: Total Muat - Total Keseluruhan QTY Ambil
+    const sisaBelumDiinput = totalMuat - totalSudahDiambil;
+
+    // 4. Tampilkan ke input QTY Belum Diinput
+    inputSummaryKurang.value = sisaBelumDiinput;
 }
 
-function hapusItemMutasiTemp(idx) {
-    listRakMutasiTemp.splice(idx, 1);
-    renderListMutasiTemp();
-}
 
-function simpanDataMutasi() {
-    if (listRakMutasiTemp.length === 0) {
-        if (typeof miuiAlert === 'function') {
-            miuiAlert('Belum ada data rak yang dimasukkan ke daftar mutasi!');
-        }
+// Fungsi untuk menyimpan data Ambil Rak ke Firestore dengan tambahan field qtySisa
+async function tambahItemMutasiList() {
+    // 1. Ambil nilai dari form input di sebelah kiri
+    const tanggalMuat = document.getElementById('input-tgl-muat')?.value; // Format: YYYY-MM-DD
+    const selectKode = document.getElementById('mutasi-kode');
+    const kodeBarang = selectKode ? selectKode.value : '';
+    const lokasiRak = document.getElementById('mutasi-lokasi')?.value.trim();
+    const qtyStok = Number(document.getElementById('mutasi-stok-gudang')?.value || 0);
+    const qtyAmbil = Number(document.getElementById('mutasi-qty')?.value || 0);
+
+    // Validasi input
+    if (!tanggalMuat) {
+        miuiAlert("Pilih tanggal muat terlebih dahulu!");
         return;
     }
-    if (typeof miuiAlert === 'function') {
-        miuiAlert('Data Mutasi berhasil disimpan dan diarsipkan!');
+    if (!kodeBarang) {
+        miuiAlert("Pilih kode barang terlebih dahulu!");
+        return;
     }
-    listRakMutasiTemp = [];
-    renderListMutasiTemp();
+    if (!lokasiRak) {
+        miuiAlert("Masukkan lokasi rak atau pilih dari WMS Report!");
+        return;
+    }
+    if (qtyAmbil <= 0) {
+        miuiAlert("Masukkan QTY Ambil dengan benar!");
+        return;
+    }
+
+    // Hitung sisa stok (stok gudang dikurangi qty yang diambil)
+    const qtySisa = qtyStok - qtyAmbil;
+
+    // Konversi format tanggal ke ID dokumen tanggal (contoh: 20261002)
+    const firestoreDateId = tanggalMuat.replace(/-/g, '');
+
+    // Buat ID dokumen berformat kode_qty yang unik (contoh: CRR4A01_5)
+    const docIdKodeQty = `${kodeBarang}_${qtyAmbil}_${Date.now()}`;
+
+    // Data payload lengkap yang akan disimpan ke Firestore
+    const dataPayload = {
+        kode: kodeBarang,
+        lokasi: lokasiRak,
+        qtyStok: qtyStok,
+        qtyAmbil: qtyAmbil,
+        qtySisa: qtySisa, // Field baru untuk sisa stok
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    try {
+        // 2. Simpan ke Firestore: muat_fdn -> tanggal -> ambilrak -> dokumen_id (kode_qty)
+        await db.collection('muat_fdn')
+                .doc(firestoreDateId)
+                .collection('ambilrak')
+                .doc(docIdKodeQty)
+                .set(dataPayload);
+
+        console.log("Berhasil menyimpan data ambilrak ke Firestore!");
+
+        // 3. Render/tampilkan ke tabel lokal di bawah secara visual
+        if (typeof tampilkanKeTabelLokal === 'function') {
+            tampilkanKeTabelLokal(kodeBarang, lokasiRak, qtyAmbil, qtyStok, qtySisa);
+        }
+
+        // 4. Reset form input kecil agar siap untuk input berikutnya
+        document.getElementById('mutasi-lokasi').value = '';
+        document.getElementById('mutasi-stok-gudang').value = '';
+        document.getElementById('mutasi-qty').value = '';
+        document.getElementById('mutasi-lokasi').focus();
+
+    } catch (error) {
+        console.error("Gagal menyimpan data ke Firestore: ", error);
+        miuiAlert("Terjadi kesalahan saat menyimpan data ke database.");
+    }
 }
+
+// Fungsi untuk memuat dan merender data ambilrak dari Firestore ke tabel
+function loadDataAmbilRak() {
+    const tanggalMuat = document.getElementById('input-tgl-muat')?.value;
+    if (!tanggalMuat) return;
+
+    const firestoreDateId = tanggalMuat.replace(/-/g, '');
+    const tbody = document.getElementById('container-list-mutasi');
+    const badgeTotalAmbil = document.getElementById('total-ambil-badge');
+    const inputSummaryKurang = document.getElementById('summary-kurang'); // Opsional pengingat
+    
+    if (!tbody) return;
+
+    db.collection('muat_fdn')
+      .doc(firestoreDateId)
+      .collection('ambilrak')
+      .orderBy('timestamp', 'desc')
+      .onSnapshot((snapshot) => {
+          tbody.innerHTML = '';
+
+          if (snapshot.empty) {
+              tbody.innerHTML = `
+                  <tr>
+                      <td colspan="6" class="p-4 text-center text-slate-400 italic">Belum ada rak ditambahkan</td>
+                  </tr>
+              `;
+              if (badgeTotalAmbil) badgeTotalAmbil.textContent = '0';
+              return;
+          }
+
+          let index = 1;
+          let akumulasiTotalAmbil = 0; // Variabel penampung jumlah total ambil
+
+          snapshot.forEach((doc) => {
+              const data = doc.data();
+              const docId = doc.id;
+
+              const kode = data.kode || '-';
+              const rak = data.lokasi || '-';
+              const ambil = Number(data.qtyAmbil || 0);
+              const stok = data.qtyStok || 0;
+              const sisa = data.qtySisa !== undefined ? data.qtySisa : (stok - ambil);
+
+              // Tambahkan ke akumulasi total
+              akumulasiTotalAmbil += ambil;
+
+              const tr = document.createElement('tr');
+              tr.className = "border-b hover:bg-orange-50 cursor-pointer transition text-slate-700";
+              tr.title = "Klik untuk Edit atau Hapus";
+              tr.onclick = function() {
+                  bukaModalEditHapus(firestoreDateId, docId, data);
+              };
+
+              tr.innerHTML = `
+                  <td class="p-1.5 border border-orange-200 text-center font-semibold text-slate-500 w-10">${index++}</td>
+                  <td class="p-1.5 border border-orange-200 font-bold text-slate-800 truncate">${kode}</td>
+                  <td class="p-1.5 border border-orange-200 font-semibold text-orange-700 w-24 truncate">${rak}</td>
+                  <td class="p-1.5 border border-orange-200 text-center font-black text-orange-600 w-14">${ambil}</td>
+                  <td class="p-1.5 border border-orange-200 text-center text-slate-600 w-14">${stok}</td>
+                  <td class="p-1.5 border border-orange-200 text-center text-slate-600 w-14">${sisa}</td>
+              `;
+              tbody.appendChild(tr);
+          });
+
+          // Tampilkan total akumulasi ambil ke badge/footer
+          if (badgeTotalAmbil) {
+              badgeTotalAmbil.textContent = akumulasiTotalAmbil;
+          }
+
+          // [Opsional] Jika nanti ingin langsung menghubungkannya untuk memotong QTY Belum Diinput:
+           const totalMuat = Number(document.getElementById('tot-keseluruhan')?.value || 0);
+           if (inputSummaryKurang) {
+               inputSummaryKurang.value = totalMuat - akumulasiTotalAmbil;
+           }
+
+      }, (error) => {
+          console.error("Gagal memuat data ambilrak: ", error);
+      });
+}
+
+// Fungsi untuk membuka modal dan mengisi form dengan data yang diklik
+function bukaModalEditHapus(dateId, docId, data) {
+    document.getElementById('edit-date-id').value = dateId;
+    document.getElementById('edit-doc-id').value = docId;
+    document.getElementById('edit-kode').value = data.kode || '';
+    document.getElementById('edit-lokasi').value = data.lokasi || '';
+    document.getElementById('edit-qty-stok').value = data.qtyStok || 0;
+    document.getElementById('edit-qty-ambil').value = data.qtyAmbil || 0;
+    document.getElementById('edit-qty-sisa').value = data.qtySisa !== undefined ? data.qtySisa : ((data.qtyStok || 0) - (data.qtyAmbil || 0));
+
+    // Tampilkan modal
+    const modal = document.getElementById('modal-edit-rak');
+    if (modal) modal.classList.remove('hidden');
+}
+
+// Fungsi untuk menutup modal
+function tutupModalEditRak() {
+    const modal = document.getElementById('modal-edit-rak');
+    if (modal) modal.classList.add('hidden');
+}
+
+// Fungsi hitung otomatis nilai sisa di dalam modal saat input stok/ambil diubah
+function hitungOtomatisSisaEdit() {
+    const stok = Number(document.getElementById('edit-qty-stok').value || 0);
+    const ambil = Number(document.getElementById('edit-qty-ambil').value || 0);
+    const sisa = stok - ambil;
+    document.getElementById('edit-qty-sisa').value = sisa;
+}
+
+// Fungsi untuk menyimpan perubahan data ke Firestore
+async function simpanPerubahanItem() {
+    const dateId = document.getElementById('edit-date-id').value;
+    const docId = document.getElementById('edit-doc-id').value;
+    const lokasiBaru = document.getElementById('edit-lokasi').value.trim();
+    const qtyStokBaru = Number(document.getElementById('edit-qty-stok').value || 0);
+    const qtyAmbilBaru = Number(document.getElementById('edit-qty-ambil').value || 0);
+    const qtySisaBaru = Number(document.getElementById('edit-qty-sisa').value || 0);
+
+    if (!lokasiBaru) {
+        alert("Lokasi rak tidak boleh kosong!");
+        return;
+    }
+    if (qtyAmbilBaru <= 0) {
+        alert("QTY Ambil harus lebih besar dari 0!");
+        return;
+    }
+
+    try {
+        // Update data dokumen di Firestore
+        await db.collection('muat_fdn')
+                .doc(dateId)
+                .collection('ambilrak')
+                .doc(docId)
+                .update({
+                    lokasi: lokasiBaru,
+                    qtyStok: qtyStokBaru,
+                    qtyAmbil: qtyAmbilBaru,
+                    qtySisa: qtySisaBaru
+                });
+
+        console.log("Data berhasil diperbarui!");
+        tutupModalEditRak();
+    } catch (error) {
+        console.error("Gagal memperbarui data: ", error);
+        alert("Terjadi kesalahan saat memperbarui data ke database.");
+    }
+}
+
+// Fungsi untuk menghapus item dari modal
+async function hapusItemDariModal() {
+    if (confirm("Apakah Anda yakin ingin menghapus item rak ini dari daftar?")) {
+        const dateId = document.getElementById('edit-date-id').value;
+        const docId = document.getElementById('edit-doc-id').value;
+
+        try {
+            await db.collection('muat_fdn')
+                    .doc(dateId)
+                    .collection('ambilrak')
+                    .doc(docId)
+                    .delete();
+
+            console.log("Item berhasil dihapus!");
+            tutupModalEditRak();
+        } catch (error) {
+            console.error("Gagal menghapus item: ", error);
+            alert("Terjadi kesalahan saat menghapus data.");
+        }
+    }
+}
+
+
 
 // Daftarkan fungsi ke window agar bisa diakses global
 window.filterWmsReportData = filterWmsReportData;
 window.tambahItemMutasiList = tambahItemMutasiList;
 window.hapusItemMutasiTemp = hapusItemMutasiTemp;
-window.simpanDataMutasi = simpanDataMutasi;
