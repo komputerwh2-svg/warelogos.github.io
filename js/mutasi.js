@@ -45,38 +45,63 @@ async function updateFormatTanggal(dateString) {
     }
 }
 
-// Inisialisasi Otomatis saat Modul Muat / Mutasi Dibuka (Menampilkan Tanggal Hari Ini)
+// Inisialisasi Otomatis saat Modul Muat / Mutasi Dibuka (Mendeteksi Tanggal Data Terbaru)
 window.initMutasi = async function() {
-    // Ambil tanggal hari ini dalam format YYYY-MM-DD
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    const todayString = `${year}-${month}-${day}`;
-    
-    // Terapkan ke sistem dan tampilan visual (ini sudah otomatis memanggil updateFormatTanggal)
-    await updateFormatTanggal(todayString);
-    
-    // Sinkronkan juga nilai pada elemen input date asli jika ada
-    const triggerInput = document.getElementById('trigger-tgl-muat');
-    if (triggerInput) {
-        triggerInput.value = todayString;
+    let targetDateString = "";
+    let dateId = "";
+
+    try {
+        // 1. Cek apakah ada fungsi untuk mengambil daftar tanggal/data terbaru dari Firestore atau cache
+        // (Sesuaikan nama fungsi query/helper Firestore Anda jika sudah ada, misal: getLatestAvailableDate())
+        if (typeof getLatestAvailableDate === 'function') {
+            targetDateString = await getLatestAvailableDate(); // Format yang diharapkan: 'YYYY-MM-DD'
+        }
+
+        // Fallback: Jika fungsi helper belum ada atau gagal, ambil dari data WMS / FDN yang tersimpan lokal/Firebase
+        if (!targetDateString) {
+            // Coba ambil dari elemen input date atau data cache lokal jika tersedia
+            const triggerInput = document.getElementById('trigger-tgl-muat');
+            if (triggerInput && triggerInput.value) {
+                targetDateString = triggerInput.value;
+            }
+        }
+    } catch (error) {
+        console.warn("Gagal mendeteksi tanggal terbaru secara otomatis, menggunakan tanggal hari ini.", error);
     }
 
-    // Format tanggal ke YYYYMMDD untuk mengambil data FDN
-    const dateId = `${year}${month}${day}`;
+    // Jika tetap tidak ditemukan, fallback ke tanggal hari ini (seperti sebelumnya)
+    if (!targetDateString) {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        targetDateString = `${year}-${month}-${day}`;
+    }
+
+    // Ekstrak tahun, bulan, hari untuk format dateId (YYYYMMDD)
+    const [tahung, bulang, harig] = targetDateString.split('-');
+    dateId = `${tahung}${bulang}${harig}`;
+
+    // Terapkan ke sistem dan tampilan visual
+    await updateFormatTanggal(targetDateString);
     
-    // Panggil fungsi untuk mengisi dropdown kode berdasarkan tanggal hari ini
+    // Sinkronkan nilai pada elemen input date asli
+    const triggerInput = document.getElementById('trigger-tgl-muat');
+    if (triggerInput) {
+        triggerInput.value = targetDateString;
+    }
+
+    // Panggil fungsi untuk mengisi dropdown kode berdasarkan tanggal terbaru yang ditemukan
     if (typeof populateMutasiKodeDropdown === 'function') {
         await populateMutasiKodeDropdown(dateId);
     }
 
-    // <--- TAMBAHKAN INI: Pastikan tabel rak terpilih juga dimuat saat inisialisasi awal
+    // Pastikan tabel rak terpilih juga dimuat berdasarkan tanggal tersebut
     if (typeof loadDataAmbilRak === 'function') {
         loadDataAmbilRak(dateId);
     }
 
-    console.log("Modul Mutasi diinisialisasi dengan tanggal hari ini:", todayString);
+    console.log("Modul Mutasi diinisialisasi dengan tanggal data terbaru:", targetDateString);
     if (typeof refreshWmsData === 'function') {
         refreshWmsData();
     }
@@ -809,7 +834,7 @@ async function hapusGroupFdnDocuments(dateId, docIdArray) {
 }
 
 
-// 1. Fungsi untuk mengisi dropdown kode berdasarkan data FDN tanggal aktif
+// 1. Fungsi untuk mengisi dropdown kode berdasarkan data FDN tanggal aktif (dengan Filter Sisa Kekurangan)
 async function populateMutasiKodeDropdown(dateId) {
     const selectKode = document.getElementById('mutasi-kode');
     if (!selectKode) return;
@@ -818,11 +843,11 @@ async function populateMutasiKodeDropdown(dateId) {
     selectKode.innerHTML = '<option value="">Pilih Kode...</option>';
 
     try {
-        // Ambil semua data tujuan dari koleksi muat_fdn pada tanggal tersebut (sesuaikan dengan struktur firestore Anda)
         const tanggalRef = db.collection('muat_fdn').doc(dateId);
+        
+        // 1. Ambil data FDN (tujuan) untuk mengetahui total kebutuhan
         const tujuanSnapshot = await tanggalRef.collection('datatujuan').get();
-
-        const itemMap = new Map(); // Untuk menampung dan mengakumulasi data berdasarkan kode produk
+        const itemMap = new Map(); // Menampung total kebutuhan berdasarkan kode
 
         tujuanSnapshot.forEach(doc => {
             const docData = doc.data();
@@ -831,13 +856,11 @@ async function populateMutasiKodeDropdown(dateId) {
             items.forEach(item => {
                 const kode = item.kode.toUpperCase();
                 const qtyUtama = Number(item.qty_utama || 0);
-                const dariGudang = docData.meta?.dari_gudang || 'WH-2'; // Acuan gudang (WH-2 / WH-3)
+                const dariGudang = docData.meta?.dari_gudang || 'WH-2';
 
                 if (itemMap.has(kode)) {
-                    // Jika kode sudah ada, akumulasikan qty_utamanya
                     const existing = itemMap.get(kode);
                     existing.totalQty += qtyUtama;
-                    // Jika ada salah satu yang WH-3, tandai bahwa item ini melibatkan WH-3
                     if (dariGudang === 'WH-3') {
                         existing.isWh3 = true;
                     }
@@ -851,31 +874,76 @@ async function populateMutasiKodeDropdown(dateId) {
             });
         });
 
-        // Ubah Map ke Array untuk diurutkan
-        let aggregatedItems = Array.from(itemMap.values());
+        // 2. Ambil data yang sudah di-input ke koleksi 'ambilrak' untuk menghitung yang sudah diambil
+        const ambilRakSnapshot = await tanggalRef.collection('ambilrak').get();
+        const rekapAmbil = {};
 
-        // Pengurutan: Prioritaskan WH-3 terlebih dahulu (isWh3 = true di atas), kemudian urutkan berdasarkan abjad kode barang
-        aggregatedItems.sort((a, b) => {
-            if (a.isWh3 && !b.isWh3) return -1; // a (WH-3) didahulukan
-            if (!a.isWh3 && b.isWh3) return 1;  // b (WH-3) didahulukan
-            return a.kode.localeCompare(b.kode); // Jika sama-sama WH-3 atau WH-2, urutkan abjad kode
+        ambilRakSnapshot.forEach(doc => {
+            const data = doc.data();
+            const kode = (data.kode || '').toUpperCase();
+            const ambil = Number(data.qtyAmbil || 0);
+            rekapAmbil[kode] = (rekapAmbil[kode] || 0) + ambil;
         });
 
-        // Masukkan ke dalam elemen <select> dropdown
+        // 3. Filter dan hitung sisa kekurangan untuk setiap item
+        let aggregatedItems = [];
+        itemMap.forEach((value, kode) => {
+            const totalKebutuhan = value.totalQty;
+            const sudahDiambil = rekapAmbil[kode] || 0;
+            const kekurangan = totalKebutuhan - sudahDiambil;
+
+            // Jika masih ada kekurangan (belum terpenuhi), masukkan ke daftar dropdown
+            if (kekurangan > 0) {
+                aggregatedItems.push({
+                    kode: kode,
+                    totalQty: totalKebutuhan,
+                    sudahDiambil: sudahDiambil,
+                    kekurangan: kekurangan,
+                    isWh3: value.isWh3
+                });
+            }
+        });
+
+        // Pengurutan: Prioritaskan WH-3 terlebih dahulu, kemudian urutkan abjad kode barang
+        aggregatedItems.sort((a, b) => {
+            if (a.isWh3 && !b.isWh3) return -1;
+            if (!a.isWh3 && b.isWh3) return 1;
+            return a.kode.localeCompare(b.kode);
+        });
+
+        // 4. Masukkan ke dalam elemen <select> dropdown
         aggregatedItems.forEach(item => {
             const option = document.createElement('option');
             option.value = item.kode;
-            // Tampilkan informasi tambahan pada label opsi jika berasal dari WH-3 agar operator tahu
+            
             const labelGudang = item.isWh3 ? ' [WH-3]' : '';
-            option.textContent = `${item.kode} - ( ${item.totalQty} Krt ) ${labelGudang}`;
-            // Simpan data akumulasi pada atribut dataset agar mudah dipanggil saat dipilih
+            
+            // Format label: Jika sudah ada yang diambil sebagian, tampilkan info kekurangan
+            if (item.sudahDiambil > 0) {
+                option.textContent = `${item.kode} - (${item.totalQty} Krt)${labelGudang} - (Kurang ${item.kekurangan} krt)`;
+                option.className = "text-orange-600 font-bold";
+            } else {
+                option.textContent = `${item.kode} - (${item.totalQty} Krt)${labelGudang}`;
+                option.className = "text-slate-800 font-bold";
+            }
+
             option.dataset.totalQty = item.totalQty;
             option.dataset.isWh3 = item.isWh3;
             
             selectKode.appendChild(option);
         });
 
-        console.log("Dropdown kode mutasi berhasil dimuat dan diurutkan.");
+        // 5. Otomatis pilih item teratas yang belum terpenuhi
+        if (selectKode.options.length > 1) {
+            selectKode.selectedIndex = 1; 
+            const changeEvent = new Event('change', { bubbles: true });
+            selectKode.dispatchEvent(changeEvent);
+        } else {
+            // Jika semua sudah terpenuhi / habis
+            selectKode.value = "";
+        }
+
+        console.log("Dropdown kode mutasi diperbarui berdasarkan sisa kekurangan qty.");
 
     } catch (error) {
         console.error("Gagal memuat data untuk dropdown mutasi:", error);
@@ -950,6 +1018,30 @@ function isiRakWh3() {
             inputStok.select();
         }
     }
+}
+
+// Pengaman real-time pada input QTY Ambil
+const inputQtyAmbil = document.getElementById('mutasi-qty');
+const inputStokGudang = document.getElementById('mutasi-stok-gudang');
+
+if (inputQtyAmbil && inputStokGudang) {
+    inputQtyAmbil.addEventListener('input', function() {
+        const qtyAmbil = Number(this.value);
+        const qtyStok = Number(inputStokGudang.value || 0);
+
+        // Cek jika QTY Ambil melebihi QTY Stok
+        if (qtyAmbil > qtyStok) {
+            // Panggil miuiAlert dengan pesan batas maksimal stok
+            if (typeof miuiAlert === 'function') {
+                miuiAlert(`QTY Ambil tidak boleh melebihi QTY Stok (${qtyStok})!`);
+            } else {
+                alert(`QTY Ambil tidak boleh melebihi QTY Stok (${qtyStok})!`);
+            }
+
+            // Kembalikan nilai input menjadi batas maksimal stok
+            this.value = qtyStok;
+        }
+    });
 }
 
 // Fungsi untuk menghitung QTY Belum Diinput berdasarkan Total Muat (tot-keseluruhan) dikurangi total QTY Ambil di tabel
@@ -1038,16 +1130,16 @@ async function tambahItemMutasiList() {
 
         console.log("Berhasil menyimpan data ambilrak ke Firestore!");
 
-        // 3. Render/tampilkan ke tabel lokal di bawah secara visual
-        if (typeof tampilkanKeTabelLokal === 'function') {
-            tampilkanKeTabelLokal(kodeBarang, lokasiRak, qtyAmbil, qtyStok, qtySisa);
-        }
-
-        // 4. Reset form input kecil agar siap untuk input berikutnya
+        // 3. Reset form input kecil agar siap untuk input berikutnya
         document.getElementById('mutasi-lokasi').value = '';
         document.getElementById('mutasi-stok-gudang').value = '';
         document.getElementById('mutasi-qty').value = '';
         document.getElementById('mutasi-lokasi').focus();
+
+        // 4. Perbarui dropdown secara otomatis agar sisa kuantitas/kode yang habis langsung ter-refresh
+        if (typeof populateMutasiKodeDropdown === 'function') {
+            await populateMutasiKodeDropdown(firestoreDateId);
+        }
 
     } catch (error) {
         console.error("Gagal menyimpan data ke Firestore: ", error);
@@ -1055,7 +1147,7 @@ async function tambahItemMutasiList() {
     }
 }
 
-// Fungsi untuk memuat dan merender data ambilrak dari Firestore ke tabel
+// Fungsi untuk memuat dan merender data ambilrak dari Firestore ke tabel (Digrup & Urutan Kronologis)
 function loadDataAmbilRak() {
     const tanggalMuat = document.getElementById('input-tgl-muat')?.value;
     if (!tanggalMuat) return;
@@ -1067,10 +1159,11 @@ function loadDataAmbilRak() {
     
     if (!tbody) return;
 
+    // Ubah urutan ke 'asc' agar data pertama input berada di nomor 1 dan berurutan ke bawah
     db.collection('muat_fdn')
       .doc(firestoreDateId)
       .collection('ambilrak')
-      .orderBy('timestamp', 'desc')
+      .orderBy('timestamp', 'asc')
       .onSnapshot((snapshot) => {
           tbody.innerHTML = '';
 
@@ -1084,38 +1177,69 @@ function loadDataAmbilRak() {
               return;
           }
 
-          let index = 1;
-          let akumulasiTotalAmbil = 0; // Variabel penampung jumlah total ambil
+          let akumulasiTotalAmbil = 0;
+          let rawDataArray = [];
 
+          // Tampung semua data terlebih dahulu
           snapshot.forEach((doc) => {
               const data = doc.data();
-              const docId = doc.id;
+              rawDataArray.push({
+                  id: doc.id,
+                  kode: data.kode || '-',
+                  rak: data.lokasi || '-',
+                  ambil: Number(data.qtyAmbil || 0),
+                  stok: data.qtyStok || 0,
+                  sisa: data.qtySisa !== undefined ? data.qtySisa : (Number(data.qtyStok || 0) - Number(data.qtyAmbil || 0)),
+                  rawDocData: data
+              });
+          });
 
-              const kode = data.kode || '-';
-              const rak = data.lokasi || '-';
-              const ambil = Number(data.qtyAmbil || 0);
-              const stok = data.qtyStok || 0;
-              const sisa = data.qtySisa !== undefined ? data.qtySisa : (stok - ambil);
+          // Kelompokkan data berdasarkan kode barang yang sama
+          const groupedData = {};
+          rawDataArray.forEach((item) => {
+              akumulasiTotalAmbil += item.ambil; // Akumulasi total
+              if (!groupedData[item.kode]) {
+                  groupedData[item.kode] = [];
+              }
+              groupedData[item.kode].push(item);
+          });
 
-              // Tambahkan ke akumulasi total
-              akumulasiTotalAmbil += ambil;
+          let nomorUrut = 1;
 
-              const tr = document.createElement('tr');
-              tr.className = "border-b hover:bg-orange-50 cursor-pointer transition text-slate-700";
-              tr.title = "Klik untuk Edit atau Hapus";
-              tr.onclick = function() {
-                  bukaModalEditHapus(firestoreDateId, docId, data);
-              };
+          // Render data yang sudah dikelompokkan ke dalam tabel
+          Object.keys(groupedData).forEach((kode) => {
+              const itemsInGroup = groupedData[kode];
 
-              tr.innerHTML = `
-                  <td class="p-1.5 border border-orange-200 text-center font-semibold text-slate-500 w-10">${index++}</td>
-                  <td class="p-1.5 border border-orange-200 font-bold text-slate-800 truncate">${kode}</td>
-                  <td class="p-1.5 border border-orange-200 font-semibold text-orange-700 w-24 truncate">${rak}</td>
-                  <td class="p-1.5 border border-orange-200 text-center font-black text-orange-600 w-14">${ambil}</td>
-                  <td class="p-1.5 border border-orange-200 text-center text-slate-600 w-14">${stok}</td>
-                  <td class="p-1.5 border border-orange-200 text-center text-slate-600 w-14">${sisa}</td>
-              `;
-              tbody.appendChild(tr);
+              itemsInGroup.forEach((item, subIndex) => {
+                  const tr = document.createElement('tr');
+                  tr.className = "border-b hover:bg-orange-50 cursor-pointer transition text-slate-700";
+                  tr.title = "Klik untuk Edit atau Hapus";
+                  tr.onclick = function() {
+                      bukaModalEditHapus(firestoreDateId, item.id, item.rawDocData);
+                  };
+
+                  if (subIndex === 0) {
+                      // Baris pertama dalam grup: Tampilkan nomor urut dan kode barang dengan rowspan
+                      tr.innerHTML = `
+                          <td class="p-1.5 border border-orange-200 text-center font-semibold text-slate-500 w-10 align-top" rowspan="${itemsInGroup.length}">${nomorUrut}</td>
+                          <td class="p-1.5 border border-orange-200 font-bold text-slate-800 truncate align-top" rowspan="${itemsInGroup.length}">${item.kode}</td>
+                          <td class="p-1.5 border border-orange-200 font-semibold text-orange-700 w-24 truncate">${item.rak}</td>
+                          <td class="p-1.5 border border-orange-200 text-center font-black text-orange-600 w-14">${item.ambil}</td>
+                          <td class="p-1.5 border border-orange-200 text-center text-slate-600 w-14">${item.stok}</td>
+                          <td class="p-1.5 border border-orange-200 text-center text-slate-600 w-14">${item.sisa}</td>
+                      `;
+                      nomorUrut++;
+                  } else {
+                      // Baris lanjutan dalam grup: Kolom No dan Kode dikosongkan agar tergabung rapi
+                      tr.innerHTML = `
+                          <td class="p-1.5 border border-orange-200 font-semibold text-orange-700 w-24 truncate">${item.rak}</td>
+                          <td class="p-1.5 border border-orange-200 text-center font-black text-orange-600 w-14">${item.ambil}</td>
+                          <td class="p-1.5 border border-orange-200 text-center text-slate-600 w-14">${item.stok}</td>
+                          <td class="p-1.5 border border-orange-200 text-center text-slate-600 w-14">${item.sisa}</td>
+                      `;
+                  }
+                  tbody.appendChild(tr);
+              });
           });
 
           // Tampilkan total akumulasi ambil ke badge/footer
@@ -1123,11 +1247,17 @@ function loadDataAmbilRak() {
               badgeTotalAmbil.textContent = akumulasiTotalAmbil;
           }
 
-          // [Opsional] Jika nanti ingin langsung menghubungkannya untuk memotong QTY Belum Diinput:
-           const totalMuat = Number(document.getElementById('tot-keseluruhan')?.value || 0);
-           if (inputSummaryKurang) {
-               inputSummaryKurang.value = totalMuat - akumulasiTotalAmbil;
-           }
+          // Perbarui summary kurang jika ada
+          const totalMuat = Number(document.getElementById('tot-keseluruhan')?.value || 0);
+          if (inputSummaryKurang) {
+              inputSummaryKurang.value = totalMuat - akumulasiTotalAmbil;
+          }
+
+          // <--- OTOMATIS SCROLL KE BAWAH (FOKUS KE DATA TERBARU) --->
+          const containerTabel = tbody.closest('.overflow-y-auto') || tbody.parentElement;
+          if (containerTabel) {
+              containerTabel.scrollTop = containerTabel.scrollHeight;
+          }
 
       }, (error) => {
           console.error("Gagal memuat data ambilrak: ", error);
