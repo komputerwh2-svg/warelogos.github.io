@@ -138,30 +138,30 @@
 
                 </div>
 
-                <!-- Baris Bawah: Tombol Aksi & Info Sisa Belum Diinput -->
+                <!-- Baris Bawah: Info Sisa Belum Diinput & Tombol Aksi -->
                 <div class="grid grid-cols-12 gap-2 items-center pt-1">
                     
-                    <!-- Tombol Tambah Rak & Cetak (7 Kolom) -->
-                    <div class="col-span-7 grid grid-cols-2 gap-1.5">
-                        <button type="button" onclick="tambahItemMutasiList()" class="bg-orange-400 hover:bg-orange-500 text-slate-900 border border-orange-600 py-1.5 px-2 rounded font-black text-[10px] uppercase shadow-sm text-center transition">
-                            ➕ TAMBAH RAK
-                        </button>
-                        <button type="button" onclick="cetakArsipMutasi()" class="bg-orange-300 hover:bg-orange-400 text-slate-900 border border-orange-500 py-1.5 px-2 rounded font-black text-[10px] uppercase shadow-sm text-center transition">
-                            🖨️ CETAK / ARSIP
-                        </button>
-                    </div>
-
-                    <!-- Info Sisa Belum Diinput (5 Kolom) -->
+                    <!-- Info Sisa Belum Diinput (Pojok Kiri - 5 Kolom) -->
                     <div class="col-span-5 flex items-center space-x-1.5 bg-slate-50 px-2 py-1 rounded border border-orange-200">
                         <span class="text-[9px] font-bold text-slate-700 whitespace-nowrap">QTY Belum Diinput:</span>
                         <input type="text" id="summary-kurang" readonly value="0" class="w-full p-1 text-center bg-white border border-orange-300 rounded font-black text-xs text-slate-800">
                     </div>
 
+                    <!-- Tombol Aksi: Cetak/Arsip (Tengah) & Tambah Rak (Pojok Kanan) - 7 Kolom -->
+                    <div class="col-span-7 grid grid-cols-2 gap-1.5">
+                        <button type="button" onclick="cetakArsipMutasi()" class="bg-orange-300 hover:bg-orange-400 text-slate-900 border border-orange-500 py-1.5 px-2 rounded font-black text-[10px] uppercase shadow-sm text-center transition">
+                            🖨️ CETAK / ARSIP
+                        </button>
+                        <button type="button" onclick="tambahItemMutasiList()" class="bg-orange-400 hover:bg-orange-500 text-slate-900 border border-orange-600 py-1.5 px-2 rounded font-black text-[10px] uppercase shadow-sm text-center transition">
+                            ➕ TAMBAH RAK
+                        </button>
+                    </div>
+
                 </div>
 
-                <!-- 3. Tabel Daftar Rak Terpilih dengan Scroll MIUI v5 & Baris Total -->
+                <!-- 3. Tabel Daftar Rak Terpilih dengan Tinggi Terkunci -->
                 <div class="bg-white border border-orange-300 rounded shadow-sm overflow-hidden mt-1 flex flex-col">
-                    <div class="max-h-[300px] overflow-y-auto miui-custom-scroll">
+                    <div class="max-h-[188px] overflow-y-auto miui-custom-scroll">
                         <table class="w-full text-left border-collapse text-[11px] table-fixed">
                             <thead class="sticky top-0 bg-slate-200 text-slate-700 font-black text-[10px] uppercase z-10">
                                 <tr>
@@ -251,10 +251,10 @@
                     </div>
                 </div>
 
-                <!-- Tabel WMS Report -->
-                <div class="overflow-x-auto overflow-y-auto flex-1 rounded-xl border border-orange-200 max-h-[500px] miui-custom-scroll">
+                <!-- Tabel WMS Report dengan Tinggi Terkunci agar Pas di Layar 67% -->
+                <div class="overflow-x-auto overflow-y-auto rounded-xl border border-orange-200 max-h-[360px] miui-custom-scroll">
                     <table class="w-full border-collapse text-left">
-                        <thead>
+                        <thead class="sticky top-0 z-10">
                             <tr class="bg-slate-100 text-xs text-slate-600 border border-orange-200">
                                 <th class="p-2 border border-orange-200 text-center w-10">NO</th>
                                 <th class="p-2 border border-orange-200">KODE_LOKASI</th>
