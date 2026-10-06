@@ -103,35 +103,35 @@
                 <!-- Baris Utama Form Isian (1 Baris Memanjang) -->
                 <div class="grid grid-cols-12 gap-1.5 items-end">
                     
-                    <!-- 1. Kode Barang (3 Kolom) -->
-                    <div class="col-span-3">
+                    <!-- 1. Kode Barang (5 Kolom - Lebih Luas) -->
+                    <div class="col-span-5">
                         <label class="block text-[10px] font-bold text-slate-700 mb-0.5">Kode Barang</label>
                         <select id="mutasi-kode" class="w-full p-1.5 text-xs font-bold text-slate-900 border border-orange-300 rounded bg-white shadow-sm focus:outline-none focus:ring-1 focus:ring-orange-500">
                             <option value="" class="text-slate-500">Pilih Kode...</option>
                         </select>
                     </div>
 
-                    <!-- 2. Rak / Lokasi (3 Kolom) -->
-                    <div class="col-span-3">
+                    <!-- 2. Rak / Lokasi (2 Kolom - Dipersempit) -->
+                    <div class="col-span-2">
                         <label class="block text-[10px] font-bold text-slate-700 mb-0.5">Rak / Lokasi</label>
                         <input type="text" id="mutasi-lokasi" placeholder="Pilih WMS..." class="w-full p-1.5 text-xs font-bold border border-orange-300 text-slate-700 rounded bg-white uppercase">
                     </div>
 
-                    <!-- 3. Tombol WH3 (1 Kolom) - Diubah menjadi Tombol Interaktif -->
+                    <!-- 3. Tombol WH3 (1 Kolom) -->
                     <div class="col-span-1 flex justify-center">
                         <button type="button" onclick="isiRakWh3()" class="bg-orange-500 hover:bg-orange-600 text-white font-black text-[9px] py-2 rounded shadow-sm text-center w-full block tracking-wider transition cursor-pointer" title="Klik untuk isi WH-3">
                             WH3
                         </button>
                     </div>
 
-                    <!-- 4. QTY Stok (2 Kolom) -->
+                    <!-- 4. QTY Stok (2 Kolom - Ukuran Sama) -->
                     <div class="col-span-2">
                         <label class="block text-[10px] font-bold text-slate-700 mb-0.5">QTY Stok</label>
                         <input type="text" id="mutasi-stok-gudang" placeholder="0" class="w-full p-1.5 text-xs font-bold border border-orange-300 rounded bg-slate-50 text-center text-slate-700">
                     </div>
 
-                    <!-- 5. QTY Ambil (3 Kolom) -->
-                    <div class="col-span-3">
+                    <!-- 5. QTY Ambil (2 Kolom - Ukuran Sama dengan Stok) -->
+                    <div class="col-span-2">
                         <label class="block text-[10px] font-bold text-slate-700 mb-0.5">QTY Ambil</label>
                         <input type="number" id="mutasi-qty" placeholder="0" class="w-full p-1.5 text-xs font-bold border border-orange-300 text-slate-700 rounded bg-white text-center">
                     </div>
@@ -166,7 +166,7 @@
                             <thead class="sticky top-0 bg-slate-200 text-slate-700 font-black text-[10px] uppercase z-10">
                                 <tr>
                                     <th class="p-1.5 border border-orange-300 text-center w-10">NO</th>
-                                    <th class="p-1.5 border border-orange-300">KODE</th>
+                                    <th class="p-1.5 border border-orange-300">KODE BARANG</th>
                                     <th class="p-1.5 border border-orange-300 w-24">RAK</th>
                                     <th class="p-1.5 border border-orange-300 text-center w-14">AMBIL</th>
                                     <th class="p-1.5 border border-orange-300 text-center w-14">STOK</th>
@@ -252,7 +252,7 @@
                 </div>
 
                 <!-- Tabel WMS Report dengan Tinggi yang Dipaskan Sejajar Sisi Kiri -->
-                <div class="overflow-x-auto overflow-y-auto rounded-xl border border-orange-200 max-h-[510px] miui-custom-scroll">
+                <div class="overflow-x-auto overflow-y-auto rounded-xl border border-orange-200 max-h-[515px] miui-custom-scroll">
                     <table class="w-full border-collapse text-left">
                         <thead class="sticky top-0 z-10">
                             <tr class="bg-slate-100 text-xs text-slate-600 border border-orange-200">
