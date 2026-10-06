@@ -927,7 +927,10 @@ async function populateMutasiKodeDropdown(dateId) {
                 option.className = "text-slate-800 font-bold";
             }
 
+            // Simpan data penting ke dataset agar bisa dibaca validator qty ambil
             option.dataset.totalQty = item.totalQty;
+            option.dataset.sudahDiambil = item.sudahDiambil;
+            option.dataset.kekurangan = item.kekurangan;
             option.dataset.isWh3 = item.isWh3;
             
             selectKode.appendChild(option);
@@ -1020,26 +1023,38 @@ function isiRakWh3() {
     }
 }
 
-// Pengaman real-time pada input QTY Ambil
+// Pengaman real-time pada input QTY Ambil (Batas: Stok Gudang & Sisa Kekurangan Dropdown)
 const inputQtyAmbil = document.getElementById('mutasi-qty');
 const inputStokGudang = document.getElementById('mutasi-stok-gudang');
+const selectKodeBarang = document.getElementById('mutasi-kode');
 
 if (inputQtyAmbil && inputStokGudang) {
     inputQtyAmbil.addEventListener('input', function() {
         const qtyAmbil = Number(this.value);
         const qtyStok = Number(inputStokGudang.value || 0);
-
-        // Cek jika QTY Ambil melebihi QTY Stok
-        if (qtyAmbil > qtyStok) {
-            // Panggil miuiAlert dengan pesan batas maksimal stok
-            if (typeof miuiAlert === 'function') {
-                miuiAlert(`QTY Ambil tidak boleh melebihi QTY Stok (${qtyStok})!`);
-            } else {
-                alert(`QTY Ambil tidak boleh melebihi QTY Stok (${qtyStok})!`);
+        
+        // Ambil sisa kekurangan dari dataset option dropdown yang sedang dipilih
+        let qtyKekurangan = qtyStok; // Default jika belum pilih
+        if (selectKodeBarang && selectKodeBarang.selectedOptions.length > 0) {
+            const selectedOpt = selectKodeBarang.selectedOptions[0];
+            const kekuranganAttr = selectedOpt.dataset.kekurangan;
+            if (kekuranganAttr !== undefined) {
+                qtyKekurangan = Number(kekuranganAttr);
             }
+        }
+        
+        // Tentukan batas maksimal yang paling ketat (antara Stok Gudang atau Sisa Kekurangan)
+        let batasMaksimal = Math.min(qtyStok, qtyKekurangan);
+        let pesanPeringatan = `QTY Ambil tidak boleh melebihi batas (Stok: ${qtyStok}, Kekurangan: ${qtyKekurangan})!`;
 
-            // Kembalikan nilai input menjadi batas maksimal stok
-            this.value = qtyStok;
+        // Cek jika QTY Ambil melampaui batas maksimal
+        if (qtyAmbil > batasMaksimal) {
+            if (typeof miuiAlert === 'function') {
+                miuiAlert(pesanPeringatan);
+            } else {
+                alert(pesanPeringatan);
+            }
+            this.value = batasMaksimal; // Kembalikan ke nilai batas aman
         }
     });
 }
@@ -1265,7 +1280,7 @@ function loadDataAmbilRak() {
 }
 
 // Fungsi untuk membuka modal dan mengisi form dengan data yang diklik
-function bukaModalEditHapus(dateId, docId, data) {
+async function bukaModalEditHapus(dateId, docId, data) {
     document.getElementById('edit-date-id').value = dateId;
     document.getElementById('edit-doc-id').value = docId;
     document.getElementById('edit-kode').value = data.kode || '';
@@ -1273,6 +1288,44 @@ function bukaModalEditHapus(dateId, docId, data) {
     document.getElementById('edit-qty-stok').value = data.qtyStok || 0;
     document.getElementById('edit-qty-ambil').value = data.qtyAmbil || 0;
     document.getElementById('edit-qty-sisa').value = data.qtySisa !== undefined ? data.qtySisa : ((data.qtyStok || 0) - (data.qtyAmbil || 0));
+
+    // Ambil informasi sisa kekurangan terbaru berdasarkan FDN untuk validasi di modal
+    try {
+        const tanggalRef = db.collection('muat_fdn').doc(dateId);
+        const tujuanSnapshot = await tanggalRef.collection('datatujuan').get();
+        let totalKebutuhan = 0;
+
+        tujuanSnapshot.forEach(doc => {
+            const docData = doc.data();
+            const items = docData.data || [];
+            items.forEach(item => {
+                if ((item.kode || '').toUpperCase() === (data.kode || '').toUpperCase()) {
+                    totalKebutuhan += Number(item.qty_utama || 0);
+                }
+            });
+        });
+
+        // Ambil data ambilrak lain selain dokumen ini untuk menghitung total yang sudah diambil
+        const ambilRakSnapshot = await tanggalRef.collection('ambilrak').get();
+        let sudahDiambilLainnya = 0;
+        ambilRakSnapshot.forEach(doc => {
+            if (doc.id !== docId) {
+                const d = doc.data();
+                if ((d.kode || '').toUpperCase() === (data.kode || '').toUpperCase()) {
+                    sudahDiambilLainnya += Number(d.qtyAmbil || 0);
+                }
+            }
+        });
+
+        const sisaKekuranganMaks = totalKebutuhan - sudahDiambilLainnya;
+        // Simpan batas maksimal kekurangan ke dataset elemen modal edit qty ambil untuk pengaman
+        const inputEditAmbil = document.getElementById('edit-qty-ambil');
+        if (inputEditAmbil) {
+            inputEditAmbil.dataset.maxKekurangan = sisaKekuranganMaks > 0 ? sisaKekuranganMaks : 0;
+        }
+    } catch (e) {
+        console.error("Gagal menghitung batas kekurangan di modal:", e);
+    }
 
     // Tampilkan modal
     const modal = document.getElementById('modal-edit-rak');
@@ -1285,15 +1338,35 @@ function tutupModalEditRak() {
     if (modal) modal.classList.add('hidden');
 }
 
-// Fungsi hitung otomatis nilai sisa di dalam modal saat input stok/ambil diubah
+// Fungsi hitung otomatis nilai sisa di dalam modal saat input stok/ambil diubah + Pengaman Batas
 function hitungOtomatisSisaEdit() {
-    const stok = Number(document.getElementById('edit-qty-stok').value || 0);
-    const ambil = Number(document.getElementById('edit-qty-ambil').value || 0);
+    const inputAmbil = document.getElementById('edit-qty-ambil');
+    const inputStok = document.getElementById('edit-qty-stok');
+    
+    const stok = Number(inputStok.value || 0);
+    let ambil = Number(inputAmbil.value || 0);
+    
+    // Ambil batas maksimal kekurangan dari dataset
+    const maxKekurangan = inputAmbil.dataset.maxKekurangan !== undefined ? Number(inputAmbil.dataset.maxKekurangan) : stok;
+    
+    // Tentukan batas paling ketat antara stok gudang dan sisa kekurangan FDN
+    const batasMaksimum = Math.min(stok, maxKekurangan);
+
+    if (ambil > batasMaksimum) {
+        if (typeof miuiAlert === 'function') {
+            miuiAlert(`QTY Ambil tidak boleh melebihi batas (Stok: ${stok}, Maks. Kekurangan: ${maxKekurangan})!`);
+        } else {
+            alert(`QTY Ambil melebihi batas yang diizinkan!`);
+        }
+        ambil = batasMaksimum;
+        inputAmbil.value = ambil;
+    }
+
     const sisa = stok - ambil;
     document.getElementById('edit-qty-sisa').value = sisa;
 }
 
-// Fungsi untuk menyimpan perubahan data ke Firestore
+// Fungsi untuk menyimpan perubahan data ke Firestore dan Sinkronisasi Ulang
 async function simpanPerubahanItem() {
     const dateId = document.getElementById('edit-date-id').value;
     const docId = document.getElementById('edit-doc-id').value;
@@ -1303,11 +1376,11 @@ async function simpanPerubahanItem() {
     const qtySisaBaru = Number(document.getElementById('edit-qty-sisa').value || 0);
 
     if (!lokasiBaru) {
-        alert("Lokasi rak tidak boleh kosong!");
+        miuiAlert("Lokasi rak tidak boleh kosong!");
         return;
     }
     if (qtyAmbilBaru <= 0) {
-        alert("QTY Ambil harus lebih besar dari 0!");
+        miuiAlert("QTY Ambil harus lebih besar dari 0!");
         return;
     }
 
@@ -1326,13 +1399,18 @@ async function simpanPerubahanItem() {
 
         console.log("Data berhasil diperbarui!");
         tutupModalEditRak();
+
+        // Sinkronisasi otomatis dropdown kode di layar utama setelah perubahan
+        if (typeof populateMutasiKodeDropdown === 'function') {
+            await populateMutasiKodeDropdown(dateId);
+        }
     } catch (error) {
         console.error("Gagal memperbarui data: ", error);
-        alert("Terjadi kesalahan saat memperbarui data ke database.");
+        miuiAlert("Terjadi kesalahan saat memperbarui data ke database.");
     }
 }
 
-// Fungsi untuk menghapus item dari modal
+// Fungsi untuk menghapus item dari modal dan Sinkronisasi Ulang
 async function hapusItemDariModal() {
     if (confirm("Apakah Anda yakin ingin menghapus item rak ini dari daftar?")) {
         const dateId = document.getElementById('edit-date-id').value;
@@ -1347,9 +1425,14 @@ async function hapusItemDariModal() {
 
             console.log("Item berhasil dihapus!");
             tutupModalEditRak();
+
+            // Sinkronisasi otomatis dropdown kode di layar utama setelah penghapusan
+            if (typeof populateMutasiKodeDropdown === 'function') {
+                await populateMutasiKodeDropdown(dateId);
+            }
         } catch (error) {
             console.error("Gagal menghapus item: ", error);
-            alert("Terjadi kesalahan saat menghapus data.");
+            miuiAlert("Terjadi kesalahan saat menghapus data.");
         }
     }
 }
@@ -1359,4 +1442,3 @@ async function hapusItemDariModal() {
 // Daftarkan fungsi ke window agar bisa diakses global
 window.filterWmsReportData = filterWmsReportData;
 window.tambahItemMutasiList = tambahItemMutasiList;
-window.hapusItemMutasiTemp = hapusItemMutasiTemp;
