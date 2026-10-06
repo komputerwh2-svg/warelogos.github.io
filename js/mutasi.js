@@ -1087,6 +1087,72 @@ function hitungSisaBelumDiinput() {
     inputSummaryKurang.value = sisaBelumDiinput;
 }
 
+// fungsi tombol enter
+document.addEventListener("DOMContentLoaded", function() {
+    const inputLokasi = document.getElementById('mutasi-lokasi');
+    const inputStok = document.getElementById('mutasi-stok-gudang');
+    const inputAmbil = document.getElementById('mutasi-qty');
+    const selectKode = document.getElementById('mutasi-kode');
+
+    // 1. Dari Dropdown Kode Barang (jika ditekan Enter, pindah ke Lokasi)
+    if (selectKode) {
+        selectKode.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (inputLokasi) {
+                    inputLokasi.focus();
+                    inputLokasi.select();
+                }
+            }
+        });
+        selectKode.addEventListener('change', function() {
+            if (inputLokasi) {
+                inputLokasi.focus();
+                inputLokasi.select();
+            }
+        });
+    }
+
+    // 2. Dari Rak / Lokasi (Enter -> Pindah ke QTY Stok & otomatis huruf kapital)
+    if (inputLokasi) {
+        inputLokasi.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.value = this.value.trim().toUpperCase(); // Otomatis kapital
+                if (inputStok) {
+                    inputStok.focus();
+                    inputStok.select();
+                }
+            }
+        });
+    }
+
+    // 3. Dari QTY Stok (Enter -> Pindah ke QTY Ambil)
+    if (inputStok) {
+        inputStok.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (inputAmbil) {
+                    inputAmbil.focus();
+                    inputAmbil.select();
+                }
+            }
+        });
+    }
+
+    // 4. Dari QTY Ambil (Enter -> Jalankan Tambah Rak)
+    if (inputAmbil) {
+        inputAmbil.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (typeof tambahItemMutasiList === 'function') {
+                    tambahItemMutasiList();
+                }
+            }
+        });
+    }
+});
+
 
 // Fungsi untuk menyimpan data Ambil Rak ke Firestore dengan tambahan field qtySisa
 async function tambahItemMutasiList() {
@@ -1094,7 +1160,7 @@ async function tambahItemMutasiList() {
     const tanggalMuat = document.getElementById('input-tgl-muat')?.value; // Format: YYYY-MM-DD
     const selectKode = document.getElementById('mutasi-kode');
     const kodeBarang = selectKode ? selectKode.value : '';
-    const lokasiRak = document.getElementById('mutasi-lokasi')?.value.trim();
+    const lokasiRak = document.getElementById('mutasi-lokasi')?.value.trim().toUpperCase();
     const qtyStok = Number(document.getElementById('mutasi-stok-gudang')?.value || 0);
     const qtyAmbil = Number(document.getElementById('mutasi-qty')?.value || 0);
 
