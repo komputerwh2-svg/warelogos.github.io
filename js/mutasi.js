@@ -1060,7 +1060,7 @@ function isiRakWh3() {
 
 
 async function prosesAmbilRakOtomatis() {
-    console.log("Debug: Tombol Ambil Rak Otomatis (Mode Inkremental/Sinkronisasi) diklik!");
+    //console.log("Debug: Tombol Ambil Rak Otomatis (Mode Inkremental/Sinkronisasi) diklik!");
 
     const tanggalMuat = document.getElementById('input-tgl-muat')?.value;
     if (!tanggalMuat) {
@@ -1256,9 +1256,9 @@ async function prosesAmbilRakOtomatis() {
             }
 
             if (typeof miuiAlert === 'function') {
-                miuiAlert("Sinkronisasi FDN & Penambahan Baru Selesai!");
+                miuiAlert("Simpan Data Berhasil!");
             } else {
-                alert("Sinkronisasi FDN & Penambahan Baru Selesai!");
+                alert("Simpan Data Berhasil!");
             }
 
             if (typeof loadDataAmbilRak === 'function') loadDataAmbilRak(firestoreDateId);
@@ -1836,8 +1836,495 @@ async function hapusItemDariModal() {
     }
 }
 
-
-
 // Daftarkan fungsi ke window agar bisa diakses global
 window.filterWmsReportData = filterWmsReportData;
 window.tambahItemMutasiList = tambahItemMutasiList;
+
+
+window.cetakArsipMutasi = async function() {
+    // Sesuaikan ID elemen tanggal dengan form Anda ('input-tgl-muat')
+    const tglMuat = document.getElementById('input-tgl-muat')?.value;
+    
+    if (!tglMuat) {
+        if (typeof window.miuiAlert === 'function') window.miuiAlert("Pilih tanggal muat terlebih dahulu!");
+        else alert("Pilih tanggal muat terlebih dahulu!");
+        return;
+    }
+
+    // Panggil modal progress universal jika tersedia
+    if (typeof window.showCetakProgress === 'function') {
+        window.showCetakProgress("Menyiapkan Dokumen Cetak (0/3)...");
+    } else {
+        console.warn("Fungsi showCetakProgress belum terdaftar di window!");
+    }
+
+    try {
+        // Cetak Versi 1 (Rekap Mutasi)
+        if (window.showCetakProgress) window.showCetakProgress("Mengirim Dokumen Versi 1 - Rekap Mutasi (1/3)...");
+        await cetakLaporanVersi1(tglMuat);
+        await new Promise(resolve => setTimeout(resolve, 600));
+
+        // Cetak Versi 2 - Copy 1 (Detail Rak)
+        if (window.showCetakProgress) window.showCetakProgress("Mengirim Dokumen Versi 2 - Copy 1 (2/3)...");
+        await cetakLaporanVersi2(tglMuat);
+        await new Promise(resolve => setTimeout(resolve, 600));
+
+        // Sembunyikan modal setelah selesai
+        if (typeof window.hideCetakProgress === 'function') {
+            window.hideCetakProgress();
+        }
+
+        if (typeof window.miuiAlert === 'function') {
+            window.miuiAlert("Berhasil mengirim 3 dokumen ke antrean cetak!");
+        } else {
+            alert("Berhasil mengirim 3 dokumen ke antrean cetak!");
+        }
+
+    } catch (error) {
+        console.error("Gagal memproses cetak:", error);
+        if (typeof window.hideCetakProgress === 'function') window.hideCetakProgress();
+        if (typeof window.miuiAlert === 'function') {
+            window.miuiAlert("Terjadi kesalahan saat mengirim dokumen cetak.");
+        } else {
+            alert("Terjadi kesalahan saat mengirim dokumen cetak.");
+        }
+    }
+};
+
+
+// Fungsi Cetak Versi 1: Akumulasi Item Barang & FDN
+async function cetakLaporanVersi1(tglMuat) {
+    if (!tglMuat) {
+        tglMuat = document.getElementById('input-tgl-muat')?.value;
+    }
+    if (!tglMuat) {
+        if (typeof window.miuiAlert === 'function') {
+            window.miuiAlert("Pilih tanggal muat terlebih dahulu!");
+        } else {
+            alert("Pilih tanggal muat terlebih dahulu!");
+        }
+        return;
+    }
+    const firestoreDateId = tglMuat.replace(/-/g, '');
+
+    try {
+        // 1. Ambil data akumulasi barang dari 'ambilrak'
+        const snapshotAmbil = await db.collection('muat_fdn').doc(firestoreDateId).collection('ambilrak').get();
+        const dataMap = {};
+
+        snapshotAmbil.forEach(doc => {
+            const d = doc.data();
+            const kode = String(d.kode || '').trim().toUpperCase();
+            if (!kode) return;
+
+            if (!dataMap[kode]) {
+                dataMap[kode] = { total: 0, wh2: 0, wh3: 0 };
+            }
+            const qty = Number(d.qtyAmbil || 0);
+            dataMap[kode].total += qty;
+            
+            const lok = String(d.lokasi || '').toUpperCase();
+            if (lok.includes('WH-3') || lok === 'WH3') {
+                dataMap[kode].wh3 += qty;
+            } else {
+                dataMap[kode].wh2 += qty;
+            }
+        });
+
+        // 2. Ambil data FDN & Tujuan dari subkoleksi 'datatujuan' dan kelompokkan berdasarkan Tujuan
+        const tujuanMap = {}; 
+        
+        try {
+            const snapshotDatatujuan = await db.collection('muat_fdn').doc(firestoreDateId).collection('datatujuan').get();
+            snapshotDatatujuan.forEach(doc => {
+                const d = doc.data();
+                const rawNoFdn = String(d.meta?.nomor_dokumen || d.nomor_dokumen || '').trim();
+                const tujuan = String(d.meta?.tujuan || d.tujuan || '').trim().toUpperCase();
+
+                if (rawNoFdn && tujuan) {
+                    if (!tujuanMap[tujuan]) {
+                        tujuanMap[tujuan] = [];
+                    }
+                    if (!tujuanMap[tujuan].includes(rawNoFdn)) {
+                        tujuanMap[tujuan].push(rawNoFdn);
+                    }
+                }
+            });
+        } catch (e) {
+            console.log("Gagal mengambil data dari datatujuan:", e);
+        }
+
+        let listCombinedRows = [];
+        const sortedKeys = Object.keys(dataMap).sort((a, b) => {
+            const itemA = dataMap[a];
+            const itemB = dataMap[b];
+            const isWh3A = itemA.wh3 > 0 && itemA.wh2 === 0 ? 1 : 0;
+            const isWh3B = itemB.wh3 > 0 && itemB.wh2 === 0 ? 1 : 0;
+            if (isWh3A !== isWh3B) return isWh3B - isWh3A;
+            return a.localeCompare(b);
+        });
+
+        let tujuanKeys = Object.keys(tujuanMap);
+        let maxRows = Math.max(sortedKeys.length, tujuanKeys.length);
+
+        for (let i = 0; i < maxRows; i++) {
+            const kode = sortedKeys[i] || '';
+            const tujuan = tujuanKeys[i] || '';
+            let formattedFdn = '';
+
+            if (tujuan && tujuanMap[tujuan]) {
+                const fdnList = tujuanMap[tujuan];
+                formattedFdn = fdnList.map((rawFdn, idx) => {
+                    if (idx === 0) {
+                        return rawFdn.length >= 5 ? rawFdn.slice(-5) : rawFdn;
+                    } else {
+                        return rawFdn.length >= 3 ? rawFdn.slice(-3) : rawFdn;
+                    }
+                }).join('/');
+            }
+
+            listCombinedRows.push({
+                kode: kode,
+                item: kode ? dataMap[kode] : null,
+                noFdn: formattedFdn,
+                tujuan: tujuan
+            });
+        }
+
+        let printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+            <html>
+            <head>
+                <title>MUTASI GUDANG WH-2</title>
+                <style>
+                    /* Import atau definisikan font EDO jika tersedia di sistem/lokal, fallback ke font dekoratif */
+                    @font-face {
+                        font-family: 'Edo';
+                        src: local('Edo'), url('EDO.ttf') format('truetype');
+                    }
+                    @font-face {
+                        font-family: 'Century Gothic';
+                        src: local('Century Gothic'), url('CenturyGothic.ttf') format('truetype');
+                    }
+
+                    body { 
+                        font-family: 'Century Gothic', Arial, sans-serif; 
+                        font-size: 10px; 
+                        margin: 15px; 
+                        color: #000; 
+                    }
+                    .header-title { 
+                        font-family: 'Edo', Arial, sans-serif; 
+                        font-weight: normal; 
+                        font-size: 13px; 
+                        text-align: center; 
+                        margin-bottom: 2px; 
+                        letter-spacing: 1px;
+                    }
+                    .sub-header { 
+                        font-family: 'Century Gothic', Arial, sans-serif; 
+                        margin-bottom: 8px; 
+                        font-size: 12px; 
+                        text-align: left;
+                    }
+                    table { 
+                        width: 100%; 
+                        border-collapse: collapse; 
+                        margin-bottom: 10px; 
+                        font-family: 'Century Gothic', Arial, sans-serif;
+                        font-size: 10px;
+                    }
+                    th, td { 
+                        border: 1px solid #000; 
+                        padding: 3px 5px; 
+                        text-align: center; 
+                        vertical-align: middle; 
+                    }
+                    th { 
+                        background-color: #f2f2f2; 
+                        font-size: 10px; 
+                        font-family: 'Century Gothic', Arial, sans-serif;
+                    }
+                    .text-left { text-align: left; }
+                    .font-bold { font-weight: bold; }
+                    @media print { body { margin: 0; } }
+                </style>
+            </head>
+            <body>
+                <div class="header-title">MUTASI GUDANG WH-2</div>
+                <div class="sub-header">${typeof formatTanggalIndo === 'function' ? formatTanggalIndo(tglMuat) : tglMuat} - ${typeof getCurrentTime === 'function' ? getCurrentTime() : ''}</div>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 22%;">KODE</th>
+                            <th style="width: 8%;">TOTAL</th>
+                            <th style="width: 5%;">V</th>
+                            <th style="width: 10%;">WH-2</th>
+                            <th style="width: 10%;">WH-3</th>
+                            <th style="width: 20%;">NO. FDN</th>
+                            <th style="width: 25%;">TUJUAN</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `);
+
+        let totalSeluruh = 0, totalWh2 = 0, totalWh3 = 0;
+
+        listCombinedRows.forEach(row => {
+            const item = row.item;
+            if (item) {
+                totalSeluruh += item.total;
+                totalWh2 += item.wh2;
+                totalWh3 += item.wh3;
+            }
+
+            printWindow.document.write(`
+                <tr>
+                    <td class="text-left font-bold">${row.kode}</td>
+                    <td>${item ? item.total : ''}</td>
+                    <td></td>
+                    <td>${item && item.wh2 > 0 ? item.wh2 : ''}</td>
+                    <td>${item && item.wh3 > 0 ? item.wh3 : ''}</td>
+                    <td class="text-left">${row.noFdn}</td>
+                    <td class="text-left">${row.tujuan}</td>
+                </tr>
+            `);
+        });
+
+        printWindow.document.write(`
+                        <tr class="font-bold" style="background-color: #f9f9f9;">
+                            <td class="text-left">TOTAL QTY</td>
+                            <td>${totalSeluruh}</td>
+                            <td></td>
+                            <td>${totalWh2}</td>
+                            <td>${totalWh3}</td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+        setTimeout(() => { printWindow.print(); }, 500);
+
+    } catch (error) {
+        console.error("Gagal mencetak laporan versi 1:", error);
+        if (typeof window.miuiAlert === 'function') {
+            window.miuiAlert("Terjadi kesalahan saat memuat data cetak versi 1.");
+        } else {
+            alert("Terjadi kesalahan saat memuat data cetak versi 1.");
+        }
+    }
+}
+
+
+// Fungsi Cetak Versi 2: Detail Ambil Rak & FDN
+async function cetakLaporanVersi2() {
+    const tanggalMuat = document.getElementById('input-tgl-muat')?.value;
+    if (!tanggalMuat) {
+        alert("Pilih tanggal muat terlebih dahulu!");
+        return;
+    }
+    const firestoreDateId = tanggalMuat.replace(/-/g, '');
+
+    try {
+        // 1. Ambil data dari subkoleksi 'ambilrak'
+        const snapshotAmbil = await db.collection('muat_fdn').doc(firestoreDateId).collection('ambilrak').get();
+        let listAmbil = [];
+        snapshotAmbil.forEach(doc => {
+            listAmbil.push(doc.data());
+        });
+
+        // Urutkan data: WH-3 terlebih dahulu di atas, lalu urut abjad kode barang
+        listAmbil.sort((a, b) => {
+            const lokA = String(a.lokasi || '').toUpperCase();
+            const lokB = String(b.lokasi || '').toUpperCase();
+            
+            const isWh3A = lokA.includes('WH-3') || lokA === 'WH3' ? 1 : 0;
+            const isWh3B = lokB.includes('WH-3') || lokB === 'WH3' ? 1 : 0;
+            
+            if (isWh3A !== isWh3B) {
+                return isWh3B - isWh3A; // WH-3 di atas
+            }
+            return String(a.kode || '').localeCompare(String(b.kode || ''));
+        });
+
+        // 2. Ambil data FDN & Tujuan dari subkoleksi 'datatujuan' dan kelompokkan per Tujuan
+        const tujuanMap = {}; 
+        try {
+            const snapshotDatatujuan = await db.collection('muat_fdn').doc(firestoreDateId).collection('datatujuan').get();
+            snapshotDatatujuan.forEach(doc => {
+                const d = doc.data();
+                const rawNoFdn = String(d.meta?.nomor_dokumen || d.nomor_dokumen || '').trim();
+                let tujuan = String(d.meta?.tujuan || d.tujuan || '').trim().toUpperCase();
+
+                // Ganti "STOCK POINT" menjadi "SP"
+                tujuan = tujuan.replace(/STOCK POINT/g, 'SP');
+
+                if (rawNoFdn && tujuan) {
+                    if (!tujuanMap[tujuan]) {
+                        tujuanMap[tujuan] = [];
+                    }
+                    if (!tujuanMap[tujuan].includes(rawNoFdn)) {
+                        tujuanMap[tujuan].push(rawNoFdn);
+                    }
+                }
+            });
+        } catch (e) {
+            console.log("Gagal mengambil data dari datatujuan:", e);
+        }
+
+        let fdnRowsData = [];
+        Object.keys(tujuanMap).forEach(tujuan => {
+            const fdnList = tujuanMap[tujuan];
+            const formattedFdn = fdnList.map((rawFdn, idx) => {
+                if (idx === 0) {
+                    return rawFdn.length >= 5 ? rawFdn.slice(-5) : rawFdn;
+                } else {
+                    return rawFdn.length >= 3 ? rawFdn.slice(-3) : rawFdn;
+                }
+            }).join('/');
+
+            fdnRowsData.push({
+                noFdn: formattedFdn,
+                tujuan: tujuan
+            });
+        });
+
+        let printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+            <html>
+            <head>
+                <title>Mutasi Gudang WH-2 - Detail Rak</title>
+                <style>
+                    @font-face {
+                        font-family: 'Edo';
+                        src: local('Edo'), url('EDO.ttf') format('truetype');
+                    }
+                    @font-face {
+                        font-family: 'Century Gothic';
+                        src: local('Century Gothic'), url('CenturyGothic.ttf') format('truetype');
+                    }
+
+                    body { 
+                        font-family: 'Century Gothic', Arial, sans-serif; 
+                        font-size: 10px; 
+                        margin: 15px; 
+                        color: #000; 
+                    }
+                    .header-title { 
+                        font-family: 'Edo', Arial, sans-serif; 
+                        font-weight: normal; 
+                        font-size: 13px; 
+                        text-align: center; 
+                        margin-bottom: 5px; 
+                        letter-spacing: 1px;
+                    }
+                    .sub-header { 
+                        font-family: 'Century Gothic', Arial, sans-serif; 
+                        margin-bottom: 10px; 
+                        font-size: 12px; 
+                        text-align: center;
+                    }
+                    table { 
+                        width: 100%; 
+                        border-collapse: collapse; 
+                        margin-bottom: 10px; 
+                        font-family: 'Century Gothic', Arial, sans-serif;
+                        font-size: 10px;
+                    }
+                    th, td { 
+                        border: 1px solid #000; 
+                        padding: 3px 5px; 
+                        text-align: center; 
+                        vertical-align: middle;
+                    }
+                    th { 
+                        background-color: #f2f2f2; 
+                        font-size: 10px;
+                        font-family: 'Century Gothic', Arial, sans-serif;
+                    }
+                    .text-left { text-align: left; }
+                    .font-bold { font-weight: bold; }
+                    @media print { body { margin: 0; } }
+                </style>
+            </head>
+            <body>
+                <div class="header-title">MUTASI GUDANG WH-2</div>
+                <div class="sub-header">${typeof formatTanggalIndo === 'function' ? formatTanggalIndo(tanggalMuat) : tanggalMuat} - ${typeof getCurrentTime === 'function' ? getCurrentTime() : ''}</div>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 4%;">NO</th>
+                            <th style="width: 23%;">KODE</th>
+                            <th style="width: 9%;">RAK</th>
+                            <th style="width: 7%;">AMBIL</th>
+                            <th style="width: 7%;">STOK</th>
+                            <th style="width: 7%;">SISA</th>
+                            <th style="width: 4%;">NO</th>
+                            <th style="width: 18%;">NO. FDN</th>
+                            <th style="width: 21%;">TUJUAN KIRIM</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `);
+
+        let no = 1;
+        let maxRows = Math.max(listAmbil.length, fdnRowsData.length);
+
+        for (let i = 0; i < maxRows; i++) {
+            const itemAmbil = listAmbil[i] || {};
+            const itemFdn = fdnRowsData[i] || {};
+
+            const formatVal = (val) => {
+                if (val === undefined || val === null || val === '' || Number(val) === 0) {
+                    return '-';
+                }
+                return val;
+            };
+
+            printWindow.document.write(`
+                <tr>
+                    <td>${itemAmbil.kode ? no++ : ''}</td>
+                    <td class="text-left font-bold">${itemAmbil.kode || ''}</td>
+                    <td>${itemAmbil.lokasi || ''}</td>
+                    <td>${formatVal(itemAmbil.qtyAmbil)}</td>
+                    <td>${formatVal(itemAmbil.qtyStok)}</td>
+                    <td>${formatVal(itemAmbil.qtySisa)}</td>
+                    <td>${itemFdn.noFdn ? (i + 1) : ''}</td>
+                    <td class="text-left">${itemFdn.noFdn || ''}</td>
+                    <td class="text-left">${itemFdn.tujuan || ''}</td>
+                </tr>
+            `);
+        }
+
+        printWindow.document.write(`
+                    </tbody>
+                </table>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+        setTimeout(() => { printWindow.print(); }, 500);
+
+    } catch (error) {
+        console.error("Gagal mencetak laporan versi 2:", error);
+        miuiAlert("Terjadi kesalahan saat memuat data cetak.");
+    }
+}
+
+// Helper Format Tanggal & Waktu
+function formatTanggalIndo(tglStr) {
+    if (!tglStr) return '';
+    const date = new Date(tglStr);
+    return date.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+function getCurrentTime() {
+    const now = new Date();
+    return now.toTimeString().split(' ')[0].substring(0, 5);
+}
