@@ -76,11 +76,22 @@
                         <!-- Input file tersembunyi dengan dukungan multi-file -->
                         <input type="file" id="file-fdn-input" accept=".txt" multiple style="display: none;" onchange="handleImportFdnFiles(event)">
 
-                        <!-- Tombol Import FDN -->
-                        <div>
-                            <button type="button" onclick="document.getElementById('file-fdn-input').click();" class="w-full bg-orange-500 hover:bg-orange-600 text-white py-1 px-1.5 rounded font-black text-[10px] uppercase shadow text-center border border-orange-600">
-                                IMPORT FDN
-                            </button>
+                        <!-- Tombol Import FDN & Tombol Ambil Rak Otomatis (Sejajar 1 Baris) -->
+                        <div class="grid grid-cols-2 gap-1.5">
+                            <!-- Tombol Ambil Rak Otomatis Baru -->
+                            <div>
+                                <button type="button" id="btn-ambil-rak-otomatis" onclick="prosesAmbilRakOtomatis()" class="w-full bg-orange-500 hover:bg-orange-600 text-white py-1 px-1.5 rounded font-black text-[10px] uppercase shadow text-center border border-orange-600 transition flex items-center justify-center gap-1">
+                                    🚀 AMBIL RAK
+                                </button>
+                            </div>
+                            
+                            <!-- Tombol Import FDN Asli -->
+                            <div>
+                                <input type="file" id="file-fdn-input" style="display: none;" onchange="handleFileFdn(this)">
+                                <button type="button" onclick="document.getElementById('file-fdn-input').click();" class="w-full bg-orange-500 hover:bg-orange-600 text-white py-1 px-1.5 rounded font-black text-[10px] uppercase shadow text-center border border-orange-600 transition">
+                                    📂 IMPORT FDN
+                                </button>
+                            </div>
                         </div>
                     </div>
 
