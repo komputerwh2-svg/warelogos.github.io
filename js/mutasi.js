@@ -984,27 +984,62 @@ document.getElementById('mutasi-kode').addEventListener('change', function() {
 
 // Fungsi untuk menangani klik pada baris tabel WMS Report
 function pilihRakWms(lokasi, stok) {
-    // 1. Isi input Rak / Lokasi di form sebelah kiri
     const inputLokasi = document.getElementById('mutasi-lokasi');
-    if (inputLokasi) {
-        inputLokasi.value = lokasi;
+    const inputStok = document.getElementById('mutasi-stok-gudang');
+    const inputQtyAmbil = document.getElementById('mutasi-qty');
+    const selectKodeBarangRak = document.getElementById('mutasi-kode');
+
+    const lokasiBaru = (lokasi || '').trim().toUpperCase();
+    const kodeBarangAktif = selectKodeBarangRak && selectKodeBarangRak.selectedOptions.length > 0 
+        ? selectKodeBarangRak.selectedOptions[0].value.trim().toUpperCase() 
+        : '';
+
+    // 1. Cek duplikasi terlebih dahulu sebelum memasukkan nilai (Kecuali WH-3)
+    if (lokasiBaru && lokasiBaru !== 'WH-3' && kodeBarangAktif) {
+        const barisListRak = document.querySelectorAll('#container-list-mutasi tr');
+        let sudahAda = false;
+
+        barisListRak.forEach(row => {
+            const cols = row.querySelectorAll('td');
+            if (cols.length >= 3) {
+                const textKode = (cols[1]?.textContent || '').trim().toUpperCase();
+                const textLokasi = (cols[2]?.textContent || '').trim().toUpperCase();
+
+                if (textKode === kodeBarangAktif && textLokasi === lokasiBaru) {
+                    sudahAda = true;
+                }
+            }
+        });
+
+        // Jika sudah ada, tampilkan miuiAlert dan batalkan pengisian otomatis
+        if (sudahAda) {
+            const pesanPeringatan = `Rak [${lokasiBaru}] untuk barang [${kodeBarangAktif}] sudah pernah diinput! Silakan pilih rak lainnya.`;
+            if (typeof miuiAlert === 'function') {
+                miuiAlert(pesanPeringatan);
+            } else {
+                alert(pesanPeringatan);
+            }
+            return; // Berhenti di sini, form tidak terisi data duplikat
+        }
     }
 
-    // 2. Isi input QTY Stok di form sebelah kiri
-    const inputStok = document.getElementById('mutasi-stok-gudang');
+    // 2. Jika aman (belum ada / WH-3), isi input Rak / Lokasi di form sebelah kiri
+    if (inputLokasi) {
+        inputLokasi.value = lokasiBaru;
+    }
+
+    // 3. Isi input QTY Stok di form sebelah kiri
     if (inputStok) {
         inputStok.value = stok;
     }
 
-    // 3. Otomatis arahkan fokus kursor ke input QTY Ambil agar operator bisa langsung mengetik
-    const inputQtyAmbil = document.getElementById('mutasi-qty');
+    // 4. Otomatis arahkan fokus kursor ke input QTY Ambil agar operator bisa langsung mengetik
     if (inputQtyAmbil) {
         inputQtyAmbil.focus();
-        // Opsional: otomatis isi QTY Ambil dengan nilai stok jika ingin lebih cepat, atau kosongkan
-        // inputQtyAmbil.value = stok; 
+        inputQtyAmbil.select(); // Opsional: langsung pilih teks di dalam qty ambil
     }
 
-    console.log("Rak dipilih:", lokasi, "Stok:", stok);
+    console.log("Rak dipilih:", lokasiBaru, "Stok:", stok);
 }
 
 // Fungsi untuk mengisi otomatis kolom Rak / Lokasi dengan teks "WH-3" dan memfokuskan ke QTY Stok
@@ -1020,6 +1055,220 @@ function isiRakWh3() {
             inputStok.focus();
             inputStok.select();
         }
+    }
+}
+
+
+async function prosesAmbilRakOtomatis() {
+    console.log("Debug: Tombol Ambil Rak Otomatis (Mode Inkremental/Sinkronisasi) diklik!");
+
+    const tanggalMuat = document.getElementById('input-tgl-muat')?.value;
+    if (!tanggalMuat) {
+        if (typeof miuiAlert === 'function') miuiAlert("Tanggal aktif belum dipilih!");
+        else alert("Tanggal aktif belum dipilih!");
+        return;
+    }
+
+    const firestoreDateId = tanggalMuat.replace(/-/g, '');
+    const tanggalRef = db.collection('muat_fdn').doc(firestoreDateId);
+
+    try {
+        const selectKode = document.getElementById('mutasi-kode');
+        if (!selectKode || selectKode.options.length <= 1) {
+            if (typeof miuiAlert === 'function') miuiAlert("Tidak ada data FDN / kode barang yang tersedia untuk diproses!");
+            else alert("Tidak ada data FDN / kode barang yang tersedia untuk diproses!");
+            return;
+        }
+
+        // 1. Ambil data yang sudah terlanjur diabsen/diambil sebelumnya di Firestore (tabel kiri)
+        // Agar kita tahu item apa saja dan berapa qty yang sudah terambil
+        const existingAmbilSnapshot = await tanggalRef.collection('ambilrak').get();
+        const terambilMap = {}; // Format: { "KODE_BARANG": totalQtySudahDiambil }
+        
+        existingAmbilSnapshot.forEach(doc => {
+            const data = doc.data();
+            const kd = String(data.kode || '').trim().toUpperCase();
+            const qty = Number(data.qtyAmbil || 0);
+            if (kd) {
+                terambilMap[kd] = (terambilMap[kd] || 0) + qty;
+            }
+        });
+
+        // 2. Ambil seluruh data WMS terbaru dari Firebase RTDB
+        let rawData = [];
+        try {
+            if (typeof firebase !== 'undefined' && firebase.database) {
+                const snapshot = await firebase.database().ref('stok_cache/data').once('value');
+                const val = snapshot.val();
+                if (val) {
+                    rawData = Array.isArray(val) ? val : Object.values(val);
+                }
+            }
+        } catch (err) {
+            console.warn("Gagal ambil langsung dari RTDB, mencoba variabel global...", err);
+        }
+
+        if (rawData.length === 0) {
+            let sourceData = typeof globalWmsData !== 'undefined' ? globalWmsData : 
+                             (typeof wmsDataCache !== 'undefined' ? wmsDataCache : 
+                             (typeof stokCache !== 'undefined' ? stokCache : null));
+            if (sourceData) {
+                rawData = Array.isArray(sourceData) ? sourceData : Object.values(sourceData);
+            }
+        }
+
+        if (!rawData || rawData.length === 0) {
+            if (typeof miuiAlert === 'function') miuiAlert("Data WMS di Firebase / memori kosong!");
+            else alert("Data WMS di Firebase / memori kosong!");
+            return;
+        }
+
+        if (confirm("Jalankan sinkronisasi FDN otomatis? (Hanya memproses FDN baru atau kekurangan qty yang belum terambil)")) {
+            
+            // Loop untuk SEMUA opsi di dropdown
+            for (let i = 0; i < selectKode.options.length; i++) {
+                const opt = selectKode.options[i];
+                const fullOptText = (opt.value || opt.text || '').trim().toUpperCase();
+                
+                if (!fullOptText || fullOptText.includes('PILIH') || fullOptText === '') continue;
+                
+                const kodeBarang = fullOptText.split(' - ')[0].split('(')[0].trim();
+                
+                // Total kebutuhan total berdasarkan FDN saat ini
+                let totalKebutuhanFdn = Number(opt.dataset.kekurangan || opt.getAttribute('data-kekurangan') || opt.dataset.qty || 0);
+                if (totalKebutuhanFdn <= 0) {
+                    const matchKrt = fullOptText.match(/\(([^)]+)\)/);
+                    if (matchKrt) {
+                        const angkaKrt = parseInt(matchKrt[1].replace(/[^0-9]/g, ''));
+                        if (!isNaN(angkaKrt)) totalKebutuhanFdn = angkaKrt;
+                    }
+                }
+                if (totalKebutuhanFdn <= 0) totalKebutuhanFdn = 1;
+
+                // HITUNG DELTA: Berapa sisa kekurangan yang BELUM diambil sebelumnya?
+                const sudahDiambil = terambilMap[kodeBarang] || 0;
+                let sisaKebutuhanItem = totalKebutuhanFdn - sudahDiambil;
+
+                // Jika sisa kebutuhan <= 0, artinya FDN item ini sudah terpenuhi sebelumnya, lewati!
+                if (sisaKebutuhanItem <= 0) {
+                    console.log(`Debug [Item ${i}]: ${kodeBarang} sudah terpenuhi (Butuh: ${totalKebutuhanFdn}, Sudah Ambil: ${sudahDiambil}), dilewati.`);
+                    continue;
+                }
+
+                console.log(`Debug [Item ${i}]: ${kodeBarang} ada penambahan/kurang (Butuh: ${totalKebutuhanFdn}, Sudah: ${sudahDiambil}, Sisa yg harus dicari: ${sisaKebutuhanItem})`);
+
+                const isWh3Item = opt.dataset.isWh3 === 'true' || opt.getAttribute('data-is-wh3') === 'true';
+
+                if (isWh3Item) {
+                    const docIdKodeQty = `${kodeBarang}_${sisaKebutuhanItem}_${Date.now()}_${i}_wh3`;
+                    await tanggalRef.collection('ambilrak').doc(docIdKodeQty).set({
+                        kode: kodeBarang,
+                        lokasi: 'WH-3',
+                        qtyStok: sisaKebutuhanItem,
+                        qtyAmbil: sisaKebutuhanItem,
+                        qtySisa: 0,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    continue; 
+                }
+
+                // Pencarian WMS untuk menutupi sisa kekurangan
+                let stokWmsList = rawData.filter(item => {
+                    if (!item) return false;
+                    const kodeItem = String(item.KODE || item.kode || item.KODE_BARANG || '').trim().toUpperCase();
+                    return kodeItem === kodeBarang || kodeItem.includes(kodeBarang) || kodeBarang.includes(kodeItem);
+                });
+
+                if (stokWmsList.length === 0) continue;
+
+                let normalizedStok = stokWmsList.map(item => {
+                    return {
+                        kode: kodeBarang,
+                        lokasi: String(item.LOKASI_PALET || item.lokasi || item.LOKASI || '').trim(),
+                        stok: Number(item.QTY_STOK || item.stok || item.QTY || 0),
+                        expdate: String(item.EXPDATE || item.expdate || item.TANGGAL_EXP || '2099-12-31').trim()
+                    };
+                }).filter(item => item.stok > 0 && item.lokasi);
+
+                // Alokasi WH-3 jika ada di stok fisik
+                const indexWh3 = normalizedStok.findIndex(item => item.lokasi.toUpperCase().includes('WH-3') || item.lokasi.toUpperCase() === 'WH3');
+                if (indexWh3 !== -1) {
+                    const dataWh3 = normalizedStok[indexWh3];
+                    const qtyStokGudang = dataWh3.stok;
+                    const qtyAmbil = Math.min(sisaKebutuhanItem, qtyStokGudang);
+                    const qtySisa = qtyStokGudang - qtyAmbil;
+
+                    const docIdKodeQty = `${kodeBarang}_${qtyAmbil}_${Date.now()}_${i}_wh3`;
+                    await tanggalRef.collection('ambilrak').doc(docIdKodeQty).set({
+                        kode: kodeBarang,
+                        lokasi: dataWh3.lokasi,
+                        qtyStok: qtyStokGudang,
+                        qtyAmbil: qtyAmbil,
+                        qtySisa: qtySisa,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    sisaKebutuhanItem -= qtyAmbil;
+                    if (qtySisa <= 0) {
+                        normalizedStok.splice(indexWh3, 1);
+                    } else {
+                        normalizedStok[indexWh3].stok = qtySisa;
+                    }
+                }
+
+                // Alokasi ke rak WMS regular untuk menutupi sisa delta kebutuhan
+                if (sisaKebutuhanItem > 0 && normalizedStok.length > 0) {
+                    let sisaRakWms = normalizedStok.filter(item => {
+                        const locUp = item.lokasi.toUpperCase();
+                        return !locUp.includes('WH-3') && locUp !== 'WH3';
+                    });
+
+                    sisaRakWms.sort((a, b) => {
+                        if (a.stok !== b.stok) return a.stok - b.stok;
+                        const dateA = new Date(a.expdate);
+                        const dateB = new Date(b.expdate);
+                        return dateA - dateB;
+                    });
+
+                    for (const wms of sisaRakWms) {
+                        if (sisaKebutuhanItem <= 0) break;
+
+                        const qtyStokGudang = wms.stok;
+                        if (qtyStokGudang <= 0) continue;
+
+                        const qtyAmbil = Math.min(sisaKebutuhanItem, qtyStokGudang);
+                        const qtySisa = qtyStokGudang - qtyAmbil;
+                        
+                        const docIdKodeQty = `${kodeBarang}_${qtyAmbil}_${Date.now()}_${i}_${Math.floor(Math.random()*10000)}`;
+
+                        await tanggalRef.collection('ambilrak').doc(docIdKodeQty).set({
+                            kode: kodeBarang,
+                            lokasi: wms.lokasi,
+                            qtyStok: qtyStokGudang,
+                            qtyAmbil: qtyAmbil,
+                            qtySisa: qtySisa,
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+
+                        sisaKebutuhanItem -= qtyAmbil;
+                    }
+                }
+            }
+
+            if (typeof miuiAlert === 'function') {
+                miuiAlert("Sinkronisasi FDN & Penambahan Baru Selesai!");
+            } else {
+                alert("Sinkronisasi FDN & Penambahan Baru Selesai!");
+            }
+
+            if (typeof loadDataAmbilRak === 'function') loadDataAmbilRak(firestoreDateId);
+            if (typeof updateSummaryMutasi === 'function') updateSummaryMutasi();
+            if (typeof populateMutasiKodeDropdown === 'function') await populateMutasiKodeDropdown(firestoreDateId);
+        }
+
+    } catch (error) {
+        console.error("Gagal menjalankan sinkronisasi FDN otomatis:", error);
+        if (typeof miuiAlert === 'function') miuiAlert("Terjadi kesalahan saat sinkronisasi FDN.");
     }
 }
 
@@ -1055,6 +1304,90 @@ if (inputQtyAmbil && inputStokGudang) {
                 alert(pesanPeringatan);
             }
             this.value = batasMaksimal; // Kembalikan ke nilai batas aman
+        }
+    });
+}
+
+// Pengaman real-time pada input Lokasi Rak (Cek duplikasi rak per kode barang, kecuali WH-3)
+const inputLokasiRak = document.getElementById('mutasi-lokasi');
+const selectKodeBarangRak = document.getElementById('mutasi-kode');
+
+if (inputLokasiRak) {
+    // Fungsi pengecekan saat input kehilangan fokus (blur) atau ditekan Enter
+    function validasiRakDuplikat() {
+        const lokasiDipilih = inputLokasiRak.value.trim().toUpperCase();
+        
+        // Jika kosong atau WH-3, lewati pengaman (WH-3 boleh dipakai berkali-kali)
+        if (!lokasiDipilih || lokasiDipilih === 'WH-3') return true;
+
+        // Ambil kode barang yang sedang dipilih
+        let kodeBarangAktif = '';
+        if (selectKodeBarangRak && selectKodeBarangRak.selectedOptions.length > 0) {
+            kodeBarangAktif = selectKodeBarangRak.selectedOptions[0].value.trim().toUpperCase();
+        }
+
+        if (!kodeBarangAktif) {
+            if (typeof miuiAlert === 'function') {
+                miuiAlert("Silakan pilih Kode Barang terlebih dahulu!");
+            } else {
+                alert("Silakan pilih Kode Barang terlebih dahulu!");
+            }
+            inputLokasiRak.value = '';
+            return false;
+        }
+
+        // Cek secara instan dari tabel list rak yang sudah diinput di sebelah kiri (container-list-mutasi)
+        const barisListRak = document.querySelectorAll('#container-list-mutasi tr');
+        let sudahAda = false;
+
+        barisListRak.forEach(row => {
+            const cols = row.querySelectorAll('td');
+            // Pastikan baris tersebut valid (bukan baris "Belum ada rak ditambahkan")
+            if (cols.length >= 3) {
+                const textKode = (cols[1]?.textContent || '').trim().toUpperCase();
+                const textLokasi = (cols[2]?.textContent || '').trim().toUpperCase();
+
+                if (textKode === kodeBarangAktif && textLokasi === lokasiDipilih) {
+                    sudahAda = true;
+                }
+            }
+        });
+
+        if (sudahAda) {
+            const pesanPeringatan = `Rak [${lokasiDipilih}] untuk barang [${kodeBarangAktif}] sudah pernah diinput! Silakan pilih rak lainnya.`;
+            if (typeof miuiAlert === 'function') {
+                miuiAlert(pesanPeringatan);
+            } else {
+                alert(pesanPeringatan);
+            }
+            inputLokasiRak.value = ''; // Kosongkan kembali
+            inputLokasiRak.focus();
+            return false;
+        }
+
+        return true;
+    }
+
+    // Jalankan validasi saat input selesai diketik (blur)
+    inputLokasiRak.addEventListener('blur', function() {
+        this.value = this.value.trim().toUpperCase();
+        validasiRakDuplikat();
+    });
+
+    // Jalankan juga saat tombol Enter ditekan pada kolom lokasi rak
+    inputLokasiRak.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            this.value = this.value.trim().toUpperCase();
+            
+            // Jika lolos validasi duplikat, pindah fokus ke input QTY Stok
+            if (validasiRakDuplikat()) {
+                const inputStokGudang = document.getElementById('mutasi-stok-gudang');
+                if (inputStokGudang) {
+                    inputStokGudang.focus();
+                    inputStokGudang.select();
+                }
+            }
         }
     });
 }
