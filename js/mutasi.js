@@ -1,109 +1,202 @@
-// Array nama bulan dalam Bahasa Indonesia untuk format visual
-const namaBulanIndo = [
-    "Januari", "Februari", "Maret", "April", "Mei", "Juni", 
-    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
-];
+// Variabel global untuk menyimpan data FDN yang valid
+let globalDataFdn = [];
 
-function formatTanggalIndonesia(dateString) {
-    if (!dateString) return "";
-    const parts = dateString.split("-");
-    if (parts.length !== 3) return dateString;
-    
-    const tahun = parts[0];
-    const bulanIndex = parseInt(parts[1], 10) - 1;
-    const hari = parts[2];
-    
-    const namaBulan = namaBulanIndo[bulanIndex] || "";
-    return `${parseInt(hari, 10)} ${namaBulan} ${tahun}`;
-}
+window.loadDataBulanDanTanggal = async function() {
+    const selectBulan = document.getElementById('select-periode-bulan');
+    const selectTgl = document.getElementById('input-tgl-muat');
+    const db = window.db;
 
-// Fungsi untuk memformat tanggal visual dan memuat data FDN dari Firestore
-async function updateFormatTanggal(dateString) {
-    if (!dateString) return;
+    if (!selectBulan || !selectTgl || !db) return;
 
-    // 1. Simpan nilai mentah ke input hidden (format: YYYY-MM-DD)
-    document.getElementById('input-tgl-muat').value = dateString;
-
-    // 2. Ubah format untuk tampilan visual menggunakan fungsi Indonesia (contoh: 1 Oktober 2026)
-    const formattedVisual = formatTanggalIndonesia(dateString);
-    document.getElementById('display-tgl-muat').value = formattedVisual;
-
-    // 3. Konversi format YYYY-MM-DD menjadi YYYYMMDD untuk ID Firestore (contoh: 20261001)
-    const firestoreDateId = dateString.replace(/-/g, '');
-
-    // 4. Muat daftar FDN ke kotak preview sebelah kanan
-    await renderDaftarFdnToPreview(firestoreDateId);
-
-    // 5. Sinkronkan dan perbarui dropdown kode pada Form Ambil Rak sesuai tanggal baru
-    if (typeof populateMutasiKodeDropdown === 'function') {
-        await populateMutasiKodeDropdown(firestoreDateId);
-    }
-
-    // 6. <--- TAMBAHKAN INI: Muat tabel daftar rak yang sudah dipilih untuk tanggal tersebut
-    if (typeof loadDataAmbilRak === 'function') {
-        loadDataAmbilRak(firestoreDateId);
-    }
-}
-
-// Inisialisasi Otomatis saat Modul Muat / Mutasi Dibuka (Mendeteksi Tanggal Data Terbaru)
-window.initMutasi = async function() {
-    let targetDateString = "";
-    let dateId = "";
+    selectBulan.innerHTML = '<option value="">Memuat Bulan...</option>';
+    selectTgl.innerHTML = '<option value="">Pilih Tanggal...</option>';
 
     try {
-        // 1. Cek apakah ada fungsi untuk mengambil daftar tanggal/data terbaru dari Firestore atau cache
-        // (Sesuaikan nama fungsi query/helper Firestore Anda jika sudah ada, misal: getLatestAvailableDate())
-        if (typeof getLatestAvailableDate === 'function') {
-            targetDateString = await getLatestAvailableDate(); // Format yang diharapkan: 'YYYY-MM-DD'
+        console.log("Membaca data tanggal dari field meta.tanggal di collectionGroup datatujuan");
+        const snapshot = await db.collectionGroup('datatujuan').get();
+        
+        console.log("Jumlah dokumen di collectionGroup datatujuan:", snapshot.size);
+
+        globalDataFdn = [];
+        let bulanSet = new Set();
+        let tanggalSet = new Set();
+        const namaBulan = [
+            "Januari", "Februari", "Maret", "April", "Mei", "Juni", 
+            "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+        ];
+
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            // Ambil dari field meta.tanggal (contoh format: "26/09/2026")
+            const tglStr = data && data.meta ? data.meta.tanggal : null;
+
+            if (tglStr && typeof tglStr === 'string' && tglStr.includes('/')) {
+                // Pisahkan format "DD/MM/YYYY" menjadi komponen hari, bulan, tahun
+                const parts = tglStr.split('/');
+                if (parts.length === 3) {
+                    let hari = parts[0]; // "26"
+                    let angkaBulan = parts[1]; // "09"
+                    let tahun = parts[2]; // "2026"
+
+                    // Buat ID unik YYYYMMDD untuk sorting dan value (contoh: "20260926")
+                    let tglId = `${tahun}${angkaBulan}${hari}`;
+
+                    if (!tanggalSet.has(tglId)) {
+                        tanggalSet.add(tglId);
+
+                        let bulanIndex = parseInt(angkaBulan, 10) - 1;
+                        if (bulanIndex >= 0 && bulanIndex < 12) {
+                            let namaBulanStr = `${namaBulan[bulanIndex]} ${tahun}`; // "September 2026"
+                            let bulanKey = `${tahun}-${angkaBulan}`; // "2026-09"
+                            let formattedDate = `${hari}-${angkaBulan}-${tahun}`; // "26-09-2026"
+
+                            bulanSet.add(JSON.stringify({ key: bulanKey, name: namaBulanStr }));
+
+                            globalDataFdn.push({
+                                raw: tglId,           // "20260926"
+                                bulanKey: bulanKey,   // "2026-09"
+                                formatted: formattedDate // "26-09-2026"
+                            });
+                        }
+                    }
+                }
+            }
+        });
+
+        console.log("Total tanggal unik dari meta.tanggal ditemukan:", globalDataFdn.length);
+
+        if (globalDataFdn.length === 0) {
+            selectBulan.innerHTML = '<option value="">Tidak ada data bulan</option>';
+            selectTgl.innerHTML = '<option value="">Pilih Tanggal</option>';
+            return;
         }
 
-        // Fallback: Jika fungsi helper belum ada atau gagal, ambil dari data WMS / FDN yang tersimpan lokal/Firebase
-        if (!targetDateString) {
-            // Coba ambil dari elemen input date atau data cache lokal jika tersedia
-            const triggerInput = document.getElementById('trigger-tgl-muat');
-            if (triggerInput && triggerInput.value) {
-                targetDateString = triggerInput.value;
-            }
+        // Urutkan data dari yang terbaru (Descending)
+        globalDataFdn.sort((a, b) => b.raw.localeCompare(a.raw));
+
+        let listBulan = Array.from(bulanSet).map(item => JSON.parse(item));
+        listBulan.sort((a, b) => b.key.localeCompare(a.key));
+
+        // Render Dropdown Bulan
+        selectBulan.innerHTML = '<option value="">Pilih Bulan...</option>';
+        listBulan.forEach(b => {
+            let opt = document.createElement('option');
+            opt.value = b.key;
+            opt.textContent = b.name;
+            selectBulan.appendChild(opt);
+        });
+
+        // Set default ke bulan aktif saat ini jika ada, atau ambil yang teratas
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+        const currentBulanKey = `${currentYear}-${currentMonth}`;
+
+        const foundCurrentMonth = listBulan.find(b => b.key === currentBulanKey);
+        if (foundCurrentMonth) {
+            selectBulan.value = currentBulanKey;
+        } else if (listBulan.length > 0) {
+            selectBulan.value = listBulan[0].key;
+        }
+
+        // Panggil filter tanggal berdasarkan bulan yang terpilih
+        window.filterTanggalByBulan();
+
+    } catch (error) {
+        console.error("Gagal memuat data dari meta.tanggal:", error);
+        selectBulan.innerHTML = '<option value="">Error Memuat Data</option>';
+    }
+};
+
+// 1. Perbarui fungsi onTanggalMuatChange agar memanggil renderDaftarFdnToPreview
+window.onTanggalMuatChange = async function(tglId) {
+    if (!tglId) return;
+    console.log("Tanggal Muat dipilih:", tglId);
+    
+    // 1. Render preview FDN
+    if (typeof renderDaftarFdnToPreview === 'function') {
+        await renderDaftarFdnToPreview(tglId);
+    }
+    
+    // 2. Render atau muat data ambilrak dari Firestore sesuai tanggal terpilih
+    if (typeof loadDataAmbilRak === 'function') {
+        loadDataAmbilRak();
+    }
+
+    // 3. Isi dropdown kode barang berdasarkan FDN tanggal aktif
+    if (typeof populateMutasiKodeDropdown === 'function') {
+        await populateMutasiKodeDropdown(tglId);
+    }
+    
+    // 3. Jika ada fungsi lain untuk render tabel gabungan
+    if (typeof window.renderTabelGabungan === 'function') {
+        await window.renderTabelGabungan(tglId);
+    }
+};
+
+// 2. Pastikan saat filter tanggal diubah, nilai value-nya adalah 'YYYYMMDD' (tglId)
+window.filterTanggalByBulan = function() {
+    const selectBulan = document.getElementById('select-periode-bulan');
+    const selectTgl = document.getElementById('input-tgl-muat');
+    
+    if (!selectBulan || !selectTgl) return;
+
+    const selectedBulanKey = selectBulan.value; // Contoh: "2026-09"
+    selectTgl.innerHTML = '<option value="">Pilih Tanggal...</option>';
+
+    if (!selectedBulanKey) return;
+
+    const filteredDates = globalDataFdn.filter(item => item.bulanKey === selectedBulanKey);
+
+    if (filteredDates.length === 0) {
+        selectTgl.innerHTML = '<option value="">Tidak ada tanggal</option>';
+        return;
+    }
+
+    filteredDates.forEach(item => {
+        let opt = document.createElement('option');
+        opt.value = item.raw; // item.raw ini berisi "20260926" (dateId)
+        opt.textContent = item.formatted; // Tampilan "26-09-2026"
+        selectTgl.appendChild(opt);
+    });
+
+    // Otomatis pilih tanggal pertama dan trigger perubahannya
+    if (filteredDates.length > 0) {
+        selectTgl.value = filteredDates[0].raw;
+        if (typeof window.onTanggalMuatChange === 'function') {
+            window.onTanggalMuatChange(selectTgl.value);
+        }
+    }
+};
+
+// Event Listener
+document.addEventListener('DOMContentLoaded', () => {
+    const selectBulan = document.getElementById('select-periode-bulan');
+    if (selectBulan) {
+        selectBulan.addEventListener('change', window.filterTanggalByBulan);
+    }
+    const selectTgl = document.getElementById('input-tgl-muat');
+    if (selectTgl) {
+        selectTgl.addEventListener('change', function() {
+            window.onTanggalMuatChange(this.value);
+        });
+    }
+});
+
+// Inisialisasi Otomatis saat Modul Mutasi Dibuka
+window.initMutasi = async function() {
+    try {
+        if (typeof window.loadDataBulanDanTanggal === 'function') {
+            await window.loadDataBulanDanTanggal();
+        }
+
+        console.log("Modul Mutasi berhasil diinisialisasi menggunakan meta.tanggal.");
+        
+        if (typeof window.refreshWmsData === 'function') {
+            refreshWmsData();
         }
     } catch (error) {
-        console.warn("Gagal mendeteksi tanggal terbaru secara otomatis, menggunakan tanggal hari ini.", error);
-    }
-
-    // Jika tetap tidak ditemukan, fallback ke tanggal hari ini (seperti sebelumnya)
-    if (!targetDateString) {
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        targetDateString = `${year}-${month}-${day}`;
-    }
-
-    // Ekstrak tahun, bulan, hari untuk format dateId (YYYYMMDD)
-    const [tahung, bulang, harig] = targetDateString.split('-');
-    dateId = `${tahung}${bulang}${harig}`;
-
-    // Terapkan ke sistem dan tampilan visual
-    await updateFormatTanggal(targetDateString);
-    
-    // Sinkronkan nilai pada elemen input date asli
-    const triggerInput = document.getElementById('trigger-tgl-muat');
-    if (triggerInput) {
-        triggerInput.value = targetDateString;
-    }
-
-    // Panggil fungsi untuk mengisi dropdown kode berdasarkan tanggal terbaru yang ditemukan
-    if (typeof populateMutasiKodeDropdown === 'function') {
-        await populateMutasiKodeDropdown(dateId);
-    }
-
-    // Pastikan tabel rak terpilih juga dimuat berdasarkan tanggal tersebut
-    if (typeof loadDataAmbilRak === 'function') {
-        loadDataAmbilRak(dateId);
-    }
-
-    console.log("Modul Mutasi diinisialisasi dengan tanggal data terbaru:", targetDateString);
-    if (typeof refreshWmsData === 'function') {
-        refreshWmsData();
+        console.error("Gagal menginisialisasi Modul Mutasi:", error);
     }
 };
 
@@ -321,18 +414,26 @@ async function handleImportFdnFiles(event) {
 
     miuiAlert(`Proses Impor Selesai!\nBerhasil: ${successCount} file\nGagal: ${failCount} file`);
 
-    // Jika ada file yang berhasil diimpor, otomatis sesuaikan tanggal di UI dan render preview-nya
+    // Jika ada file yang berhasil diimpor, muat ulang data dropdown dan arahkan ke tanggal terbaru
     if (latestImportedDateId) {
-        // Ubah format dari YYYYMMDD menjadi YYYY-MM-DD agar cocok dengan input type="date"
-        const formattedDateInput = `${latestImportedDateId.substring(0, 4)}-${latestImportedDateId.substring(4, 6)}-${latestImportedDateId.substring(6, 8)}`;
-        
-        const inputTanggalElem = document.getElementById('input-tanggal-muat');
-        if (inputTanggalElem) {
-            inputTanggalElem.value = formattedDateInput;
+        // 1. Muat ulang data bulan dan tanggal agar tanggal baru dari FDN masuk ke opsi dropdown
+        if (typeof window.loadDataBulanDanTanggal === 'function') {
+            await window.loadDataBulanDanTanggal();
         }
 
-        // Render ulang preview daftar FDN sesuai tanggal file yang baru diimpor
-        await renderDaftarFdnToPreview(latestImportedDateId);
+        // 2. Sesuaikan ID elemen select tanggal yang benar: 'input-tgl-muat'
+        const selectTgl = document.getElementById('input-tgl-muat');
+        if (selectTgl) {
+            selectTgl.value = latestImportedDateId; // Nilainya format YYYYMMDD (contoh: 20261008)
+        }
+
+        // 3. Panggil fungsi onTanggalMuatChange agar preview FDN dan data rak ikut ter-render otomatis
+        if (typeof window.onTanggalMuatChange === 'function') {
+            await window.onTanggalMuatChange(latestImportedDateId);
+        } else {
+            // Fallback jika onTanggalMuatChange belum terpanggil
+            await renderDaftarFdnToPreview(latestImportedDateId);
+        }
     }
     
     // Reset input file
@@ -462,10 +563,24 @@ async function parseAndSaveFdn(fileContent) {
 
     console.log(`Sukses menyimpan FDN dengan ID: ${docIdTujuan}`);
     
-    const inputTanggalElem = document.getElementById('input-tanggal-muat');
-    const targetDateId = inputTanggalElem ? inputTanggalElem.value : docIdTanggal;
-    
-    await renderDaftarFdnToPreview(targetDateId);
+    // 6. PERBAIKAN: Ambil elemen dropdown tanggal yang benar ('input-tgl-muat')
+    const selectTgl = document.getElementById('input-tgl-muat');
+    const selectBulan = document.getElementById('select-periode-bulan');
+
+    // Format docIdTanggal (YYYYMMDD) menjadi format tampilan atau sesuaikan dengan nilai option
+    // Jika list global/bulan belum memuat tanggal ini, muat ulang daftar bulan & tanggal terlebih dahulu
+    if (typeof window.loadDataBulanDanTanggal === 'function') {
+        await window.loadDataBulanDanTanggal();
+    }
+
+    // Set dropdown tanggal ke tanggal FDN yang baru di-import (docIdTanggal)
+    if (selectTgl) {
+        selectTgl.value = docIdTanggal;
+        // Picu event change atau jalankan fungsi muat data tanggal tersebut secara langsung
+        if (typeof window.onTanggalMuatChange === 'function') {
+            await window.onTanggalMuatChange(docIdTanggal);
+        }
+    }
 
     // KEMBALIKAN NILAI TANGGAL AGAR DITANGKAP OLEH handleImportFdnFiles
     return docIdTanggal;
@@ -1841,8 +1956,86 @@ window.filterWmsReportData = filterWmsReportData;
 window.tambahItemMutasiList = tambahItemMutasiList;
 
 
-window.cetakArsipMutasi = async function() {
-    // Sesuaikan ID elemen tanggal dengan form Anda ('input-tgl-muat')
+// 1. Fungsi untuk membuka Modal Popup MIUI v5 saat tombol Cetak / Arsip diklik
+window.bukaModalCetakArsip = function() {
+    const tglMuat = document.getElementById('input-tgl-muat')?.value;
+    if (!tglMuat) {
+        if (typeof window.miuiAlert === 'function') {
+            window.miuiAlert("Pilih tanggal muat terlebih dahulu!");
+        } else {
+            alert("Pilih tanggal muat terlebih dahulu!");
+        }
+        return;
+    }
+
+    let modalEl = document.getElementById('miui-modal-cetak-arsip');
+    if (!modalEl) {
+        const modalHtml = `
+        <div id="miui-modal-cetak-arsip" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); z-index: 9999; justify-content: center; align-items: center; font-family: 'Century Gothic', Arial, sans-serif;">
+            <div style="background: #ffffff; width: 320px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); overflow: hidden; animation: miuiScaleUp 0.2s ease-in-out;">
+                <!-- Header MIUI v5 -->
+                <div style="background-color: #ff9800; color: #1e293b; padding: 12px 16px; font-weight: 900; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0;">
+                    🖨️ Pengaturan Cetak Arsip Mutasi
+                </div>
+                <!-- Body Content -->
+                <div style="padding: 16px;">
+                    <label for="input-jumlah-copy-v2" style="display: block; font-size: 11px; font-weight: bold; color: #334155; margin-bottom: 6px; text-transform: uppercase;">
+                        Masukkan Jumlah Salinan Cetak Rak:
+                    </label>
+                    <input type="number" id="input-jumlah-copy-v2" value="2" min="2" max="5" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; color: #060606; font-weight: bold; box-sizing: border-box; outline: none; text-align: center;" />
+                    <div style="font-size: 10px; color: #64748b; margin-top: 6px;">
+                        Sistem akan mencetak 1x Rekap Mutasi (Versi 1) dan Detail Rak (Versi 2) sesuai jumlah copy yang diatur.
+                    </div>
+                </div>
+                <!-- Footer Buttons -->
+                <div style="background-color: #f8fafc; padding: 10px 16px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid #e2e8f0;">
+                    <button type="button" onclick="tutupModalCetakArsip()" style="background-color: #e2e8f0; color: #334155; border: none; padding: 6px 12px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; text-transform: uppercase;">
+                        Batal
+                    </button>
+                    <button type="button" onclick="eksekusiCetakArsipDariModal()" style="background-color: #ff9800; color: #1e293b; border: none; padding: 6px 14px; border-radius: 4px; font-size: 10px; font-weight: 900; cursor: pointer; text-transform: uppercase; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                        Cetak Sekarang
+                    </button>
+                </div>
+            </div>
+        </div>
+        <style>
+            @keyframes miuiScaleUp {
+                from { transform: scale(0.9); opacity: 0; }
+                to { transform: scale(1); opacity: 1; }
+            }
+        </style>`;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        modalEl = document.getElementById('miui-modal-cetak-arsip');
+    }
+
+    modalEl.style.display = 'flex';
+    document.getElementById('input-jumlah-copy-v2').value = '2';    
+    document.getElementById('input-jumlah-copy-v2').focus();
+};
+
+window.tutupModalCetakArsip = function() {
+    const modalEl = document.getElementById('miui-modal-cetak-arsip');
+    if (modalEl) {
+        modalEl.style.display = 'none';
+    }
+};
+
+window.eksekusiCetakArsipDariModal = function() {
+    const jmlInput = document.getElementById('input-jumlah-copy-v2');
+    let jumlahCopy = parseInt(jmlInput?.value || 1);
+    if (isNaN(jumlahCopy) || jumlahCopy < 1) {
+        jumlahCopy = 1;
+    }
+
+    tutupModalCetakArsip();
+    
+    // Panggil fungsi utama cetakArsipMutasi dengan membawa parameter jumlah copy Versi 2
+    window.cetakArsipMutasi(jumlahCopy);
+};
+
+
+// 2. Fungsi Utama Cetak Arsip Mutasi dengan Loop Versi 2
+window.cetakArsipMutasi = async function(jumlahCopyV2 = 1) {
     const tglMuat = document.getElementById('input-tgl-muat')?.value;
     
     if (!tglMuat) {
@@ -1851,33 +2044,44 @@ window.cetakArsipMutasi = async function() {
         return;
     }
 
-    // Panggil modal progress universal jika tersedia
+    const totalStep = 1 + jumlahCopyV2;
+    let currentStep = 0;
+
     if (typeof window.showCetakProgress === 'function') {
-        window.showCetakProgress("Menyiapkan Dokumen Cetak (0/3)...");
+        window.showCetakProgress(`Menyiapkan Dokumen Cetak (0/${totalStep})...`);
     } else {
         console.warn("Fungsi showCetakProgress belum terdaftar di window!");
     }
 
     try {
         // Cetak Versi 1 (Rekap Mutasi)
-        if (window.showCetakProgress) window.showCetakProgress("Mengirim Dokumen Versi 1 - Rekap Mutasi (1/3)...");
+        currentStep++;
+        if (window.showCetakProgress) {
+            window.showCetakProgress(`Mengirim Dokumen Versi 1 - Rekap Mutasi (${currentStep}/${totalStep})...`);
+        }
         await cetakLaporanVersi1(tglMuat);
         await new Promise(resolve => setTimeout(resolve, 600));
 
-        // Cetak Versi 2 - Copy 1 (Detail Rak)
-        if (window.showCetakProgress) window.showCetakProgress("Mengirim Dokumen Versi 2 - Copy 1 (2/3)...");
-        await cetakLaporanVersi2(tglMuat);
-        await new Promise(resolve => setTimeout(resolve, 600));
+        // Cetak Versi 2 - Berulang sebanyak jumlah copy yang diinputkan
+        for (let i = 1; i <= jumlahCopyV2; i++) {
+            currentStep++;
+            if (window.showCetakProgress) {
+                window.showCetakProgress(`Mengirim Dokumen Detail Rak - Copy ${i} dari ${jumlahCopyV2} (${currentStep}/${totalStep})...`);
+            }
+            await cetakLaporanVersi2(tglMuat);
+            await new Promise(resolve => setTimeout(resolve, 600));
+        }
 
-        // Sembunyikan modal setelah selesai
+        // Sembunyikan modal progress setelah selesai
         if (typeof window.hideCetakProgress === 'function') {
             window.hideCetakProgress();
         }
 
+        const pesanSukses = `Berhasil mengirim 1 Rekap Mutasi & ${jumlahCopyV2} Detail Rak ke antrean cetak!`;
         if (typeof window.miuiAlert === 'function') {
-            window.miuiAlert("Berhasil mengirim 3 dokumen ke antrean cetak!");
+            window.miuiAlert(pesanSukses);
         } else {
-            alert("Berhasil mengirim 3 dokumen ke antrean cetak!");
+            alert(pesanSukses);
         }
 
     } catch (error) {
@@ -1891,9 +2095,8 @@ window.cetakArsipMutasi = async function() {
     }
 };
 
-
-// Fungsi Cetak Versi 1: Akumulasi Item Barang & FDN
-async function cetakLaporanVersi1(tglMuat) {
+// Fungsi Cetak Versi 1: Akumulasi Item Barang & FDN (Lengkap & Bersih)
+window.cetakLaporanVersi1 = async function(tglMuat) {
     if (!tglMuat) {
         tglMuat = document.getElementById('input-tgl-muat')?.value;
     }
@@ -1939,7 +2142,10 @@ async function cetakLaporanVersi1(tglMuat) {
             snapshotDatatujuan.forEach(doc => {
                 const d = doc.data();
                 const rawNoFdn = String(d.meta?.nomor_dokumen || d.nomor_dokumen || '').trim();
-                const tujuan = String(d.meta?.tujuan || d.tujuan || '').trim().toUpperCase();
+                let tujuan = String(d.meta?.tujuan || d.tujuan || '').trim().toUpperCase();
+
+                // Ganti "STOCK POINT" menjadi "SP" secara konsisten
+                tujuan = tujuan.replace(/STOCK POINT/g, 'SP');
 
                 if (rawNoFdn && tujuan) {
                     if (!tujuanMap[tujuan]) {
@@ -1991,85 +2197,8 @@ async function cetakLaporanVersi1(tglMuat) {
             });
         }
 
-        let printWindow = window.open('', '_blank');
-        printWindow.document.write(`
-            <html>
-            <head>
-                <title>MUTASI GUDANG WH-2</title>
-                <style>
-                    /* Import atau definisikan font EDO jika tersedia di sistem/lokal, fallback ke font dekoratif */
-                    @font-face {
-                        font-family: 'Edo';
-                        src: local('Edo'), url('EDO.ttf') format('truetype');
-                    }
-                    @font-face {
-                        font-family: 'Century Gothic';
-                        src: local('Century Gothic'), url('CenturyGothic.ttf') format('truetype');
-                    }
-
-                    body { 
-                        font-family: 'Century Gothic', Arial, sans-serif; 
-                        font-size: 10px; 
-                        margin: 15px; 
-                        color: #000; 
-                    }
-                    .header-title { 
-                        font-family: 'Edo', Arial, sans-serif; 
-                        font-weight: normal; 
-                        font-size: 13px; 
-                        text-align: center; 
-                        margin-bottom: 2px; 
-                        letter-spacing: 1px;
-                    }
-                    .sub-header { 
-                        font-family: 'Century Gothic', Arial, sans-serif; 
-                        margin-bottom: 8px; 
-                        font-size: 12px; 
-                        text-align: left;
-                    }
-                    table { 
-                        width: 100%; 
-                        border-collapse: collapse; 
-                        margin-bottom: 10px; 
-                        font-family: 'Century Gothic', Arial, sans-serif;
-                        font-size: 10px;
-                    }
-                    th, td { 
-                        border: 1px solid #000; 
-                        padding: 3px 5px; 
-                        text-align: center; 
-                        vertical-align: middle; 
-                    }
-                    th { 
-                        background-color: #f2f2f2; 
-                        font-size: 10px; 
-                        font-family: 'Century Gothic', Arial, sans-serif;
-                    }
-                    .text-left { text-align: left; }
-                    .font-bold { font-weight: bold; }
-                    @media print { body { margin: 0; } }
-                </style>
-            </head>
-            <body>
-                <div class="header-title">MUTASI GUDANG WH-2</div>
-                <div class="sub-header">${typeof formatTanggalIndo === 'function' ? formatTanggalIndo(tglMuat) : tglMuat} - ${typeof getCurrentTime === 'function' ? getCurrentTime() : ''}</div>
-                
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="width: 22%;">KODE</th>
-                            <th style="width: 8%;">TOTAL</th>
-                            <th style="width: 5%;">V</th>
-                            <th style="width: 10%;">WH-2</th>
-                            <th style="width: 10%;">WH-3</th>
-                            <th style="width: 20%;">NO. FDN</th>
-                            <th style="width: 25%;">TUJUAN</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        `);
-
         let totalSeluruh = 0, totalWh2 = 0, totalWh3 = 0;
+        let rowsUtamaHtml = '';
 
         listCombinedRows.forEach(row => {
             const item = row.item;
@@ -2079,56 +2208,175 @@ async function cetakLaporanVersi1(tglMuat) {
                 totalWh3 += item.wh3;
             }
 
-            printWindow.document.write(`
+            rowsUtamaHtml += `
                 <tr>
-                    <td class="text-left font-bold">${row.kode}</td>
+                    <td class="text-left font-bold" style="text-align: left; padding-left: 5px; width: 75px; font-weight: bold;">${row.kode}</td>
                     <td>${item ? item.total : ''}</td>
                     <td></td>
                     <td>${item && item.wh2 > 0 ? item.wh2 : ''}</td>
                     <td>${item && item.wh3 > 0 ? item.wh3 : ''}</td>
-                    <td class="text-left">${row.noFdn}</td>
-                    <td class="text-left">${row.tujuan}</td>
+                    <td class="text-left" style="text-align: left;">${row.noFdn}</td>
+                    <td class="text-left" style="text-align: left;">${row.tujuan}</td>
                 </tr>
-            `);
+            `;
         });
 
-        printWindow.document.write(`
-                        <tr class="font-bold" style="background-color: #f9f9f9;">
-                            <td class="text-left">TOTAL QTY</td>
-                            <td>${totalSeluruh}</td>
-                            <td></td>
-                            <td>${totalWh2}</td>
-                            <td>${totalWh3}</td>
-                            <td></td>
-                            <td></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </body>
-            </html>
-        `);
-        printWindow.document.close();
-        setTimeout(() => { printWindow.print(); }, 500);
+        // Baris Total Qty di bawah tabel
+        rowsUtamaHtml += `
+            <tr class="font-bold" style="background-color: #f9f9f9; font-weight: bold;">
+                <td class="text-left" style="text-align: left; padding-left: 5px;">TOTAL QTY</td>
+                <td>${totalSeluruh}</td>
+                <td></td>
+                <td>${totalWh2}</td>
+                <td>${totalWh3}</td>
+                <td></td>
+                <td></td>
+            </tr>
+        `;
 
-    } catch (error) {
-        console.error("Gagal mencetak laporan versi 1:", error);
+        // Format Sub-Header Waktu Lengkap (Contoh: Kamis, 08 Oktober 2026 - 11.48.25)
+        const now = new Date();
+        const daftarHari = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+        const hari = daftarHari[now.getDay()];
+        
+        const tgl = String(now.getDate()).padStart(2, '0');
+        const blnIndex = now.getMonth();
+        const thn = now.getFullYear();
+        
+        const namaBulan = [
+            "Januari", "Februari", "Maret", "April", "Mei", "Juni", 
+            "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+        ];
+        const bulan = namaBulan[blnIndex];
+
+        const jam = String(now.getHours()).padStart(2, '0');
+        const menit = String(now.getMinutes()).padStart(2, '0');
+        const detik = String(now.getSeconds()).padStart(2, '0');
+        
+        const formatWaktuLengkap = `${hari}, ${tgl} ${bulan} ${thn} - ${jam}.${menit}.${detik}`;
+
+        const finalHtml = `
+        <html>
+        <head>
+            <style>
+                @font-face {
+                    font-family: 'Edo';
+                    src: local('Edo'), url('EDO.ttf') format('truetype');
+                }
+                @font-face {
+                    font-family: 'Century Gothic';
+                    src: local('Century Gothic'), url('CenturyGothic.ttf') format('truetype');
+                }
+
+                @page { size: 215mm 330mm portrait; margin: 20mm 1mm 1mm 1mm; }
+                body { 
+                    font-family: 'Century Gothic', Arial, sans-serif; 
+                    font-size: 10pt; 
+                    margin: 0; 
+                    padding: 0; 
+                    color: #000; 
+                }
+                .header-title { 
+                    font-family: 'Edo', Arial, sans-serif; 
+                    font-weight: normal; 
+                    font-size: 13pt; 
+                    text-align: center; 
+                    margin-bottom: 2px; 
+                    letter-spacing: 1px;
+                }
+                .sub-header { 
+                    font-family: 'Century Gothic', Arial, sans-serif; 
+                    margin-bottom: 8px; 
+                    font-size: 10pt; 
+                    text-align: left;
+                }
+                table { 
+                    width: 100%; 
+                    border-collapse: collapse; 
+                    margin-bottom: 10px; 
+                    font-family: 'Century Gothic', Arial, sans-serif;
+                    font-size: 10pt;
+                    table-layout: fixed;
+                }
+                th, td { 
+                    border: 1px solid #000; 
+                    padding: 3px 5px; 
+                    text-align: center; 
+                    vertical-align: middle; 
+                }
+                th { 
+                    background-color: #f2f2f2; 
+                    font-size: 10pt; 
+                }
+                .text-left { text-align: left; }
+                .font-bold { font-weight: bold; }
+            </style>
+        </head>
+        <body>
+            <div class="header-title">MUTASI GUDANG WH-2</div>
+            <div class="sub-header">${formatWaktuLengkap}</div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 22%;">KODE</th>
+                        <th style="width: 8%;">TOTAL</th>
+                        <th style="width: 5%;">V</th>
+                        <th style="width: 10%;">WH-2</th>
+                        <th style="width: 10%;">WH-3</th>
+                        <th style="width: 20%;">NO. FDN</th>
+                        <th style="width: 25%;">TUJUAN</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsUtamaHtml}
+                </tbody>
+            </table>
+        </body>
+        </html>`;
+
+        // 3. Kirim ke Print Server (Firebase Realtime Database)
+        const judulTugas = "Cetak Dokumen v1";
+        const safeKeyName = `Cetak_Dokumen_v1_${tgl}-${String(blnIndex + 1).padStart(2, '0')}-${thn}_${jam}-${menit}-${detik}`;
+
+        await fetch(`https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs/${safeKeyName}.json`, {
+            method: 'PUT',
+            body: JSON.stringify({ 
+                judul: judulTugas,
+                waktu_teks: formatWaktuLengkap,
+                html: finalHtml, 
+                status: 'PENDING',
+                timestamp: Date.now() 
+            }),
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+    } catch (e) {
+        console.error("Gagal mencetak laporan versi 1:", e);
         if (typeof window.miuiAlert === 'function') {
-            window.miuiAlert("Terjadi kesalahan saat memuat data cetak versi 1.");
+            window.miuiAlert("Gagal cetak v1: " + e.message);
         } else {
-            alert("Terjadi kesalahan saat memuat data cetak versi 1.");
+            alert("Gagal cetak v1: " + e.message);
         }
+        throw e; // Lemparkan kembali error agar fungsi pemanggil (cetakArsipMutasi) tahu jika ada kendala
     }
-}
+};
 
 
-// Fungsi Cetak Versi 2: Detail Ambil Rak & FDN
-async function cetakLaporanVersi2() {
-    const tanggalMuat = document.getElementById('input-tgl-muat')?.value;
-    if (!tanggalMuat) {
-        alert("Pilih tanggal muat terlebih dahulu!");
+// Fungsi Cetak Versi 2: Detail Ambil Rak & FDN (Dengan grouping kode barang di tengah)
+window.cetakLaporanVersi2 = async function(tglMuat) {
+    if (!tglMuat) {
+        tglMuat = document.getElementById('input-tgl-muat')?.value;
+    }
+    if (!tglMuat) {
+        if (typeof window.miuiAlert === 'function') {
+            window.miuiAlert("Pilih tanggal muat terlebih dahulu!");
+        } else {
+            alert("Pilih tanggal muat terlebih dahulu!");
+        }
         return;
     }
-    const firestoreDateId = tanggalMuat.replace(/-/g, '');
+    const firestoreDateId = tglMuat.replace(/-/g, '');
 
     try {
         // 1. Ambil data dari subkoleksi 'ambilrak'
@@ -2161,7 +2409,7 @@ async function cetakLaporanVersi2() {
                 const rawNoFdn = String(d.meta?.nomor_dokumen || d.nomor_dokumen || '').trim();
                 let tujuan = String(d.meta?.tujuan || d.tujuan || '').trim().toUpperCase();
 
-                // Ganti "STOCK POINT" menjadi "SP"
+                // Ganti "STOCK POINT" menjadi "SP" secara konsisten
                 tujuan = tujuan.replace(/STOCK POINT/g, 'SP');
 
                 if (rawNoFdn && tujuan) {
@@ -2194,90 +2442,46 @@ async function cetakLaporanVersi2() {
             });
         });
 
-        let printWindow = window.open('', '_blank');
-        printWindow.document.write(`
-            <html>
-            <head>
-                <title>Mutasi Gudang WH-2 - Detail Rak</title>
-                <style>
-                    @font-face {
-                        font-family: 'Edo';
-                        src: local('Edo'), url('EDO.ttf') format('truetype');
-                    }
-                    @font-face {
-                        font-family: 'Century Gothic';
-                        src: local('Century Gothic'), url('CenturyGothic.ttf') format('truetype');
-                    }
+        // Grouping data ambil berdasarkan KODE untuk menentukan rowspan dan posisi tengah
+        const groupedAmbil = [];
+        let mapGroup = {};
 
-                    body { 
-                        font-family: 'Century Gothic', Arial, sans-serif; 
-                        font-size: 10px; 
-                        margin: 15px; 
-                        color: #000; 
-                    }
-                    .header-title { 
-                        font-family: 'Edo', Arial, sans-serif; 
-                        font-weight: normal; 
-                        font-size: 13px; 
-                        text-align: center; 
-                        margin-bottom: 5px; 
-                        letter-spacing: 1px;
-                    }
-                    .sub-header { 
-                        font-family: 'Century Gothic', Arial, sans-serif; 
-                        margin-bottom: 10px; 
-                        font-size: 12px; 
-                        text-align: center;
-                    }
-                    table { 
-                        width: 100%; 
-                        border-collapse: collapse; 
-                        margin-bottom: 10px; 
-                        font-family: 'Century Gothic', Arial, sans-serif;
-                        font-size: 10px;
-                    }
-                    th, td { 
-                        border: 1px solid #000; 
-                        padding: 3px 5px; 
-                        text-align: center; 
-                        vertical-align: middle;
-                    }
-                    th { 
-                        background-color: #f2f2f2; 
-                        font-size: 10px;
-                        font-family: 'Century Gothic', Arial, sans-serif;
-                    }
-                    .text-left { text-align: left; }
-                    .font-bold { font-weight: bold; }
-                    @media print { body { margin: 0; } }
-                </style>
-            </head>
-            <body>
-                <div class="header-title">MUTASI GUDANG WH-2</div>
-                <div class="sub-header">${typeof formatTanggalIndo === 'function' ? formatTanggalIndo(tanggalMuat) : tanggalMuat} - ${typeof getCurrentTime === 'function' ? getCurrentTime() : ''}</div>
-                
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="width: 4%;">NO</th>
-                            <th style="width: 23%;">KODE</th>
-                            <th style="width: 9%;">RAK</th>
-                            <th style="width: 7%;">AMBIL</th>
-                            <th style="width: 7%;">STOK</th>
-                            <th style="width: 7%;">SISA</th>
-                            <th style="width: 4%;">NO</th>
-                            <th style="width: 18%;">NO. FDN</th>
-                            <th style="width: 21%;">TUJUAN KIRIM</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        `);
+        listAmbil.forEach(item => {
+            const kode = String(item.kode || '').trim();
+            if (!mapGroup[kode]) {
+                mapGroup[kode] = {
+                    kode: kode,
+                    items: []
+                };
+                groupedAmbil.push(mapGroup[kode]);
+            }
+            mapGroup[kode].items.push(item);
+        });
 
-        let no = 1;
+        let rowsBodyHtml = '';
+        let noUrutItem = 1;
         let maxRows = Math.max(listAmbil.length, fdnRowsData.length);
+        
+        // Flatten kembali dengan struktur grup untuk merender sel di tengah
+        let flattenedRows = [];
+        groupedAmbil.forEach(group => {
+            group.items.forEach((subItem, idx) => {
+                flattenedRows.push({
+                    ...subItem,
+                    isFirstOfGroup: (idx === 0),
+                    groupSpan: group.items.length,
+                    groupIndex: noUrutItem,
+                    isGrouped: true
+                });
+            });
+            noUrutItem++;
+        });
 
-        for (let i = 0; i < maxRows; i++) {
-            const itemAmbil = listAmbil[i] || {};
+        // Jika fdnRowsData lebih panjang, padukan dengan baris kosong
+        let finalMaxRows = Math.max(flattenedRows.length, fdnRowsData.length);
+
+        for (let i = 0; i < finalMaxRows; i++) {
+            const ambilRow = flattenedRows[i] || {};
             const itemFdn = fdnRowsData[i] || {};
 
             const formatVal = (val) => {
@@ -2287,35 +2491,164 @@ async function cetakLaporanVersi2() {
                 return val;
             };
 
-            printWindow.document.write(`
+            let kodeHtml = '';
+            let noHtml = '';
+
+            if (ambilRow.kode) {
+                if (ambilRow.isFirstOfGroup) {
+                    // Gunakan rowspan agar kolom NO dan KODE menyatu di tengah secara vertikal
+                    noHtml = `<td rowspan="${ambilRow.groupSpan}" style="vertical-align: middle; text-align: center;">${ambilRow.groupIndex}</td>`;
+                    kodeHtml = `<td rowspan="${ambilRow.groupSpan}" class="text-left font-bold" style="vertical-align: middle; text-align: left; padding-left: 5px; font-weight: bold;">${ambilRow.kode}</td>`;
+                }
+            } else {
+                noHtml = `<td></td>`;
+                kodeHtml = `<td></td>`;
+            }
+
+            rowsBodyHtml += `
                 <tr>
-                    <td>${itemAmbil.kode ? no++ : ''}</td>
-                    <td class="text-left font-bold">${itemAmbil.kode || ''}</td>
-                    <td>${itemAmbil.lokasi || ''}</td>
-                    <td>${formatVal(itemAmbil.qtyAmbil)}</td>
-                    <td>${formatVal(itemAmbil.qtyStok)}</td>
-                    <td>${formatVal(itemAmbil.qtySisa)}</td>
+                    ${noHtml}
+                    ${kodeHtml}
+                    <td>${ambilRow.lokasi || ''}</td>
+                    <td>${formatVal(ambilRow.qtyAmbil)}</td>
+                    <td>${formatVal(ambilRow.qtyStok)}</td>
+                    <td>${formatVal(ambilRow.qtySisa)}</td>
                     <td>${itemFdn.noFdn ? (i + 1) : ''}</td>
-                    <td class="text-left">${itemFdn.noFdn || ''}</td>
-                    <td class="text-left">${itemFdn.tujuan || ''}</td>
+                    <td class="text-left" style="text-align: left;">${itemFdn.noFdn || ''}</td>
+                    <td class="text-left" style="text-align: left;">${itemFdn.tujuan || ''}</td>
                 </tr>
-            `);
+            `;
         }
 
-        printWindow.document.write(`
-                    </tbody>
-                </table>
-            </body>
-            </html>
-        `);
-        printWindow.document.close();
-        setTimeout(() => { printWindow.print(); }, 500);
+        // Format Sub-Header Waktu Lengkap
+        const now = new Date();
+        const daftarHari = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+        const hari = daftarHari[now.getDay()];
+        
+        const tgl = String(now.getDate()).padStart(2, '0');
+        const blnIndex = now.getMonth();
+        const thn = now.getFullYear();
+        
+        const namaBulan = [
+            "Januari", "Februari", "Maret", "April", "Mei", "Juni", 
+            "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+        ];
+        const bulan = namaBulan[blnIndex];
 
+        const jam = String(now.getHours()).padStart(2, '0');
+        const menit = String(now.getMinutes()).padStart(2, '0');
+        const detik = String(now.getSeconds()).padStart(2, '0');
+        
+        const formatWaktuLengkap = `${hari}, ${tgl} ${bulan} ${thn} - ${jam}.${menit}.${detik}`;
+
+        const finalHtml = `
+        <html>
+        <head>
+            <style>
+                @font-face {
+                    font-family: 'Edo';
+                    src: local('Edo'), url('EDO.ttf') format('truetype');
+                }
+                @font-face {
+                    font-family: 'Century Gothic';
+                    src: local('Century Gothic'), url('CenturyGothic.ttf') format('truetype');
+                }
+
+                @page { size: 215mm 330mm portrait; margin: 20mm 1mm 1mm 1mm; }
+                body { 
+                    font-family: 'Century Gothic', Arial, sans-serif; 
+                    font-size: 10pt; 
+                    margin: 0; 
+                    padding: 0; 
+                    color: #000; 
+                }
+                .header-title { 
+                    font-family: 'Edo', Arial, sans-serif; 
+                    font-weight: normal; 
+                    font-size: 13pt; 
+                    text-align: center; 
+                    margin-bottom: 2px; 
+                    letter-spacing: 1px;
+                }
+                .sub-header { 
+                    font-family: 'Century Gothic', Arial, sans-serif; 
+                    margin-bottom: 8px; 
+                    font-size: 10pt; 
+                    text-align: left;
+                }
+                table { 
+                    width: 100%; 
+                    border-collapse: collapse; 
+                    margin-bottom: 10px; 
+                    font-family: 'Century Gothic', Arial, sans-serif;
+                    font-size: 10pt;
+                    table-layout: fixed;
+                }
+                th, td { 
+                    border: 1px solid #000; 
+                    padding: 3px 5px; 
+                    text-align: center; 
+                    vertical-align: middle; 
+                }
+                th { 
+                    background-color: #f2f2f2; 
+                    font-size: 10pt; 
+                }
+                .text-left { text-align: left; }
+                .font-bold { font-weight: bold; }
+            </style>
+        </head>
+        <body>
+            <div class="header-title">MUTASI GUDANG WH-2</div>
+            <div class="sub-header">${formatWaktuLengkap}</div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 4%;">NO</th>
+                        <th style="width: 23%;">KODE</th>
+                        <th style="width: 9%;">RAK</th>
+                        <th style="width: 7%;">AMBIL</th>
+                        <th style="width: 7%;">STOK</th>
+                        <th style="width: 7%;">SISA</th>
+                        <th style="width: 4%;">NO</th>
+                        <th style="width: 18%;">NO. FDN</th>
+                        <th style="width: 21%;">TUJUAN KIRIM</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsBodyHtml}
+                </tbody>
+            </table>
+        </body>
+        </html>`;
+
+        // 3. Kirim ke Print Server (Firebase Realtime Database)
+        const judulTugas = "Cetak Dokumen v2 (Detail Rak)";
+        const safeKeyName = `Cetak_Dokumen_v2_${tgl}-${String(blnIndex + 1).padStart(2, '0')}-${thn}_${jam}-${menit}-${detik}`;
+
+        await fetch(`https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs/${safeKeyName}.json`, {
+            method: 'PUT',
+            body: JSON.stringify({ 
+                judul: judulTugas,
+                waktu_teks: formatWaktuLengkap,
+                html: finalHtml, 
+                status: 'PENDING',
+                timestamp: Date.now() 
+            }),
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
     } catch (error) {
         console.error("Gagal mencetak laporan versi 2:", error);
-        miuiAlert("Terjadi kesalahan saat memuat data cetak.");
+        if (typeof window.miuiAlert === 'function') {
+            window.miuiAlert("Gagal cetak v2: " + error.message);
+        } else {
+            alert("Gagal cetak v2: " + error.message);
+        }
+        throw error;
     }
-}
+};
 
 // Helper Format Tanggal & Waktu
 function formatTanggalIndo(tglStr) {
