@@ -38,20 +38,20 @@
                 <div class="grid grid-cols-12 gap-2 items-stretch">
                     <!-- Kolom Kiri: Input Tanggal Muat, Tombol Import FDN, & Statistik -->
                     <div class="col-span-5 flex flex-col justify-between space-y-1.5">
-                        <!-- Tanggal Muat dengan Format Visual DD MMMM YYYY -->
-                        <div class="space-y-0.5 relative">
-                            <span class="text-[9px] font-bold text-slate-600 block uppercase">Pilih Tanggal Muat</span>
+                        <!-- Filter Periode Bulan & Tanggal Muat -->
+                        <div class="grid grid-cols-2 gap-2">
+                            <div class="space-y-0.5 relative">
+                                <span class="text-[9px] font-bold text-slate-600 block uppercase">Periode Bulan</span>
+                                <select id="select-periode-bulan" class="w-full p-1 bg-white border border-orange-300 rounded font-bold text-[10px] text-slate-800 shadow-sm cursor-pointer" onchange="filterTanggalByBulan()">
+                                    <option value="">Pilih Bulan...</option>
+                                </select>
+                            </div>
                             
-                            <!-- Input tersembunyi untuk dibaca sistem/database (Format: YYYY-MM-DD) -->
-                            <input type="hidden" id="input-tgl-muat" value="">
-                            
-                            <!-- Kotak tampilan visual untuk pengguna (Format: 01 Oktober 2026) -->
-                            <div class="relative">
-                                <input type="text" id="display-tgl-muat" readonly placeholder="Pilih tanggal..." class="w-full p-1 bg-white border border-orange-300 rounded font-bold text-[10px] text-slate-800 shadow-sm cursor-pointer pr-6">
-                                <span class="absolute right-1.5 top-1 text-slate-400 text-[10px] pointer-events-none">📅</span>
-                                
-                                <!-- Input date asli yang transparan di atasnya agar fungsionalitas kalender bawaan tetap jalan -->
-                                <input type="date" id="trigger-tgl-muat" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onchange="updateFormatTanggal(this.value)">
+                            <div class="space-y-0.5 relative">
+                                <span class="text-[9px] font-bold text-slate-600 block uppercase">Tanggal Muat</span>
+                                <select id="input-tgl-muat" class="w-full p-1 bg-white border border-orange-300 rounded font-bold text-[10px] text-slate-800 shadow-sm cursor-pointer" onchange="onTanggalMuatChange(this.value)">
+                                    <option value="">Pilih Tanggal...</option>
+                                </select>
                             </div>
                         </div>
 
@@ -160,7 +160,7 @@
 
                     <!-- Tombol Aksi: Cetak/Arsip (Tengah) & Tambah Rak (Pojok Kanan) - 7 Kolom -->
                     <div class="col-span-7 grid grid-cols-2 gap-1.5">
-                        <button type="button" onclick="cetakArsipMutasi()" class="bg-orange-300 hover:bg-orange-400 text-slate-900 border border-orange-500 py-1.5 px-2 rounded font-black text-[10px] uppercase shadow-sm text-center transition">
+                        <button type="button" onclick="bukaModalCetakArsip()" class="bg-orange-300 hover:bg-orange-400 text-slate-900 border border-orange-500 py-1.5 px-2 rounded font-black text-[10px] uppercase shadow-sm text-center transition">
                             🖨️ CETAK / ARSIP
                         </button>
                         <button type="button" id="btn-tambah-rak" onclick="tambahItemMutasiList()" class="bg-orange-400 hover:bg-orange-500 text-slate-900 border border-orange-600 py-1.5 px-2 rounded font-black text-[10px] uppercase shadow-sm text-center transition">
