@@ -1175,8 +1175,6 @@ function isiRakWh3() {
 
 
 async function prosesAmbilRakOtomatis() {
-    //console.log("Debug: Tombol Ambil Rak Otomatis (Mode Inkremental/Sinkronisasi) diklik!");
-
     const tanggalMuat = document.getElementById('input-tgl-muat')?.value;
     if (!tanggalMuat) {
         if (typeof miuiAlert === 'function') miuiAlert("Tanggal aktif belum dipilih!");
@@ -1196,7 +1194,6 @@ async function prosesAmbilRakOtomatis() {
         }
 
         // 1. Ambil data yang sudah terlanjur diabsen/diambil sebelumnya di Firestore (tabel kiri)
-        // Agar kita tahu item apa saja dan berapa qty yang sudah terambil
         const existingAmbilSnapshot = await tanggalRef.collection('ambilrak').get();
         const terambilMap = {}; // Format: { "KODE_BARANG": totalQtySudahDiambil }
         
@@ -1225,8 +1222,8 @@ async function prosesAmbilRakOtomatis() {
 
         if (rawData.length === 0) {
             let sourceData = typeof globalWmsData !== 'undefined' ? globalWmsData : 
-                             (typeof wmsDataCache !== 'undefined' ? wmsDataCache : 
-                             (typeof stokCache !== 'undefined' ? stokCache : null));
+                           (typeof wmsDataCache !== 'undefined' ? wmsDataCache : 
+                           (typeof stokCache !== 'undefined' ? stokCache : null));
             if (sourceData) {
                 rawData = Array.isArray(sourceData) ? sourceData : Object.values(sourceData);
             }
@@ -1240,6 +1237,9 @@ async function prosesAmbilRakOtomatis() {
 
         if (confirm("Jalankan sinkronisasi FDN otomatis? (Hanya memproses FDN baru atau kekurangan qty yang belum terambil)")) {
             
+            // Set pelacak agar kode barang yang sama tidak diproses dobel dalam satu eksekusi
+            const processedCodes = new Set();
+
             // Loop untuk SEMUA opsi di dropdown
             for (let i = 0; i < selectKode.options.length; i++) {
                 const opt = selectKode.options[i];
@@ -1247,7 +1247,14 @@ async function prosesAmbilRakOtomatis() {
                 
                 if (!fullOptText || fullOptText.includes('PILIH') || fullOptText === '') continue;
                 
+                // Ambil murni kode barangnya saja
                 const kodeBarang = fullOptText.split(' - ')[0].split('(')[0].trim();
+                
+                // Jika kode ini sudah diproses di iterasi sebelumnya, lewati untuk mencegah data dobel!
+                if (processedCodes.has(kodeBarang)) {
+                    continue;
+                }
+                processedCodes.add(kodeBarang);
                 
                 // Total kebutuhan total berdasarkan FDN saat ini
                 let totalKebutuhanFdn = Number(opt.dataset.kekurangan || opt.getAttribute('data-kekurangan') || opt.dataset.qty || 0);
@@ -1982,9 +1989,9 @@ window.bukaModalCetakArsip = function() {
                     <label for="input-jumlah-copy-v2" style="display: block; font-size: 11px; font-weight: bold; color: #334155; margin-bottom: 6px; text-transform: uppercase;">
                         Masukkan Jumlah Salinan Cetak Rak:
                     </label>
-                    <input type="number" id="input-jumlah-copy-v2" value="2" min="2" max="5" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; color: #060606; font-weight: bold; box-sizing: border-box; outline: none; text-align: center;" />
+                    <input type="number" id="input-jumlah-copy-v2" value="2" min="1" max="10" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; color: #060606; font-weight: bold; box-sizing: border-box; outline: none; text-align: center;" />
                     <div style="font-size: 10px; color: #64748b; margin-top: 6px;">
-                        Sistem akan mencetak 1x Rekap Mutasi (Versi 1) dan Detail Rak (Versi 2) sesuai jumlah copy yang diatur.
+                        Sistem akan mengunduh Excel Arsip, mencetak 1x Rekap Mutasi (Versi 1), dan Detail Rak (Versi 2) sesuai jumlah copy.
                     </div>
                 </div>
                 <!-- Footer Buttons -->
@@ -2034,7 +2041,7 @@ window.eksekusiCetakArsipDariModal = function() {
 };
 
 
-// 2. Fungsi Utama Cetak Arsip Mutasi dengan Loop Versi 2
+// 2. Fungsi Utama Cetak Arsip Mutasi dengan Ekspor Excel di awal & Loop Versi 2
 window.cetakArsipMutasi = async function(jumlahCopyV2 = 1) {
     const tglMuat = document.getElementById('input-tgl-muat')?.value;
     
@@ -2044,17 +2051,30 @@ window.cetakArsipMutasi = async function(jumlahCopyV2 = 1) {
         return;
     }
 
-    const totalStep = 1 + jumlahCopyV2;
+    // Total langkah: 1 (Ekspor Excel) + 1 (Versi 1) + jumlahCopyV2 (Versi 2)
+    const totalStep = 2 + jumlahCopyV2;
     let currentStep = 0;
 
     if (typeof window.showCetakProgress === 'function') {
-        window.showCetakProgress(`Menyiapkan Dokumen Cetak (0/${totalStep})...`);
+        window.showCetakProgress(`Menyiapkan Dokumen Cetak & Arsip (0/${totalStep})...`);
     } else {
         console.warn("Fungsi showCetakProgress belum terdaftar di window!");
     }
 
     try {
-        // Cetak Versi 1 (Rekap Mutasi)
+        // Step 1: Ekspor & Unduh File Excel (.xls) dengan Sheet MUTASI & RAK terlebih dahulu
+        currentStep++;
+        if (window.showCetakProgress) {
+            window.showCetakProgress(`Membuat & Mengunduh Berkas Excel Arsip (${currentStep}/${totalStep})...`);
+        }
+        if (typeof window.exportMutasiToExcel === 'function') {
+            await window.exportMutasiToExcel(tglMuat);
+        } else {
+            console.warn("Fungsi exportMutasiToExcel belum tersedia.");
+        }
+        await new Promise(resolve => setTimeout(resolve, 600));
+
+        // Step 2: Cetak Versi 1 (Rekap Mutasi)
         currentStep++;
         if (window.showCetakProgress) {
             window.showCetakProgress(`Mengirim Dokumen Versi 1 - Rekap Mutasi (${currentStep}/${totalStep})...`);
@@ -2062,7 +2082,7 @@ window.cetakArsipMutasi = async function(jumlahCopyV2 = 1) {
         await cetakLaporanVersi1(tglMuat);
         await new Promise(resolve => setTimeout(resolve, 600));
 
-        // Cetak Versi 2 - Berulang sebanyak jumlah copy yang diinputkan
+        // Step 3 hingga N: Cetak Versi 2 - Berulang sebanyak jumlah copy
         for (let i = 1; i <= jumlahCopyV2; i++) {
             currentStep++;
             if (window.showCetakProgress) {
@@ -2077,7 +2097,7 @@ window.cetakArsipMutasi = async function(jumlahCopyV2 = 1) {
             window.hideCetakProgress();
         }
 
-        const pesanSukses = `Berhasil mengirim 1 Rekap Mutasi & ${jumlahCopyV2} Detail Rak ke antrean cetak!`;
+        const pesanSukses = `Berhasil mengunduh arsip Excel & mengirim ${jumlahCopyV2} Detail Rak ke antrean cetak!`;
         if (typeof window.miuiAlert === 'function') {
             window.miuiAlert(pesanSukses);
         } else {
@@ -2085,12 +2105,12 @@ window.cetakArsipMutasi = async function(jumlahCopyV2 = 1) {
         }
 
     } catch (error) {
-        console.error("Gagal memproses cetak:", error);
+        console.error("Gagal memproses cetak & arsip:", error);
         if (typeof window.hideCetakProgress === 'function') window.hideCetakProgress();
         if (typeof window.miuiAlert === 'function') {
-            window.miuiAlert("Terjadi kesalahan saat mengirim dokumen cetak.");
+            window.miuiAlert("Terjadi kesalahan saat memproses cetak & arsip.");
         } else {
-            alert("Terjadi kesalahan saat mengirim dokumen cetak.");
+            alert("Terjadi kesalahan saat memproses cetak & arsip.");
         }
     }
 };
@@ -2279,7 +2299,7 @@ window.cetakLaporanVersi1 = async function(tglMuat) {
                 .header-title { 
                     font-family: 'Edo', Arial, sans-serif; 
                     font-weight: normal; 
-                    font-size: 13pt; 
+                    font-size: 16pt; 
                     text-align: center; 
                     margin-bottom: 2px; 
                     letter-spacing: 1px;
@@ -2287,7 +2307,7 @@ window.cetakLaporanVersi1 = async function(tglMuat) {
                 .sub-header { 
                     font-family: 'Century Gothic', Arial, sans-serif; 
                     margin-bottom: 8px; 
-                    font-size: 10pt; 
+                    font-size: 12pt; 
                     text-align: left;
                 }
                 table { 
@@ -2295,7 +2315,7 @@ window.cetakLaporanVersi1 = async function(tglMuat) {
                     border-collapse: collapse; 
                     margin-bottom: 10px; 
                     font-family: 'Century Gothic', Arial, sans-serif;
-                    font-size: 10pt;
+                    font-size: 12pt;
                     table-layout: fixed;
                 }
                 th, td { 
@@ -2306,7 +2326,7 @@ window.cetakLaporanVersi1 = async function(tglMuat) {
                 }
                 th { 
                     background-color: #f2f2f2; 
-                    font-size: 10pt; 
+                    font-size: 12pt; 
                 }
                 .text-left { text-align: left; }
                 .font-bold { font-weight: bold; }
@@ -2363,7 +2383,7 @@ window.cetakLaporanVersi1 = async function(tglMuat) {
 };
 
 
-// Fungsi Cetak Versi 2: Detail Ambil Rak & FDN (Dengan grouping kode barang di tengah)
+// Fungsi Cetak Versi 2: Detail Ambil Rak & FDN (Tanpa rowspan, kode & nomor dikosongkan untuk baris duplikat berikutnya)
 window.cetakLaporanVersi2 = async function(tglMuat) {
     if (!tglMuat) {
         tglMuat = document.getElementById('input-tgl-muat')?.value;
@@ -2379,25 +2399,25 @@ window.cetakLaporanVersi2 = async function(tglMuat) {
     const firestoreDateId = tglMuat.replace(/-/g, '');
 
     try {
-        // 1. Ambil data dari subkoleksi 'ambilrak'
-        const snapshotAmbil = await db.collection('muat_fdn').doc(firestoreDateId).collection('ambilrak').get();
-        let listAmbil = [];
-        snapshotAmbil.forEach(doc => {
-            listAmbil.push(doc.data());
-        });
+        // 1. Ambil data dari subkoleksi 'ambilrak' diurutkan berdasarkan timestamp (asc)
+        const snapshotAmbil = await db.collection('muat_fdn')
+            .doc(firestoreDateId)
+            .collection('ambilrak')
+            .orderBy('timestamp', 'asc')
+            .get();
 
-        // Urutkan data: WH-3 terlebih dahulu di atas, lalu urut abjad kode barang
-        listAmbil.sort((a, b) => {
-            const lokA = String(a.lokasi || '').toUpperCase();
-            const lokB = String(b.lokasi || '').toUpperCase();
-            
-            const isWh3A = lokA.includes('WH-3') || lokA === 'WH3' ? 1 : 0;
-            const isWh3B = lokB.includes('WH-3') || lokB === 'WH3' ? 1 : 0;
-            
-            if (isWh3A !== isWh3B) {
-                return isWh3B - isWh3A; // WH-3 di atas
-            }
-            return String(a.kode || '').localeCompare(String(b.kode || ''));
+        let rawDataArray = [];
+        snapshotAmbil.forEach(doc => {
+            const data = doc.data();
+            rawDataArray.push({
+                id: doc.id,
+                kode: String(data.kode || '-').trim(),
+                rak: String(data.lokasi || '-').trim(),
+                ambil: Number(data.qtyAmbil || 0),
+                stok: Number(data.qtyStok || 0),
+                sisa: data.qtySisa !== undefined ? Number(data.qtySisa) : (Number(data.qtyStok || 0) - Number(data.qtyAmbil || 0)),
+                rawDocData: data
+            });
         });
 
         // 2. Ambil data FDN & Tujuan dari subkoleksi 'datatujuan' dan kelompokkan per Tujuan
@@ -2442,46 +2462,13 @@ window.cetakLaporanVersi2 = async function(tglMuat) {
             });
         });
 
-        // Grouping data ambil berdasarkan KODE untuk menentukan rowspan dan posisi tengah
-        const groupedAmbil = [];
-        let mapGroup = {};
-
-        listAmbil.forEach(item => {
-            const kode = String(item.kode || '').trim();
-            if (!mapGroup[kode]) {
-                mapGroup[kode] = {
-                    kode: kode,
-                    items: []
-                };
-                groupedAmbil.push(mapGroup[kode]);
-            }
-            mapGroup[kode].items.push(item);
-        });
-
         let rowsBodyHtml = '';
-        let noUrutItem = 1;
-        let maxRows = Math.max(listAmbil.length, fdnRowsData.length);
-        
-        // Flatten kembali dengan struktur grup untuk merender sel di tengah
-        let flattenedRows = [];
-        groupedAmbil.forEach(group => {
-            group.items.forEach((subItem, idx) => {
-                flattenedRows.push({
-                    ...subItem,
-                    isFirstOfGroup: (idx === 0),
-                    groupSpan: group.items.length,
-                    groupIndex: noUrutItem,
-                    isGrouped: true
-                });
-            });
-            noUrutItem++;
-        });
-
-        // Jika fdnRowsData lebih panjang, padukan dengan baris kosong
-        let finalMaxRows = Math.max(flattenedRows.length, fdnRowsData.length);
+        let nomorUrut = 1;
+        let lastKode = '';
+        let finalMaxRows = Math.max(rawDataArray.length, fdnRowsData.length);
 
         for (let i = 0; i < finalMaxRows; i++) {
-            const ambilRow = flattenedRows[i] || {};
+            const ambilRow = rawDataArray[i] || {};
             const itemFdn = fdnRowsData[i] || {};
 
             const formatVal = (val) => {
@@ -2491,28 +2478,30 @@ window.cetakLaporanVersi2 = async function(tglMuat) {
                 return val;
             };
 
-            let kodeHtml = '';
-            let noHtml = '';
+            let noDisplay = '';
+            let kodeDisplay = '';
 
             if (ambilRow.kode) {
-                if (ambilRow.isFirstOfGroup) {
-                    // Gunakan rowspan agar kolom NO dan KODE menyatu di tengah secara vertikal
-                    noHtml = `<td rowspan="${ambilRow.groupSpan}" style="vertical-align: middle; text-align: center;">${ambilRow.groupIndex}</td>`;
-                    kodeHtml = `<td rowspan="${ambilRow.groupSpan}" class="text-left font-bold" style="vertical-align: middle; text-align: left; padding-left: 5px; font-weight: bold;">${ambilRow.kode}</td>`;
+                if (ambilRow.kode !== lastKode) {
+                    // Kemunculan pertama kode ini: tampilkan nomor urut dan kode barang
+                    noDisplay = nomorUrut++;
+                    kodeDisplay = ambilRow.kode;
+                    lastKode = ambilRow.kode;
+                } else {
+                    // Kode yang sama pada baris berikutnya: kosongkan nomor dan kode
+                    noDisplay = '';
+                    kodeDisplay = '';
                 }
-            } else {
-                noHtml = `<td></td>`;
-                kodeHtml = `<td></td>`;
             }
 
             rowsBodyHtml += `
                 <tr>
-                    ${noHtml}
-                    ${kodeHtml}
-                    <td>${ambilRow.lokasi || ''}</td>
-                    <td>${formatVal(ambilRow.qtyAmbil)}</td>
-                    <td>${formatVal(ambilRow.qtyStok)}</td>
-                    <td>${formatVal(ambilRow.qtySisa)}</td>
+                    <td>${noDisplay}</td>
+                    <td class="text-left font-bold" style="text-align: left; padding-left: 5px; font-weight: bold;">${kodeDisplay}</td>
+                    <td>${ambilRow.rak || ''}</td>
+                    <td>${formatVal(ambilRow.ambil)}</td>
+                    <td>${formatVal(ambilRow.stok)}</td>
+                    <td>${formatVal(ambilRow.sisa)}</td>
                     <td>${itemFdn.noFdn ? (i + 1) : ''}</td>
                     <td class="text-left" style="text-align: left;">${itemFdn.noFdn || ''}</td>
                     <td class="text-left" style="text-align: left;">${itemFdn.tujuan || ''}</td>
@@ -2565,7 +2554,7 @@ window.cetakLaporanVersi2 = async function(tglMuat) {
                 .header-title { 
                     font-family: 'Edo', Arial, sans-serif; 
                     font-weight: normal; 
-                    font-size: 13pt; 
+                    font-size: 16pt; 
                     text-align: center; 
                     margin-bottom: 2px; 
                     letter-spacing: 1px;
@@ -2573,7 +2562,7 @@ window.cetakLaporanVersi2 = async function(tglMuat) {
                 .sub-header { 
                     font-family: 'Century Gothic', Arial, sans-serif; 
                     margin-bottom: 8px; 
-                    font-size: 10pt; 
+                    font-size: 12pt; 
                     text-align: left;
                 }
                 table { 
@@ -2581,7 +2570,7 @@ window.cetakLaporanVersi2 = async function(tglMuat) {
                     border-collapse: collapse; 
                     margin-bottom: 10px; 
                     font-family: 'Century Gothic', Arial, sans-serif;
-                    font-size: 10pt;
+                    font-size: 12pt;
                     table-layout: fixed;
                 }
                 th, td { 
@@ -2592,7 +2581,7 @@ window.cetakLaporanVersi2 = async function(tglMuat) {
                 }
                 th { 
                     background-color: #f2f2f2; 
-                    font-size: 10pt; 
+                    font-size: 12pt; 
                 }
                 .text-left { text-align: left; }
                 .font-bold { font-weight: bold; }
@@ -2661,3 +2650,348 @@ function getCurrentTime() {
     const now = new Date();
     return now.toTimeString().split(' ')[0].substring(0, 5);
 }
+
+
+// Fungsi Ekspor Excel Arsip Dua Sheet (.xls) - Fix ReferenceError dataMap
+window.exportMutasiToExcel = async function(tglMuat) {
+    if (!tglMuat) {
+        tglMuat = document.getElementById('input-tgl-muat')?.value;
+    }
+    if (!tglMuat) {
+        if (typeof window.miuiAlert === 'function') {
+            window.miuiAlert("Pilih tanggal muat terlebih dahulu!");
+        } else {
+            alert("Pilih tanggal muat terlebih dahulu!");
+        }
+        return;
+    }
+    const firestoreDateId = tglMuat.replace(/-/g, '');
+
+    try {
+        if (typeof window.showCetakProgress === 'function') {
+            window.showCetakProgress("Menyiapkan data untuk file Excel...");
+        }
+
+        // ==========================================
+        // 1. AMBIL & PROSES DATA UNTUK SHEET 1 (MUTASI / VERSI 1)
+        // ==========================================
+        const snapshotAmbilV1 = await db.collection('muat_fdn').doc(firestoreDateId).collection('ambilrak').get();
+        const dataMapV1 = {};
+
+        snapshotAmbilV1.forEach(doc => {
+            const d = doc.data();
+            const kode = String(d.kode || '').trim().toUpperCase();
+            if (!kode) return;
+
+            if (!dataMapV1[kode]) {
+                dataMapV1[kode] = { total: 0, wh2: 0, wh3: 0 };
+            }
+            const qty = Number(d.qtyAmbil || 0);
+            dataMapV1[kode].total += qty;
+            
+            const lok = String(d.lokasi || '').toUpperCase();
+            if (lok.includes('WH-3') || lok === 'WH3') {
+                dataMapV1[kode].wh3 += qty; // Diperbaiki dari dataMap menjadi dataMapV1
+            } else {
+                dataMapV1[kode].wh2 += qty; // Diperbaiki dari dataMap menjadi dataMapV1
+            }
+        });
+
+        const tujuanMapV1 = {}; 
+        try {
+            const snapshotDatatujuan = await db.collection('muat_fdn').doc(firestoreDateId).collection('datatujuan').get();
+            snapshotDatatujuan.forEach(doc => {
+                const d = doc.data();
+                const rawNoFdn = String(d.meta?.nomor_dokumen || d.nomor_dokumen || '').trim();
+                let tujuan = String(d.meta?.tujuan || d.tujuan || '').trim().toUpperCase();
+                tujuan = tujuan.replace(/STOCK POINT/g, 'SP');
+
+                if (rawNoFdn && tujuan) {
+                    if (!tujuanMapV1[tujuan]) tujuanMapV1[tujuan] = [];
+                    if (!tujuanMapV1[tujuan].includes(rawNoFdn)) tujuanMapV1[tujuan].push(rawNoFdn);
+                }
+            });
+        } catch (e) {
+            console.log("Catatan datatujuan V1:", e);
+        }
+
+        let listCombinedRowsV1 = [];
+        const sortedKeysV1 = Object.keys(dataMapV1).sort((a, b) => {
+            const itemA = dataMapV1[a];
+            const itemB = dataMapV1[b];
+            const isWh3A = itemA.wh3 > 0 && itemA.wh2 === 0 ? 1 : 0;
+            const isWh3B = itemB.wh3 > 0 && itemB.wh2 === 0 ? 1 : 0;
+            if (isWh3A !== isWh3B) return isWh3B - isWh3A;
+            return a.localeCompare(b);
+        });
+
+        let tujuanKeysV1 = Object.keys(tujuanMapV1);
+        let maxRowsV1 = Math.max(sortedKeysV1.length, tujuanKeysV1.length);
+
+        for (let i = 0; i < maxRowsV1; i++) {
+            const kode = sortedKeysV1[i] || '';
+            const tujuan = tujuanKeysV1[i] || '';
+            let formattedFdn = '';
+
+            if (tujuan && tujuanMapV1[tujuan]) {
+                const fdnList = tujuanMapV1[tujuan];
+                formattedFdn = fdnList.map((rawFdn, idx) => {
+                    if (idx === 0) return rawFdn.length >= 5 ? rawFdn.slice(-5) : rawFdn;
+                    else return rawFdn.length >= 3 ? rawFdn.slice(-3) : rawFdn;
+                }).join('/');
+            }
+
+            listCombinedRowsV1.push({
+                kode: kode,
+                item: kode ? dataMapV1[kode] : null,
+                noFdn: formattedFdn,
+                tujuan: tujuan
+            });
+        }
+
+        let totalSeluruhV1 = 0, totalWh2V1 = 0, totalWh3V1 = 0;
+        let sheet1XmlRows = '';
+
+        listCombinedRowsV1.forEach((row, index) => {
+            const item = row.item;
+            if (item) {
+                totalSeluruhV1 += item.total;
+                totalWh2V1 += item.wh2;
+                totalWh3V1 += item.wh3;
+            }
+            const valTotal = item && item.total > 0 ? item.total : '';
+            const valWh2 = item && item.wh2 > 0 ? item.wh2 : '';
+            const valWh3 = item && item.wh3 > 0 ? item.wh3 : '';
+            const noFdnNum = row.noFdn ? (index + 1) : '';
+
+            sheet1XmlRows += `
+            <Row>
+                <Cell><Data ss:Type="String">${row.kode || ''}</Data></Cell>
+                <Cell><Data ss:Type="${valTotal !== '' ? 'Number' : 'String'}">${valTotal}</Data></Cell>
+                <Cell><Data ss:Type="String"></Data></Cell>
+                <Cell><Data ss:Type="${valWh2 !== '' ? 'Number' : 'String'}">${valWh2}</Data></Cell>
+                <Cell><Data ss:Type="${valWh3 !== '' ? 'Number' : 'String'}">${valWh3}</Data></Cell>
+                <Cell><Data ss:Type="${noFdnNum !== '' ? 'Number' : 'String'}">${noFdnNum}</Data></Cell>
+                <Cell><Data ss:Type="String">${row.noFdn || ''}</Data></Cell>
+                <Cell><Data ss:Type="String">${row.tujuan || ''}</Data></Cell>
+            </Row>`;
+        });
+
+        sheet1XmlRows += `
+        <Row>
+            <Cell><Data ss:Type="String">TOTAL QTY</Data></Cell>
+            <Cell><Data ss:Type="Number">${totalSeluruhV1}</Data></Cell>
+            <Cell><Data ss:Type="String"></Data></Cell>
+            <Cell><Data ss:Type="Number">${totalWh2V1}</Data></Cell>
+            <Cell><Data ss:Type="Number">${totalWh3V1}</Data></Cell>
+            <Cell><Data ss:Type="String"></Data></Cell>
+            <Cell><Data ss:Type="String"></Data></Cell>
+            <Cell><Data ss:Type="String"></Data></Cell>
+        </Row>`;
+
+
+        // ==========================================
+        // 2. AMBIL & PROSES DATA UNTUK SHEET 2 (RAK / VERSI 2)
+        // ==========================================
+        const snapshotAmbilV2 = await db.collection('muat_fdn')
+            .doc(firestoreDateId)
+            .collection('ambilrak')
+            .orderBy('timestamp', 'asc')
+            .get();
+
+        let rawDataArrayV2 = [];
+        snapshotAmbilV2.forEach(doc => {
+            const data = doc.data();
+            rawDataArrayV2.push({
+                id: doc.id,
+                kode: String(data.kode || '-').trim(),
+                rak: String(data.lokasi || '-').trim(),
+                ambil: Number(data.qtyAmbil || 0),
+                stok: Number(data.qtyStok || 0),
+                sisa: data.qtySisa !== undefined ? Number(data.qtySisa) : (Number(data.qtyStok || 0) - Number(data.qtyAmbil || 0))
+            });
+        });
+
+        const tujuanMapV2 = {}; 
+        try {
+            const snapshotDatatujuanV2 = await db.collection('muat_fdn').doc(firestoreDateId).collection('datatujuan').get();
+            snapshotDatatujuanV2.forEach(doc => {
+                const d = doc.data();
+                const rawNoFdn = String(d.meta?.nomor_dokumen || d.nomor_dokumen || '').trim();
+                let tujuan = String(d.meta?.tujuan || d.tujuan || '').trim().toUpperCase();
+                tujuan = tujuan.replace(/STOCK POINT/g, 'SP');
+
+                if (rawNoFdn && tujuan) {
+                    if (!tujuanMapV2[tujuan]) tujuanMapV2[tujuan] = [];
+                    if (!tujuanMapV2[tujuan].includes(rawNoFdn)) tujuanMapV2[tujuan].push(rawNoFdn);
+                }
+            });
+        } catch (e) {
+            console.log("Catatan datatujuan V2:", e);
+        }
+
+        let fdnRowsDataV2 = [];
+        Object.keys(tujuanMapV2).forEach(tujuan => {
+            const fdnList = tujuanMapV2[tujuan];
+            const formattedFdn = fdnList.map((rawFdn, idx) => {
+                if (idx === 0) return rawFdn.length >= 5 ? rawFdn.slice(-5) : rawFdn;
+                else return rawFdn.length >= 3 ? rawFdn.slice(-3) : rawFdn;
+            }).join('/');
+
+            fdnRowsDataV2.push({
+                noFdn: formattedFdn,
+                tujuan: tujuan
+            });
+        });
+
+        let sheet2XmlRows = '';
+        let nomorUrutV2 = 1;
+        let lastKodeV2 = '';
+        let finalMaxRowsV2 = Math.max(rawDataArrayV2.length, fdnRowsDataV2.length);
+
+        for (let i = 0; i < finalMaxRowsV2; i++) {
+            const ambilRow = rawDataArrayV2[i] || {};
+            const itemFdn = fdnRowsDataV2[i] || {};
+
+            const formatVal = (val) => (val === undefined || val === null || val === '' || Number(val) === 0) ? '-' : val;
+
+            let noDisplay = '';
+            let kodeDisplay = '';
+
+            if (ambilRow.kode) {
+                if (ambilRow.kode !== lastKodeV2) {
+                    noDisplay = nomorUrutV2++;
+                    kodeDisplay = ambilRow.kode;
+                    lastKodeV2 = ambilRow.kode;
+                } else {
+                    noDisplay = '';
+                    kodeDisplay = '';
+                }
+            }
+
+            sheet2XmlRows += `
+            <Row>
+                <Cell><Data ss:Type="${noDisplay !== '' ? 'Number' : 'String'}">${noDisplay !== '' ? noDisplay : ''}</Data></Cell>
+                <Cell><Data ss:Type="String">${kodeDisplay}</Data></Cell>
+                <Cell><Data ss:Type="String">${ambilRow.rak || ''}</Data></Cell>
+                <Cell><Data ss:Type="String">${formatVal(ambilRow.ambil)}</Data></Cell>
+                <Cell><Data ss:Type="String">${formatVal(ambilRow.stok)}</Data></Cell>
+                <Cell><Data ss:Type="String">${formatVal(ambilRow.sisa)}</Data></Cell>
+                <Cell><Data ss:Type="${itemFdn.noFdn ? 'Number' : 'String'}">${itemFdn.noFdn ? (i + 1) : ''}</Data></Cell>
+                <Cell><Data ss:Type="String">${itemFdn.noFdn || ''}</Data></Cell>
+                <Cell><Data ss:Type="String">${itemFdn.tujuan || ''}</Data></Cell>
+            </Row>`;
+        }
+
+
+        // ==========================================
+        // 3. FORMAT NAMA FILE & WAKTU
+        // ==========================================
+        const now = new Date();
+        const daftarHari = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+        const hari = daftarHari[now.getDay()];
+        
+        const tgl = String(now.getDate()).padStart(2, '0');
+        const bln = String(now.getMonth() + 1).padStart(2, '0');
+        const thn = now.getFullYear();
+        
+        const jam = String(now.getHours()).padStart(2, '0');
+        const menit = String(now.getMinutes()).padStart(2, '0');
+        const detik = String(now.getSeconds()).padStart(2, '0');
+        
+        const namaFileExcel = `Form Mutasi ${thn} ${bln}-${tgl} ${hari} ${jam}.${menit}.${detik}.xls`;
+
+
+        // ==========================================
+        // 4. STRUKTUR XML SPREADSHEETML MULTI-SHEET
+        // ==========================================
+        const excelXml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+          xmlns:o="urn:schemas-microsoft-com:office:office"
+          xmlns:x="urn:schemas-microsoft-com:office:excel"
+          xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+          xmlns:html="http://www.w3.org/TR/REC-html40">
+  <Styles>
+    <Style ss:ID="Header">
+      <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+      <Font ss:Bold="1" ss:Size="10" ss:FontName="Arial"/>
+      <Interior ss:Color="#F2F2F2" ss:Pattern="Solid"/>
+      <Borders>
+        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>
+        <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>
+        <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
+        <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
+      </Borders>
+    </Style>
+    <Style ss:ID="Default">
+      <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+      <Borders>
+        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>
+        <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>
+        <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
+        <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
+      </Borders>
+      <Font ss:Size="10" ss:FontName="Arial"/>
+    </Style>
+  </Styles>
+
+  <!-- SHEET 1: MUTASI -->
+  <Worksheet ss:Name="MUTASI">
+    <Table>
+      <Row ss:StyleID="Header">
+        <Cell><Data ss:Type="String">KODE</Data></Cell>
+        <Cell><Data ss:Type="String">TOTAL</Data></Cell>
+        <Cell><Data ss:Type="String">V</Data></Cell>
+        <Cell><Data ss:Type="String">WH-2</Data></Cell>
+        <Cell><Data ss:Type="String">WH-3</Data></Cell>
+        <Cell><Data ss:Type="String">NO</Data></Cell>
+        <Cell><Data ss:Type="String">NO. FDN</Data></Cell>
+        <Cell><Data ss:Type="String">TUJUAN</Data></Cell>
+      </Row>
+      ${sheet1XmlRows}
+    </Table>
+  </Worksheet>
+
+  <!-- SHEET 2: RAK -->
+  <Worksheet ss:Name="RAK">
+    <Table>
+      <Row ss:StyleID="Header">
+        <Cell><Data ss:Type="String">NO</Data></Cell>
+        <Cell><Data ss:Type="String">KODE</Data></Cell>
+        <Cell><Data ss:Type="String">RAK</Data></Cell>
+        <Cell><Data ss:Type="String">AMBIL</Data></Cell>
+        <Cell><Data ss:Type="String">STOK</Data></Cell>
+        <Cell><Data ss:Type="String">SISA</Data></Cell>
+        <Cell><Data ss:Type="String">NO</Data></Cell>
+        <Cell><Data ss:Type="String">NO. FDN</Data></Cell>
+        <Cell><Data ss:Type="String">TUJUAN KIRIM</Data></Cell>
+      </Row>
+      ${sheet2XmlRows}
+    </Table>
+  </Worksheet>
+</Workbook>`;
+
+        const blob = new Blob([excelXml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = namaFileExcel;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        if (typeof window.hideCetakProgress === 'function') window.hideCetakProgress();
+
+    } catch (error) {
+        console.error("Gagal export Excel:", error);
+        if (typeof window.hideCetakProgress === 'function') window.hideCetakProgress();
+        if (typeof window.miuiAlert === 'function') {
+            window.miuiAlert("Gagal export Excel: " + error.message);
+        } else {
+            alert("Gagal export Excel: " + error.message);
+        }
+        throw error;
+    }
+};
