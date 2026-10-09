@@ -2919,3 +2919,499 @@ window.cetakDokumenVersi2 = async function(tglMuat) {
         miuiAlert("Gagal cetak: " + e.message);
     }
 };
+
+
+
+// Variabel global untuk menampung data FDN di dalam modal
+let modalGlobalDataFdn = [];
+
+// 1. Fungsi Membuka Modal Mutasi Depo/SP
+window.bukaModalMutasiDepoSp = async function() {
+    let modalEl = document.getElementById('miui-modal-mutasi-depo');
+    if (!modalEl) {
+        const modalHtml = `
+        <div id="miui-modal-mutasi-depo" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); z-index: 9999; justify-content: center; align-items: center; font-family: 'Century Gothic', Arial, sans-serif;">
+            <div style="background: #ffffff; width: 720px; max-height: 85vh; border-radius: 8px; box-shadow: 0 4px 25px rgba(0,0,0,0.2); overflow: hidden; display: flex; flex-direction: column; animation: miuiScaleUp 0.2s ease-in-out;">
+                <!-- Header MIUI v5 Orange -->
+                <div style="background-color: #ff9800; color: #1e293b; padding: 12px 16px; font-weight: 900; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ff9800;">
+                    <span>📦 Data Mutasi FDN Depo/SP</span>
+                    <button type="button" onclick="tutupModalMutasiDepo()" style="background: none; border: none; color: #1e293b; font-size: 16px; cursor: pointer; font-weight: bold;">&times;</button>
+                </div>
+                
+                <!-- Filter Bulan & Tanggal Muat -->
+                <div style="padding: 12px 16px; background-color: #f8fafc; border-bottom: 1px solid #ff9800; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                    <span style="font-size: 10px; font-weight: bold; color: #334155; text-transform: uppercase;">PILIH PERIODE BULAN:</span>
+                    <select id="modal-select-periode-bulan" style="padding: 6px 8px; border: 1px solid #ff9800; border-radius: 4px; font-size: 11px; color: #000000; font-weight: bold; outline: none;" onchange="modalFilterTanggalByBulan()">
+                        <option value="">Memuat Bulan...</option>
+                    </select>
+
+                    <span style="font-size: 10px; font-weight: bold; color: #334155; text-transform: uppercase; margin-left: 8px;">PILIH TANGGAL MUAT MUTASI FDN:</span>
+                    <select id="modal-input-tgl-muat" style="padding: 6px 8px; border: 1px solid #ff9800; border-radius: 4px; font-size: 11px; color: #000000; font-weight: bold; outline: none;" onchange="loadDataMuatDepoFirebase()">
+                        <option value="">Pilih Tanggal...</option>
+                    </select>
+
+                    <button type="button" onclick="ambilDataKeTabelWh3()" style="background-color: #ff9800; color: #1e293b; border: none; padding: 6px 20px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; text-transform: uppercase; box-shadow: 0 1px 2px rgba(0,0,0,0.1); margin-left: auto;">
+                        AMBIL DATA WH-3
+                    </button>
+                </div>
+
+                <!-- Body Tabel Hasil Render dengan Inline MIUI Custom Scrollbar -->
+                <div style="padding: 16px; overflow-y: auto; flex: 1; background: #fff; max-height: calc(85vh - 130px); scrollbar-width: thin; scrollbar-color: #cbd5e1 #f1f5f9;" 
+                    onmouseover="this.style.setProperty('--scroll-thumb', '#fea724')" 
+                    onmouseout="this.style.setProperty('--scroll-thumb', 'transparent')">
+                    <div id="modal-content-container" style="font-size: 11px; color: #334155; min-height: 200px;">
+                        <p style="text-align: center; color: #64748b; padding: 20px;">Memuat data terbaru...</p>
+                    </div>
+                </div>
+
+                <style>
+                    /* CSS Kustom Scrollbar Khusus Area Tabel Modal */
+                    div::-webkit-scrollbar {
+                        width: 6px;
+                    }
+                    div::-webkit-scrollbar-track {
+                        background: #ff9800;
+                        border-radius: 4px;
+                    }
+                    div::-webkit-scrollbar-thumb {
+                        background: #ff7316;
+                        border-radius: 4px;
+                    }
+                    div::-webkit-scrollbar-thumb:hover {
+                        background: #f7b666;
+                    }
+                </style>
+
+                <!-- Footer dengan Info Total & Badge Orange -->
+                <div style="background-color: #f8fafc; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #ff9800;">
+                    <div id="modal-footer-info" style="font-size: 10px; font-weight: 900; color: #1e293b; text-transform: uppercase; letter-spacing: 0.3px;">
+                        TOTAL MUAT KESELURUHAN : 0 KARTON | DATA WH-3 : 0 KARTON [ 0 ITEM ]
+                    </div>
+                    <button type="button" onclick="tutupModalMutasiDepo()" style="background-color: #e2e8f0; color: #334155; border: none; padding: 6px 14px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; text-transform: uppercase;">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+        <style>
+            @keyframes miuiScaleUp {
+                from { transform: scale(0.9); opacity: 0; }
+                to { transform: scale(1); opacity: 1; }
+            }
+        </style>`;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        modalEl = document.getElementById('miui-modal-mutasi-depo');
+    }
+
+    modalEl.style.display = 'flex';
+    // Otomatis muat data bulan & tanggal terbaru saat modal dibuka
+    await modalLoadDataBulanDanTanggal();
+};
+
+window.tutupModalMutasiDepo = function() {
+    const modalEl = document.getElementById('miui-modal-mutasi-depo');
+    if (modalEl) modalEl.style.display = 'none';
+};
+
+
+// 2. Fungsi Load Bulan & Tanggal dari Firebase (Sesuai Gaya Modul Mutasi)
+window.modalLoadDataBulanDanTanggal = async function() {
+    const selectBulan = document.getElementById('modal-select-periode-bulan');
+    const selectTgl = document.getElementById('modal-input-tgl-muat');
+    const db = window.db;
+
+    if (!selectBulan || !selectTgl || !db) return;
+
+    selectBulan.innerHTML = '<option value="">Memuat Bulan...</option>';
+    selectTgl.innerHTML = '<option value="">Pilih Tanggal...</option>';
+
+    try {
+        const snapshot = await db.collectionGroup('datatujuan').get();
+        modalGlobalDataFdn = [];
+        let bulanSet = new Set();
+        let tanggalSet = new Set();
+        const namaBulan = [
+            "Januari", "Februari", "Maret", "April", "Mei", "Juni", 
+            "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+        ];
+
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const tglStr = data && data.meta ? data.meta.tanggal : null;
+
+            if (tglStr && typeof tglStr === 'string' && tglStr.includes('/')) {
+                const parts = tglStr.split('/');
+                if (parts.length === 3) {
+                    let hari = parts[0];
+                    let angkaBulan = parts[1];
+                    let tahun = parts[2];
+
+                    let tglId = `${tahun}${angkaBulan}${hari}`;
+
+                    if (!tanggalSet.has(tglId)) {
+                        tanggalSet.add(tglId);
+
+                        let bulanIndex = parseInt(angkaBulan, 10) - 1;
+                        if (bulanIndex >= 0 && bulanIndex < 12) {
+                            let namaBulanStr = `${namaBulan[bulanIndex]} ${tahun}`;
+                            let bulanKey = `${tahun}-${angkaBulan}`;
+                            let formattedDate = `${hari}-${angkaBulan}-${tahun}`;
+
+                            bulanSet.add(JSON.stringify({ key: bulanKey, name: namaBulanStr }));
+
+                            modalGlobalDataFdn.push({
+                                raw: tglId,           // "20261009"
+                                bulanKey: bulanKey,   // "2026-10"
+                                formatted: formattedDate // "09-10-2026"
+                            });
+                        }
+                    }
+                }
+            }
+        });
+
+        if (modalGlobalDataFdn.length === 0) {
+            selectBulan.innerHTML = '<option value="">Tidak ada data bulan</option>';
+            selectTgl.innerHTML = '<option value="">Pilih Tanggal</option>';
+            return;
+        }
+
+        modalGlobalDataFdn.sort((a, b) => b.raw.localeCompare(a.raw));
+
+        let listBulan = Array.from(bulanSet).map(item => JSON.parse(item));
+        listBulan.sort((a, b) => b.key.localeCompare(a.key));
+
+        selectBulan.innerHTML = '<option value="">Pilih Bulan...</option>';
+        listBulan.forEach(b => {
+            let opt = document.createElement('option');
+            opt.value = b.key;
+            opt.textContent = b.name;
+            selectBulan.appendChild(opt);
+        });
+
+        // Set ke bulan terbaru secara otomatis
+        if (listBulan.length > 0) {
+            selectBulan.value = listBulan[0].key;
+            modalFilterTanggalByBulan();
+        }
+
+    } catch (error) {
+        console.error("Gagal memuat data bulan/tanggal modal:", error);
+        selectBulan.innerHTML = '<option value="">Error Memuat Data</option>';
+    }
+};
+
+
+// 3. Filter Tanggal Berdasarkan Bulan & Auto Render Tanggal Terbaru
+window.modalFilterTanggalByBulan = function() {
+    const selectBulan = document.getElementById('modal-select-periode-bulan');
+    const selectTgl = document.getElementById('modal-input-tgl-muat');
+    
+    if (!selectBulan || !selectTgl) return;
+
+    const selectedBulanKey = selectBulan.value;
+    selectTgl.innerHTML = '<option value="">Pilih Tanggal...</option>';
+
+    if (!selectedBulanKey) return;
+
+    const filteredDates = modalGlobalDataFdn.filter(item => item.bulanKey === selectedBulanKey);
+
+    filteredDates.forEach(item => {
+        let opt = document.createElement('option');
+        opt.value = item.raw; // Contoh: "20261009"
+        opt.textContent = item.formatted; // Contoh: "09-10-2026"
+        selectTgl.appendChild(opt);
+    });
+
+    if (filteredDates.length > 0) {
+        selectTgl.value = filteredDates[0].raw;
+        // Langsung muat data otomatis untuk tanggal terbaru yang terpilih
+        loadDataMuatDepoFirebase();
+    }
+};
+
+
+// 4. Ambil & Render Data dari Firebase dengan Kalkulasi Badge Footer WH-3
+window.loadDataMuatDepoFirebase = async function() {
+    const selectTgl = document.getElementById('modal-input-tgl-muat');
+    const container = document.getElementById('modal-content-container');
+    const footerInfo = document.getElementById('modal-footer-info');
+    const firestoreDateId = selectTgl?.value; 
+
+    if (!firestoreDateId) {
+        container.innerHTML = `<p style="color: #ef4444; text-align: center;">Pilih tanggal muat terlebih dahulu!</p>`;
+        if (footerInfo) footerInfo.textContent = "TOTAL MUAT KESELURUHAN : 0 KARTON | DATA WH-3 : 0 ITEM [ 0 KARTON ]";
+        return;
+    }
+
+    container.innerHTML = `<p style="text-align: center; color: #64748b; padding: 20px;">Mengambil data dari Firebase...</p>`;
+    if (footerInfo) footerInfo.textContent = "Menghitung data...";
+
+    try {
+        const docRef = db.collection('muat_fdn').doc(firestoreDateId);
+        
+        const [snapshotTujuan, snapshotAmbil] = await Promise.all([
+            docRef.collection('datatujuan').get(),
+            docRef.collection('ambilrak').orderBy('timestamp', 'asc').get()
+        ]);
+
+        let tujuanMap = {}; 
+        snapshotTujuan.forEach(doc => {
+            const d = doc.data();
+            const rawNoFdn = String(d.meta?.nomor_dokumen || d.nomor_dokumen || '').trim();
+            let tujuan = String(d.meta?.tujuan || d.tujuan || '').trim().toUpperCase();
+            tujuan = tujuan.replace(/STOCK POINT/g, 'SP');
+
+            if (rawNoFdn && tujuan) {
+                if (!tujuanMap[tujuan]) tujuanMap[tujuan] = [];
+                if (!tujuanMap[tujuan].includes(rawNoFdn)) tujuanMap[tujuan].push(rawNoFdn);
+            }
+        });
+
+        let ambilList = [];
+        let totalQtyAmbilSemua = 0;
+        let totalQtyWh3 = 0;
+        let totalCountWh3 = 0;
+
+        snapshotAmbil.forEach(doc => {
+            const data = doc.data();
+            const stok = Number(data.qtyStok || 0);
+            const ambil = Number(data.qtyAmbil || 0);
+            const sisa = data.qtySisa !== undefined ? Number(data.qtySisa) : (stok - ambil);
+            const lokasi = String(data.lokasi || '').trim();
+
+            totalQtyAmbilSemua += ambil;
+
+            const isWh3 = lokasi.toUpperCase().includes('WH-3') || lokasi.toUpperCase() === 'WH3';
+            if (isWh3) {
+                totalCountWh3++;
+                totalQtyWh3 += ambil;
+            }
+
+            ambilList.push({
+                kode: String(data.kode || '-').trim(),
+                rak: lokasi,
+                ambil: ambil,
+                stok: stok,
+                sisa: sisa
+            });
+        });
+
+        // Update informasi footer dengan badge warna orange khas MIUI v5
+        if (footerInfo) {
+            footerInfo.innerHTML = `
+                TOTAL MUAT KESELURUHAN : <span style="background-color: #ff990077; color: #000000; padding: 2px 6px; border-radius: 4px;">${totalQtyAmbilSemua} KARTON</span> 
+                | DATA WH-3 : <span style="background-color: #ff990077; color: #000000; padding: 2px 6px; border-radius: 4px;">${totalQtyWh3} KARTON</span> 
+                [ <span>${totalCountWh3} ITEM</span> ]
+            `;
+        }
+
+        if (Object.keys(tujuanMap).length === 0 && ambilList.length === 0) {
+            container.innerHTML = `<div style="text-align: center; color: #64748b; padding: 30px;">Tidak ada data untuk tanggal terpilih di Firebase.</div>`;
+            return;
+        }
+
+        // --- RENDER 1: RINGKASAN TUJUAN (Format 5 digit dari kanan) ---
+        let htmlContent = `
+            <h4 style="font-weight: bold; margin-bottom: 6px; color: #1e293b; font-size: 12px; text-transform: uppercase;">📋 Ringkasan Tujuan (FDN)</h4>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px;">
+                <thead>
+                    <tr style="background-color: #f8fafc; text-align: left;">
+                        <th style="border: 0.5px solid #cbd5e1; padding: 6px; text-align: center; width: 35px;">No</th>
+                        <th style="border: 0.5px solid #cbd5e1; padding: 6px;">Nomor Dokumen FDN</th>
+                        <th style="border: 0.5px solid #cbd5e1; padding: 6px;">Tujuan</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        let noTujuan = 1;
+        Object.keys(tujuanMap).forEach(tujuan => {
+            const fdnList = tujuanMap[tujuan];
+            const formattedFdn = fdnList.map((rawFdn) => {
+                return rawFdn.length >= 5 ? rawFdn.slice(-5) : rawFdn;
+            }).join(' / ');
+
+            htmlContent += `
+                <tr>
+                    <td style="border: 0.5px solid #cbd5e1; padding: 6px; text-align: center;">${noTujuan++}</td>
+                    <td style="border: 0.5px solid #cbd5e1; padding: 6px; font-weight: bold; mso-number-format:'\@';">${formattedFdn}</td>
+                    <td style="border: 0.5px solid #cbd5e1; padding: 6px; font-weight: bold;">${tujuan}</td>
+                </tr>
+            `;
+        });
+
+        htmlContent += `
+                </tbody>
+            </table>
+
+            <h4 style="font-weight: bold; margin-bottom: 6px; color: #1e293b; font-size: 12px; text-transform: uppercase;">📦 Detail Pengambilan Rak</h4>
+            <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                <thead>
+                    <tr style="background-color: #f8fafc; text-align: left;">
+                        <th style="border: 0.5px solid #cbd5e1; padding: 6px; text-align: center; width: 35px;">No</th>
+                        <th style="border: 0.5px solid #cbd5e1; padding: 6px; width: 110px;">Kode Barang</th>
+                        <th style="border: 0.5px solid #cbd5e1; padding: 6px; text-align: center; width: 85px;">Lokasi Rak</th>
+                        <th style="border: 0.5px solid #cbd5e1; padding: 6px; text-align: center; width: 55px;">Ambil</th>
+                        <th style="border: 0.5px solid #cbd5e1; padding: 6px; text-align: center; width: 55px;">Stok</th>
+                        <th style="border: 0.5px solid #cbd5e1; padding: 6px; text-align: center; width: 55px;">Sisa</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        // --- RENDER 2: DETAIL RAK ---
+        let nomorUrutRak = 1;
+        let lastKodeRak = '';
+
+        if (ambilList.length > 0) {
+            ambilList.forEach((item) => {
+                let noDisplay = '';
+                let kodeDisplay = '';
+
+                if (item.kode !== lastKodeRak) {
+                    noDisplay = nomorUrutRak++;
+                    kodeDisplay = item.kode;
+                    lastKodeRak = item.kode;
+                } else {
+                    noDisplay = '';
+                    kodeDisplay = '';
+                }
+
+                const isWh3 = item.rak.toUpperCase().includes('WH-3') || item.rak.toUpperCase() === 'WH3';
+                const rowStyle = isWh3 ? 'background-color: #fff7ed;' : 'background-color: #ffffff;';
+
+                htmlContent += `
+                    <tr style="${rowStyle}">
+                        <td style="border: 0.5px solid #cbd5e1; padding: 5px; text-align: center;">${noDisplay}</td>
+                        <td style="border: 0.5px solid #cbd5e1; padding: 5px; font-weight: bold; mso-number-format:'\@';">${kodeDisplay}</td>
+                        <td style="border: 0.5px solid #cbd5e1; padding: 5px; text-align: center; ${isWh3 ? 'font-weight: bold; color: #c2410c;' : ''}">${item.rak}</td>
+                        <td style="border: 0.5px solid #cbd5e1; padding: 5px; text-align: center; font-weight: bold; color: #ff9800;">${item.ambil !== 0 ? item.ambil : '-'}</td>
+                        <td style="border: 0.5px solid #cbd5e1; padding: 5px; text-align: center;">${item.stok !== 0 ? item.stok : '-'}</td>
+                        <td style="border: 0.5px solid #cbd5e1; padding: 5px; text-align: center;">${item.sisa !== 0 ? item.sisa : '-'}</td>
+                    </tr>
+                `;
+            });
+        } else {
+            htmlContent += `<tr><td colspan="6" style="border: 0.5px solid #cbd5e1; padding: 8px; text-align: center; color: #64748b;">Belum ada data ambil rak.</td></tr>`;
+        }
+
+        htmlContent += `
+                </tbody>
+            </table>
+        `;
+
+        container.innerHTML = htmlContent;
+
+    } catch (error) {
+        console.error("Gagal memuat data mutasi depo dari Firebase:", error);
+        container.innerHTML = `<p style="color: #ef4444; text-align: center; padding: 20px;">Terjadi kesalahan saat mengambil data: ${error.message}</p>`;
+        if (footerInfo) footerInfo.textContent = "Error memuat info";
+    }
+};
+
+
+// 5. Fungsi Tombol "AMBIL KE WH-3" (Otomatis Masuk ke Textarea & Langsung Convert Data)
+window.ambilDataKeTabelWh3 = async function() {
+    const selectTgl = document.getElementById('modal-input-tgl-muat');
+    const firestoreDateId = selectTgl?.value; // Contoh format: "20261008"
+
+    if (!firestoreDateId) {
+        if (typeof window.miuiAlert === 'function') {
+            window.miuiAlert("Pilih tanggal muat terlebih dahulu!");
+        } else {
+            alert("Pilih tanggal muat terlebih dahulu!");
+        }
+        return;
+    }
+
+    try {
+        if (typeof window.showCetakProgress === 'function') {
+            window.showCetakProgress("Mengambil data WH-3 dari Firebase...");
+        }
+
+        const docRef = db.collection('muat_fdn').doc(firestoreDateId);
+        const snapshotAmbil = await docRef.collection('ambilrak').orderBy('timestamp', 'asc').get();
+
+        if (snapshotAmbil.empty) {
+            if (typeof window.hideCetakProgress === 'function') window.hideCetakProgress();
+            window.miuiAlert(`Tidak ada data pengambilan rak untuk tanggal ${firestoreDateId}.`);
+            return;
+        }
+
+        // Filter hanya data yang lokasi raknya mengandung "WH-3" atau "WH3"
+        let dataWh3 = [];
+        snapshotAmbil.forEach(doc => {
+            const data = doc.data();
+            const lokasi = String(data.lokasi || '').toUpperCase();
+            if (lokasi.includes('WH-3') || lokasi === 'WH3') {
+                dataWh3.push({
+                    kode: String(data.kode || '').trim(),
+                    lokasi: String(data.lokasi || '').trim(),
+                    qtyAmbil: Number(data.qtyAmbil || 0)
+                });
+            }
+        });
+
+        if (dataWh3.length === 0) {
+            if (typeof window.hideCetakProgress === 'function') window.hideCetakProgress();
+            window.miuiAlert("Tidak ditemukan data dengan lokasi WH-3 pada tanggal ini.");
+            return;
+        }
+
+        // Ekstrak komponen tanggal dari firestoreDateId
+        const tahunFile = firestoreDateId.substring(0, 4);
+        const bln = firestoreDateId.substring(4, 6);
+        const tgl = firestoreDateId.substring(6, 8);
+
+        // Pembentukan Nomor DO Mutasi
+        const noDOMutasi = `${parseInt(tgl)}${parseInt(bln)}${tahunFile.slice(-2)}`; 
+
+        // Susun format data terstruktur ke Z-MTS
+        const formattedData = {};
+        formattedData[noDOMutasi] = {
+            tujuan: "Z-MTS",
+            data: {}
+        };
+
+        dataWh3.forEach((item) => {
+            formattedData[noDOMutasi].data[item.kode] = {
+                kodeBarang: item.kode,
+                qtyUtama: item.qtyAmbil,
+                gudang: item.lokasi
+            };
+        });
+
+        // Masukkan ke Textarea Bosnet
+        const ta = document.getElementById('ta-bosnet-input');
+        if (ta) {
+            ta.value = JSON.stringify(formattedData, null, 2);
+        }
+
+        // Isi otomatis form tujuan Z-MTS
+        const inputKodeTujuan = document.getElementById('input-kode-tujuan');
+        const inputNamaTujuan = document.getElementById('input-nama-tujuan');
+
+        if (inputKodeTujuan) inputKodeTujuan.value = "Z-MTS";
+        if (inputNamaTujuan) inputNamaTujuan.value = `MUTASI GUDANG WH-2 (${noDOMutasi})`;
+
+        // Tutup modal
+        tutupModalMutasiDepo();
+
+        if (typeof window.hideCetakProgress === 'function') window.hideCetakProgress();
+
+        // Otomatis jalankan fungsi konversi data agar langsung tampil di tabel utama WH-3
+        if (typeof window.prosesDataBosnet === 'function') {
+            window.prosesDataBosnet();
+        } else {
+            console.warn("Fungsi prosesDataBosnet tidak ditemukan.");
+        }
+
+        window.miuiAlert(`Berhasil memuat dan mengonversi ${dataWh3.length} baris data Mutasi WH-3 (${noDOMutasi}).`);
+
+    } catch (error) {
+        console.error("Gagal mengambil data WH-3 dari Firebase:", error);
+        if (typeof window.hideCetakProgress === 'function') window.hideCetakProgress();
+        window.miuiAlert("Terjadi kesalahan saat mengambil data WH-3: " + error.message);
+    }
+};
