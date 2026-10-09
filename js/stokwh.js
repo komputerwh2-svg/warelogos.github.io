@@ -3753,6 +3753,82 @@ function pilihKodeHP(kode) {
     updateInfoKodeTerpilihHP();
 }
 
+// Buka Modal Kalkulator
+window.bukaKalkulatorHP = function() {
+    const modal = document.getElementById('modal-kalkulator-hp');
+    const display = document.getElementById('calc-display');
+    if (modal) {
+        // Ambil nilai awal dari input qty beceran jika sudah ada isinya
+        const currentVal = document.getElementById('hp-qty-beceran')?.value;
+        display.value = currentVal ? currentVal : '0';
+        modal.style.display = 'flex';
+    }
+};
+
+// Tutup Modal Kalkulator
+window.tutupKalkulatorHP = function() {
+    const modal = document.getElementById('modal-kalkulator-hp');
+    if (modal) modal.style.display = 'none';
+};
+
+// Tambah Angka/Operator ke Display
+window.calcAppend = function(val) {
+    const display = document.getElementById('calc-display');
+    if (!display) return;
+    
+    if (display.value === '0' && val !== '.') {
+        display.value = val;
+    } else {
+        display.value += val;
+    }
+};
+
+// Clear (C)
+window.calcClear = function() {
+    const display = document.getElementById('calc-display');
+    if (display) display.value = '0';
+};
+
+// Delete / Backspace (⌫)
+window.calcDel = function() {
+    const display = document.getElementById('calc-display');
+    if (display) {
+        display.value = display.value.length > 1 ? display.value.slice(0, -1) : '0';
+    }
+};
+
+// Hitung Hasil (=)
+window.calcCalculate = function() {
+    const display = document.getElementById('calc-display');
+    if (!display) return;
+    try {
+        // Menggunakan Function untuk mengevaluasi ekspresi matematika dengan aman
+        let result = Function('"use strict";return (' + display.value + ')')();
+        display.value = Number.isFinite(result) ? result : 'Error';
+    } catch (e) {
+        display.value = 'Error';
+    }
+};
+
+// Salin Hasil ke Kolom Qty Beceran
+window.gunakanHasilKalkulator = function() {
+    const display = document.getElementById('calc-display');
+    const inputQty = document.getElementById('hp-qty-beceran');
+    
+    if (display && inputQty) {
+        // Hitung dulu jika operator belum ditekan
+        try {
+            let result = Function('"use strict";return (' + display.value + ')')();
+            if (Number.isFinite(result)) {
+                inputQty.value = result;
+            }
+        } catch (e) {
+            inputQty.value = display.value;
+        }
+    }
+    tutupKalkulatorHP();
+};
+
 async function simpanDataFisikHP() {
     const kodeInputEl = document.getElementById('hp-kode-barang');
     const kode = kodeInputEl ? kodeInputEl.value.trim().toUpperCase() : "";
@@ -5580,8 +5656,8 @@ function getDbRef() {
     throw new Error("Koneksi Firebase Realtime Database tidak ditemukan.");
 }
 
-// Fungsi Sinkronisasi Data Stok WH3 di RTDB berdasarkan Tanggal Aktif
-function sinkronisasiDatabaseStokWH3(kodeAsal, kodeTujuan) {
+// Fungsi Sinkronisasi Data Stok WH3 di RTDB berdasarkan Tanggal Aktif dengan Qty Dinamis
+function sinkronisasiDatabaseStokWH3(kodeAsal, qtyAsal, kodeTujuan, qtyTujuan, keteranganRak) {
     const dateInput = document.getElementById('select-tanggal-wh3');
     const tanggalAktif = dateInput ? dateInput.value.replace(/-/g, '') : null;
 
@@ -5591,73 +5667,71 @@ function sinkronisasiDatabaseStokWH3(kodeAsal, kodeTujuan) {
     }
 
     const dbConn = getDbRef();
-    // Cari path node database sesuai tanggal aktif (misal: stokwh3_20260822)
-    const nodePath = `stokwh3_${tanggalAktif}`;
+    // Perbaiki path node agar mencakup folder induk 'stok_wh3/'
+    const nodePath = `stok_wh3/stokwh3_${tanggalAktif}`;
 
     dbConn.ref(nodePath).once('value').then((snapshot) => {
         if (!snapshot.exists()) {
-            console.warn("Data stok untuk tanggal aktif tidak ditemukan di RTDB.");
+            console.warn("Data stok untuk tanggal aktif tidak ditemukan di RTDB pada path:", nodePath);
             return;
         }
 
         const dataHarian = snapshot.val();
         let updates = {};
 
-        // Update Barang Asal (+) : Kurangi kolom beceran sebanyak 1 krt
+        // 1. Update Barang Asal (+) : Kurangi nilai beceran utama & beceran_qty_teks sebanyak qtyAsal
         if (dataHarian[kodeAsal]) {
-            let beceranAsal = parseInt(dataHarian[kodeAsal].beceran) || 0;
-            let blokAsal = parseInt(dataHarian[kodeAsal].blok) || 0;
-            let utuhanAsal = parseInt(dataHarian[kodeAsal].utuhan) || 0;
-            let bosnetAsal = parseInt(dataHarian[kodeAsal].bosnet) || 0;
-            let qaAsal = parseInt(dataHarian[kodeAsal].qa) || 0;
+            let itemAsal = dataHarian[kodeAsal];
+            let beceranAsal = parseInt(itemAsal.beceran) || 0;
+            let blokAsal = parseInt(itemAsal.blok) || 0;
+            let utuhanAsal = parseInt(itemAsal.utuhan) || 0;
+            let bosnetAsal = parseInt(itemAsal.bosnet) || 0;
+            let qaAsal = parseInt(itemAsal.qa) || 0;
 
-            // Kurangi beceran (pastikan tidak kurang dari 0)
-            let beceranBaruAsal = Math.max(0, beceranAsal - 1);
+            let beceranBaruAsal = Math.max(0, beceranAsal - qtyAsal);
+            
             updates[`${nodePath}/${kodeAsal}/beceran`] = beceranBaruAsal;
 
-            // Hitung ulang total dan selisih baru untuk barang asal
-            let fisikBaruAsal = kodeAsal.includes("PR-PKT") ? (beceranBaruAsal + utuhanAsal) : (blokAsal + beceranBaruAsal + utuhanAsal);
-            let totalBaruAsal = fisikBaruAsal; // Atau sesuaikan dengan rumus total di sistem Anda
-            let selisihBaruAsal = fisikBaruAsal - (bosnetAsal + qaAsal);
+            if (itemAsal.detail_rak) {
+                updates[`${nodePath}/${kodeAsal}/detail_rak/beceran_qty_teks`] = beceranBaruAsal > 0 ? beceranBaruAsal.toString() : "0";
+            }
 
-            updates[`${nodePath}/${kodeAsal}/total`] = totalBaruAsal;
-            updates[`${nodePath}/${kodeAsal}/selisih`] = selisihBaruAsal;
+            let fisikBaruAsal = kodeAsal.includes("PR-PKT") ? (beceranBaruAsal + utuhanAsal) : (blokAsal + beceranBaruAsal + utuhanAsal);
+            updates[`${nodePath}/${kodeAsal}/total`] = fisikBaruAsal;
+            updates[`${nodePath}/${kodeAsal}/selisih`] = fisikBaruAsal - (bosnetAsal + qaAsal);
         }
 
-        // Update Barang Tujuan (-) : Tambahkan kolom beceran sebanyak 1 krt
+        // 2. Update Barang Tujuan (-) : Kurangi QA, tambah beceran utama & teks rak tujuan
         if (dataHarian[kodeTujuan]) {
-            let beceranTujuan = parseInt(dataHarian[kodeTujuan].beceran) || 0;
-            let blokTujuan = parseInt(dataHarian[kodeTujuan].blok) || 0;
-            let utuhanTujuan = parseInt(dataHarian[kodeTujuan].utuhan) || 0;
-            let bosnetTujuan = parseInt(dataHarian[kodeTujuan].bosnet) || 0;
-            let qaTujuan = parseInt(dataHarian[kodeTujuan].qa) || 0;
+            let itemTujuan = dataHarian[kodeTujuan];
+            let beceranTujuan = parseInt(itemTujuan.beceran) || 0;
+            let blokTujuan = parseInt(itemTujuan.blok) || 0;
+            let utuhanTujuan = parseInt(itemTujuan.utuhan) || 0;
+            let bosnetTujuan = parseInt(itemTujuan.bosnet) || 0;
+            let qaTujuan = parseInt(itemTujuan.qa) || 0;
 
-            // Tambah beceran
-            let beceranBaruTujuan = beceranTujuan + 1;
+            let qaBaruTujuan = Math.max(0, qaTujuan - qtyTujuan);
+            let beceranBaruTujuan = beceranTujuan + qtyTujuan;
+
+            updates[`${nodePath}/${kodeTujuan}/qa`] = qaBaruTujuan;
             updates[`${nodePath}/${kodeTujuan}/beceran`] = beceranBaruTujuan;
 
-            // Hitung ulang total dan selisih baru untuk barang tujuan
-            let fisikBaruTujuan = kodeTujuan.includes("PR-PKT") ? (beceranBaruTujuan + utuhanTujuan) : (blokTujuan + beceranBaruTujuan + utuhanTujuan);
-            let totalBaruTujuan = fisikBaruTujuan;
-            let selisihBaruTujuan = fisikBaruTujuan - (bosnetTujuan + qaTujuan);
+            if (!itemTujuan.detail_rak) {
+                updates[`${nodePath}/${kodeTujuan}/detail_rak`] = {};
+            }
+            updates[`${nodePath}/${kodeTujuan}/detail_rak/beceran_rak`] = keteranganRak;
+            updates[`${nodePath}/${kodeTujuan}/detail_rak/beceran_qty_teks`] = beceranBaruTujuan.toString();
 
-            updates[`${nodePath}/${kodeTujuan}/total`] = totalBaruTujuan;
-            updates[`${nodePath}/${kodeTujuan}/selisih`] = selisihBaruTujuan;
+            let fisikBaruTujuan = kodeTujuan.includes("PR-PKT") ? (beceranBaruTujuan + utuhanTujuan) : (blokTujuan + beceranBaruTujuan + utuhanTujuan);
+            updates[`${nodePath}/${kodeTujuan}/total`] = fisikBaruTujuan;
+            updates[`${nodePath}/${kodeTujuan}/selisih`] = fisikBaruTujuan - (bosnetTujuan + qaBaruTujuan);
         }
 
         // Kirim update batch ke Firebase RTDB
         if (Object.keys(updates).length > 0) {
             dbConn.ref().update(updates).then(() => {
                 console.log("Sinkronisasi stok fisik berhasil diterapkan ke RTDB.");
-                // Perbarui juga data di cache window jika ada
-                if (typeof window.currentStokData !== 'undefined' && window.currentStokData[nodePath]) {
-                    if (window.currentStokData[nodePath][kodeAsal]) {
-                        window.currentStokData[nodePath][kodeAsal].beceran = Math.max(0, (parseInt(window.currentStokData[nodePath][kodeAsal].beceran) || 0) - 1);
-                    }
-                    if (window.currentStokData[nodePath][kodeTujuan]) {
-                        window.currentStokData[nodePath][kodeTujuan].beceran = (parseInt(window.currentStokData[nodePath][kodeTujuan].beceran) || 0) + 1;
-                    }
-                }
+                if (typeof muatDataStokWH3 === 'function') muatDataStokWH3();
             }).catch(err => {
                 console.error("Gagal melakukan update database stok:", err);
             });
@@ -5669,9 +5743,16 @@ function sinkronisasiDatabaseStokWH3(kodeAsal, kodeTujuan) {
 
 // Fungsi Utama Eksekusi Pertukaran Fisik
 function eksekusiTukarFisik() {
-    const asalPlus = document.getElementById('select-asal-plus').value.trim().toUpperCase();
-    const tujuanMinus = document.getElementById('select-tujuan-minus').value.trim().toUpperCase();
-    const keteranganRak = document.getElementById('input-keterangan-rak').value.trim();
+    const rawAsal = document.getElementById('select-asal-plus').value.trim();
+    const rawTujuan = document.getElementById('select-tujuan-minus').value.trim();
+    
+    // Ambil kode barang murni (mengambil kata pertama atau sebelum spasi/karakter khusus)
+    const asalPlus = rawAsal.split(/[\s|]+/)[0].toUpperCase();
+    const tujuanMinus = rawTujuan.split(/[\s|]+/)[0].toUpperCase();
+
+    const qtyAsal = parseInt(document.getElementById('input-qty-asal').value) || 1;
+    const qtyTujuan = parseInt(document.getElementById('input-qty-tujuan').value) || 1;
+    const keteranganRak = document.getElementById('input-keterangan-tukar').value.trim();
 
     if (!asalPlus || !tujuanMinus) {
         if (typeof miuiAlert === 'function') miuiAlert("Silakan pilih Barang Asal (+) dan Target Tujuan (- / QA) terlebih dahulu!");
@@ -5694,8 +5775,8 @@ function eksekusiTukarFisik() {
     
     const dataBaru = {
         waktu: waktuSekarang,
-        asal: `${asalPlus} = 1 krt`,
-        tujuan: `${tujuanMinus} = 1 krt`,
+        asal: `${asalPlus} = ${qtyAsal} krt`,
+        tujuan: `${tujuanMinus} = ${qtyTujuan} krt`,
         keterangan: keteranganRak,
         timestamp: timestamp
     };
@@ -5706,16 +5787,18 @@ function eksekusiTukarFisik() {
         // 1. Simpan Riwayat Tukar ke RTDB (stok_tukar/riwayat)
         dbConn.ref('stok_tukar/riwayat/' + customKey).set(dataBaru).then(() => {
             
-            // 2. Jalankan Sinkronisasi / Perubahan Data Stok Langsung di RTDB Tanggal Aktif
+            // 2. Jalankan Sinkronisasi / Perubahan Data Stok Langsung di RTDB Tanggal Aktif dengan Qty Dinamis
             if (typeof sinkronisasiDatabaseStokWH3 === 'function') {
-                sinkronisasiDatabaseStokWH3(asalPlus, tujuanMinus);
+                sinkronisasiDatabaseStokWH3(asalPlus, qtyAsal, tujuanMinus, qtyTujuan, keteranganRak);
             }
 
             if (typeof miuiAlert === 'function') miuiAlert("Pertukaran fisik berhasil diproses dan disinkronkan dengan database utama!");
             else alert("Pertukaran fisik berhasil diproses dan disinkronkan dengan database utama!");
             
-            // Bersihkan input keterangan rak
-            document.getElementById('input-keterangan-rak').value = '';
+            // Bersihkan input form setelah sukses
+            document.getElementById('input-qty-asal').value = '';
+            document.getElementById('input-qty-tujuan').value = '';
+            document.getElementById('input-keterangan-tukar').value = '';
             
             // 3. UPDATE / REFRESH OTOMATIS PANEL ATAS DAN TABEL RIWAYAT
             if (typeof muatDataPanelTukarFisik === 'function') {
@@ -5724,7 +5807,6 @@ function eksekusiTukarFisik() {
             if (typeof renderTabelRiwayatTukar === 'function') {
                 renderTabelRiwayatTukar();
             }
-            // Refresh tabel utama stok WH-3 jika fungsi tersedia
             if (typeof muatDataStokWH3 === 'function') {
                 muatDataStokWH3();
             }
