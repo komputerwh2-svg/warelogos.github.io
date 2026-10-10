@@ -892,20 +892,23 @@ async function eksekusiHapusPilihan() {
     const dateId = activeModalContext.dateId;
 
     if (selectedVal === "ALL") {
-        const allFirestoreIds = activeModalContext.matchedDocs.map(d => d.firestoreId);
-        await hapusGroupFdnDocuments(dateId, allFirestoreIds);
+        miuiConfirm("Apakah Anda yakin ingin menghapus SEMUA data FDN ini?", async function() {
+            const allFirestoreIds = activeModalContext.matchedDocs.map(d => d.firestoreId);
+            await hapusGroupFdnDocuments(dateId, allFirestoreIds);
+        });
     } else {
-        // Hapus spesifik satu dokumen FDN yang dipilih
-        if (!confirm(`Apakah Anda yakin ingin menghapus FDN yang dipilih ini?`)) return;
-        try {
-            await db.collection('muat_fdn').doc(dateId).collection('datatujuan').doc(selectedVal).delete();
-            miuiAlert("Data FDN berhasil dihapus.");
-            closeFdnModal();
-            renderDaftarFdnToPreview(dateId);
-        } catch (error) {
-            console.error("Gagal menghapus FDN satuan:", error);
-            miuiAlert("Terjadi kesalahan saat menghapus data.");
-        }
+        // Hapus spesifik satu dokumen FDN yang dipilih menggunakan miuiConfirm
+        miuiConfirm("Apakah Anda yakin ingin menghapus FDN yang dipilih ini?", async function() {
+            try {
+                await db.collection('muat_fdn').doc(dateId).collection('datatujuan').doc(selectedVal).delete();
+                miuiAlert("Data FDN berhasil dihapus.");
+                closeFdnModal();
+                renderDaftarFdnToPreview(dateId);
+            } catch (error) {
+                console.error("Gagal menghapus FDN satuan:", error);
+                miuiAlert("Terjadi kesalahan saat menghapus data.");
+            }
+        });
     }
 }
 
@@ -917,35 +920,37 @@ function closeFdnModal() {
 
 // Fungsi helper hapus dokumen satuan
 async function hapusFdnDocument(dateId, docId) {
-    if (!confirm(`Apakah Anda yakin ingin menghapus FDN ini dari sistem?`)) return;
-    try {
-        await db.collection('muat_fdn').doc(dateId).collection('datatujuan').doc(docId).delete();
-        miuiAlert("Data FDN berhasil dihapus.");
-        closeFdnModal();
-        renderDaftarFdnToPreview(dateId);
-    } catch (error) {
-        console.error("Gagal menghapus FDN:", error);
-        miuiAlert("Terjadi kesalahan saat menghapus data.");
-    }
+    miuiConfirm("Apakah Anda yakin ingin menghapus FDN ini dari sistem?", async function() {
+        try {
+            await db.collection('muat_fdn').doc(dateId).collection('datatujuan').doc(docId).delete();
+            miuiAlert("Data FDN berhasil dihapus.");
+            closeFdnModal();
+            renderDaftarFdnToPreview(dateId);
+        } catch (error) {
+            console.error("Gagal menghapus FDN:", error);
+            miuiAlert("Terjadi kesalahan saat menghapus data.");
+        }
+    });
 }
 
 // Fungsi helper hapus sekumpulan dokumen FDN
 async function hapusGroupFdnDocuments(dateId, docIdArray) {
-    if (!confirm(`Apakah Anda yakin ingin menghapus seluruh (${docIdArray.length}) FDN pada tujuan ini?`)) return;
-    try {
-        const batch = db.batch();
-        docIdArray.forEach(docId => {
-            const docRef = db.collection('muat_fdn').doc(dateId).collection('datatujuan').doc(docId);
-            batch.delete(docRef);
-        });
-        await batch.commit();
-        miuiAlert("Semua data FDN pada tujuan ini berhasil dihapus.");
-        closeFdnModal();
-        renderDaftarFdnToPreview(dateId);
-    } catch (error) {
-        console.error("Gagal menghapus sekumpulan FDN:", error);
-        miuiAlert("Terjadi kesalahan saat menghapus data.");
-    }
+    miuiConfirm(`Apakah Anda yakin ingin menghapus seluruh (${docIdArray.length}) FDN pada tujuan ini?`, async function() {
+        try {
+            const batch = db.batch();
+            docIdArray.forEach(docId => {
+                const docRef = db.collection('muat_fdn').doc(dateId).collection('datatujuan').doc(docId);
+                batch.delete(docRef);
+            });
+            await batch.commit();
+            miuiAlert("Semua data FDN pada tujuan ini berhasil dihapus.");
+            closeFdnModal();
+            renderDaftarFdnToPreview(dateId);
+        } catch (error) {
+            console.error("Gagal menghapus sekumpulan FDN:", error);
+            miuiAlert("Terjadi kesalahan saat menghapus data.");
+        }
+    });
 }
 
 
@@ -1173,7 +1178,7 @@ function isiRakWh3() {
     }
 }
 
-
+// Fungsi utama untuk memproses ambil rak otomatis berdasarkan FDN dan data WMS
 async function prosesAmbilRakOtomatis() {
     const tanggalMuat = document.getElementById('input-tgl-muat')?.value;
     if (!tanggalMuat) {
@@ -1222,8 +1227,8 @@ async function prosesAmbilRakOtomatis() {
 
         if (rawData.length === 0) {
             let sourceData = typeof globalWmsData !== 'undefined' ? globalWmsData : 
-                           (typeof wmsDataCache !== 'undefined' ? wmsDataCache : 
-                           (typeof stokCache !== 'undefined' ? stokCache : null));
+                             (typeof wmsDataCache !== 'undefined' ? wmsDataCache : 
+                             (typeof stokCache !== 'undefined' ? stokCache : null));
             if (sourceData) {
                 rawData = Array.isArray(sourceData) ? sourceData : Object.values(sourceData);
             }
@@ -1235,7 +1240,8 @@ async function prosesAmbilRakOtomatis() {
             return;
         }
 
-        if (confirm("Jalankan sinkronisasi FDN otomatis? (Hanya memproses FDN baru atau kekurangan qty yang belum terambil)")) {
+        // Mengganti confirm() bawaan dengan miuiConfirm MIUI v5
+        miuiConfirm("Ambil data rak otomatis? (Hanya memproses FDN baru atau kekurangan qty yang belum terambil)", async function() {
             
             // Set pelacak agar kode barang yang sama tidak diproses dobel dalam satu eksekusi
             const processedCodes = new Set();
@@ -1386,7 +1392,7 @@ async function prosesAmbilRakOtomatis() {
             if (typeof loadDataAmbilRak === 'function') loadDataAmbilRak(firestoreDateId);
             if (typeof updateSummaryMutasi === 'function') updateSummaryMutasi();
             if (typeof populateMutasiKodeDropdown === 'function') await populateMutasiKodeDropdown(firestoreDateId);
-        }
+        });
 
     } catch (error) {
         console.error("Gagal menjalankan sinkronisasi FDN otomatis:", error);
@@ -1933,7 +1939,7 @@ async function simpanPerubahanItem() {
 
 // Fungsi untuk menghapus item dari modal dan Sinkronisasi Ulang
 async function hapusItemDariModal() {
-    if (confirm("Apakah Anda yakin ingin menghapus item rak ini dari daftar?")) {
+    miuiConfirm("Apakah Anda yakin ingin menghapus item rak ini dari daftar?", async function() {
         const dateId = document.getElementById('edit-date-id').value;
         const docId = document.getElementById('edit-doc-id').value;
 
@@ -1955,7 +1961,7 @@ async function hapusItemDariModal() {
             console.error("Gagal menghapus item: ", error);
             miuiAlert("Terjadi kesalahan saat menghapus data.");
         }
-    }
+    });
 }
 
 // Daftarkan fungsi ke window agar bisa diakses global

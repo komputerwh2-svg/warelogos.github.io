@@ -866,26 +866,79 @@ function aktifkanCloudPrintEngine() {
 
 
 // =========================================================================
-// 6. SYSTEM COMPONENT: CUSTOM NOTIF miuiAlert ENGINE (MIUI V5 SPEC)
+// 6. SYSTEM COMPONENT: CUSTOM NOTIF miuiAlert & miuiConfirm ENGINE (MIUI V5 SPEC)
 // =========================================================================
-function miuiAlert(pesan) {
+window.miuiAlert = function(pesan) {
     const box = document.getElementById('miui-global-miuiAlert');
     const teks = document.getElementById('miui-miuiAlert-message');
     const contOk = document.getElementById('miui-container-ok');
     const contConfirm = document.getElementById('miui-container-confirm');
 
+    if (!box || !teks) return;
+
     teks.innerText = pesan;
-    contOk.classList.remove('hidden');    // Tampilkan OK
-    contConfirm.classList.add('hidden'); // Sembunyikan Ya/Batal
+    if (contOk) contOk.classList.remove('hidden');      // Tampilkan OK
+    if (contConfirm) contConfirm.classList.add('hidden'); // Sembunyikan Ya/Batal
     box.classList.remove('hidden');
 }
 
-function tutupmiuiAlert() {
+window.tutupmiuiAlert = function() {
     const boxmiuiAlert = document.getElementById('miui-global-miuiAlert');
     if (boxmiuiAlert) {
         boxmiuiAlert.classList.add('hidden'); 
     }
 }
+
+// Definisikan secara eksplisit pada window agar tidak error "not defined"
+window.miuiConfirm = function(pesan, callbackYa) {
+    const box = document.getElementById('miui-global-miuiAlert');
+    const teks = document.getElementById('miui-miuiAlert-message');
+    const contOk = document.getElementById('miui-container-ok');
+    const contConfirm = document.getElementById('miui-container-confirm');
+    const btnYa = document.getElementById('miui-btn-ya');
+    const btnTidak = document.getElementById('miui-btn-tidak');
+
+    if (!box || !teks) {
+        if (confirm(pesan)) {
+            if (typeof callbackYa === 'function') callbackYa();
+        }
+        return;
+    }
+
+    teks.innerText = pesan;
+    if (contOk) contOk.classList.add('hidden');          // Sembunyikan OK
+    if (contConfirm) contConfirm.classList.remove('hidden'); // Tampilkan Ya/Batal
+    box.classList.remove('hidden');
+
+    const handleYa = () => {
+        cleanup();
+        if (typeof callbackYa === 'function') {
+            callbackYa();
+        }
+    };
+
+    const handleTidak = () => {
+        cleanup();
+    };
+
+    const cleanup = () => {
+        box.classList.add('hidden');
+        if (contOk) contOk.classList.remove('hidden');
+        if (contConfirm) contConfirm.classList.add('hidden');
+        if (btnYa) btnYa.removeEventListener('click', handleYa);
+        if (btnTidak) btnTidak.removeEventListener('click', handleTidak);
+    };
+
+    if (btnYa && btnTidak) {
+        const newBtnYa = btnYa.cloneNode(true);
+        const newBtnTidak = btnTidak.cloneNode(true);
+        btnYa.replaceWith(newBtnYa);
+        btnTidak.replaceWith(newBtnTidak);
+
+        document.getElementById('miui-btn-ya').addEventListener('click', handleYa);
+        document.getElementById('miui-btn-tidak').addEventListener('click', handleTidak);
+    }
+};
 
 
 // Variabel penyimpan target aplikasi yang ingin dibuka
