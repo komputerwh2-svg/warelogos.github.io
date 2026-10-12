@@ -3014,19 +3014,19 @@ window.tutupModalMutasiDepo = function() {
 };
 
 
-// 2. Fungsi Load Bulan & Tanggal dari Firebase (Sesuai Gaya Modul Mutasi)
+// 2. Fungsi Load Bulan & Tanggal dari Realtime Database (RTDB Version)
 window.modalLoadDataBulanDanTanggal = async function() {
     const selectBulan = document.getElementById('modal-select-periode-bulan');
     const selectTgl = document.getElementById('modal-input-tgl-muat');
-    const db = window.db;
 
-    if (!selectBulan || !selectTgl || !db) return;
+    if (!selectBulan || !selectTgl) return;
 
     selectBulan.innerHTML = '<option value="">Memuat Bulan...</option>';
     selectTgl.innerHTML = '<option value="">Pilih Tanggal...</option>';
 
     try {
-        const snapshot = await db.collectionGroup('datatujuan').get();
+        // Ambil seluruh data dari root node 'muat_fdn' di RTDB
+        const snapshot = await firebase.database().ref('muat_fdn').once('value');
         modalGlobalDataFdn = [];
         let bulanSet = new Set();
         let tanggalSet = new Set();
@@ -3035,40 +3035,55 @@ window.modalLoadDataBulanDanTanggal = async function() {
             "Juli", "Agustus", "September", "Oktober", "November", "Desember"
         ];
 
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            const tglStr = data && data.meta ? data.meta.tanggal : null;
+        if (snapshot.exists()) {
+            const muatFdnObj = snapshot.val();
+            
+            // Loop setiap dateId (misal: "20261012")
+            Object.keys(muatFdnObj).forEach(dateId => {
+                const dateNode = muatFdnObj[dateId];
+                if (dateNode && dateNode.datatujuan) {
+                    const dataTujuanObj = dateNode.datatujuan;
+                    
+                    // Ambil tanggal dari meta salah satu dokumen di datatujuan
+                    let tglStr = null;
+                    const tujuanKeys = Object.keys(dataTujuanObj);
+                    if (tujuanKeys.length > 0) {
+                        const firstDoc = dataTujuanObj[tujuanKeys[0]];
+                        tglStr = firstDoc && firstDoc.meta ? firstDoc.meta.tanggal : null;
+                    }
 
-            if (tglStr && typeof tglStr === 'string' && tglStr.includes('/')) {
-                const parts = tglStr.split('/');
-                if (parts.length === 3) {
-                    let hari = parts[0];
-                    let angkaBulan = parts[1];
-                    let tahun = parts[2];
+                    if (tglStr && typeof tglStr === 'string' && tglStr.includes('/')) {
+                        const parts = tglStr.split('/');
+                        if (parts.length === 3) {
+                            let hari = parts[0];
+                            let angkaBulan = parts[1];
+                            let tahun = parts[2];
 
-                    let tglId = `${tahun}${angkaBulan}${hari}`;
+                            let tglId = `${tahun}${angkaBulan}${hari}`;
 
-                    if (!tanggalSet.has(tglId)) {
-                        tanggalSet.add(tglId);
+                            if (!tanggalSet.has(tglId)) {
+                                tanggalSet.add(tglId);
 
-                        let bulanIndex = parseInt(angkaBulan, 10) - 1;
-                        if (bulanIndex >= 0 && bulanIndex < 12) {
-                            let namaBulanStr = `${namaBulan[bulanIndex]} ${tahun}`;
-                            let bulanKey = `${tahun}-${angkaBulan}`;
-                            let formattedDate = `${hari}-${angkaBulan}-${tahun}`;
+                                let bulanIndex = parseInt(angkaBulan, 10) - 1;
+                                if (bulanIndex >= 0 && bulanIndex < 12) {
+                                    let namaBulanStr = `${namaBulan[bulanIndex]} ${tahun}`;
+                                    let bulanKey = `${tahun}-${angkaBulan}`;
+                                    let formattedDate = `${hari}-${angkaBulan}-${tahun}`;
 
-                            bulanSet.add(JSON.stringify({ key: bulanKey, name: namaBulanStr }));
+                                    bulanSet.add(JSON.stringify({ key: bulanKey, name: namaBulanStr }));
 
-                            modalGlobalDataFdn.push({
-                                raw: tglId,           // "20261009"
-                                bulanKey: bulanKey,   // "2026-10"
-                                formatted: formattedDate // "09-10-2026"
-                            });
+                                    modalGlobalDataFdn.push({
+                                        raw: tglId,           // "20261012"
+                                        bulanKey: bulanKey,   // "2026-10"
+                                        formatted: formattedDate // "12-10-2026"
+                                    });
+                                }
+                            }
                         }
                     }
                 }
-            }
-        });
+            });
+        }
 
         if (modalGlobalDataFdn.length === 0) {
             selectBulan.innerHTML = '<option value="">Tidak ada data bulan</option>';
@@ -3096,13 +3111,13 @@ window.modalLoadDataBulanDanTanggal = async function() {
         }
 
     } catch (error) {
-        console.error("Gagal memuat data bulan/tanggal modal:", error);
+        console.error("Gagal memuat data bulan/tanggal modal dari RTDB:", error);
         selectBulan.innerHTML = '<option value="">Error Memuat Data</option>';
     }
 };
 
 
-// 3. Filter Tanggal Berdasarkan Bulan & Auto Render Tanggal Terbaru
+// 3. Filter Tanggal Berdasarkan Bulan & Auto Render Tanggal Terbaru (Tetap Sama)
 window.modalFilterTanggalByBulan = function() {
     const selectBulan = document.getElementById('modal-select-periode-bulan');
     const selectTgl = document.getElementById('modal-input-tgl-muat');
@@ -3118,8 +3133,8 @@ window.modalFilterTanggalByBulan = function() {
 
     filteredDates.forEach(item => {
         let opt = document.createElement('option');
-        opt.value = item.raw; // Contoh: "20261009"
-        opt.textContent = item.formatted; // Contoh: "09-10-2026"
+        opt.value = item.raw; // Contoh: "20261012"
+        opt.textContent = item.formatted; // Contoh: "12-10-2026"
         selectTgl.appendChild(opt);
     });
 
@@ -3131,7 +3146,7 @@ window.modalFilterTanggalByBulan = function() {
 };
 
 
-// 4. Ambil & Render Data dari Firebase dengan Kalkulasi Badge Footer WH-3
+// 4. Ambil & Render Data dari Realtime Database (RTDB) dengan Kalkulasi Badge Footer WH-3
 window.loadDataMuatDepoFirebase = async function() {
     const selectTgl = document.getElementById('modal-input-tgl-muat');
     const container = document.getElementById('modal-content-container');
@@ -3144,37 +3159,53 @@ window.loadDataMuatDepoFirebase = async function() {
         return;
     }
 
-    container.innerHTML = `<p style="text-align: center; color: #64748b; padding: 20px;">Mengambil data dari Firebase...</p>`;
+    container.innerHTML = `<p style="text-align: center; color: #64748b; padding: 20px;">Mengambil data dari Realtime Database...</p>`;
     if (footerInfo) footerInfo.textContent = "Menghitung data...";
 
     try {
-        const docRef = db.collection('muat_fdn').doc(firestoreDateId);
+        const rtdbRef = firebase.database().ref(`muat_fdn/${firestoreDateId}`);
         
+        // Ambil data datatujuan dan ambilrak secara paralel dari RTDB menggunakan once('value')
         const [snapshotTujuan, snapshotAmbil] = await Promise.all([
-            docRef.collection('datatujuan').get(),
-            docRef.collection('ambilrak').orderBy('timestamp', 'asc').get()
+            rtdbRef.child('datatujuan').once('value'),
+            rtdbRef.child('ambilrak').once('value')
         ]);
 
         let tujuanMap = {}; 
-        snapshotTujuan.forEach(doc => {
-            const d = doc.data();
-            const rawNoFdn = String(d.meta?.nomor_dokumen || d.nomor_dokumen || '').trim();
-            let tujuan = String(d.meta?.tujuan || d.tujuan || '').trim().toUpperCase();
-            tujuan = tujuan.replace(/STOCK POINT/g, 'SP');
+        if (snapshotTujuan.exists()) {
+            const dataTujuanObj = snapshotTujuan.val();
+            Object.keys(dataTujuanObj).forEach(key => {
+                const d = dataTujuanObj[key];
+                const rawNoFdn = String(d.meta?.nomor_dokumen || d.nomor_dokumen || '').trim();
+                let tujuan = String(d.meta?.tujuan || d.tujuan || '').trim().toUpperCase();
+                tujuan = tujuan.replace(/STOCK POINT/g, 'SP');
 
-            if (rawNoFdn && tujuan) {
-                if (!tujuanMap[tujuan]) tujuanMap[tujuan] = [];
-                if (!tujuanMap[tujuan].includes(rawNoFdn)) tujuanMap[tujuan].push(rawNoFdn);
-            }
-        });
+                if (rawNoFdn && tujuan) {
+                    if (!tujuanMap[tujuan]) tujuanMap[tujuan] = [];
+                    if (!tujuanMap[tujuan].includes(rawNoFdn)) tujuanMap[tujuan].push(rawNoFdn);
+                }
+            });
+        }
 
         let ambilList = [];
         let totalQtyAmbilSemua = 0;
         let totalQtyWh3 = 0;
         let totalCountWh3 = 0;
 
-        snapshotAmbil.forEach(doc => {
-            const data = doc.data();
+        if (snapshotAmbil.exists()) {
+            const dataAmbilObj = snapshotAmbil.val();
+            
+            // Ubah objek ke array dan urutkan berdasarkan timestamp secara ascending (kronologis)
+            ambilList = Object.keys(dataAmbilObj).map(key => {
+                return {
+                    id: key,
+                    ...dataAmbilObj[key]
+                };
+            }).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+        }
+
+        // Normalisasi dan hitung akumulasi
+        let normalizedAmbilList = ambilList.map(data => {
             const stok = Number(data.qtyStok || 0);
             const ambil = Number(data.qtyAmbil || 0);
             const sisa = data.qtySisa !== undefined ? Number(data.qtySisa) : (stok - ambil);
@@ -3188,13 +3219,13 @@ window.loadDataMuatDepoFirebase = async function() {
                 totalQtyWh3 += ambil;
             }
 
-            ambilList.push({
+            return {
                 kode: String(data.kode || '-').trim(),
                 rak: lokasi,
                 ambil: ambil,
                 stok: stok,
                 sisa: sisa
-            });
+            };
         });
 
         // Update informasi footer dengan badge warna orange khas MIUI v5
@@ -3206,7 +3237,7 @@ window.loadDataMuatDepoFirebase = async function() {
             `;
         }
 
-        if (Object.keys(tujuanMap).length === 0 && ambilList.length === 0) {
+        if (Object.keys(tujuanMap).length === 0 && normalizedAmbilList.length === 0) {
             container.innerHTML = `<div style="text-align: center; color: #64748b; padding: 30px;">Tidak ada data untuk tanggal terpilih di Firebase.</div>`;
             return;
         }
@@ -3264,8 +3295,8 @@ window.loadDataMuatDepoFirebase = async function() {
         let nomorUrutRak = 1;
         let lastKodeRak = '';
 
-        if (ambilList.length > 0) {
-            ambilList.forEach((item) => {
+        if (normalizedAmbilList.length > 0) {
+            normalizedAmbilList.forEach((item) => {
                 let noDisplay = '';
                 let kodeDisplay = '';
 
@@ -3304,14 +3335,14 @@ window.loadDataMuatDepoFirebase = async function() {
         container.innerHTML = htmlContent;
 
     } catch (error) {
-        console.error("Gagal memuat data mutasi depo dari Firebase:", error);
+        console.error("Gagal memuat data mutasi depo dari Realtime Database:", error);
         container.innerHTML = `<p style="color: #ef4444; text-align: center; padding: 20px;">Terjadi kesalahan saat mengambil data: ${error.message}</p>`;
         if (footerInfo) footerInfo.textContent = "Error memuat info";
     }
 };
 
 
-// 5. Fungsi Tombol "AMBIL KE WH-3" (Otomatis Masuk ke Textarea & Langsung Convert Data)
+// 5. Fungsi Tombol "AMBIL KE WH-3" (RTDB Version - Otomatis Masuk ke Textarea & Langsung Convert Data)
 window.ambilDataKeTabelWh3 = async function() {
     const selectTgl = document.getElementById('modal-input-tgl-muat');
     const firestoreDateId = selectTgl?.value; // Contoh format: "20261008"
@@ -3327,22 +3358,31 @@ window.ambilDataKeTabelWh3 = async function() {
 
     try {
         if (typeof window.showCetakProgress === 'function') {
-            window.showCetakProgress("Mengambil data WH-3 dari Firebase...");
+            window.showCetakProgress("Mengambil data WH-3 dari Realtime Database...");
         }
 
-        const docRef = db.collection('muat_fdn').doc(firestoreDateId);
-        const snapshotAmbil = await docRef.collection('ambilrak').orderBy('timestamp', 'asc').get();
+        const rtdbRef = firebase.database().ref(`muat_fdn/${firestoreDateId}/ambilrak`);
+        const snapshotAmbil = await rtdbRef.once('value');
 
-        if (snapshotAmbil.empty) {
+        if (!snapshotAmbil.exists()) {
             if (typeof window.hideCetakProgress === 'function') window.hideCetakProgress();
             window.miuiAlert(`Tidak ada data pengambilan rak untuk tanggal ${firestoreDateId}.`);
             return;
         }
 
+        const dataAmbilObj = snapshotAmbil.val();
+        
+        // Ubah objek ke array dan urutkan berdasarkan timestamp secara ascending (kronologis)
+        let rawDataArray = Object.keys(dataAmbilObj).map(key => {
+            return {
+                id: key,
+                ...dataAmbilObj[key]
+            };
+        }).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
         // Filter hanya data yang lokasi raknya mengandung "WH-3" atau "WH3"
         let dataWh3 = [];
-        snapshotAmbil.forEach(doc => {
-            const data = doc.data();
+        rawDataArray.forEach(data => {
             const lokasi = String(data.lokasi || '').toUpperCase();
             if (lokasi.includes('WH-3') || lokasi === 'WH3') {
                 dataWh3.push({
@@ -3410,7 +3450,7 @@ window.ambilDataKeTabelWh3 = async function() {
         window.miuiAlert(`Berhasil memuat dan mengonversi ${dataWh3.length} baris data Mutasi WH-3 (${noDOMutasi}).`);
 
     } catch (error) {
-        console.error("Gagal mengambil data WH-3 dari Firebase:", error);
+        console.error("Gagal mengambil data WH-3 dari Realtime Database:", error);
         if (typeof window.hideCetakProgress === 'function') window.hideCetakProgress();
         window.miuiAlert("Terjadi kesalahan saat mengambil data WH-3: " + error.message);
     }
