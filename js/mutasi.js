@@ -1262,6 +1262,11 @@ async function populateMutasiKodeDropdown(dateId) {
                 const items = docData.data || [];
                 const dariGudang = docData.meta?.dari_gudang || 'WH-2';
 
+                // Deteksi apakah dokumen FDN ini berstatus tambahan
+                const isDocTambahan = (docData.meta?.tipe || docData.tipe || '').toUpperCase() === 'TAMBAHAN' || 
+                                      String(docId).toUpperCase().includes('TAMBAHAN' ) ||
+                                      JSON.stringify(docData).toUpperCase().includes('TAMBAHAN');
+
                 items.forEach(item => {
                     const kode = String(item.kode || '').trim().toUpperCase();
                     if (!kode) return;
@@ -1274,11 +1279,13 @@ async function populateMutasiKodeDropdown(dateId) {
                         const existing = globalItemMap.get(kode);
                         existing.totalQty += qtyUtama;
                         if (isWh3Doc) existing.isWh3 = true;
+                        if (isDocTambahan) existing.isTambahan = true; // Tandai jika ada dokumen tambahan untuk kode ini
                     } else {
                         globalItemMap.set(kode, {
                             kode: kode,
                             totalQty: qtyUtama,
-                            isWh3: isWh3Doc
+                            isWh3: isWh3Doc,
+                            isTambahan: isDocTambahan
                         });
                     }
                 });
@@ -1314,7 +1321,8 @@ async function populateMutasiKodeDropdown(dateId) {
                     totalQty: totalKebutuhan,
                     sudahDiambil: sudahDiambil,
                     kekurangan: kekurangan,
-                    isWh3: value.isWh3
+                    isWh3: value.isWh3,
+                    isTambahan: value.isTambahan
                 });
             }
         });
@@ -1350,6 +1358,7 @@ async function populateMutasiKodeDropdown(dateId) {
             option.dataset.sudahDiambil = item.sudahDiambil;
             option.dataset.kekurangan = item.kekurangan;
             option.dataset.isWh3 = item.isWh3;
+            option.dataset.isTambahan = item.isTambahan ? 'true' : 'false'; // Menyimpan status tambahan ke dataset option
             
             selectKode.appendChild(option);
         });
@@ -1676,9 +1685,8 @@ async function prosesAmbilRakOtomatis() {
                 if (sisaKebutuhanItem <= 0) {
                     let totalFdnItem = Number(opt.dataset.qty || opt.dataset.totalFdn || 0);
                     if (totalFdnItem <= 0) {
-                        // Fallback: Parse angka dalam kurung pertama (total FDN)
                         const matchTotal = fullOptText.match(/\((\d+)\s*Krt/i) || fullOptText.match(/\((\d+)\)/);
-                        totalFdnItem = matchTotal ? parseInt(matchTotal[1]) : 70; // Default aman
+                        totalFdnItem = matchTotal ? parseInt(matchTotal[1]) : 70; 
                     }
                     sisaKebutuhanItem = totalFdnItem - (terambilMap[kodeBarang] || 0);
                 }
@@ -1688,7 +1696,10 @@ async function prosesAmbilRakOtomatis() {
                 }
 
                 adaItemDiproses = true;
-                const tipeAlokasi = (sudahDiambil > 0) ? "TAMBAHAN" : "UTAMA";
+                
+                // --- DETEKSI TIPE ALOKASI AKURAT BERDASARKAN FDN TAMBAHAN ATAU RIWAYAT ---
+                const isFDNTambahan = opt.dataset.isTambahan === 'true' || fullOptText.includes('TAMBAHAN');
+                const tipeAlokasi = isFDNTambahan ? "TAMBAHAN" : ((sudahDiambil > 0) ? "TAMBAHAN" : "UTAMA");
 
                 // 1. CEK ITEM WH-3
                 const isWh3Item = opt.dataset.isWh3 === 'true' || 
@@ -1713,11 +1724,11 @@ async function prosesAmbilRakOtomatis() {
                     continue;
                 }
 
-                // 2. PENCARIAN ITEM WMS REGULER
+                // 2. PENCARIAN ITEM WMS REGULER (Gunakan Exact Match agar kode mirip tidak saling tarik)
                 let stokWmsList = rawData.filter(item => {
                     if (!item) return false;
                     const kodeItem = String(item.KODE || item.kode || item.KODE_BARANG || '').trim().toUpperCase();
-                    return kodeItem === kodeBarang || kodeItem.includes(kodeBarang) || kodeBarang.includes(kodeItem);
+                    return kodeItem === kodeBarang; // Wajib sama persis secara mutlak
                 });
 
                 if (stokWmsList.length === 0) continue;
@@ -1735,7 +1746,7 @@ async function prosesAmbilRakOtomatis() {
                         kode: kodeBarang,
                         lokasi: lokasiRak,
                         stok: stokAsliWms,
-                        sisaStokReal: sisaStokReal, // Stok bersih setelah dikurangi data utama/sebelumnya
+                        sisaStokReal: sisaStokReal, 
                         expdate: String(item.EXPDATE || item.expdate || item.TANGGAL_EXP || '2099-12-31').trim()
                     };
                 }).filter(item => item.sisaStokReal > 0 && item.lokasi);
@@ -1765,7 +1776,7 @@ async function prosesAmbilRakOtomatis() {
                             qtyStok: wms.stok, 
                             qtyAmbil: qtyAmbil,
                             qtySisa: qtySisa,
-                            tipe: tipeAlokasi, // Otomatis berstatus TAMBAHAN jika sudah ada pengambilan data utama
+                            tipe: tipeAlokasi, // Otomatis berstatus TAMBAHAN jika berasal dari FDN Tambahan atau sudah ada pengambilan sebelumnya
                             timestamp: firebase.database.ServerValue.TIMESTAMP
                         });
 
@@ -2241,7 +2252,7 @@ function loadDataAmbilRak() {
                     tr.innerHTML = `
                         <td class="p-1.5 border border-orange-200 text-center font-semibold text-slate-500 w-10 align-top" rowspan="${itemsInGroup.length}">${nomorUrut}</td>
                         <td class="p-1.5 border border-orange-200 font-bold text-slate-800 truncate align-top" rowspan="${itemsInGroup.length}">${item.kode}</td>
-                        <td class="p-1.5 border border-orange-200 font-semibold text-orange-700 w-50 whitespace-nowrap">${badgeStatusHtml} ${item.rak}</td>
+                        <td class="p-1.5 border border-orange-200 font-semibold text-orange-700 w-60 whitespace-nowrap">${badgeStatusHtml} ${item.rak}</td>
                         <td class="p-1.5 border border-orange-200 text-center font-black text-orange-600 w-14">${item.ambil}</td>
                         <td class="p-1.5 border border-orange-200 text-center text-slate-600 w-14">${item.stok}</td>
                         <td class="p-1.5 border border-orange-200 text-center text-slate-600 w-14">${item.sisa}</td>
@@ -2249,7 +2260,7 @@ function loadDataAmbilRak() {
                     nomorUrut++;
                 } else {
                     tr.innerHTML = `
-                        <td class="p-1.5 border border-orange-200 font-semibold text-orange-700 w-50 whitespace-nowrap">${badgeStatusHtml} ${item.rak}</td>
+                        <td class="p-1.5 border border-orange-200 font-semibold text-orange-700 w-60 whitespace-nowrap">${badgeStatusHtml} ${item.rak}</td>
                         <td class="p-1.5 border border-orange-200 text-center font-black text-orange-600 w-14">${item.ambil}</td>
                         <td class="p-1.5 border border-orange-200 text-center text-slate-600 w-14">${item.stok}</td>
                         <td class="p-1.5 border border-orange-200 text-center text-slate-600 w-14">${item.sisa}</td>
@@ -2481,13 +2492,19 @@ window.bukaModalCetakArsip = function() {
                         Sistem akan mengunduh Excel Arsip, mencetak 1x Rekap Mutasi (Versi 1), dan Detail Rak (Versi 2) sesuai jumlah copy.
                     </div>
                 </div>
-                <!-- Footer Buttons -->
+                <!-- Footer Buttons (Di dalam Modal Pengaturan Cetak Arsip) -->
                 <div style="background-color: #f8fafc; padding: 10px 16px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid #e2e8f0;">
                     <button type="button" onclick="tutupModalCetakArsip()" style="background-color: #e2e8f0; color: #334155; border: none; padding: 6px 12px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; text-transform: uppercase;">
-                        Batal
+                        🚫 Batal
                     </button>
+                    
+                    <!-- TOMBOL BARU: Cetak Khusus Data Tambahan dari dalam Modal -->
+                    <button type="button" onclick="cetakLaporanVersi2Tambahan()" style="background-color: #d97706; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; font-size: 10px; font-weight: 900; cursor: pointer; text-transform: uppercase; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                        🖨️ Cetak Tambahan
+                    </button>
+
                     <button type="button" onclick="eksekusiCetakArsipDariModal()" style="background-color: #ff9800; color: #1e293b; border: none; padding: 6px 14px; border-radius: 4px; font-size: 10px; font-weight: 900; cursor: pointer; text-transform: uppercase; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
-                        Cetak Sekarang
+                        🖨️ Cetak Sekarang
                     </button>
                 </div>
             </div>
@@ -3049,7 +3066,7 @@ window.cetakLaporanVersi2 = async function(tglMuat) {
                     src: local('Century Gothic'), url('CenturyGothic.ttf') format('truetype');
                 }
 
-                /* Atur ukuran kertas dan margin halaman (menyediakan ruang untuk footer di bawah) */
+                /* Pengaturan halaman cetak dan nomor halaman otomatis di bawah */
                 @page { 
                     size: 215mm 330mm portrait; 
                     margin: 15mm 10mm 20mm 10mm; 
@@ -3067,18 +3084,6 @@ window.cetakLaporanVersi2 = async function(tglMuat) {
                     margin: 0; 
                     padding: 0; 
                     color: #000; 
-                }
-
-                /* Fallback elemen footer untuk browser yang merender counter via CSS langsung di body */
-                .page-footer {
-                    position: fixed;
-                    bottom: -10mm;
-                    left: 0;
-                    right: 0;
-                    text-align: center;
-                    font-size: 9pt;
-                    font-family: 'Century Gothic', Arial, sans-serif;
-                    display: none;
                 }
 
                 @media print {
@@ -3145,11 +3150,6 @@ window.cetakLaporanVersi2 = async function(tglMuat) {
                     ${rowsBodyHtml}
                 </tbody>
             </table>
-
-            <!-- Footer halaman otomatis di bagian bawah tengah -->
-            <div class="page-footer">
-                Halaman <span class="pageNumber"></span> dari <span class="totalPages"></span>
-            </div>
         </body>
         </html>`;
 
@@ -3175,6 +3175,332 @@ window.cetakLaporanVersi2 = async function(tglMuat) {
             window.miuiAlert("Gagal cetak v2: " + error.message);
         } else {
             alert("Gagal cetak v2: " + error.message);
+        }
+        throw error;
+    }
+};
+
+
+// Fungsi Cetak Versi 2 KHUSUS TAMBAHAN: Detail Ambil Rak Tambahan & FDN Tambahan Saja
+window.cetakLaporanVersi2Tambahan = async function(tglMuat) {
+    if (!tglMuat) {
+        tglMuat = document.getElementById('input-tgl-muat')?.value;
+    }
+    if (!tglMuat) {
+        if (typeof window.miuiAlert === 'function') {
+            window.miuiAlert("Pilih tanggal muat terlebih dahulu!");
+        } else {
+            alert("Pilih tanggal muat terlebih dahulu!");
+        }
+        return;
+    }
+
+    // --- AMBIL JUMLAH SALINAN DARI INPUT MODAL (input-jumlah-copy-v2) ---
+    const inputCopy = document.getElementById('input-jumlah-copy-v2');
+    let jumlahSalinan = parseInt(inputCopy?.value || 1);
+    if (isNaN(jumlahSalinan) || jumlahSalinan < 1) {
+        jumlahSalinan = 1;
+    }
+
+    const firestoreDateId = tglMuat.replace(/-/g, '');
+
+    try {
+        const rtdbRef = firebase.database().ref(`muat_fdn/${firestoreDateId}`);
+
+        // 1. Ambil data dari node 'ambilrak' di RTDB dan filter HANYA yang bertipe TAMBAHAN
+        const snapshotAmbil = await rtdbRef.child('ambilrak').once('value');
+        let rawDataArray = [];
+
+        if (snapshotAmbil.exists()) {
+            const dataAmbilObj = snapshotAmbil.val();
+            
+            rawDataArray = Object.keys(dataAmbilObj).map(key => {
+                return {
+                    id: key,
+                    ...dataAmbilObj[key]
+                };
+            }).filter(data => String(data.tipe || 'UTAMA').toUpperCase() === 'TAMBAHAN')
+              .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+        }
+
+        if (rawDataArray.length === 0) {
+            if (typeof window.miuiAlert === 'function') {
+                window.miuiAlert("Tidak ada data dengan status TAMBAHAN untuk dicetak.");
+            } else {
+                alert("Tidak ada data dengan status TAMBAHAN untuk dicetak.");
+            }
+            return;
+        }
+
+        // Normalisasi properti data ambilrak tambahan
+        const normalizedAmbilData = rawDataArray.map(data => ({
+            id: data.id,
+            kode: String(data.kode || '-').trim(),
+            rak: String(data.lokasi || '-').trim(),
+            ambil: Number(data.qtyAmbil || 0),
+            stok: Number(data.qtyStok || 0),
+            sisa: data.qtySisa !== undefined ? Number(data.qtySisa) : (Number(data.qtyStok || 0) - Number(data.qtyAmbil || 0)),
+            rawDocData: data
+        }));
+
+        // 2. Ambil data FDN & Tujuan HANYA yang berstatus TAMBAHAN dari node 'datatujuan' RTDB
+        const tujuanMap = {}; 
+        try {
+            const snapshotDatatujuan = await rtdbRef.child('datatujuan').once('value');
+            if (snapshotDatatujuan.exists()) {
+                const dataTujuanObj = snapshotDatatujuan.val();
+                Object.keys(dataTujuanObj).forEach(key => {
+                    const d = dataTujuanObj[key];
+                    
+                    // Deteksi apakah dokumen datatujuan ini berstatus TAMBAHAN
+                    const isDocTambahan = (d.meta?.tipe || d.tipe || '').toUpperCase() === 'TAMBAHAN' || 
+                                          String(key).toUpperCase().includes('TAMBAHAN') ||
+                                          JSON.stringify(d).toUpperCase().includes('TAMBAHAN');
+
+                    // Jika bukan dokumen tambahan, lewati
+                    if (!isDocTambahan) return;
+
+                    const rawNoFdn = String(d.meta?.nomor_dokumen || d.nomor_dokumen || '').trim();
+                    let tujuan = String(d.meta?.tujuan || d.tujuan || '').trim().toUpperCase();
+
+                    tujuan = tujuan.replace(/STOCK POINT/g, 'SP');
+
+                    if (rawNoFdn && tujuan) {
+                        if (!tujuanMap[tujuan]) {
+                            tujuanMap[tujuan] = [];
+                        }
+                        if (!tujuanMap[tujuan].includes(rawNoFdn)) {
+                            tujuanMap[tujuan].push(rawNoFdn);
+                        }
+                    }
+                });
+            }
+        } catch (e) {
+            console.log("Gagal mengambil data dari datatujuan RTDB:", e);
+        }
+
+        let fdnRowsData = [];
+        Object.keys(tujuanMap).forEach(tujuan => {
+            const fdnList = tujuanMap[tujuan];
+            const formattedFdn = fdnList.map((rawFdn, idx) => {
+                if (idx === 0) {
+                    return rawFdn.length >= 5 ? rawFdn.slice(-5) : rawFdn;
+                } else {
+                    return rawFdn.length >= 3 ? rawFdn.slice(-3) : rawFdn;
+                }
+            }).join('/');
+
+            fdnRowsData.push({
+                noFdn: formattedFdn,
+                tujuan: tujuan
+            });
+        });
+
+        let rowsBodyHtml = '';
+        let nomorUrut = 1;
+        let lastKode = '';
+        let finalMaxRows = Math.max(normalizedAmbilData.length, fdnRowsData.length);
+
+        for (let i = 0; i < finalMaxRows; i++) {
+            const ambilRow = normalizedAmbilData[i] || {};
+            const itemFdn = fdnRowsData[i] || {};
+
+            const formatVal = (val) => {
+                if (val === undefined || val === null || val === '' || Number(val) === 0) {
+                    return '-';
+                }
+                return val;
+            };
+
+            let noDisplay = '';
+            let kodeDisplay = '';
+
+            if (ambilRow.kode) {
+                if (ambilRow.kode !== lastKode) {
+                    noDisplay = nomorUrut++;
+                    kodeDisplay = ambilRow.kode;
+                    lastKode = ambilRow.kode;
+                } else {
+                    noDisplay = '';
+                    kodeDisplay = '';
+                }
+            }
+
+            rowsBodyHtml += `
+                <tr>
+                    <td>${noDisplay}</td>
+                    <td class="text-left font-bold" style="text-align: left; padding-left: 5px; font-weight: bold;">${kodeDisplay}</td>
+                    <td>${ambilRow.rak || ''}</td>
+                    <td>${formatVal(ambilRow.ambil)}</td>
+                    <td>${formatVal(ambilRow.stok)}</td>
+                    <td>${formatVal(ambilRow.sisa)}</td>
+                    <td>${itemFdn.noFdn ? (i + 1) : ''}</td>
+                    <td class="text-left" style="text-align: left;">${itemFdn.noFdn || ''}</td>
+                    <td class="text-left" style="text-align: left;">${itemFdn.tujuan || ''}</td>
+                </tr>
+            `;
+        }
+
+        // Format Sub-Header Waktu Lengkap
+        const now = new Date();
+        const daftarHari = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+        const hari = daftarHari[now.getDay()];
+        
+        const tgl = String(now.getDate()).padStart(2, '0');
+        const blnIndex = now.getMonth();
+        const thn = now.getFullYear();
+        
+        const namaBulan = [
+            "Januari", "Februari", "Maret", "April", "Mei", "Juni", 
+            "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+        ];
+        const bulan = namaBulan[blnIndex];
+
+        const jam = String(now.getHours()).padStart(2, '0');
+        const menit = String(now.getMinutes()).padStart(2, '0');
+        const detik = String(now.getSeconds()).padStart(2, '0');
+        
+        const formatWaktuLengkap = `${hari}, ${tgl} ${bulan} ${thn} ${jam}.${menit}.${detik}`;
+
+        const finalHtml = `
+        <html>
+        <head>
+            <style>
+                @font-face {
+                    font-family: 'Edo';
+                    src: local('Edo'), url('EDO.ttf') format('truetype');
+                }
+                @font-face {
+                    font-family: 'Century Gothic';
+                    src: local('Century Gothic'), url('CenturyGothic.ttf') format('truetype');
+                }
+
+                /* Pengaturan halaman cetak dan nomor halaman otomatis di bawah */
+                @page { 
+                    size: 215mm 330mm portrait; 
+                    margin: 15mm 10mm 20mm 10mm; 
+                    @bottom-center {
+                        content: "Halaman " counter(page) " dari " counter(pages);
+                        font-family: 'Century Gothic', Arial, sans-serif;
+                        font-size: 9pt;
+                        color: #000;
+                    }
+                }
+
+                body { 
+                    font-family: 'Century Gothic', Arial, sans-serif; 
+                    font-size: 10pt; 
+                    margin: 0; 
+                    padding: 0; 
+                    color: #000; 
+                }
+
+                .page-footer {
+                    position: fixed;
+                    bottom: -10mm;
+                    left: 0;
+                    right: 0;
+                    text-align: center;
+                    font-size: 9pt;
+                    font-family: 'Century Gothic', Arial, sans-serif;
+                    display: none;
+                }
+
+                @media print {
+                    .page-footer {
+                        display: block;
+                    }
+                }
+
+                .header-title { 
+                    font-family: 'Edo', Arial, sans-serif; 
+                    font-weight: normal; 
+                    font-size: 16pt; 
+                    text-align: center; 
+                    margin-bottom: 2px; 
+                    letter-spacing: 1px;
+                }
+                .sub-header { 
+                    font-family: 'Century Gothic', Arial, sans-serif; 
+                    margin-bottom: 8px; 
+                    font-size: 12pt; 
+                    text-align: left;
+                }
+                table { 
+                    width: 100%; 
+                    border-collapse: collapse; 
+                    margin-bottom: 15px; 
+                    font-family: 'Century Gothic', Arial, sans-serif;
+                    font-size: 11pt;
+                    table-layout: fixed;
+                }
+                th, td { 
+                    border: 1px solid #000; 
+                    padding: 3px 5px; 
+                    text-align: center; 
+                    vertical-align: middle; 
+                }
+                th { 
+                    background-color: #f2f2f2; 
+                    font-size: 11pt; 
+                }
+                .text-left { text-align: left; }
+                .font-bold { font-weight: bold; }
+            </style>
+        </head>
+        <body>
+            <div class="header-title">MUTASI GUDANG WH-2 (CETAK TAMBAHAN)</div>
+            <div class="sub-header">${formatWaktuLengkap}</div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 4%;">NO</th>
+                        <th style="width: 23%;">KODE</th>
+                        <th style="width: 9%;">RAK</th>
+                        <th style="width: 7%;">AMBIL</th>
+                        <th style="width: 7%;">STOK</th>
+                        <th style="width: 7%;">SISA</th>
+                        <th style="width: 4%;">NO</th>
+                        <th style="width: 18%;">NO. FDN</th>
+                        <th style="width: 21%;">TUJUAN KIRIM</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsBodyHtml}
+                </tbody>
+            </table>
+        </body>
+        </html>`;
+
+        // 3. Kirim ke Print Server (Firebase Realtime Database) berulang sesuai jumlahSalinan
+        for (let c = 1; c <= jumlahSalinan; c++) {
+            const judulTugas = `Cetak Dokumen v2 Tambahan (Detail Rak) - Copy ${c} dari ${jumlahSalinan}`;
+            const safeKeyName = `Cetak_Dokumen_v2_Tambahan_${tgl}-${String(blnIndex + 1).padStart(2, '0')}-${thn}_${jam}-${menit}-${detik}_copy${c}`;
+
+            await fetch(`https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs/${safeKeyName}.json`, {
+                method: 'PUT',
+                body: JSON.stringify({ 
+                    judul: judulTugas,
+                    waktu_teks: formatWaktuLengkap,
+                    html: finalHtml, 
+                    status: 'PENDING',
+                    timestamp: Date.now() + c 
+                }),
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        if (typeof window.miuiAlert === 'function') {
+            window.miuiAlert(`Berhasil mengirim ${jumlahSalinan} salinan perintah cetak tambahan!`);
+        }
+        
+    } catch (error) {
+        console.error("Gagal mencetak laporan versi 2 tambahan dari RTDB:", error);
+        if (typeof window.miuiAlert === 'function') {
+            window.miuiAlert("Gagal cetak v2 tambahan: " + error.message);
+        } else {
+            alert("Gagal cetak v2 tambahan: " + error.message);
         }
         throw error;
     }
