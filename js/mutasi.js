@@ -1,3 +1,237 @@
+// Buka Modal Database Manager & Auto Pilih Tanggal Terbaru
+window.openDatabaseManagerModal = async function() {
+    const modal = document.getElementById('modal-db-manager');
+    const selectTgl = document.getElementById('db-select-tanggal');
+    if (!modal || !selectTgl) return;
+
+    modal.classList.remove('hidden');
+    selectTgl.innerHTML = '<option value="">Memuat daftar tanggal...</option>';
+    document.getElementById('db-node-details-container').innerHTML = '<p class="text-slate-500 italic text-center py-10">Pilih tanggal terlebih dahulu...</p>';
+
+    try {
+        const snapshot = await firebase.database().ref('muat_fdn').once('value');
+        selectTgl.innerHTML = '<option value="">-- Pilih Tanggal Database --</option>';
+
+        if (snapshot.exists()) {
+            const dataObj = snapshot.val();
+            // Urutkan tanggal dari yang terbaru (descending)
+            const dates = Object.keys(dataObj).sort((a, b) => b.localeCompare(a));
+
+            dates.forEach(dateId => {
+                const thn = dateId.substring(0, 4);
+                const bln = dateId.substring(4, 6);
+                const tgl = dateId.substring(6, 8);
+                const formatted = `${tgl}-${bln}-${thn}`;
+
+                let opt = document.createElement('option');
+                opt.value = dateId;
+                opt.textContent = `${formatted} (ID: ${dateId})`;
+                selectTgl.appendChild(opt);
+            });
+
+            // Otomatis pilih dan muat tanggal terbaru jika datanya ada
+            if (dates.length > 0) {
+                selectTgl.value = dates[0];
+                loadDatabaseNodeDetails(); // Langsung muat rincian data tanggal terbaru
+            }
+        } else {
+            selectTgl.innerHTML = '<option value="">Tidak ada data di muat_fdn</option>';
+        }
+    } catch (error) {
+        console.error("Gagal memuat tanggal database:", error);
+        selectTgl.innerHTML = '<option value="">Error memuat data</option>';
+    }
+};
+
+// Tutup Modal Database Manager
+window.closeDatabaseManagerModal = function() {
+    const modal = document.getElementById('modal-db-manager');
+    if (modal) modal.classList.add('hidden');
+};
+
+// Muat Rincian Node RTDB Berdasarkan Tanggal yang Dipilih
+window.loadDatabaseNodeDetails = async function() {
+    const selectTgl = document.getElementById('db-select-tanggal');
+    const container = document.getElementById('db-node-details-container');
+    const dateId = selectTgl?.value;
+
+    if (!dateId) {
+        container.innerHTML = '<p class="text-slate-500 italic text-center py-10">Pilih tanggal terlebih dahulu untuk melihat isi node database...</p>';
+        return;
+    }
+
+    container.innerHTML = '<p class="text-slate-500 italic text-center py-10">Memuat rincian node dari RTDB...</p>';
+
+    try {
+        const dateRef = firebase.database().ref(`muat_fdn/${dateId}`);
+        const snapshot = await dateRef.once('value');
+
+        if (!snapshot.exists()) {
+            container.innerHTML = '<p class="text-red-500 text-center py-10">Data untuk tanggal ini kosong atau sudah terhapus.</p>';
+            return;
+        }
+
+        const dataNode = snapshot.val();
+        const ambilRakCount = dataNode.ambilrak ? Object.keys(dataNode.ambilrak).length : 0;
+        const dataTujuanCount = dataNode.datatujuan ? Object.keys(dataNode.datatujuan).length : 0;
+
+        let html = `
+            <div class="space-y-3">
+                <div class="bg-white p-3 rounded border border-slate-200 space-y-2">
+                    <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+                        <div>
+                            <span class="font-bold text-slate-800">Tanggal ID:</span> <span class="text-orange-600 font-bold">${dateId}</span><br>
+                            <span class="text-slate-700">• Jumlah Data Ambil Rak: <b>${ambilRakCount} item</b></span>
+                        </div>
+                        <div>
+                            <button onclick="confirmDeleteNodeData('${dateId}', 'ambilrak', 'Data Ambil Rak')" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded font-bold shadow-xs transition text-[11px]">
+                                🗑️ Hapus Data Rak
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between items-center pt-1">
+                        <div>
+                            <span class="text-slate-700">• Jumlah Data Tujuan FDN: <b>${dataTujuanCount} dokumen</b></span>
+                        </div>
+                        <div>
+                            <button onclick="confirmDeleteNodeData('${dateId}', 'datatujuan', 'Data FDN')" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded font-bold shadow-xs transition text-[11px]">
+                                🗑️ Hapus Data Fdn
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border-t border-slate-200 pt-2">
+                    <h5 class="font-bold text-slate-700 mb-1">Rincian Dokumen Tujuan:</h5>
+                    <div class="max-h-40 overflow-y-auto bg-white p-2 rounded border border-orange-200 space-y-1 miui-custom-scroll">
+        `;
+
+        if (dataNode.datatujuan) {
+            Object.keys(dataNode.datatujuan).forEach(tujuanKey => {
+                const item = dataNode.datatujuan[tujuanKey];
+                const meta = item.meta || {};
+                html += `<div class="text-[11px] border-b border-slate-100 pb-1 flex justify-between">
+                    <span><b>${meta.nomor_dokumen || tujuanKey}</b> → ${meta.tujuan || '-'} (${meta.tipe || 'UTAMA'})</span>
+                    <button onclick="confirmDeleteFdnDoc('${dateId}', '${tujuanKey}')" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded font-bold">🗑️ Hapus</button>
+                </div>`;
+            });
+        } else {
+            html += `<p class="text-slate-400 italic">Tidak ada data datatujuan.</p>`;
+        }
+
+        html += `
+                    </div>
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = html;
+
+    } catch (error) {
+        console.error("Gagal memuat rincian node RTDB:", error);
+        container.innerHTML = '<p class="text-red-500 text-center py-10">Terjadi kesalahan saat memuat rincian database.</p>';
+    }
+};
+
+// Helper Global untuk miuiConfirm Kustom Anda
+window.miuiConfirmCustom = function(message, onYes) {
+    const alertBox = document.getElementById('modal-miuiAlert') || document.getElementById('miui-global-miuiAlert');
+    const msgEl = document.getElementById('miui-miuiAlert-message');
+    const containerOk = document.getElementById('miui-container-ok');
+    const containerConfirm = document.getElementById('miui-container-confirm');
+    const btnYa = document.getElementById('miui-btn-ya');
+    const btnTidak = document.getElementById('miui-btn-tidak');
+
+    if (!alertBox || !msgEl) {
+        // Fallback ke confirm browser jika elemen tidak ditemukan
+        if (confirm(message)) onYes();
+        return;
+    }
+
+    msgEl.textContent = message;
+    containerOk.classList.add('hidden');
+    containerConfirm.classList.remove('hidden');
+    alertBox.classList.remove('hidden');
+
+    // Bersihkan event listener sebelumnya agar tidak menumpuk
+    const newBtnYa = btnYa.cloneNode(true);
+    const newBtnTidak = btnTidak.cloneNode(true);
+    btnYa.parentNode.replaceChild(newBtnYa, btnYa);
+    btnTidak.parentNode.replaceChild(newBtnTidak, btnTidak);
+
+    newBtnYa.addEventListener('click', function() {
+        alertBox.classList.add('hidden');
+        if (typeof onYes === 'function') onYes();
+    });
+
+    newBtnTidak.addEventListener('click', function() {
+        alertBox.classList.add('hidden');
+    });
+};
+
+// Konfirmasi & Hapus Node Spesifik (ambilrak / datatujuan) - Memanggil initMutasi()
+window.confirmDeleteNodeData = function(dateId, nodeName, labelName) {
+    miuiConfirmCustom(`Yakin ingin menghapus seluruh ${labelName} untuk tanggal ${dateId}?`, function() {
+        firebase.database().ref(`muat_fdn/${dateId}/${nodeName}`).remove()
+            .then(() => {
+                if (typeof window.miuiAlert === 'function') {
+                    window.miuiAlert(`${labelName} berhasil dihapus!`);
+                }
+                
+                // Inisialisasi ulang seluruh modul mutasi agar dropdown & preview ikut ter-refresh total
+                if (typeof window.initMutasi === 'function') {
+                    window.initMutasi();
+                } else if (typeof window.modalLoadDataBulanDanTanggal === 'function') {
+                    window.modalLoadDataBulanDanTanggal();
+                }
+                
+                // Refresh rincian di modal database manager
+                if (typeof window.loadDatabaseNodeDetails === 'function') {
+                    window.loadDatabaseNodeDetails();
+                }
+            })
+            .catch((err) => {
+                if (typeof window.miuiAlert === 'function') {
+                    window.miuiAlert("Gagal menghapus: " + err.message);
+                } else {
+                    alert("Gagal menghapus: " + err.message);
+                }
+            });
+    });
+};
+
+// Konfirmasi & Hapus Satu Dokumen FDN - Memanggil initMutasi()
+window.confirmDeleteFdnDoc = function(dateId, docKey) {
+    miuiConfirmCustom(`Yakin ingin menghapus dokumen FDN (${docKey}) ini dari database?`, function() {
+        firebase.database().ref(`muat_fdn/${dateId}/datatujuan/${docKey}`).remove()
+            .then(() => {
+                if (typeof window.miuiAlert === 'function') {
+                    window.miuiAlert("Dokumen FDN berhasil dihapus!");
+                }
+                
+                // Inisialisasi ulang seluruh modul mutasi agar dropdown & preview ikut ter-refresh total
+                if (typeof window.initMutasi === 'function') {
+                    window.initMutasi();
+                } else if (typeof window.modalLoadDataBulanDanTanggal === 'function') {
+                    window.modalLoadDataBulanDanTanggal();
+                }
+                
+                // Refresh rincian di modal database manager
+                if (typeof window.loadDatabaseNodeDetails === 'function') {
+                    window.loadDatabaseNodeDetails();
+                }
+            })
+            .catch((err) => {
+                if (typeof window.miuiAlert === 'function') {
+                    window.miuiAlert("Gagal menghapus: " + err.message);
+                } else {
+                    alert("Gagal menghapus: " + err.message);
+                }
+            });
+    });
+};
+
 
 // Variabel global untuk menyimpan data FDN yang valid
 let globalDataFdn = [];
@@ -396,21 +630,43 @@ async function refreshWmsData() {
 }
 
 
-// Fungsi utama untuk menangani banyak file yang dipilih sekaligus (Aman & Berurutan)
+// Fungsi utama untuk menangani banyak file yang dipilih sekaligus (Aman & Berurutan dengan Deteksi Batch Utama/Tambahan)
 async function handleImportFdnFiles(event) {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
     let successCount = 0;
     let failCount = 0;
-    let latestImportedDateId = null; // Menyimpan ID tanggal (YYYYMMDD) dari file terakhir yang diimpor
+    let latestImportedDateId = null; 
+    let batchTipe = null; // Penyeragaman tipe (UTAMA / TAMBAHAN) untuk satu batch import ini
 
     // Loop melalui setiap file yang dipilih secara berurutan dengan for...of
     for (const file of files) {
         try {
             const textContent = await readFileAsync(file);
-            // Panggil fungsi parseAndSaveFdn murni tanpa render di tengah jalan
-            const parsedDateId = await parseAndSaveFdn(textContent);
+
+            // Jika ini adalah file pertama dalam batch, tentukan tanggal dan cek status database RTDB SEKALI SAJA
+            if (!batchTipe) {
+                // Ekstraksi tanggal singkat dari teks file pertama untuk cek database
+                const matchTanggal = textContent.match(/TANGGAL\s*:\s*([0-9\/]+)/);
+                if (matchTanggal) {
+                    const [d, m, y] = matchTanggal[1].trim().split('/');
+                    const targetDateId = `${y}${m}${d}`;
+                    latestImportedDateId = targetDateId;
+
+                    // Cek ke RTDB apakah node datatujuan di tanggal ini sudah ada isinya
+                    const snapshot = await firebase.database().ref(`muat_fdn/${targetDateId}/datatujuan`).once('value');
+                    if (snapshot.exists() && Object.keys(snapshot.val()).length > 0) {
+                        batchTipe = "TAMBAHAN";
+                    } else {
+                        batchTipe = "UTAMA";
+                    }
+                    console.log(`[Batch Import] Deteksi tipe batch untuk tanggal ${targetDateId}: ${batchTipe}`);
+                }
+            }
+
+            // Panggil fungsi parseAndSaveFdn dengan membawa parameter batchTipe yang seragam
+            const parsedDateId = await parseAndSaveFdn(textContent, batchTipe);
             if (parsedDateId) {
                 latestImportedDateId = parsedDateId;
             }
@@ -421,7 +677,7 @@ async function handleImportFdnFiles(event) {
         }
     }
 
-    miuiAlert(`Proses Impor Selesai!\nBerhasil: ${successCount} file\nGagal: ${failCount} file`);
+    miuiAlert(`Proses Impor Selesai!\nTipe Batch: ${batchTipe || 'UTAMA'}\nBerhasil: ${successCount} file\nGagal: ${failCount} file`);
 
     // JIKA SEMUA FILE SELESAI DIIMPOR, BARU JALANKAN REFRESH UI SEKALI SAJA DI AKHIR
     if (latestImportedDateId) {
@@ -463,8 +719,8 @@ function readFileAsync(file) {
     });
 }
 
-// Fungsi parser dan penyimpanan FDN ke Firebase Realtime Database (RTDB) - Diperbaiki
-async function parseAndSaveFdn(fileContent) {
+// Fungsi parser dan penyimpanan FDN ke Firebase Realtime Database (RTDB) - Mendukung Forced Tipe (Batch)
+async function parseAndSaveFdn(fileContent, forcedTipe = null) {
     const lines = fileContent.split('\n');
     let dariGudangRaw = '', nomorDokumen = '', tanggal = '', tujuanRaw = '';
     let items = [];
@@ -501,11 +757,9 @@ async function parseAndSaveFdn(fileContent) {
 
         // Parsing baris produk tabel (Dibuat lebih fleksibel menangkap format kuantitas terpisah spasi/slash)
         const trimmed = line.trim();
-        // Cek apakah baris diawali dengan nomor urut tabel (misal: "1  KODEBARANG")
         if (/^\d+\s+[A-Z0-9\-_]+/.test(trimmed)) {
             const tokens = trimmed.split(/\s+/);
             if (tokens.length >= 2) {
-                // Cari token yang mengandung format kuantitas (mengandung garis miring '/')
                 const qtyTokenIndex = tokens.findIndex(t => /^\d+\/\d+\/\d+\/\d+\$/.test(t) || (t.includes('/') && t.split('/').length === 4));
                 
                 if (qtyTokenIndex !== -1) {
@@ -550,7 +804,20 @@ async function parseAndSaveFdn(fileContent) {
     const [d, m, y] = tanggal.split('/');
     const docIdTanggal = `${y}${m}${d}`;
 
-    // 5. Simpan ke Realtime Database (RTDB) dengan menyertakan array data items
+    // Tentukan tipe FDN: gunakan forcedTipe jika diberikan dari batch, jika tidak lakukan cek otomatis
+    let tipeFdn = forcedTipe;
+    if (!tipeFdn) {
+        const tanggalRef = firebase.database().ref(`muat_fdn/${docIdTanggal}`);
+        const datatujuanRef = tanggalRef.child('datatujuan');
+        const existingSnapshot = await datatujuanRef.once('value');
+        
+        tipeFdn = "UTAMA";
+        if (existingSnapshot.exists() && Object.keys(existingSnapshot.val()).length > 0) {
+            tipeFdn = "TAMBAHAN";
+        }
+    }
+
+    // 5. Simpan ke Realtime Database (RTDB) dengan menyertakan tipe FDN di dalam meta
     const tujuanRef = firebase.database().ref(`muat_fdn/${docIdTanggal}/datatujuan/${docIdTujuan}`);
 
     await tujuanRef.set({
@@ -559,16 +826,17 @@ async function parseAndSaveFdn(fileContent) {
             nomor_dokumen: nomorDokumen,
             tanggal: tanggal,
             tujuan: tujuanRaw,
+            tipe: tipeFdn, // Menandai UTAMA atau TAMBAHAN secara konsisten dalam satu batch
             updated_at: new Date().toISOString()
         },
         data: items
     });
 
-    console.log(`[RTDB] Sukses menyimpan FDN dengan ID: ${docIdTujuan} beserta ${items.length} item.`);
+    console.log(`[RTDB] Sukses menyimpan FDN (${tipeFdn}) dengan ID: ${docIdTujuan} beserta ${items.length} item.`);
     return docIdTanggal;
 }
 
-// Fungsi untuk mengambil data dari RTDB node datatujuan dan menampilkannya ke #fdn-preview-text
+// Fungsi untuk mengambil data dari RTDB node datatujuan dan menampilkannya ke #fdn-preview-text (Dengan dukungan Badge Tambahan)
 async function renderDaftarFdnToPreview(dateId) {
     const previewContainer = document.getElementById('fdn-preview-text');
     if (!previewContainer) return;
@@ -610,8 +878,9 @@ async function renderDaftarFdnToPreview(dateId) {
             uniqueTujuanSet.add(tujuan);
 
             const nomorDokumen = meta.nomor_dokumen || docId;
-            const docIdRtdb = docId; // Simpan ID dokumen RTDB (misal: SP_CILACAP_75642)
+            const docIdRtdb = docId; 
             const gudang = meta.dari_gudang || 'WH-2';
+            const tipeFdn = meta.tipe || 'UTAMA'; // Ambil tipe FDN (UTAMA / TAMBAHAN)
             
             // Hitung item & total qty_utama
             const items = data.data || [];
@@ -627,15 +896,23 @@ async function renderDaftarFdnToPreview(dateId) {
                 groupedByTujuan[tujuan] = {
                     tujuan: tujuan,
                     dokumenList: [],
-                    docIdList: [], // Menyimpan ID dokumen untuk modal
+                    docIdList: [], 
                     gudangSet: new Set(),
-                    itemCounts: []
+                    itemCounts: [],
+                    hasTambahan: false // Indikator apakah ada dokumen tambahan di tujuan ini
                 };
             }
-            groupedByTujuan[tujuan].dokumenList.push(nomorDokumen);
+            groupedByTujuan[tujuan].dokumenList.push({
+                nomorDokumen: nomorDokumen,
+                tipe: tipeFdn
+            });
             groupedByTujuan[tujuan].docIdList.push(docIdRtdb);
             groupedByTujuan[tujuan].gudangSet.add(gudang);
             groupedByTujuan[tujuan].itemCounts.push(itemCount);
+
+            if (tipeFdn === 'TAMBAHAN') {
+                groupedByTujuan[tujuan].hasTambahan = true;
+            }
         });
 
         // Update nilai ke 3 kotak statistik di bawah
@@ -650,10 +927,17 @@ async function renderDaftarFdnToPreview(dateId) {
         for (const key in groupedByTujuan) {
             const group = groupedByTujuan[key];
             
-            // Ambil 5 digit terakhir dari setiap nomor dokumen
-            const suffixes = group.dokumenList.map(doc => {
+            // Ambil 5 digit terakhir dari setiap nomor dokumen dan format tampilannya
+            const suffixes = group.dokumenList.map(docObj => {
+                const doc = docObj.nomorDokumen;
                 const digits = doc.replace(/\D/g, '');
-                return digits.length >= 5 ? digits.slice(-5) : doc;
+                const suffix = digits.length >= 5 ? digits.slice(-5) : doc;
+                
+                // Jika dokumen berstatus TAMBAHAN, berikan badge khusus di samping nomor dokumen
+                if (docObj.tipe === 'TAMBAHAN') {
+                    return `${suffix} <span style="background-color: #ff9800; color: #fff; font-size: 8px; padding: 1px 3px; border-radius: 2px; font-weight: bold;">TAMBAHAN</span>`;
+                }
+                return suffix;
             });
             
             const formattedDoc = suffixes.join(' & ');
@@ -696,7 +980,7 @@ let activeModalContext = {
     matchedDocs: [] // Berisi array ID dokumen RTDB dan nomor dokumennya
 };
 
-// Modifikasi fungsi openFdnDetailModalByTujuan untuk Realtime Database (RTDB)
+// Modifikasi fungsi openFdnDetailModalByTujuan untuk menampilkan Badge Tipe (UTAMA / TAMBAHAN)
 async function openFdnDetailModalByTujuan(dateId, tujuanKey) {
     const modal = document.getElementById('fdn-modal-detail');
     const itemListContainer = document.getElementById('modal-item-list');
@@ -722,7 +1006,7 @@ async function openFdnDetailModalByTujuan(dateId, tujuanKey) {
         const dataTujuanObj = snapshot.val();
         let matchedDocs = [];
         let allItemsCombined = [];
-        let docNumbers = [];
+        let docEntries = []; // Menyimpan info nomor dokumen beserta tipenya
         let tanggalVal = '-';
         let tujuanVal = '-';
         let gudangSet = new Set();
@@ -736,11 +1020,15 @@ async function openFdnDetailModalByTujuan(dateId, tujuanKey) {
 
             if (currentTujuan === tujuanKey) {
                 const noDok = meta.nomor_dokumen || docId;
+                const tipeDok = (meta.tipe || 'UTAMA').toUpperCase(); // Ambil tipe dokumen
+
                 matchedDocs.push({
-                    rtdbId: docId, // Simpan ID dokumen RTDB
-                    nomorDokumen: noDok
+                    rtdbId: docId,
+                    nomorDokumen: noDok,
+                    tipe: tipeDok
                 });
-                docNumbers.push(noDok);
+                
+                docEntries.push({ nomor: noDok, tipe: tipeDok });
                 
                 if (tanggalVal === '-') tanggalVal = meta.tanggal || '-';
                 if (tujuanVal === '-') tujuanVal = currentTujuan;
@@ -753,6 +1041,7 @@ async function openFdnDetailModalByTujuan(dateId, tujuanKey) {
                     allItemsCombined.push({
                         ...item,
                         nomor_dokumen: noDok,
+                        tipe_dokumen: tipeDok, // Sertakan tipe di setiap item tabel
                         dari_gudang: gudangAsal
                     });
                 });
@@ -771,25 +1060,27 @@ async function openFdnDetailModalByTujuan(dateId, tujuanKey) {
             return;
         }
 
-        // Format tampilan nomor dokumen gabungan di header
-        let formattedDocNo = '';
-        if (docNumbers.length === 1) {
-            formattedDocNo = docNumbers[0];
-        } else {
-            const firstDoc = docNumbers[0];
-            const lastDashIdx = firstDoc.lastIndexOf('-');
-            const prefix = lastDashIdx !== -1 ? firstDoc.substring(0, lastDashIdx + 1) : '';
-            const suffixes = docNumbers.map(doc => {
-                const idx = doc.lastIndexOf('-');
-                return idx !== -1 ? doc.substring(idx + 1) : doc;
-            });
-            formattedDocNo = prefix + suffixes.join(' & ');
-        }
+        // Format tampilan nomor dokumen gabungan lengkap dengan Badge Tipe di Header
+        let formattedDocHtml = '';
+        docEntries.forEach((entry, idx) => {
+            const docStr = entry.nomor;
+            const digits = docStr.replace(/\D/g, '');
+            const shortDoc = digits.length >= 5 ? digits.slice(-5) : docStr;
+            
+            const badgeClass = entry.tipe === 'TAMBAHAN' 
+                ? 'bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded text-[10px] font-bold ml-1 inline-block align-middle' 
+                : 'bg-blue-100 text-blue-800 border border-blue-300 px-1.5 py-0.5 rounded text-[10px] font-bold ml-1 inline-block align-middle';
+
+            formattedDocHtml += `${shortDoc} <span class="${badgeClass}">${entry.tipe}</span>`;
+            if (idx < docEntries.length - 1) {
+                formattedDocHtml += ' & ';
+            }
+        });
 
         const gudangArr = Array.from(gudangSet);
         const gudangStr = gudangArr.length > 1 ? gudangArr.join(' & ') : (gudangArr[0] || 'WH-2');
 
-        document.getElementById('modal-doc-no').innerText = formattedDocNo;
+        document.getElementById('modal-doc-no').innerHTML = formattedDocHtml;
         document.getElementById('modal-tanggal').innerText = tanggalVal;
         document.getElementById('modal-tujuan').innerText = tujuanVal;
         document.getElementById('modal-gudang').innerText = gudangStr;
@@ -806,6 +1097,12 @@ async function openFdnDetailModalByTujuan(dateId, tujuanKey) {
             const docStr = item.nomor_dokumen;
             const digits = docStr.replace(/\D/g, '');
             const shortDoc = digits.length >= 5 ? digits.slice(-5) : docStr;
+            const tipeItem = item.tipe_dokumen || 'UTAMA';
+
+            // Tentukan warna badge kecil di baris tabel
+            const tableBadgeClass = tipeItem === 'TAMBAHAN'
+                ? 'bg-amber-100 text-amber-800 border border-amber-300 px-1 py-0.2 rounded text-[9px] font-bold ml-1'
+                : 'bg-blue-100 text-blue-800 border border-blue-300 px-1 py-0.2 rounded text-[9px] font-bold ml-1';
 
             // Tentukan styling baris: WH-3 diberi warna oranye, WH-2 tetap standar
             const rowClass = item.dari_gudang === 'WH-3'
@@ -821,7 +1118,7 @@ async function openFdnDetailModalByTujuan(dateId, tujuanKey) {
                     <td class="p-2 text-center font-medium text-slate-500">${index + 1}</td>
                     <td class="p-2 font-mono font-bold text-orange-600 uppercase">${item.kode}</td>
                     <td class="p-2 font-mono">${jumlahStr}</td>
-                    <td class="p-2 font-mono font-semibold">${shortDoc}</td>
+                    <td class="p-2 font-mono font-semibold">${shortDoc} <span class="${tableBadgeClass}">${tipeItem}</span></td>
                     <td class="${gudangColClass}">${item.dari_gudang}</td>
                 </tr>
             `;
@@ -1258,7 +1555,7 @@ function isiRakWh3() {
     }
 }
 
-// Fungsi utama untuk memproses ambil rak otomatis berdasarkan FDN dan data WMS (RTDB Version)
+// Fungsi utama untuk memproses ambil rak otomatis dengan perhitungan akumulasi FDN & Running Stock yang akurat
 async function prosesAmbilRakOtomatis() {
     const tanggalMuat = document.getElementById('input-tgl-muat')?.value;
     if (!tanggalMuat) {
@@ -1278,18 +1575,24 @@ async function prosesAmbilRakOtomatis() {
             return;
         }
 
-        // 1. Ambil data yang sudah terlanjur diabsen/diambil sebelumnya di RTDB (tabel kiri)
+        // 1. Ambil seluruh data yang sudah diambil sebelumnya di RTDB (tabel kiri) untuk melacak pemakaian rak
         const existingAmbilSnapshot = await rtdbRef.child('ambilrak').once('value');
         const terambilMap = {}; // Format: { "KODE_BARANG": totalQtySudahDiambil }
+        const rakTerpakaiMap = {}; // Format: { "KODE_BARANG_LOKASIRAK": totalQtySudahDiambilDiRakIni }
         
         if (existingAmbilSnapshot.exists()) {
             const dataAmbilObj = existingAmbilSnapshot.val();
             Object.keys(dataAmbilObj).forEach(rakId => {
                 const data = dataAmbilObj[rakId];
                 const kd = String(data.kode || '').trim().toUpperCase();
+                const lokasi = String(data.lokasi || '').trim().toUpperCase();
                 const qty = Number(data.qtyAmbil || 0);
                 if (kd) {
                     terambilMap[kd] = (terambilMap[kd] || 0) + qty;
+                    if (lokasi) {
+                        const rakKey = `${kd}_${lokasi}`;
+                        rakTerpakaiMap[rakKey] = (rakTerpakaiMap[rakKey] || 0) + qty;
+                    }
                 }
             });
         }
@@ -1338,45 +1641,63 @@ async function prosesAmbilRakOtomatis() {
                 
                 const kodeBarang = fullOptText.split(' - ')[0].split('(')[0].trim();
                 
-                // Jika kode ini sudah diproses di iterasi sebelumnya, lewati untuk mencegah dobel
                 if (processedCodes.has(kodeBarang)) {
                     continue;
                 }
                 processedCodes.add(kodeBarang);
                 
-                // Ambil total kebutuhan FDN secara akurat dari dataset opsi
-                let totalKebutuhanFdn = Number(opt.dataset.kekurangan || opt.getAttribute('data-kekurangan') || opt.dataset.qty || 0);
+                // --- PERBAIKAN UTAMA: AMBIL TOTAL KEBUTUHAN FDN KUMULATIF SECARA PRESISI ---
+                let totalKebutuhanFdn = 0;
+                if (opt.dataset.qty) {
+                    totalKebutuhanFdn = Number(opt.dataset.qty);
+                } else if (opt.dataset.totalFdn) {
+                    totalKebutuhanFdn = Number(opt.dataset.totalFdn);
+                }
+
+                // Jika belum tertangkap di dataset, parse angka total pertama dari teks dropdown (misal: "MRR4A01 (70 Krt) ...")
                 if (totalKebutuhanFdn <= 0) {
-                    const matchKrt = fullOptText.match(/\(([^)]+)\)/);
-                    if (matchKrt) {
-                        const angkaKrt = parseInt(matchKrt[1].replace(/[^0-9]/g, ''));
-                        if (!isNaN(angkaKrt)) totalKebutuhanFdn = angkaKrt;
+                    const matchTotal = fullOptText.match(/\((\d+)\s*Krt/i) || fullOptText.match(/\((\d+)\)/);
+                    if (matchTotal) {
+                        totalKebutuhanFdn = parseInt(matchTotal[1]);
                     }
                 }
-                if (totalKebutuhanFdn <= 0) totalKebutuhanFdn = 1;
 
-                // HITUNG DELTA: Berapa sisa kekurangan yang BELUM diambil sebelumnya?
+                // Fallback terakhir jika masih gagal
+                if (totalKebutuhanFdn <= 0) {
+                    totalKebutuhanFdn = Number(opt.dataset.kekurangan || opt.getAttribute('data-kekurangan') || 1);
+                }
+
+                // HITUNG DELTA MUTLAK: Total Kebutuhan FDN Keseluruhan dikurangi yang sudah benar-benar tersimpan
                 const sudahDiambil = terambilMap[kodeBarang] || 0;
-                let sisaKebutuhanItem = totalKebutuhanFdn - sudahDiambil;
+                // Ambil sisa kekurangan murni secara spesifik dari dataset atau atribut HTML option
+                let sisaKebutuhanItem = Number(opt.dataset.kekurangan || opt.getAttribute('data-kekurangan') || 0);
 
-                // Jika sisa kebutuhan <= 0, artinya FDN item ini sudah terpenuhi sebelumnya
+                // Jika dataset kekurangan kosong, hitung manual dari total FDN dikurangi yang sudah diambil
+                if (sisaKebutuhanItem <= 0) {
+                    let totalFdnItem = Number(opt.dataset.qty || opt.dataset.totalFdn || 0);
+                    if (totalFdnItem <= 0) {
+                        // Fallback: Parse angka dalam kurung pertama (total FDN)
+                        const matchTotal = fullOptText.match(/\((\d+)\s*Krt/i) || fullOptText.match(/\((\d+)\)/);
+                        totalFdnItem = matchTotal ? parseInt(matchTotal[1]) : 70; // Default aman
+                    }
+                    sisaKebutuhanItem = totalFdnItem - (terambilMap[kodeBarang] || 0);
+                }
+
                 if (sisaKebutuhanItem <= 0) {
                     continue;
                 }
 
                 adaItemDiproses = true;
+                const tipeAlokasi = (sudahDiambil > 0) ? "TAMBAHAN" : "UTAMA";
 
-                // 1. CEK APAKAH INI ITEM WH-3 (Prioritas Pertama)
+                // 1. CEK ITEM WH-3
                 const isWh3Item = opt.dataset.isWh3 === 'true' || 
                                   opt.getAttribute('data-is-wh3') === 'true' || 
                                   fullOptText.includes('WH-3') || 
                                   fullOptText.includes('WH3');
 
                 if (isWh3Item) {
-                    // KHUSUS WH-3: Ambil nilai kekurangan langsung dari dataset elemen option secara akurat
-                    let realKekurangan = Number(opt.dataset.kekurangan || opt.getAttribute('data-kekurangan') || sisaKebutuhanItem);
-                    if (realKekurangan <= 0) realKekurangan = sisaKebutuhanItem;
-
+                    let realKekurangan = sisaKebutuhanItem;
                     if (realKekurangan > 0) {
                         const docIdKodeQty = `${kodeBarang}_${realKekurangan}_${Date.now()}_${i}_wh3`;
                         await rtdbRef.child(`ambilrak/${docIdKodeQty}`).set({
@@ -1385,15 +1706,14 @@ async function prosesAmbilRakOtomatis() {
                             qtyStok: realKekurangan,
                             qtyAmbil: realKekurangan,
                             qtySisa: 0,
+                            tipe: tipeAlokasi,
                             timestamp: firebase.database.ServerValue.TIMESTAMP
                         });
-
-                        console.log(`[WH-3 Full Pull] Berhasil menarik penuh ${realKekurangan} krt untuk ${kodeBarang}`);
                     }
-                    continue; // Lanjut ke item berikutnya karena WH-3 langsung dilunaskan
+                    continue;
                 }
 
-                // 2. --- (PENCARIAN UNTUK ITEM REGULER WMS) ---
+                // 2. PENCARIAN ITEM WMS REGULER
                 let stokWmsList = rawData.filter(item => {
                     if (!item) return false;
                     const kodeItem = String(item.KODE || item.kode || item.KODE_BARANG || '').trim().toUpperCase();
@@ -1403,18 +1723,26 @@ async function prosesAmbilRakOtomatis() {
                 if (stokWmsList.length === 0) continue;
 
                 let normalizedStok = stokWmsList.map(item => {
+                    const lokasiRak = String(item.LOKASI_PALET || item.lokasi || item.LOKASI || '').trim().toUpperCase();
+                    const stokAsliWms = Number(item.QTY_STOK || item.stok || item.QTY || 0);
+                    
+                    // HITUNG STOK BERJALAN (Kurangi dengan yang sudah diambil sebelumnya di rak ini)
+                    const rakKey = `${kodeBarang}_${lokasiRak}`;
+                    const sudahDiambilDiRakIni = rakTerpakaiMap[rakKey] || 0;
+                    const sisaStokReal = stokAsliWms - sudahDiambilDiRakIni;
+
                     return {
                         kode: kodeBarang,
-                        lokasi: String(item.LOKASI_PALET || item.lokasi || item.LOKASI || '').trim(),
-                        stok: Number(item.QTY_STOK || item.stok || item.QTY || 0),
+                        lokasi: lokasiRak,
+                        stok: stokAsliWms,
+                        sisaStokReal: sisaStokReal, // Stok bersih setelah dikurangi data utama/sebelumnya
                         expdate: String(item.EXPDATE || item.expdate || item.TANGGAL_EXP || '2099-12-31').trim()
                     };
-                }).filter(item => item.stok > 0 && item.lokasi);
+                }).filter(item => item.sisaStokReal > 0 && item.lokasi);
 
-                // Alokasi ke rak WMS regular untuk menutupi sisa kekurangan
                 if (normalizedStok.length > 0) {
                     normalizedStok.sort((a, b) => {
-                        if (a.stok !== b.stok) return a.stok - b.stok;
+                        if (a.sisaStokReal !== b.sisaStokReal) return a.sisaStokReal - b.sisaStokReal;
                         const dateA = new Date(a.expdate);
                         const dateB = new Date(b.expdate);
                         return dateA - dateB;
@@ -1423,22 +1751,27 @@ async function prosesAmbilRakOtomatis() {
                     for (const wms of normalizedStok) {
                         if (sisaKebutuhanItem <= 0) break;
 
-                        const qtyStokGudang = wms.stok;
-                        if (qtyStokGudang <= 0) continue;
+                        const stokTersedia = wms.sisaStokReal; 
+                        if (stokTersedia <= 0) continue;
 
-                        const qtyAmbil = Math.min(sisaKebutuhanItem, qtyStokGudang);
-                        const qtySisa = qtyStokGudang - qtyAmbil;
+                        const qtyAmbil = Math.min(sisaKebutuhanItem, stokTersedia);
+                        const qtySisa = stokTersedia - qtyAmbil;
                         
                         const docIdKodeQty = `${kodeBarang}_${qtyAmbil}_${Date.now()}_${i}_${Math.floor(Math.random()*10000)}`;
 
                         await rtdbRef.child(`ambilrak/${docIdKodeQty}`).set({
                             kode: kodeBarang,
                             lokasi: wms.lokasi,
-                            qtyStok: qtyStokGudang,
+                            qtyStok: wms.stok, 
                             qtyAmbil: qtyAmbil,
                             qtySisa: qtySisa,
+                            tipe: tipeAlokasi, // Otomatis berstatus TAMBAHAN jika sudah ada pengambilan data utama
                             timestamp: firebase.database.ServerValue.TIMESTAMP
                         });
+
+                        // Update peta pemakaian rak lokal
+                        const rakKey = `${kodeBarang}_${wms.lokasi}`;
+                        rakTerpakaiMap[rakKey] = (rakTerpakaiMap[rakKey] || 0) + qtyAmbil;
 
                         sisaKebutuhanItem -= qtyAmbil;
                     }
@@ -1714,7 +2047,7 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 
 
-// Fungsi untuk menyimpan data Ambil Rak ke Realtime Database (RTDB) dengan tambahan field qtySisa
+// Fungsi untuk menyimpan data Ambil Rak ke Realtime Database (RTDB) dengan penanda TAMBAHAN
 async function tambahItemMutasiList() {
     // 1. Ambil nilai dari form input di sebelah kiri
     const tanggalMuat = document.getElementById('input-tgl-muat')?.value; // Format: YYYY-MM-DD
@@ -1742,32 +2075,49 @@ async function tambahItemMutasiList() {
         return;
     }
 
-    // Hitung sisa stok (stok gudang dikurangi qty yang diambil)
-    const qtySisa = qtyStok - qtyAmbil;
-
     // Konversi format tanggal ke ID dokumen tanggal (contoh: 20261002)
     const firestoreDateId = tanggalMuat.replace(/-/g, '');
-
-    // Buat ID unik berformat kode_qty
-    const docIdKodeQty = `${kodeBarang}_${qtyAmbil}_${Date.now()}`;
-
-    // Data payload lengkap yang akan disimpan ke RTDB
-    const dataPayload = {
-        kode: kodeBarang,
-        lokasi: lokasiRak,
-        qtyStok: qtyStok,
-        qtyAmbil: qtyAmbil,
-        qtySisa: qtySisa, // Field untuk sisa stok
-        timestamp: firebase.database.ServerValue.TIMESTAMP
-    };
+    const rtdbRef = firebase.database().ref(`muat_fdn/${firestoreDateId}`);
 
     try {
-        // 2. Simpan ke RTDB: muat_fdn/{firestoreDateId}/ambilrak/{docIdKodeQty}
-        await firebase.database()
-            .ref(`muat_fdn/${firestoreDateId}/ambilrak/${docIdKodeQty}`)
-            .set(dataPayload);
+        // Cek apakah barang ini sudah pernah diambil sebelumnya di node ambilrak
+        const existingAmbilSnapshot = await rtdbRef.child('ambilrak').once('value');
+        let sudahDiambil = 0;
+        
+        if (existingAmbilSnapshot.exists()) {
+            const dataAmbilObj = existingAmbilSnapshot.val();
+            Object.keys(dataAmbilObj).forEach(rakId => {
+                const data = dataAmbilObj[rakId];
+                if (String(data.kode || '').trim().toUpperCase() === kodeBarang.toUpperCase()) {
+                    sudahDiambil += Number(data.qtyAmbil || 0);
+                }
+            });
+        }
 
-        console.log("Berhasil menyimpan data ambilrak ke RTDB!");
+        // Tentukan status tipe: jika sudah ada pengambilan sebelumnya, maka input manual ini adalah TAMBAHAN
+        const tipeAlokasi = (sudahDiambil > 0) ? "TAMBAHAN" : "UTAMA";
+
+        // Hitung sisa stok (stok gudang dikurangi qty yang diambil)
+        const qtySisa = qtyStok - qtyAmbil;
+
+        // Buat ID unik berformat kode_qty
+        const docIdKodeQty = `${kodeBarang}_${qtyAmbil}_${Date.now()}`;
+
+        // Data payload lengkap dengan menyertakan field tipe
+        const dataPayload = {
+            kode: kodeBarang,
+            lokasi: lokasiRak,
+            qtyStok: qtyStok,
+            qtyAmbil: qtyAmbil,
+            qtySisa: qtySisa,
+            tipe: tipeAlokasi, // <--- Menandai UTAMA atau TAMBAHAN secara otomatis
+            timestamp: firebase.database.ServerValue.TIMESTAMP
+        };
+
+        // 2. Simpan ke RTDB: muat_fdn/{firestoreDateId}/ambilrak/{docIdKodeQty}
+        await rtdbRef.child(`ambilrak/${docIdKodeQty}`).set(dataPayload);
+
+        console.log(`Berhasil menyimpan data ambilrak (${tipeAlokasi}) ke RTDB!`);
 
         // 3. Reset form input kecil agar siap untuk input berikutnya
         document.getElementById('mutasi-lokasi').value = '';
@@ -1780,7 +2130,7 @@ async function tambahItemMutasiList() {
             await populateMutasiKodeDropdown(firestoreDateId);
         }
 
-        // 5. Perbarui juga tabel atau ringkasan ambil rak di sebelah kiri/kanan jika fungsi tersedia
+        // 5. Perbarui juga tabel atau ringkasan ambil rak di sebelah kiri
         if (typeof loadDataAmbilRak === 'function') {
             loadDataAmbilRak(firestoreDateId);
         }
@@ -1794,7 +2144,7 @@ async function tambahItemMutasiList() {
     }
 }
 
-// Fungsi untuk memuat dan merender data ambilrak dari RTDB ke tabel (Digrup & Urutan Kronologis)
+// Fungsi untuk memuat dan merender data ambilrak dari RTDB ke tabel (Dilengkapi Badge Utama/Tambahan di tiap baris rak)
 function loadDataAmbilRak() {
     const tanggalMuat = document.getElementById('input-tgl-muat')?.value;
     if (!tanggalMuat) return;
@@ -1824,21 +2174,32 @@ function loadDataAmbilRak() {
         }
 
         let akumulasiTotalAmbil = 0;
-        let rawDataArray = [];
+        let mainDataArray = [];     // Untuk data Utama
+        let tambahanDataArray = []; // Untuk data Tambahan
 
-        // Tampung semua data dari snapshot objek RTDB
+        // Tampung semua data dari snapshot objek RTDB dan pisahkan tipenya
         snapshot.forEach((childSnapshot) => {
             const data = childSnapshot.val();
-            rawDataArray.push({
+            const itemObj = {
                 id: childSnapshot.key, // Key unik RTDB
                 kode: data.kode || '-',
                 rak: data.lokasi || '-',
                 ambil: Number(data.qtyAmbil || 0),
                 stok: data.qtyStok || 0,
                 sisa: data.qtySisa !== undefined ? data.qtySisa : (Number(data.qtyStok || 0) - Number(data.qtyAmbil || 0)),
+                tipe: (data.tipe || 'UTAMA').toUpperCase(),
                 rawDocData: data
-            });
+            };
+
+            if (itemObj.tipe === 'TAMBAHAN') {
+                tambahanDataArray.push(itemObj);
+            } else {
+                mainDataArray.push(itemObj);
+            }
         });
+
+        // Gabungkan: Data Utama di atas, Data Tambahan di bawah secara berurutan
+        let rawDataArray = [...mainDataArray, ...tambahanDataArray];
 
         // Kelompokkan data berdasarkan kode barang yang sama
         const groupedData = {};
@@ -1858,27 +2219,37 @@ function loadDataAmbilRak() {
 
             itemsInGroup.forEach((item, subIndex) => {
                 const tr = document.createElement('tr');
-                tr.className = "border-b hover:bg-orange-50 cursor-pointer transition text-slate-700";
+                
+                const isTambahanGroup = item.tipe === 'TAMBAHAN';
+                const rowBgClass = isTambahanGroup 
+                    ? "border-b bg-amber-50/70 hover:bg-amber-100/80 cursor-pointer transition text-amber-900" 
+                    : "border-b hover:bg-orange-50 cursor-pointer transition text-slate-700";
+                
+                tr.className = rowBgClass;
                 tr.title = "Klik untuk Edit atau Hapus";
                 tr.onclick = function() {
                     bukaModalEditHapus(firestoreDateId, item.id, item.rawDocData);
                 };
 
+                // Badge kecil penanda status (UTAMA / TAMBAHAN) di setiap baris rak
+                // Pindahkan badge ke sebelah kiri nama rak, perbesar lebar kolom rak, dan hilangkan truncate agar badge terlihat jelas
+                const badgeStatusHtml = isTambahanGroup 
+                    ? '<span class="bg-amber-200 text-amber-900 border border-amber-400 px-1 py-0.2 rounded text-[9px] font-bold mr-1 inline-block align-middle">TBH</span>' 
+                    : '<span class="bg-blue-100 text-blue-800 border border-blue-300 px-1 py-0.2 rounded text-[9px] font-bold mr-1 inline-block align-middle">UTM</span>';
+
                 if (subIndex === 0) {
-                    // Baris pertama dalam grup: Tampilkan nomor urut dan kode barang dengan rowspan
                     tr.innerHTML = `
                         <td class="p-1.5 border border-orange-200 text-center font-semibold text-slate-500 w-10 align-top" rowspan="${itemsInGroup.length}">${nomorUrut}</td>
                         <td class="p-1.5 border border-orange-200 font-bold text-slate-800 truncate align-top" rowspan="${itemsInGroup.length}">${item.kode}</td>
-                        <td class="p-1.5 border border-orange-200 font-semibold text-orange-700 w-24 truncate">${item.rak}</td>
+                        <td class="p-1.5 border border-orange-200 font-semibold text-orange-700 w-50 whitespace-nowrap">${badgeStatusHtml} ${item.rak}</td>
                         <td class="p-1.5 border border-orange-200 text-center font-black text-orange-600 w-14">${item.ambil}</td>
                         <td class="p-1.5 border border-orange-200 text-center text-slate-600 w-14">${item.stok}</td>
                         <td class="p-1.5 border border-orange-200 text-center text-slate-600 w-14">${item.sisa}</td>
                     `;
                     nomorUrut++;
                 } else {
-                    // Baris lanjutan dalam grup: Kolom No dan Kode dikosongkan agar tergabung rapi
                     tr.innerHTML = `
-                        <td class="p-1.5 border border-orange-200 font-semibold text-orange-700 w-24 truncate">${item.rak}</td>
+                        <td class="p-1.5 border border-orange-200 font-semibold text-orange-700 w-50 whitespace-nowrap">${badgeStatusHtml} ${item.rak}</td>
                         <td class="p-1.5 border border-orange-200 text-center font-black text-orange-600 w-14">${item.ambil}</td>
                         <td class="p-1.5 border border-orange-200 text-center text-slate-600 w-14">${item.stok}</td>
                         <td class="p-1.5 border border-orange-200 text-center text-slate-600 w-14">${item.sisa}</td>
