@@ -2230,9 +2230,17 @@ function loadDataAmbilRak() {
                 const tr = document.createElement('tr');
                 
                 const isTambahanGroup = item.tipe === 'TAMBAHAN';
-                const rowBgClass = isTambahanGroup 
-                    ? "border-b bg-amber-50/70 hover:bg-amber-100/80 cursor-pointer transition text-amber-900" 
-                    : "border-b hover:bg-orange-50 cursor-pointer transition text-slate-700";
+                
+                // --- TAMBAHKAN PENGECEKAN WH-3 DI SINI ---
+                const isWh3Item = String(item.rak || '').toUpperCase().includes('WH-3');
+
+                let rowBgClass = "border-b hover:bg-orange-50 cursor-pointer transition text-slate-700";
+                if (isWh3Item) {
+                    rowBgClass = "border-b bg-orange-100/60 hover:bg-orange-100/90 cursor-pointer transition text-slate-800 font-semibold";
+                } else if (isTambahanGroup) {
+                    rowBgClass = "border-b bg-amber-50/70 hover:bg-amber-100/80 cursor-pointer transition text-amber-900";
+                }
+                // ----------------------------------------
                 
                 tr.className = rowBgClass;
                 tr.title = "Klik untuk Edit atau Hapus";
@@ -2241,7 +2249,6 @@ function loadDataAmbilRak() {
                 };
 
                 // Badge kecil penanda status (UTAMA / TAMBAHAN) di setiap baris rak
-                // Pindahkan badge ke sebelah kiri nama rak, perbesar lebar kolom rak, dan hilangkan truncate agar badge terlihat jelas
                 const badgeStatusHtml = isTambahanGroup 
                     ? '<span class="bg-amber-200 text-amber-900 border border-amber-400 px-1 py-0.2 rounded text-[9px] font-bold mr-1 inline-block align-middle">TBH</span>' 
                     : '<span class="bg-blue-100 text-blue-800 border border-blue-300 px-1 py-0.2 rounded text-[9px] font-bold mr-1 inline-block align-middle">UTM</span>';
