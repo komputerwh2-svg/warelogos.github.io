@@ -179,21 +179,21 @@
                 <!-- Panel Bawah: Riwayat Trobel -->
                 <div class="bg-white p-5 rounded-2xl shadow-sm border border-orange-500">
                     <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider mb-3">Riwayat DO Trobel</h3>
-                    <div class="overflow-x-auto">
+                    <div class="overflow-x-auto max-h-[450px] overflow-y-auto miui-custom-scroll">
                         <table class="w-full text-left border-collapse text-[11px]">
                             <thead>
-                                <tr class="bg-orange-100 text-slate-700 uppercase font-black">
-                                    <th class="p-2 border text-center">NO</th>
-                                    <th class="p-2 border">TGL DO</th>
-                                    <th class="p-2 border">TUJUAN</th>
-                                    <th class="p-2 border">NO. DN/DO</th>
-                                    <th class="p-2 border">KODE</th>
-                                    <th class="p-2 border">QTY</th>
-                                    <th class="p-2 border">KETERANGAN</th>
-                                    <th class="p-2 border">TGL PROSES</th>
-                                    <th class="p-2 border">NO. DN RETUR</th>
-                                    <th class="p-2 border">NO. ID BOSNET</th>
-                                    <th class="p-2 border">KET. PROSES</th>
+                                <tr class="bg-orange-100 text-slate-700 uppercase font-black sticky top-0 z-10">
+                                    <th class="p-2 border text-center bg-orange-100">NO</th>
+                                    <th class="p-2 border bg-orange-100">TGL DO</th>
+                                    <th class="p-2 border bg-orange-100">TUJUAN</th>
+                                    <th class="p-2 border bg-orange-100">NO. DN/DO</th>
+                                    <th class="p-2 border bg-orange-100">KODE</th>
+                                    <th class="p-2 border bg-orange-100">QTY</th>
+                                    <th class="p-2 border bg-orange-100">KETERANGAN</th>
+                                    <th class="p-2 border bg-orange-100">TGL PROSES</th>
+                                    <th class="p-2 border bg-orange-100">NO. DN RETUR</th>
+                                    <th class="p-2 border bg-orange-100">NO. ID BOSNET</th>
+                                    <th class="p-2 border bg-orange-100">KET. PROSES</th>
                                 </tr>
                             </thead>
                             <tbody id="tabel-riwayat-trobel-body">
@@ -217,28 +217,42 @@
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <div>
                                     <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">Tanggal DO</label>
-                                    <input type="date" id="klaim-tgl-do" class="w-full p-2 text-xs font-bold border border-orange-300 rounded-lg bg-white">
+                                    <input type="date" id="klaim-tgl-do" class="w-full p-2 text-xs text-slate-700 font-bold border border-orange-300 rounded-lg bg-white">
                                 </div>
                                 <div>
                                     <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">No. DO / DN</label>
-                                    <input type="text" id="klaim-no-do" placeholder="No DO/DN..." class="w-full p-2 text-xs font-bold border border-orange-300 rounded-lg bg-white">
+                                    <input type="text" id="klaim-no-do" list="list-template-no-do" placeholder="Pilih atau ketik no do..." class="w-full p-2 text-xs text-slate-700 font-bold border border-orange-300 rounded-lg bg-white uppercase">
+                                    <datalist id="list-template-no-do">
+                                        <option value="DN-HO001-">
+                                        <option value="DO-HO001-">
+                                    </datalist>
                                 </div>
-                                <div class="md:col-span-2">
+                                <div>
                                     <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">Tujuan</label>
-                                    <input type="text" id="klaim-tujuan" placeholder="Nama tujuan..." class="w-full p-2 text-xs font-bold border border-orange-300 rounded-lg bg-white">
+                                    <input type="text" id="klaim-tujuan" list="list-template-tujuan" placeholder="Pilih atau ketik tujuan..." class="w-full p-2 text-xs text-slate-700 font-bold border border-orange-300 rounded-lg bg-white uppercase">
+                                    <datalist id="list-template-tujuan">
+                                        <!-- Opsi tujuan akan terisi otomatis dari RTDB -->
+                                    </datalist>
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">Keterangan Klaim</label>
+                                    <input type="text" id="klaim-keterangan" list="list-template-ket-klaim" placeholder="Pilih / ketik klaim..." class="w-full p-2 text-xs text-slate-700 font-bold border border-orange-300 rounded-lg bg-white uppercase">
+                                    <datalist id="list-template-ket-klaim">
+                                        <option value="BARANG KURANG">
+                                        <option value="BARANG TERTUKAR">
+                                    </datalist>
                                 </div>
                                 <div>
                                     <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">Kode Barang</label>
-                                    <input type="text" id="klaim-kode" placeholder="Kode..." class="w-full p-2 text-xs font-bold border border-orange-300 rounded-lg bg-white">
+                                    <input type="text" id="klaim-kode" list="list-template-kode-barang" placeholder="Pilih / ketik kode..." class="w-full p-2 text-xs text-slate-700 font-bold border border-orange-300 rounded-lg bg-white uppercase">
+                                    <datalist id="list-template-kode-barang">
+                                        <!-- Sumber kode master barang -->
+                                    </datalist>
                                 </div>
                                 <div>
                                     <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">Qty</label>
-                                    <input type="number" id="klaim-qty" placeholder="Qty..." class="w-full p-2 text-xs font-bold border border-orange-300 rounded-lg bg-white">
+                                    <input type="number" id="klaim-qty" placeholder="Qty..." class="w-full p-2 text-xs text-slate-700 font-bold border border-orange-300 rounded-lg bg-white">
                                 </div>
-                            </div>
-                            <div>
-                                <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">Keterangan Klaim</label>
-                                <textarea id="klaim-keterangan" rows="2" placeholder="Alasan atau detail klaim..." class="w-full p-2 text-xs font-bold border border-orange-300 rounded-lg bg-white resize-none"></textarea>
                             </div>
                         </div>
 
@@ -285,18 +299,18 @@
                 <!-- Panel Bawah: Riwayat Klaim -->
                 <div class="bg-white p-5 rounded-2xl shadow-sm border border-orange-500">
                     <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider mb-3">Riwayat Klaim</h3>
-                    <div class="overflow-x-auto">
+                    <div class="overflow-x-auto max-h-[450px] overflow-y-auto miui-custom-scroll">
                         <table class="w-full text-left border-collapse text-[11px]">
                             <thead>
-                                <tr class="bg-orange-100 text-slate-700 uppercase font-black">
-                                    <th class="p-2 border text-center">NO</th>
-                                    <th class="p-2 border">TGL DO</th>
-                                    <th class="p-2 border">NO. DO/DN</th>
-                                    <th class="p-2 border">TUJUAN</th>
-                                    <th class="p-2 border">KODE</th>
-                                    <th class="p-2 border">QTY</th>
-                                    <th class="p-2 border">KETERANGAN KLAIM</th>
-                                    <th class="p-2 border text-center">FOTO BUKTI</th>
+                                <tr class="bg-orange-100 text-slate-700 uppercase font-black sticky top-0 z-10">
+                                    <th class="p-2 border text-center bg-orange-100">NO</th>
+                                    <th class="p-2 border bg-orange-100">TGL DO</th>
+                                    <th class="p-2 border bg-orange-100">NO. DO/DN</th>
+                                    <th class="p-2 border bg-orange-100">TUJUAN</th>
+                                    <th class="p-2 border bg-orange-100">KODE</th>
+                                    <th class="p-2 border bg-orange-100">QTY</th>
+                                    <th class="p-2 border bg-orange-100">KETERANGAN KLAIM</th>
+                                    <th class="p-2 border text-center bg-orange-100">FOTO BUKTI</th>
                                 </tr>
                             </thead>
                             <tbody id="tabel-riwayat-klaim-body">
