@@ -757,24 +757,28 @@ async function parseAndSaveFdn(fileContent, forcedTipe = null) {
 
         // Parsing baris produk tabel (Dibuat lebih fleksibel menangkap format kuantitas terpisah spasi/slash)
         const trimmed = line.trim();
-        if (/^\d+\s+[A-Z0-9\-_]+/.test(trimmed)) {
+        // Gunakan regex yang lebih fleksibel untuk mendeteksi baris produk dengan kode berhuruf kecil/besar
+        if (/^\d+\s+[a-zA-Z0-9\-_]+/.test(trimmed)) {
             const tokens = trimmed.split(/\s+/);
             if (tokens.length >= 2) {
                 const qtyTokenIndex = tokens.findIndex(t => /^\d+\/\d+\/\d+\/\d+\$/.test(t) || (t.includes('/') && t.split('/').length === 4));
                 
                 if (qtyTokenIndex !== -1) {
+                    // --- PERBAIKAN UTAMA: PAKSA KODE MENJADI UPPERCASE SECARA MUTLAK ---
                     const kode = tokens[1].trim().toUpperCase();
                     const qtyParts = tokens[qtyTokenIndex].split('/').map(Number);
                     
-                    items.push({
-                        kode: kode,
-                        qty_utama: qtyParts[0] || 0,
-                        sub: {
-                            bal: qtyParts[1] || 0,
-                            rtg: qtyParts[2] || 0,
-                            pcs: qtyParts[3] || 0
-                        }
-                    });
+                    if (kode) {
+                        items.push({
+                            kode: kode,
+                            qty_utama: qtyParts[0] || 0,
+                            sub: {
+                                bal: qtyParts[1] || 0,
+                                rtg: qtyParts[2] || 0,
+                                pcs: qtyParts[3] || 0
+                            }
+                        });
+                    }
                 }
             }
         }
@@ -1240,7 +1244,7 @@ async function hapusGroupFdnDocuments(dateId, docIdArray) {
 }
 
 
-// 1. Fungsi untuk mengisi dropdown kode dengan Agregasi Global Sempurna dari RTDB (Anti-Dobel Antar Dokumen FDN)
+// 1. Fungsi untuk mengisi dropdown kode dengan Agregasi Sesuai Gudang Asal (WH-2 & WH-3 Terpisah)
 async function populateMutasiKodeDropdown(dateId) {
     const selectKode = document.getElementById('mutasi-kode');
     if (!selectKode) return;
@@ -1253,18 +1257,18 @@ async function populateMutasiKodeDropdown(dateId) {
         
         // 2. Ambil seluruh data dari node 'datatujuan' di RTDB
         const tujuanSnapshot = await rtdbRef.child('datatujuan').once('value');
-        const globalItemMap = new Map(); // Map eksklusif untuk agregasi global
+        const globalItemMap = new Map(); // Map eksklusif dengan key berbasis Kode + Gudang
 
         if (tujuanSnapshot.exists()) {
             const dataTujuanObj = tujuanSnapshot.val();
             Object.keys(dataTujuanObj).forEach(docId => {
                 const docData = dataTujuanObj[docId];
                 const items = docData.data || [];
-                const dariGudang = docData.meta?.dari_gudang || 'WH-2';
+                const dariGudang = String(docData.meta?.dari_gudang || docData.dari_gudang || 'WH-2').trim().toUpperCase();
 
                 // Deteksi apakah dokumen FDN ini berstatus tambahan
                 const isDocTambahan = (docData.meta?.tipe || docData.tipe || '').toUpperCase() === 'TAMBAHAN' || 
-                                      String(docId).toUpperCase().includes('TAMBAHAN' ) ||
+                                      String(docId).toUpperCase().includes('TAMBAHAN') ||
                                       JSON.stringify(docData).toUpperCase().includes('TAMBAHAN');
 
                 items.forEach(item => {
@@ -1274,14 +1278,16 @@ async function populateMutasiKodeDropdown(dateId) {
                     const qtyUtama = Number(item.qty_utama || item.qty || 0);
                     const isWh3Doc = (dariGudang === 'WH-3' || dariGudang.includes('WH3'));
 
-                    // Jika kode sudah ada, jumlahkan total kuantitasnya
-                    if (globalItemMap.has(kode)) {
-                        const existing = globalItemMap.get(kode);
+                    // Buat unique key gabungan kode dan gudang agar WH-2 dan WH-3 terpisah mutlak
+                    const uniqueKey = `${kode}_${isWh3Doc ? 'WH3' : 'WH2'}`;
+
+                    // Jika key unik sudah ada, jumlahkan total kuantitasnya
+                    if (globalItemMap.has(uniqueKey)) {
+                        const existing = globalItemMap.get(uniqueKey);
                         existing.totalQty += qtyUtama;
-                        if (isWh3Doc) existing.isWh3 = true;
-                        if (isDocTambahan) existing.isTambahan = true; // Tandai jika ada dokumen tambahan untuk kode ini
+                        if (isDocTambahan) existing.isTambahan = true;
                     } else {
-                        globalItemMap.set(kode, {
+                        globalItemMap.set(uniqueKey, {
                             kode: kode,
                             totalQty: qtyUtama,
                             isWh3: isWh3Doc,
@@ -1301,23 +1307,29 @@ async function populateMutasiKodeDropdown(dateId) {
             Object.keys(dataAmbilObj).forEach(rakId => {
                 const data = dataAmbilObj[rakId];
                 const kode = String(data.kode || '').trim().toUpperCase();
+                const lokasi = String(data.lokasi || '').trim().toUpperCase();
                 const ambil = Number(data.qtyAmbil || 0);
                 if (kode) {
-                    rekapAmbil[kode] = (rekapAmbil[kode] || 0) + ambil;
+                    const isWh3Lokasi = (lokasi === 'WH-3' || lokasi.includes('WH3'));
+                    const uniqueKey = `${kode}_${isWh3Lokasi ? 'WH3' : 'WH2'}`;
+                    
+                    rekapAmbil[uniqueKey] = (rekapAmbil[uniqueKey] || 0) + ambil;
+                    rekapAmbil[kode] = (rekapAmbil[kode] || 0) + ambil; // Fallback
                 }
             });
         }
 
-        // 4. Hitung sisa kekurangan secara unik
+        // 4. Hitung sisa kekurangan secara unik per gudang
         let aggregatedItems = [];
-        globalItemMap.forEach((value, kode) => {
+        globalItemMap.forEach((value, uniqueKey) => {
             const totalKebutuhan = value.totalQty;
-            const sudahDiambil = rekapAmbil[kode] || 0;
+            const sudahDiambil = rekapAmbil[uniqueKey] || rekapAmbil[value.kode] || 0;
             const kekurangan = totalKebutuhan - sudahDiambil;
 
             if (kekurangan > 0) {
                 aggregatedItems.push({
-                    kode: kode,
+                    uniqueKey: uniqueKey,
+                    kode: value.kode,
                     totalQty: totalKebutuhan,
                     sudahDiambil: sudahDiambil,
                     kekurangan: kekurangan,
@@ -1334,17 +1346,14 @@ async function populateMutasiKodeDropdown(dateId) {
             return a.kode.localeCompare(b.kode);
         });
 
-        // 5. Masukkan ke dropdown dengan proteksi ekstra (Cek duplikat value sebelum append)
-        const addedCodes = new Set();
-
+        // 5. Masukkan ke dropdown dengan value murni kode barang (bersih untuk WMS Report)
         aggregatedItems.forEach(item => {
-            if (addedCodes.has(item.kode)) return; // Blokir mutlak jika kodenya sudah masuk
-            addedCodes.add(item.kode);
-
             const option = document.createElement('option');
-            option.value = item.kode;
             
-            const labelGudang = item.isWh3 ? ' [WH-3]' : '';
+            // Value murni hanya kode barang saja agar saat diklik/disalin ke WMS Report tidak ikut tercampur teks gudang
+            option.value = item.kode; 
+            
+            const labelGudang = item.isWh3 ? ' [WH-3]' : ' [WH-2]';
             
             if (item.sudahDiambil > 0) {
                 option.textContent = `${item.kode} (${item.totalQty} Krt)${labelGudang} (Kurang ${item.kekurangan} krt)`;
@@ -1354,11 +1363,14 @@ async function populateMutasiKodeDropdown(dateId) {
                 option.className = "text-slate-800 font-bold";
             }
 
+            // Simpan informasi pendukung & identitas gudang di dataset
+            option.dataset.kode = item.kode;
+            option.dataset.gudang = item.isWh3 ? 'WH3' : 'WH2'; // Identitas gudang untuk sistem
             option.dataset.totalQty = item.totalQty;
             option.dataset.sudahDiambil = item.sudahDiambil;
             option.dataset.kekurangan = item.kekurangan;
-            option.dataset.isWh3 = item.isWh3;
-            option.dataset.isTambahan = item.isTambahan ? 'true' : 'false'; // Menyimpan status tambahan ke dataset option
+            option.dataset.isWh3 = item.isWh3 ? 'true' : 'false';
+            option.dataset.isTambahan = item.isTambahan ? 'true' : 'false';
             
             selectKode.appendChild(option);
         });
@@ -1564,7 +1576,7 @@ function isiRakWh3() {
     }
 }
 
-// Fungsi utama untuk memproses ambil rak otomatis dengan perhitungan akumulasi FDN & Running Stock yang akurat
+// Fungsi utama untuk memproses ambil rak otomatis dengan pemisahan gudang WH-2 & WH-3 yang akurat
 async function prosesAmbilRakOtomatis() {
     const tanggalMuat = document.getElementById('input-tgl-muat')?.value;
     if (!tanggalMuat) {
@@ -1586,8 +1598,8 @@ async function prosesAmbilRakOtomatis() {
 
         // 1. Ambil seluruh data yang sudah diambil sebelumnya di RTDB (tabel kiri) untuk melacak pemakaian rak
         const existingAmbilSnapshot = await rtdbRef.child('ambilrak').once('value');
-        const terambilMap = {}; // Format: { "KODE_BARANG": totalQtySudahDiambil }
-        const rakTerpakaiMap = {}; // Format: { "KODE_BARANG_LOKASIRAK": totalQtySudahDiambilDiRakIni }
+        const terambilMap = {};    // Format: { "KODE_WH2" atau "KODE_WH3": totalQtySudahDiambil }
+        const rakTerpakaiMap = {}; // Format: { "KODE_LOKASIRAK": totalQtySudahDiambilDiRakIni }
         
         if (existingAmbilSnapshot.exists()) {
             const dataAmbilObj = existingAmbilSnapshot.val();
@@ -1597,7 +1609,12 @@ async function prosesAmbilRakOtomatis() {
                 const lokasi = String(data.lokasi || '').trim().toUpperCase();
                 const qty = Number(data.qtyAmbil || 0);
                 if (kd) {
-                    terambilMap[kd] = (terambilMap[kd] || 0) + qty;
+                    const isWh3Lokasi = (lokasi === 'WH-3' || lokasi.includes('WH3'));
+                    const keyGudang = `${kd}_${isWh3Lokasi ? 'WH3' : 'WH2'}`;
+                    
+                    terambilMap[keyGudang] = (terambilMap[keyGudang] || 0) + qty;
+                    terambilMap[kd] = (terambilMap[kd] || 0) + qty; // Fallback umum
+
                     if (lokasi) {
                         const rakKey = `${kd}_${lokasi}`;
                         rakTerpakaiMap[rakKey] = (rakTerpakaiMap[rakKey] || 0) + qty;
@@ -1638,57 +1655,39 @@ async function prosesAmbilRakOtomatis() {
         // Konfirmasi MIUI sebelum eksekusi
         miuiConfirm("Jalankan sinkronisasi FDN otomatis? (Memproses FDN baru atau kekurangan qty yang belum terambil)", async function() {
             
-            const processedCodes = new Set();
+            const processedKeys = new Set();
             let adaItemDiproses = false;
 
             // Loop per opsi di dropdown secara aman
             for (let i = 0; i < selectKode.options.length; i++) {
                 const opt = selectKode.options[i];
-                const fullOptText = (opt.value || opt.text || '').trim().toUpperCase();
                 
-                if (!fullOptText || fullOptText.includes('PILIH') || fullOptText === '') continue;
+                // 1. Ambil kode barang murni dari value option (bersih tanpa |WH2 / |WH3)
+                const kodeBarang = (opt.value || '').trim().toUpperCase();
                 
-                const kodeBarang = fullOptText.split(' - ')[0].split('(')[0].trim();
-                
-                if (processedCodes.has(kodeBarang)) {
+                if (!kodeBarang || kodeBarang.includes('PILIH') || kodeBarang === '') continue;
+
+                // 2. Ambil informasi target gudang dari dataset yang sudah kita pisahkan
+                const targetGudang = (opt.dataset.gudang || 'WH2').trim().toUpperCase();
+
+                const uniqueItemKey = `${kodeBarang}_${targetGudang}`;
+                if (processedKeys.has(uniqueItemKey)) {
                     continue;
                 }
-                processedCodes.add(kodeBarang);
-                
-                // --- PERBAIKAN UTAMA: AMBIL TOTAL KEBUTUHAN FDN KUMULATIF SECARA PRESISI ---
-                let totalKebutuhanFdn = 0;
-                if (opt.dataset.qty) {
-                    totalKebutuhanFdn = Number(opt.dataset.qty);
-                } else if (opt.dataset.totalFdn) {
-                    totalKebutuhanFdn = Number(opt.dataset.totalFdn);
-                }
+                processedKeys.add(uniqueItemKey);
 
-                // Jika belum tertangkap di dataset, parse angka total pertama dari teks dropdown (misal: "MRR4A01 (70 Krt) ...")
-                if (totalKebutuhanFdn <= 0) {
-                    const matchTotal = fullOptText.match(/\((\d+)\s*Krt/i) || fullOptText.match(/\((\d+)\)/);
-                    if (matchTotal) {
-                        totalKebutuhanFdn = parseInt(matchTotal[1]);
-                    }
-                }
-
-                // Fallback terakhir jika masih gagal
-                if (totalKebutuhanFdn <= 0) {
-                    totalKebutuhanFdn = Number(opt.dataset.kekurangan || opt.getAttribute('data-kekurangan') || 1);
-                }
-
-                // HITUNG DELTA MUTLAK: Total Kebutuhan FDN Keseluruhan dikurangi yang sudah benar-benar tersimpan
-                const sudahDiambil = terambilMap[kodeBarang] || 0;
-                // Ambil sisa kekurangan murni secara spesifik dari dataset atau atribut HTML option
+                // Ambil sisa kekurangan murni spesifik dari dataset option
                 let sisaKebutuhanItem = Number(opt.dataset.kekurangan || opt.getAttribute('data-kekurangan') || 0);
 
-                // Jika dataset kekurangan kosong, hitung manual dari total FDN dikurangi yang sudah diambil
                 if (sisaKebutuhanItem <= 0) {
-                    let totalFdnItem = Number(opt.dataset.qty || opt.dataset.totalFdn || 0);
+                    let totalFdnItem = Number(opt.dataset.totalQty || opt.dataset.qty || 0);
                     if (totalFdnItem <= 0) {
-                        const matchTotal = fullOptText.match(/\((\d+)\s*Krt/i) || fullOptText.match(/\((\d+)\)/);
-                        totalFdnItem = matchTotal ? parseInt(matchTotal[1]) : 70; 
+                        const fullText = (opt.text || '').trim();
+                        const matchTotal = fullText.match(/\((\d+)\s*Krt/i) || fullText.match(/\((\d+)\)/);
+                        totalFdnItem = matchTotal ? parseInt(matchTotal[1]) : 0;
                     }
-                    sisaKebutuhanItem = totalFdnItem - (terambilMap[kodeBarang] || 0);
+                    const sudahDiambilInThisWarehouse = terambilMap[uniqueItemKey] || 0;
+                    sisaKebutuhanItem = totalFdnItem - sudahDiambilInThisWarehouse;
                 }
 
                 if (sisaKebutuhanItem <= 0) {
@@ -1697,17 +1696,15 @@ async function prosesAmbilRakOtomatis() {
 
                 adaItemDiproses = true;
                 
-                // --- DETEKSI TIPE ALOKASI AKURAT BERDASARKAN FDN TAMBAHAN ATAU RIWAYAT ---
-                const isFDNTambahan = opt.dataset.isTambahan === 'true' || fullOptText.includes('TAMBAHAN');
-                const tipeAlokasi = isFDNTambahan ? "TAMBAHAN" : ((sudahDiambil > 0) ? "TAMBAHAN" : "UTAMA");
+                // Status Alokasi (UTAMA / TAMBAHAN)
+                const isFDNTambahan = opt.dataset.isTambahan === 'true' || (opt.text || '').toUpperCase().includes('TAMBAHAN');
+                const sudahDiambilGlobal = terambilMap[kodeBarang] || 0;
+                const tipeAlokasi = isFDNTambahan ? "TAMBAHAN" : ((sudahDiambilGlobal > 0) ? "TAMBAHAN" : "UTAMA");
 
-                // 1. CEK ITEM WH-3
-                const isWh3Item = opt.dataset.isWh3 === 'true' || 
-                                  opt.getAttribute('data-is-wh3') === 'true' || 
-                                  fullOptText.includes('WH-3') || 
-                                  fullOptText.includes('WH3');
+                // --- 1. JIKA TARGETNYA WH-3 ---
+                const isWh3Target = (targetGudang === 'WH3') || (opt.dataset.isWh3 === 'true');
 
-                if (isWh3Item) {
+                if (isWh3Target) {
                     let realKekurangan = sisaKebutuhanItem;
                     if (realKekurangan > 0) {
                         const docIdKodeQty = `${kodeBarang}_${realKekurangan}_${Date.now()}_${i}_wh3`;
@@ -1724,11 +1721,11 @@ async function prosesAmbilRakOtomatis() {
                     continue;
                 }
 
-                // 2. PENCARIAN ITEM WMS REGULER (Gunakan Exact Match agar kode mirip tidak saling tarik)
+                // --- 2. JIKA TARGETNYA WH-2 (PENCARIAN ITEM WMS REGULER) ---
                 let stokWmsList = rawData.filter(item => {
                     if (!item) return false;
                     const kodeItem = String(item.KODE || item.kode || item.KODE_BARANG || '').trim().toUpperCase();
-                    return kodeItem === kodeBarang; // Wajib sama persis secara mutlak
+                    return kodeItem === kodeBarang; // Exact Match
                 });
 
                 if (stokWmsList.length === 0) continue;
@@ -1737,7 +1734,7 @@ async function prosesAmbilRakOtomatis() {
                     const lokasiRak = String(item.LOKASI_PALET || item.lokasi || item.LOKASI || '').trim().toUpperCase();
                     const stokAsliWms = Number(item.QTY_STOK || item.stok || item.QTY || 0);
                     
-                    // HITUNG STOK BERJALAN (Kurangi dengan yang sudah diambil sebelumnya di rak ini)
+                    // Hitung stok berjalan (kurangi dengan yang sudah diambil sebelumnya di rak ini)
                     const rakKey = `${kodeBarang}_${lokasiRak}`;
                     const sudahDiambilDiRakIni = rakTerpakaiMap[rakKey] || 0;
                     const sisaStokReal = stokAsliWms - sudahDiambilDiRakIni;
@@ -1752,6 +1749,7 @@ async function prosesAmbilRakOtomatis() {
                 }).filter(item => item.sisaStokReal > 0 && item.lokasi);
 
                 if (normalizedStok.length > 0) {
+                    // Urutkan stok berdasarkan sisa terkecil, lalu expired terdekat (FEFO)
                     normalizedStok.sort((a, b) => {
                         if (a.sisaStokReal !== b.sisaStokReal) return a.sisaStokReal - b.sisaStokReal;
                         const dateA = new Date(a.expdate);
@@ -1776,7 +1774,7 @@ async function prosesAmbilRakOtomatis() {
                             qtyStok: wms.stok, 
                             qtyAmbil: qtyAmbil,
                             qtySisa: qtySisa,
-                            tipe: tipeAlokasi, // Otomatis berstatus TAMBAHAN jika berasal dari FDN Tambahan atau sudah ada pengambilan sebelumnya
+                            tipe: tipeAlokasi, 
                             timestamp: firebase.database.ServerValue.TIMESTAMP
                         });
 
@@ -2252,7 +2250,7 @@ function loadDataAmbilRak() {
                     tr.innerHTML = `
                         <td class="p-1.5 border border-orange-200 text-center font-semibold text-slate-500 w-10 align-top" rowspan="${itemsInGroup.length}">${nomorUrut}</td>
                         <td class="p-1.5 border border-orange-200 font-bold text-slate-800 truncate align-top" rowspan="${itemsInGroup.length}">${item.kode}</td>
-                        <td class="p-1.5 border border-orange-200 font-semibold text-orange-700 w-60 whitespace-nowrap">${badgeStatusHtml} ${item.rak}</td>
+                        <td class="p-1.5 border border-orange-200 font-semibold text-orange-700 w-70 whitespace-nowrap">${badgeStatusHtml} ${item.rak}</td>
                         <td class="p-1.5 border border-orange-200 text-center font-black text-orange-600 w-14">${item.ambil}</td>
                         <td class="p-1.5 border border-orange-200 text-center text-slate-600 w-14">${item.stok}</td>
                         <td class="p-1.5 border border-orange-200 text-center text-slate-600 w-14">${item.sisa}</td>
@@ -2260,7 +2258,7 @@ function loadDataAmbilRak() {
                     nomorUrut++;
                 } else {
                     tr.innerHTML = `
-                        <td class="p-1.5 border border-orange-200 font-semibold text-orange-700 w-60 whitespace-nowrap">${badgeStatusHtml} ${item.rak}</td>
+                        <td class="p-1.5 border border-orange-200 font-semibold text-orange-700 w-70 whitespace-nowrap">${badgeStatusHtml} ${item.rak}</td>
                         <td class="p-1.5 border border-orange-200 text-center font-black text-orange-600 w-14">${item.ambil}</td>
                         <td class="p-1.5 border border-orange-200 text-center text-slate-600 w-14">${item.stok}</td>
                         <td class="p-1.5 border border-orange-200 text-center text-slate-600 w-14">${item.sisa}</td>
@@ -2292,62 +2290,53 @@ function loadDataAmbilRak() {
     });
 }
 
-// Fungsi untuk membuka modal dan mengisi form dengan data yang diklik (RTDB Version)
-async function bukaModalEditHapus(dateId, docId, data) {
-    document.getElementById('edit-date-id').value = dateId;
-    document.getElementById('edit-doc-id').value = docId;
-    document.getElementById('edit-kode').value = data.kode || '';
-    document.getElementById('edit-lokasi').value = data.lokasi || '';
-    document.getElementById('edit-qty-stok').value = data.qtyStok || 0;
-    document.getElementById('edit-qty-ambil').value = data.qtyAmbil || 0;
-    document.getElementById('edit-qty-sisa').value = data.qtySisa !== undefined ? data.qtySisa : ((data.qtyStok || 0) - (data.qtyAmbil || 0));
+// Fungsi untuk mengatur tombol aktif (UTAMA / TAMBAHAN) pada modal edit
+function setTipeAlokasiEdit(tipe) {
+    const hiddenTipe = document.getElementById('edit-tipe-value');
+    const btnUtama = document.getElementById('btn-tipe-utama');
+    const btnTambahan = document.getElementById('btn-tipe-tambahan');
 
-    // Ambil informasi sisa kekurangan terbaru berdasarkan FDN dari RTDB untuk validasi di modal
-    try {
-        const rtdbRef = firebase.database().ref(`muat_fdn/${dateId}`);
-        
-        // Ambil data datatujuan dari RTDB
-        const tujuanSnapshot = await rtdbRef.child('datatujuan').once('value');
-        let totalKebutuhan = 0;
+    if (hiddenTipe) hiddenTipe.value = tipe;
 
-        if (tujuanSnapshot.exists()) {
-            const dataTujuanObj = tujuanSnapshot.val();
-            Object.keys(dataTujuanObj).forEach(key => {
-                const docData = dataTujuanObj[key];
-                const items = docData.data || [];
-                items.forEach(item => {
-                    if ((item.kode || '').toUpperCase() === (data.kode || '').toUpperCase()) {
-                        totalKebutuhan += Number(item.qty_utama || 0);
-                    }
-                });
-            });
+    if (tipe === 'UTAMA') {
+        if (btnUtama) {
+            btnUtama.className = "py-2 px-3 rounded font-bold border transition text-center text-xs bg-blue-600 text-white border-blue-600 shadow";
         }
-
-        // Ambil data ambilrak lain dari RTDB selain dokumen ini untuk menghitung total yang sudah diambil
-        const ambilRakSnapshot = await rtdbRef.child('ambilrak').once('value');
-        let sudahDiambilLainnya = 0;
-
-        if (ambilRakSnapshot.exists()) {
-            const dataAmbilObj = ambilRakSnapshot.val();
-            Object.keys(dataAmbilObj).forEach(rakKey => {
-                if (rakKey !== docId) {
-                    const d = dataAmbilObj[rakKey];
-                    if ((d.kode || '').toUpperCase() === (data.kode || '').toUpperCase()) {
-                        sudahDiambilLainnya += Number(d.qtyAmbil || 0);
-                    }
-                }
-            });
+        if (btnTambahan) {
+            btnTambahan.className = "py-2 px-3 rounded font-bold border transition text-center text-xs bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-200";
         }
-
-        const sisaKekuranganMaks = totalKebutuhan - sudahDiambilLainnya;
-        // Simpan batas maksimal kekurangan ke dataset elemen modal edit qty ambil untuk pengaman
-        const inputEditAmbil = document.getElementById('edit-qty-ambil');
-        if (inputEditAmbil) {
-            inputEditAmbil.dataset.maxKekurangan = sisaKekuranganMaks > 0 ? sisaKekuranganMaks : 0;
+    } else {
+        if (btnUtama) {
+            btnUtama.className = "py-2 px-3 rounded font-bold border transition text-center text-xs bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-200";
         }
-    } catch (e) {
-        console.error("Gagal menghitung batas kekurangan di modal dari RTDB:", e);
+        if (btnTambahan) {
+            btnTambahan.className = "py-2 px-3 rounded font-bold border transition text-center text-xs bg-amber-500 text-white border-amber-500 shadow";
+        }
     }
+}
+
+// Perbarui juga fungsi bukaModalEditHapus untuk memanggil status tombol tipe
+async function bukaModalEditHapus(dateId, docId, data) {
+    const elDateId = document.getElementById('edit-date-id');
+    const elDocId = document.getElementById('edit-doc-id');
+    const elKode = document.getElementById('edit-kode');
+    const elLokasi = document.getElementById('edit-lokasi');
+    const elStok = document.getElementById('edit-qty-stok');
+    const elAmbil = document.getElementById('edit-qty-ambil');
+    const elSisa = document.getElementById('edit-qty-sisa');
+
+    if (elDateId) elDateId.value = dateId || '';
+    if (elDocId) elDocId.value = docId || '';
+
+    // Set tipe alokasi (UTAMA / TAMBAHAN)
+    const tipeData = (data.tipe || 'UTAMA').toUpperCase();
+    setTipeAlokasiEdit(tipeData);
+
+    if (elKode) elKode.value = data.kode || '';
+    if (elLokasi) elLokasi.value = data.lokasi || '';
+    if (elStok) elStok.value = data.qtyStok || 0;
+    if (elAmbil) elAmbil.value = data.qtyAmbil || 0;
+    if (elSisa) elSisa.value = data.qtySisa !== undefined ? data.qtySisa : ((data.qtyStok || 0) - (data.qtyAmbil || 0));
 
     // Tampilkan modal
     const modal = document.getElementById('modal-edit-rak');
@@ -2364,11 +2353,14 @@ function tutupModalEditRak() {
 function hitungOtomatisSisaEdit() {
     const inputAmbil = document.getElementById('edit-qty-ambil');
     const inputStok = document.getElementById('edit-qty-stok');
+    const inputSisa = document.getElementById('edit-qty-sisa');
     
+    if (!inputAmbil || !inputStok) return;
+
     const stok = Number(inputStok.value || 0);
     let ambil = Number(inputAmbil.value || 0);
     
-    // Ambil batas maksimal kekurangan dari dataset
+    // Ambil batas maksimal kekurangan dari dataset (jika ada)
     const maxKekurangan = inputAmbil.dataset.maxKekurangan !== undefined ? Number(inputAmbil.dataset.maxKekurangan) : stok;
     
     // Tentukan batas paling ketat antara stok gudang dan sisa kekurangan FDN
@@ -2385,32 +2377,44 @@ function hitungOtomatisSisaEdit() {
     }
 
     const sisa = stok - ambil;
-    document.getElementById('edit-qty-sisa').value = sisa;
+    if (inputSisa) {
+        inputSisa.value = sisa >= 0 ? sisa : 0;
+    }
 }
 
-// Fungsi untuk menyimpan perubahan data ke RTDB dan Sinkronisasi Ulang
+// Fungsi untuk menyimpan perubahan data ke RTDB dan Sinkronisasi Ulang (Versi Lengkap dengan Tipe)
 async function simpanPerubahanItem() {
     const dateId = document.getElementById('edit-date-id').value;
     const docId = document.getElementById('edit-doc-id').value;
+    const tipeBaru = document.getElementById('edit-tipe-value')?.value || 'UTAMA'; // Ambil nilai tipe (UTAMA / TAMBAHAN)
     const lokasiBaru = document.getElementById('edit-lokasi').value.trim().toUpperCase();
     const qtyStokBaru = Number(document.getElementById('edit-qty-stok').value || 0);
     const qtyAmbilBaru = Number(document.getElementById('edit-qty-ambil').value || 0);
     const qtySisaBaru = Number(document.getElementById('edit-qty-sisa').value || 0);
 
     if (!lokasiBaru) {
-        miuiAlert("Lokasi rak tidak boleh kosong!");
+        if (typeof miuiAlert === 'function') {
+            miuiAlert("Lokasi rak tidak boleh kosong!");
+        } else {
+            alert("Lokasi rak tidak boleh kosong!");
+        }
         return;
     }
     if (qtyAmbilBaru <= 0) {
-        miuiAlert("QTY Ambil harus lebih besar dari 0!");
+        if (typeof miuiAlert === 'function') {
+            miuiAlert("QTY Ambil harus lebih besar dari 0!");
+        } else {
+            alert("QTY Ambil harus lebih besar dari 0!");
+        }
         return;
     }
 
     try {
-        // Update data dokumen di RTDB menggunakan .update()
+        // Update data dokumen di RTDB termasuk tipe alokasi menggunakan .update()
         await firebase.database()
                 .ref(`muat_fdn/${dateId}/ambilrak/${docId}`)
                 .update({
+                    tipe: tipeBaru,
                     lokasi: lokasiBaru,
                     qtyStok: qtyStokBaru,
                     qtyAmbil: qtyAmbilBaru,
@@ -2426,7 +2430,11 @@ async function simpanPerubahanItem() {
         }
     } catch (error) {
         console.error("Gagal memperbarui data di RTDB: ", error);
-        miuiAlert("Terjadi kesalahan saat memperbarui data ke database.");
+        if (typeof miuiAlert === 'function') {
+            miuiAlert("Terjadi kesalahan saat memperbarui data ke database.");
+        } else {
+            alert("Terjadi kesalahan saat memperbarui data ke database.");
+        }
     }
 }
 
