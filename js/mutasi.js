@@ -2704,8 +2704,11 @@ window.cetakLaporanVersi1 = async function(tglMuat) {
         const sortedKeys = Object.keys(dataMap).sort((a, b) => {
             const itemA = dataMap[a];
             const itemB = dataMap[b];
-            const isWh3A = itemA.wh3 > 0 && itemA.wh2 === 0 ? 1 : 0;
-            const isWh3B = itemB.wh3 > 0 && itemB.wh2 === 0 ? 1 : 0;
+            
+            // Ubah di sini: Cukup cek apakah item memiliki stok di WH-3 (> 0)
+            const isWh3A = itemA.wh3 > 0 ? 1 : 0;
+            const isWh3B = itemB.wh3 > 0 ? 1 : 0;
+            
             if (isWh3A !== isWh3B) return isWh3B - isWh3A;
             return a.localeCompare(b);
         });
@@ -2739,14 +2742,18 @@ window.cetakLaporanVersi1 = async function(tglMuat) {
 
         let totalSeluruh = 0, totalWh2 = 0, totalWh3 = 0;
         let rowsUtamaHtml = '';
+        const totalTujuanData = tujuanKeys.length; // Ambil total jumlah data tujuan/FDN yang tersedia
 
-        listCombinedRows.forEach(row => {
+        listCombinedRows.forEach((row, index) => {
             const item = row.item;
             if (item) {
                 totalSeluruh += item.total;
                 totalWh2 += item.wh2;
                 totalWh3 += item.wh3;
             }
+
+            // Cek apakah indeks baris saat ini masih dalam batas data FDN/Tujuan
+            const hasTujuanData = index < totalTujuanData;
 
             rowsUtamaHtml += `
                 <tr>
@@ -2755,13 +2762,13 @@ window.cetakLaporanVersi1 = async function(tglMuat) {
                     <td></td>
                     <td>${item && item.wh2 > 0 ? item.wh2 : ''}</td>
                     <td>${item && item.wh3 > 0 ? item.wh3 : ''}</td>
-                    <td class="text-left" style="text-align: left;">${row.noFdn}</td>
-                    <td class="text-left" style="text-align: left;">${row.tujuan}</td>
+                    <td class="text-left" style="text-align: left; ${!hasTujuanData ? 'border: none; background: transparent;' : ''}">${hasTujuanData ? row.noFdn : ''}</td>
+                    <td class="text-left" style="text-align: left; ${!hasTujuanData ? 'border: none; background: transparent;' : ''}">${hasTujuanData ? row.tujuan : ''}</td>
                 </tr>
             `;
         });
 
-        // Baris Total Qty di bawah tabel
+        // Baris Total Qty di bawah tabel (Dibersihkan border kolom kanannya)
         rowsUtamaHtml += `
             <tr class="font-bold" style="background-color: #f9f9f9; font-weight: bold;">
                 <td class="text-left" style="text-align: left; padding-left: 5px;">TOTAL QTY</td>
@@ -2769,8 +2776,8 @@ window.cetakLaporanVersi1 = async function(tglMuat) {
                 <td></td>
                 <td>${totalWh2}</td>
                 <td>${totalWh3}</td>
-                <td></td>
-                <td></td>
+                <td style="border: none; background: transparent;"></td>
+                <td style="border: none; background: transparent;"></td>
             </tr>
         `;
 
@@ -2808,14 +2815,32 @@ window.cetakLaporanVersi1 = async function(tglMuat) {
                     src: local('Century Gothic'), url('CenturyGothic.ttf') format('truetype');
                 }
 
-                @page { size: 215mm 330mm portrait; margin: 20mm 1mm 1mm 1mm; }
                 body { 
                     font-family: 'Century Gothic', Arial, sans-serif; 
-                    font-size: 10pt; 
+                    font-size: 8pt; 
                     margin: 0; 
                     padding: 0; 
                     color: #000; 
                 }
+
+                /* Pengaturan halaman cetak dan nomor halaman otomatis di bawah */
+                @page { 
+                    size: 215mm 330mm portrait; 
+                    margin: 15mm 1mm 10mm 1mm; 
+                    @bottom-center {
+                        content: "Halaman " counter(page) " dari " counter(pages);
+                        font-family: 'Century Gothic', Arial, sans-serif;
+                        font-size: 9pt;
+                        color: #000;
+                    }
+                }
+
+                @media print {
+                    .page-footer {
+                        display: block;
+                    }
+                }
+
                 .header-title { 
                     font-family: 'Edo', Arial, sans-serif; 
                     font-weight: normal; 
@@ -2827,15 +2852,15 @@ window.cetakLaporanVersi1 = async function(tglMuat) {
                 .sub-header { 
                     font-family: 'Century Gothic', Arial, sans-serif; 
                     margin-bottom: 8px; 
-                    font-size: 12pt; 
-                    text-align: left;
+                    font-size: 13pt; 
+                    text-align: right;
                 }
                 table { 
                     width: 100%; 
                     border-collapse: collapse; 
                     margin-bottom: 10px; 
                     font-family: 'Century Gothic', Arial, sans-serif;
-                    font-size: 11pt;
+                    font-size: 10pt;
                     table-layout: fixed;
                 }
                 th, td { 
@@ -2846,7 +2871,7 @@ window.cetakLaporanVersi1 = async function(tglMuat) {
                 }
                 th { 
                     background-color: #f2f2f2; 
-                    font-size: 11pt; 
+                    font-size: 10pt; 
                 }
                 .text-left { text-align: left; }
                 .font-bold { font-weight: bold; }
@@ -2854,7 +2879,7 @@ window.cetakLaporanVersi1 = async function(tglMuat) {
         </head>
         <body>
             <div class="header-title">MUTASI GUDANG WH-2</div>
-            <div class="sub-header">dicetak pada: ${formatWaktuLengkap}</div>
+            <div class="sub-header">${formatWaktuLengkap}</div>
             
             <table>
                 <thead>
@@ -2874,6 +2899,10 @@ window.cetakLaporanVersi1 = async function(tglMuat) {
             </table>
         </body>
         </html>`;
+
+        //const win = window.open("", "_blank");
+        //win.document.write(finalHtml);
+        //win.document.close();
 
         // 3. Kirim ke Print Server (Firebase Realtime Database)
         const judulTugas = "Cetak Dokumen v1";
@@ -2928,13 +2957,51 @@ window.cetakLaporanVersi2 = async function(tglMuat) {
         if (snapshotAmbil.exists()) {
             const dataAmbilObj = snapshotAmbil.val();
             
-            // Ubah objek ke array dan urutkan berdasarkan timestamp secara ascending (kronologis)
             rawDataArray = Object.keys(dataAmbilObj).map(key => {
                 return {
                     id: key,
                     ...dataAmbilObj[key]
                 };
-            }).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+            });
+
+            // Deteksi kode barang apa saja yang memiliki alokasi WH-3
+            const codesWithWh3 = new Set();
+            rawDataArray.forEach(item => {
+                if (String(item.lokasi || '').toUpperCase().includes('WH-3')) {
+                    codesWithWh3.add(String(item.kode || '').trim());
+                }
+            });
+
+            // Sorting dengan prioritas:
+            // 1. Kode barang yang memiliki alokasi WH-3 ditarik ke paling atas secara keseluruhan.
+            // 2. Kelompokkan berdasarkan Kode Barang (A-Z) agar baris dengan kode yang sama bersatu.
+            // 3. Di dalam kode yang sama, posisikan baris WH-3 paling atas, disusul rak lainnya.
+            rawDataArray.sort((a, b) => {
+                const kodeA = String(a.kode || '').trim();
+                const kodeB = String(b.kode || '').trim();
+                const isWh3A = String(a.lokasi || '').toUpperCase().includes('WH-3') ? 1 : 0;
+                const isWh3B = String(b.lokasi || '').toUpperCase().includes('WH-3') ? 1 : 0;
+
+                const hasWh3A = codesWithWh3.has(kodeA) ? 1 : 0;
+                const hasWh3B = codesWithWh3.has(kodeB) ? 1 : 0;
+
+                // Prioritas Utama: Item yang kodenya memiliki WH-3 ditarik ke atas
+                if (hasWh3A !== hasWh3B) {
+                    return hasWh3B - hasWh3A;
+                }
+
+                // Urutkan berdasarkan Kode Barang (A-Z) agar menyatu
+                if (kodeA !== kodeB) {
+                    return kodeA.localeCompare(kodeB);
+                }
+
+                // Untuk kode yang sama, posisikan baris WH-3 di urutan teratas di antara rak-raknya
+                if (isWh3A !== isWh3B) {
+                    return isWh3B - isWh3A;
+                }
+
+                return (a.timestamp || 0) - (b.timestamp || 0);
+            });
         }
 
         // Normalisasi properti data ambilrak
@@ -2997,10 +3064,14 @@ window.cetakLaporanVersi2 = async function(tglMuat) {
         let nomorUrut = 1;
         let lastKode = '';
         let finalMaxRows = Math.max(normalizedAmbilData.length, fdnRowsData.length);
+        let totalTujuanData = fdnRowsData.length; // Hitung batas jumlah data FDN/tujuan yang valid
 
         for (let i = 0; i < finalMaxRows; i++) {
             const ambilRow = normalizedAmbilData[i] || {};
             const itemFdn = fdnRowsData[i] || {};
+            
+            // Cek apakah baris ini masih masuk dalam rentang data FDN/tujuan
+            const hasTujuanData = i < totalTujuanData;
 
             const formatVal = (val) => {
                 if (val === undefined || val === null || val === '' || Number(val) === 0) {
@@ -3014,12 +3085,10 @@ window.cetakLaporanVersi2 = async function(tglMuat) {
 
             if (ambilRow.kode) {
                 if (ambilRow.kode !== lastKode) {
-                    // Kemunculan pertama kode ini: tampilkan nomor urut dan kode barang
                     noDisplay = nomorUrut++;
                     kodeDisplay = ambilRow.kode;
                     lastKode = ambilRow.kode;
                 } else {
-                    // Kode yang sama pada baris berikutnya: kosongkan nomor dan kode
                     noDisplay = '';
                     kodeDisplay = '';
                 }
@@ -3029,13 +3098,13 @@ window.cetakLaporanVersi2 = async function(tglMuat) {
                 <tr>
                     <td>${noDisplay}</td>
                     <td class="text-left font-bold" style="text-align: left; padding-left: 5px; font-weight: bold;">${kodeDisplay}</td>
-                    <td>${ambilRow.rak || ''}</td>
+                    <td style="${String(ambilRow.rak || '').toUpperCase().includes('WH-3') ? 'font-weight: bold;' : ''}">${ambilRow.rak || ''}</td>
                     <td>${formatVal(ambilRow.ambil)}</td>
                     <td>${formatVal(ambilRow.stok)}</td>
                     <td>${formatVal(ambilRow.sisa)}</td>
-                    <td>${itemFdn.noFdn ? (i + 1) : ''}</td>
-                    <td class="text-left" style="text-align: left;">${itemFdn.noFdn || ''}</td>
-                    <td class="text-left" style="text-align: left;">${itemFdn.tujuan || ''}</td>
+                    <td style="${!hasTujuanData ? 'border: none; background: transparent;' : ''}">${hasTujuanData && itemFdn.noFdn ? (i + 1) : ''}</td>
+                    <td class="text-left" style="text-align: left; ${!hasTujuanData ? 'border: none; background: transparent;' : ''}">${hasTujuanData ? (itemFdn.noFdn || '') : ''}</td>
+                    <td class="text-left" style="text-align: left; ${!hasTujuanData ? 'border: none; background: transparent;' : ''}">${hasTujuanData ? (itemFdn.tujuan || '') : ''}</td>
                 </tr>
             `;
         }
@@ -3077,18 +3146,18 @@ window.cetakLaporanVersi2 = async function(tglMuat) {
                 /* Pengaturan halaman cetak dan nomor halaman otomatis di bawah */
                 @page { 
                     size: 215mm 330mm portrait; 
-                    margin: 15mm 10mm 20mm 10mm; 
+                    margin: 15mm 1mm 10mm 1mm; 
                     @bottom-center {
                         content: "Halaman " counter(page) " dari " counter(pages);
                         font-family: 'Century Gothic', Arial, sans-serif;
-                        font-size: 9pt;
+                        font-size: 8pt;
                         color: #000;
                     }
                 }
 
                 body { 
                     font-family: 'Century Gothic', Arial, sans-serif; 
-                    font-size: 10pt; 
+                    font-size: 11pt; 
                     margin: 0; 
                     padding: 0; 
                     color: #000; 
@@ -3111,8 +3180,8 @@ window.cetakLaporanVersi2 = async function(tglMuat) {
                 .sub-header { 
                     font-family: 'Century Gothic', Arial, sans-serif; 
                     margin-bottom: 8px; 
-                    font-size: 12pt; 
-                    text-align: left;
+                    font-size: 13pt; 
+                    text-align: right;
                 }
                 table { 
                     width: 100%; 
@@ -3160,6 +3229,10 @@ window.cetakLaporanVersi2 = async function(tglMuat) {
             </table>
         </body>
         </html>`;
+
+        //const win = window.open("", "_blank");
+        //win.document.write(finalHtml);
+        //win.document.close();
 
         // 3. Kirim ke Print Server (Firebase Realtime Database)
         const judulTugas = "Cetak Dokumen v2 (Detail Rak)";
@@ -3386,7 +3459,7 @@ window.cetakLaporanVersi2Tambahan = async function(tglMuat) {
                 /* Pengaturan halaman cetak dan nomor halaman otomatis di bawah */
                 @page { 
                     size: 215mm 330mm portrait; 
-                    margin: 15mm 10mm 20mm 10mm; 
+                    margin: 15mm 1mm 10mm 1mm; 
                     @bottom-center {
                         content: "Halaman " counter(page) " dari " counter(pages);
                         font-family: 'Century Gothic', Arial, sans-serif;
@@ -3457,7 +3530,7 @@ window.cetakLaporanVersi2Tambahan = async function(tglMuat) {
             </style>
         </head>
         <body>
-            <div class="header-title">MUTASI GUDANG WH-2 (CETAK TAMBAHAN)</div>
+            <div class="header-title">MUTASI GUDANG WH-2 (TAMBAHAN)</div>
             <div class="sub-header">${formatWaktuLengkap}</div>
             
             <table>
