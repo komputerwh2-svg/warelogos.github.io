@@ -294,9 +294,9 @@
     <!-- Modal Database Manager RTDB -->
     <div id="modal-db-manager" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div class="bg-orange-600 text-white px-4 py-3 flex justify-between items-center">
+            <div class="bg-gradient-to-b from-[#323232] to-[#202020] border-b border-[#151515] text-white px-4 py-3 flex justify-between items-center">
                 <h3 class="font-bold text-sm uppercase">🛠️ Database Manager Muat FDn</h3>
-                <button onclick="closeDatabaseManagerModal()" class="text-white hover:text-gray-200 font-bold text-lg">&times;</button>
+                <button onclick="closeDatabaseManagerModal()" class="text-white hover:text-red-400 font-bold text-lg">✕</button>
             </div>
             <div class="p-4 overflow-y-auto flex-1 space-y-4 text-xs">
                 <div>
@@ -311,9 +311,6 @@
                     <p class="text-orange-500 italic text-center py-10">Pilih tanggal terlebih dahulu untuk melihat isi node database...</p>
                 </div>
             </div>
-            <div class="bg-orange-100 px-4 py-2 flex justify-end">
-                <button onclick="closeDatabaseManagerModal()" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-1.5 rounded font-bold text-xs">Tutup</button>
-            </div>
         </div>
     </div>
 
@@ -322,9 +319,9 @@
     <div id="fdn-modal-detail" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center hidden">
         <div class="bg-white rounded-lg shadow-2xl w-11/12 max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
             <!-- Header Modal -->
-            <div class="bg-orange-600 text-white px-4 py-2.5 flex justify-between items-center">
+            <div class="bg-gradient-to-b from-[#323232] to-[#202020] border-b border-[#151515] text-white px-4 py-2.5 flex justify-between items-center">
                 <h3 class="font-bold text-xs uppercase tracking-wider">Detail Surat Jalan / FDN Gabungan</h3>
-                <button onclick="closeFdnModal()" class="text-white hover:text-orange-200 font-bold text-sm">✕</button>
+                <button onclick="closeFdnModal()" class="text-white hover:text-red-400 font-bold text-lg">✕</button>
             </div>
 
             <!-- Body Modal (Header Diam, Tabel yang Bisa Digulir) -->
@@ -385,64 +382,80 @@
         </div>
     </div>
 
-    <!-- MODAL EDIT / HAPUS ITEM AMBIL RAK -->
-    <div id="modal-edit-rak" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center hidden">
-        <div class="bg-white rounded-lg shadow-xl border border-orange-300 w-full max-w-md mx-4 overflow-hidden">
-            <!-- Header Modal -->
-            <div class="bg-orange-500 text-white px-4 py-2.5 flex justify-between items-center font-bold text-xs uppercase tracking-wider">
-                <span>Edit / Hapus Item Ambil Rak</span>
-                <button onclick="tutupModalEditRak()" class="text-white hover:text-orange-200 text-base font-black px-1.5">&times;</button>
-            </div>
-            
-            <!-- Body Modal -->
-            <div class="p-4 space-y-3 text-xs">
-                <!-- Hidden inputs untuk menyimpan ID dan Tanggal -->
-                <input type="hidden" id="edit-date-id">
-                <input type="hidden" id="edit-doc-id">
+    <!-- MODAL EDIT / HAPUS ITEM AMBIL RAK (Fix Auto Height) -->
+<div id="modal-edit-rak" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center hidden p-4 overflow-y-auto">
+    <div class="bg-white rounded-lg shadow-2xl border border-slate-300 w-full max-w-lg overflow-hidden my-8">
+        <!-- Header Modal (Gaya Hitam Elegan ala Berita Acara) -->
+        <div class="bg-gradient-to-b from-[#323232] to-[#202020] text-white px-4 py-3 flex justify-between items-center font-bold text-xs uppercase tracking-wider">
+            <span>Edit / Hapus Item Ambil Rak</span>
+            <button onclick="tutupModalEditRak()" class="text-white hover:text-red-400 font-bold text-lg">✕</button>
+        </div>
+        
+        <!-- Body Modal (Menggunakan block biasa dengan spacing rapi agar tidak terpotong) -->
+        <div class="p-4 space-y-3 text-xs">
+            <!-- Hidden inputs untuk ID, Tanggal, dan Tipe Alokasi -->
+            <input type="hidden" id="edit-date-id">
+            <input type="hidden" id="edit-doc-id">
+            <input type="hidden" id="edit-tipe-value" value="UTAMA">
 
+            <!-- Tombol Pilihan Status Alokasi (UTM / TBH) -->
+            <div>
+                <label class="block font-bold text-slate-700 mb-1">Status Alokasi</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <button type="button" id="btn-tipe-utama" onclick="setTipeAlokasiEdit('UTAMA')" class="py-2 px-3 rounded font-bold border transition text-center text-xs">
+                        UTAMA (UTM)
+                    </button>
+                    <button type="button" id="btn-tipe-tambahan" onclick="setTipeAlokasiEdit('TAMBAHAN')" class="py-2 px-3 rounded font-bold border transition text-center text-xs">
+                        TAMBAHAN (TBH)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Kode Barang & Lokasi Rak (2 Kolom) -->
+            <div class="grid grid-cols-2 gap-2">
                 <div>
                     <label class="block font-bold text-slate-700 mb-1">Kode Barang</label>
                     <input type="text" id="edit-kode" readonly class="w-full p-2 bg-slate-100 border border-slate-300 rounded font-bold text-orange-700">
                 </div>
-
                 <div>
                     <label class="block font-bold text-slate-700 mb-1">Lokasi Rak</label>
                     <input type="text" id="edit-lokasi" class="w-full p-2 border border-orange-300 rounded focus:ring-1 focus:ring-orange-500 text-slate-700 font-bold">
                 </div>
-
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="block font-bold text-slate-700 mb-1">QTY Stok Gudang</label>
-                        <input type="number" id="edit-qty-stok" class="w-full p-2 border border-slate-300 rounded bg-slate-50 text-slate-700 font-bold" oninput="hitungOtomatisSisaEdit()">
-                    </div>
-                    <div>
-                        <label class="block font-bold text-slate-700 mb-1">QTY Ambil</label>
-                        <input type="number" id="edit-qty-ambil" class="w-full p-2 border border-orange-300 rounded font-black text-orange-600 font-bold" oninput="hitungOtomatisSisaEdit()">
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block font-bold text-slate-700 mb-1">QTY Sisa (Stok - Ambil)</label>
-                    <input type="number" id="edit-qty-sisa" readonly class="w-full p-2 bg-slate-100 border border-slate-300 rounded font-bold text-slate-800">
-                </div>
             </div>
 
-            <!-- Footer / Tombol Aksi -->
-            <div class="bg-slate-50 border-t border-slate-200 px-4 py-2.5 flex justify-between items-center">
-                <button onclick="hapusItemDariModal()" class="bg-red-500 hover:bg-red-600 text-white font-bold px-3 py-1.5 rounded shadow transition text-xs">
-                    🗑 Hapus Item
-                </button>
-                <div class="space-x-2">
-                    <button onclick="tutupModalEditRak()" class="bg-slate-300 hover:bg-slate-400 text-slate-700 font-bold px-3 py-1.5 rounded transition text-xs">
-                        Batal
-                    </button>
-                    <button onclick="simpanPerubahanItem()" class="bg-orange-500 hover:bg-orange-600 text-white font-bold px-4 py-1.5 rounded shadow transition text-xs">
-                        Simpan Perubahan
-                    </button>
+            <!-- 3 Kolom QTY (Stok, Ambil, Sisa) -->
+            <div class="grid grid-cols-3 gap-2">
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">QTY Stok</label>
+                    <input type="number" id="edit-qty-stok" class="w-full p-2 border border-slate-300 rounded bg-slate-50 text-slate-700 font-bold text-center" oninput="hitungOtomatisSisaEdit()">
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">QTY Ambil</label>
+                    <input type="number" id="edit-qty-ambil" class="w-full p-2 border border-orange-400 rounded font-black text-orange-600 font-bold text-center bg-orange-50/50" oninput="hitungOtomatisSisaEdit()">
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">QTY Sisa</label>
+                    <input type="number" id="edit-qty-sisa" readonly class="w-full p-2 bg-slate-100 border border-slate-300 rounded font-bold text-slate-800 text-center">
                 </div>
             </div>
         </div>
+
+        <!-- Footer / Tombol Aksi -->
+        <div class="bg-slate-100 border-t border-slate-200 px-4 py-3 flex justify-between items-center">
+            <button onclick="hapusItemDariModal()" class="bg-red-500 hover:bg-red-600 text-white font-bold px-3 py-1.5 rounded shadow transition text-xs">
+                🗑 Hapus Item
+            </button>
+            <div class="space-x-2">
+                <button onclick="tutupModalEditRak()" class="bg-slate-300 hover:bg-slate-400 text-slate-700 font-bold px-3 py-1.5 rounded transition text-xs">
+                    Batal
+                </button>
+                <button onclick="simpanPerubahanItem()" class="bg-orange-500 hover:bg-orange-600 text-white font-bold px-4 py-1.5 rounded shadow transition text-xs">
+                    Simpan Perubahan
+                </button>
+            </div>
+        </div>
     </div>
+</div>
 
 
 </div>
