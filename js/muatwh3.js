@@ -2480,12 +2480,33 @@ window.cetakDokumenVersi1 = async function(tglMuat) {
     const judul = document.getElementById('judul-ringkasan').innerText;
     const theadContent = document.querySelector('table thead').innerHTML;
     const rows = document.querySelectorAll('table tbody tr');
+
+    // --- TAMBAHKAN HELPER INI DI SINI ---
+    const getInisialKode = (kodeAsli) => {
+        if (!window.cacheMasterBarang) return kodeAsli;
+        const clean = kodeAsli.trim().toUpperCase();
+        const foundKey = Object.keys(window.cacheMasterBarang).find(k => k.trim().toUpperCase() === clean);
+        if (foundKey && window.cacheMasterBarang[foundKey]) {
+            const info = window.cacheMasterBarang[foundKey];
+            return info.inisial || info.INISIAL || kodeAsli;
+        }
+        return kodeAsli;
+    };
+    // ------------------------------------
     
     let rowsUtamaHtml = '';
     rows.forEach(row => {
         const selTotal = row.cells[row.cells.length - 2]?.innerText.trim();
         if (selTotal !== "" && selTotal !== "-" && !isNaN(selTotal)) {
-            rowsUtamaHtml += `<tr>${row.innerHTML}</tr>`;
+            // --- UBAH PROSES INI MENJADI CLONE DAN GANTI TEKS KODE MENJADI INISIAL ---
+            let clonedRow = row.cloneNode(true);
+            if (clonedRow.cells.length > 0) {
+                const cellKode = clonedRow.cells[0]; // Kolom KODE BARANG
+                const kodeLengkap = cellKode.innerText.trim();
+                cellKode.innerText = getInisialKode(kodeLengkap);
+            }
+            rowsUtamaHtml += `<tr>${clonedRow.innerHTML}</tr>`;
+            // ---------------------------------------------------------------------
         }
     });
 
@@ -2710,12 +2731,33 @@ window.cetakDokumenVersi2 = async function(tglMuat) {
     
     const theadContent = document.querySelector('table thead') ? document.querySelector('table thead').innerHTML : '';
     const rows = document.querySelectorAll('table tbody tr');
+
+    // --- TAMBAHKAN HELPER INI ---
+    const getInisialKode = (kodeAsli) => {
+        if (!window.cacheMasterBarang) return kodeAsli;
+        const clean = kodeAsli.trim().toUpperCase();
+        const foundKey = Object.keys(window.cacheMasterBarang).find(k => k.trim().toUpperCase() === clean);
+        if (foundKey && window.cacheMasterBarang[foundKey]) {
+            const info = window.cacheMasterBarang[foundKey];
+            return info.inisial || info.INISIAL || kodeAsli;
+        }
+        return kodeAsli;
+    };
+    // ----------------------------
     
     let rowsUtamaHtml = '';
     rows.forEach(row => {
         const selTotal = row.cells[row.cells.length - 2]?.innerText.trim();
         if (selTotal !== "" && selTotal !== "-" && !isNaN(selTotal)) {
-            rowsUtamaHtml += `<tr>${row.innerHTML}</tr>`;
+            // --- UBAH MENJADI CLONE DAN GANTI TEKS KODE MENJADI INISIAL ---
+            let clonedRow = row.cloneNode(true);
+            if (clonedRow.cells.length > 0) {
+                const cellKode = clonedRow.cells[0]; // Kolom KODE BARANG
+                const kodeLengkap = cellKode.innerText.trim();
+                cellKode.innerText = getInisialKode(kodeLengkap);
+            }
+            rowsUtamaHtml += `<tr>${clonedRow.innerHTML}</tr>`;
+            // -------------------------------------------------------------
         }
     });
 
