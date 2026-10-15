@@ -24,14 +24,13 @@
                 <span>Arsip Ceklist</span>
             </button>
 
-            <!-- Popover Daftar Arsip Ceklist Berdasarkan Tanggal -->
-            <div id="popover-arsip-ceklist" class="hidden absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-2xl border border-orange-300 p-3 z-50 text-slate-700 font-sans">
+            <!-- Popover Daftar Arsip Ceklist Berdasarkan Tanggal (Diperlebar) -->
+            <div id="popover-arsip-ceklist" class="hidden absolute right-0 mt-2 w-[380px] bg-white rounded-xl shadow-2xl border border-orange-300 p-3 z-50 text-slate-700 font-sans">
                 <div class="flex items-center justify-between pb-2 mb-2 border-b border-orange-200">
                     <span class="text-[11px] font-black uppercase text-orange-700">Riwayat Arsip Cetak</span>
-                    <span class="text-[9px] bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded font-bold">Group per Tanggal</span>
                 </div>
-                <div id="container-list-arsip-ceklist" class="max-h-60 overflow-y-auto miui-custom-scroll space-y-2 text-xs">
-                    <div class="text-slate-400 italic text-[10px] text-center py-3">Belum ada riwayat arsip tersimpan...</div>
+                <div id="container-list-arsip-ceklist" class="max-h-72 overflow-y-auto miui-custom-scroll space-y-2 text-xs">
+                    <div class="text-slate-400 italic text-[10px] text-center py-4">Belum ada riwayat arsip tersimpan...</div>
                 </div>
             </div>
         </div>
@@ -59,7 +58,7 @@
 
                 <!-- Panel Daftar Nomor FDN / Tujuan -->
                 <div class="border border-orange-300 rounded-lg p-2 bg-slate-50 space-y-1">
-                    <label class="text-[9px] font-black text-slate-500 uppercase tracking-wider block">Daftar Nomor FDN / Tujuan (Klik untuk detil surat)</label>
+                    <label class="text-[9px] font-black text-slate-500 uppercase tracking-wider block">Daftar Nomor FDN / DO</label>
                     <div id="container-list-fdn-ceklist" class="w-full h-[175px] max-h-[175px] bg-white border border-orange-300 rounded p-1.5 overflow-y-auto miui-custom-scroll text-[10px] font-mono text-slate-700 shadow-inner">
                         <div class="text-slate-400 text-xs">Belum ada data DO atau FDN diimport...</div>
                     </div>
@@ -74,7 +73,7 @@
                             placeholder="Paste data WHNB-2 dari Bosnet di sini..."></textarea>
                         
                         <div class="flex flex-col gap-1.5 flex-shrink-0 w-24">
-                            <button onclick="prosesPasteWhnb2()" class="h-[34px] bg-orange-600 hover:bg-orange-700 text-white rounded font-black text-[9px] uppercase tracking-wider flex items-center justify-center gap-1 shadow transition">
+                            <button onclick="prosesDataWHNB2()" class="h-[34px] bg-orange-600 hover:bg-orange-700 text-white rounded font-black text-[9px] uppercase tracking-wider flex items-center justify-center gap-1 shadow transition">
                                 <i class="fa-solid fa-paste"></i> WHNB-2
                             </button>
                             <button onclick="cetakCeklistMuat()" class="h-[34px] bg-slate-800 hover:bg-slate-900 text-white rounded font-black text-[9px] uppercase tracking-wider flex items-center justify-center gap-1 shadow transition">
@@ -101,7 +100,7 @@
                     </div>
 
                     <!-- Kotak Preview List Titipan diperbesar tingginya -->
-                    <div id="container-list-titipan" class="w-full h-[150px] max-h-[150px] bg-white border border-orange-300 rounded p-1.5 overflow-y-auto miui-custom-scroll text-[10px] font-mono text-slate-700 shadow-inner space-y-1">
+                    <div id="container-list-titipan" class="w-full h-[175px] max-h-[175px] bg-white border border-orange-300 rounded p-1.5 overflow-y-auto miui-custom-scroll text-[10px] font-mono text-slate-700 shadow-inner space-y-1">
                         <div class="text-slate-400 text-xs">Belum ada item titipan ditambahkan...</div>
                     </div>
                 </div>
@@ -119,7 +118,7 @@
                         </div>
                         <div>
                             <label class="text-[9px] font-bold text-slate-500 uppercase block mb-0.5">Qty</label>
-                            <input type="number" id="input-qty-titipan" class="w-full p-1.5 border border-orange-300 rounded text-xs font-medium focus:border-orange-500 outline-none" value="1" min="1">
+                            <input type="number" id="input-qty-titipan" class="w-full p-1.5 border border-orange-300 rounded text-xs font-medium focus:border-orange-500 outline-none" value="1" min="1" placeholder="KETIK JUMLAH QTY...">
                         </div>
                         <button onclick="simpanDataTitipan()" class="w-full bg-orange-600 hover:bg-orange-700 text-white py-1.5 rounded font-black text-[10px] uppercase tracking-wider shadow transition mt-1">
                             Simpan Item Titipan
@@ -132,7 +131,13 @@
 
         <!-- PANEL KANAN (40%): Tabel Item Barang -->
         <div class="w-[40%] bg-white rounded-xl shadow-sm border border-orange-500 p-3 flex flex-col overflow-hidden">
-            <h3 class="text-[10px] font-black text-slate-700 uppercase tracking-wider mb-2">Item Barang Muat</h3>
+            <!-- Ubah bagian header tabel kanan di file HTML menjadi seperti ini: -->
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-[10px] font-black text-slate-700 uppercase tracking-wider">Item Barang Muat</h3>
+                <span id="info-total-muat-keseluruhan" class="text-[10px] font-black text-orange-600 bg-orange-100 px-2 py-0.5 rounded shadow-inner">
+                    TOTAL MUAT KESELURUHAN: 0 KRT [0 Item]
+                </span>
+            </div>
             
             <div class="flex-1 overflow-x-auto overflow-y-auto miui-custom-scroll border border-orange-200 rounded-lg">
                 <table class="w-full text-left border-collapse text-[10px]">
@@ -146,7 +151,7 @@
                     </thead>
                     <tbody id="tabel-item-ceklist-body">
                         <tr>
-                            <td colspan="4" class="p-3 text-center text-slate-400 italic">Belum ada data barang</td>
+                            <td colspan="4" class="p-3 text-center text-slate-400 text-xs">Belum ada data barang</td>
                         </tr>
                     </tbody>
                 </table>
