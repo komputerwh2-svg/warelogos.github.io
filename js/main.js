@@ -1023,6 +1023,63 @@ window.aktifkanCloudPrintEngine = aktifkanCloudPrintEngine;
 // ENGINE SUB-PAGE DYNAMIC LOADING (MODULAR APPS)
 // =========================================================================
 
+// Fungsi untuk membuka subpage Ceklist Muat
+function bukaSubPageCeklistMuat() {
+    const container = document.getElementById('subpage-ceklist-muat-container'); 
+    
+    if (!container) {
+        console.error("Wadah 'subpage-ceklist-muat-container' tidak ditemukan di index.html!");
+        return;
+    }
+
+    const subpage = document.getElementById('subpage-ceklist-muat');
+
+    if (subpage) {
+        subpage.classList.remove('translate-x-full');
+        return;
+    }
+
+    // Menggunakan path absolut root server
+    fetch('/apps/ceklist-muat.html') 
+        .then(response => {
+            if (!response.ok) throw new Error("Gagal mengambil file apps/ceklist-muat.html");
+            return response.text();
+        })
+        .then(htmlContent => {
+            container.innerHTML = htmlContent;
+
+            const script = document.createElement('script');
+            script.src = "js/ceklist-muat.js"; 
+            
+            script.onload = () => {
+                if (typeof window.initCeklistMuat === 'function') {
+                    window.initCeklistMuat();
+                }
+                
+                const elemenBaru = document.getElementById('subpage-ceklist-muat');
+                if (elemenBaru) {
+                    elemenBaru.classList.remove('translate-x-full');
+                }
+            };
+            document.body.appendChild(script);
+        })
+        .catch(error => {
+            console.error(error);
+            miuiAlert("Sistem Gagal Memuat Template Ceklist Muat!");
+        });
+}
+
+// Fungsi untuk menutup subpage Ceklist Muat
+window.tutupSubPageCeklistMuat = function() {
+    const subpage = document.getElementById('subpage-ceklist-muat');
+    if (subpage) {
+        subpage.classList.add('translate-x-full');
+    }
+};
+
+window.bukaSubPageCeklistMuat = bukaSubPageCeklistMuat;
+window.tutupSubPageCeklistMuat = tutupSubPageCeklistMuat;
+
 function bukaSubPageRekapBlok() {
     const container = document.getElementById('subpage-rekap-blok-container');
     
