@@ -54,7 +54,7 @@ window.addEventListener('click', function(e) {
     }
 });
 
-// Fungsi untuk Mengambil dan Merender Daftar Arsip Cetak Dikelompokkan Berdasarkan Tanggal
+// Fungsi untuk Mengambil dan Merender Daftar Arsip Cetak dengan Urutan Tanggal Terbaru ke Terlama
 function renderRiwayatArsipCetak() {
     const container = document.getElementById('container-list-arsip-ceklist');
     if (!container) return;
@@ -71,13 +71,29 @@ function renderRiwayatArsipCetak() {
         let groupedByDate = {};
         let hasData = false;
 
-        // Helper untuk memasukkan data ke grup tanggal
-        function addToGroup(tgl, itemHtml) {
-            const dateKey = tgl || 'TANGGAL LAINNYA';
-            if (!groupedByDate[dateKey]) {
-                groupedByDate[dateKey] = [];
+        // Helper untuk memetakan tanggal (DD/MM/YYYY) menjadi format pembanding angka (YYYYMMDD) untuk sorting descending
+        function getSortableDateKey(tglStr) {
+            if (!tglStr || tglStr === 'N/A') return '00000000';
+            const parts = tglStr.split('/');
+            if (parts.length === 3) {
+                // Format YYYYMMDD agar secara string comparison langsung bisa diurutkan dari yang terbaru
+                return `${parts[2]}${parts[1]}${parts[0]}`;
             }
-            groupedByDate[dateKey].push(itemHtml);
+            return '00000000';
+        }
+
+        let rawGroups = {};
+
+        // Helper untuk memasukkan data ke penampung grup tanggal mentah
+        function addToRawGroup(tgl, itemHtml) {
+            const dateKey = tgl || 'TANGGAL LAINNYA';
+            if (!rawGroups[dateKey]) {
+                rawGroups[dateKey] = {
+                    sortKey: getSortableDateKey(tgl),
+                    items: []
+                };
+            }
+            rawGroups[dateKey].items.push(itemHtml);
         }
 
         // 1. Proses Arsip DO
@@ -105,7 +121,7 @@ function renderRiwayatArsipCetak() {
                         </div>
                     </div>
                 `;
-                addToGroup(tgl, cardHtml);
+                addToRawGroup(tgl, cardHtml);
             });
         }
 
@@ -134,7 +150,7 @@ function renderRiwayatArsipCetak() {
                         </div>
                     </div>
                 `;
-                addToGroup(tgl, cardHtml);
+                addToRawGroup(tgl, cardHtml);
             });
         }
 
@@ -143,15 +159,20 @@ function renderRiwayatArsipCetak() {
             return;
         }
 
-        // Render HTML dengan pengelompokan tanggal di atas setiap grup data
+        // Urutkan key tanggal dari yang terbaru ke terlama (Descending: Tanggal besar/baru di atas)
+        const sortedDates = Object.keys(rawGroups).sort((a, b) => {
+            return rawGroups[b].sortKey.localeCompare(rawGroups[a].sortKey);
+        });
+
+        // Render HTML dengan grup tanggal terurut dari atas ke bawah (terbaru ke terlama)
         let finalHtml = '';
-        Object.keys(groupedByDate).forEach((tanggal) => {
+        sortedDates.forEach((tanggal) => {
             finalHtml += `
                 <div class="mb-3">
                     <div class="text-[10px] font-black text-orange-700 bg-orange-100/80 px-2 py-0.5 rounded mb-1.5 sticky top-0 uppercase tracking-wider">
                         📅 ${tanggal}
                     </div>
-                    <div>${groupedByDate[tanggal].join('')}</div>
+                    <div>${rawGroups[tanggal].items.join('')}</div>
                 </div>
             `;
         });
@@ -162,7 +183,286 @@ function renderRiwayatArsipCetak() {
         console.error("Gagal membaca data arsip dari Firebase:", err);
         container.innerHTML = `<div class="text-red-400 italic text-[10px] text-center py-4">Gagal memuat riwayat arsip.</div>`;
     });
-}
+};
+
+// Fungsi Modal Detail Arsip saat Kartu Riwayat Diklik
+window.previewArsipDetail = function(kategori, muatId) {
+    const path = `ceklist_muat/arsip_cetak/ceklist_${kategori}/${muatId}`;
+    
+    firebase.database().ref(path).once('value').then((snapshot) => {
+        if (!snapshot.exists()) {
+            miuiAlert("Data arsip tidak ditemukan di Database!");
+            return;
+        }
+
+        const data = snapshot.val();
+        const meta = data.meta || {};
+        const customer = meta.namacustomer || muatId;
+        const tanggal = meta.tgl || '-';
+        const totalAll = data.total_muat_keseluruhan || 0;
+
+        // Ambil daftar nomor DO/FDN keys (selain meta, titipan, dan total_muat_keseluruhan)
+        const keysNoBukti = Object.keys(data).filter(k => k !== 'meta' && k !== 'titipan' && k !== 'total_muat_keseluruhan');
+        const titipanObj = data.titipan || {};
+        const hasTitipan = Object.keys(titipanObj).length > 0;
+
+        // Buat opsi dropdown DO/FDN & Titipan secara terpisah
+        let optionsDropdownHtml = `<option value="semua">-- Hapus Semua Arsip --</option>`;
+        keysNoBukti.forEach(k => {
+            const noBuktiVal = data[k]?.meta?.nobukti || k;
+            optionsDropdownHtml += `<option value="${k}">Hapus: ${noBuktiVal}</option>`;
+        });
+        if (hasTitipan) {
+            optionsDropdownHtml += `<option value="titipan">Hapus Data Titipan Saja</option>`;
+        }
+
+        // Buat elemen Modal Popup jika belum ada
+        let modalEl = document.getElementById('modal-detail-arsip');
+        if (!modalEl) {
+            modalEl = document.createElement('div');
+            modalEl.id = 'modal-detail-arsip';
+            modalEl.className = 'fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4 font-sans';
+            document.body.appendChild(modalEl);
+        }
+
+        let contentHtml = `
+            <div onclick="event.stopPropagation()" class="bg-white rounded-xl shadow-2xl border border-orange-300 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-fadeIn">
+                <!-- Header Modal -->
+                <div class="bg-gradient-to-b from-[#323232] to-[#202020] text-white p-3 flex justify-between items-center flex-shrink-0">
+                    <div>
+                        <div class="text-xs font-black uppercase tracking-wider">DETAIL ARSIP ${kategori.toUpperCase()}</div>
+                        <div class="text-[10px] opacity-90">Tujuan: ${customer} | Tanggal: ${tanggal}</div>
+                    </div>
+                    <button onclick="document.getElementById('modal-detail-arsip').remove()" class="text-white hover:text-red-400 font-bold text-lg">✕</button>
+                </div>
+
+                <!-- Body Modal dengan miui-custom-scroll -->
+                <div class="p-4 overflow-y-auto space-y-4 text-xs flex-1 miui-custom-scroll">
+                    <div class="bg-slate-50 border border-slate-200 rounded p-2.5">
+                        <div class="font-bold text-slate-700 mb-2">Daftar Nomor ${kategori.toUpperCase()} & Item Barang:</div>
+                        <div class="space-y-3">
+        `;
+
+        keysNoBukti.forEach((noBuktiKey) => {
+            const doObj = data[noBuktiKey];
+            const doMeta = doObj.meta || {};
+            const items = doObj.data || {};
+
+            contentHtml += `
+                <div class="border border-orange-200 rounded p-2 bg-white shadow-sm">
+                    <div class="flex justify-between items-center font-bold text-orange-800 text-[11px] border-b pb-1 mb-1.5">
+                        <span>${doMeta.nobukti || noBuktiKey}</span>
+                        <span>Total: ${doMeta.total_muat || 0} KRT</span>
+                    </div>
+                    <table class="w-full text-left text-[10px]">
+                        <thead>
+                            <tr class="text-slate-400 border-b">
+                                <th class="pb-1">KODE BARANG</th>
+                                <th class="pb-1 text-center">GUDANG</th>
+                                <th class="pb-1 text-right">QTY (KRT)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            Object.keys(items).forEach((kbKey) => {
+                const item = items[kbKey];
+                contentHtml += `
+                    <tr class="border-b border-slate-100">
+                        <td class="py-1 font-mono font-bold text-slate-700">${item.kodebarang || kbKey}</td>
+                        <td class="py-1 text-center text-slate-500">${item.kodegudang || '-'}</td>
+                        <td class="py-1 text-right font-bold text-orange-600">${item.qty_b || 0}</td>
+                    </tr>
+                `;
+            });
+
+            contentHtml += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        });
+
+        contentHtml += `
+                        </div>
+                    </div>
+        `;
+
+        // Bagian Titipan di Paling Bawah (jika ada)
+        if (hasTitipan) {
+            contentHtml += `
+                <div class="bg-amber-50 border border-amber-200 rounded p-2.5">
+                    <div class="font-bold text-amber-800 mb-1.5">📦 Data Titipan:</div>
+                    <div class="space-y-1.5">
+            `;
+
+            Object.keys(titipanObj).forEach((kategoriTitipan) => {
+                const itemsTitipan = titipanObj[kategoriTitipan];
+                Object.keys(itemsTitipan).forEach((tKey) => {
+                    const tItem = itemsTitipan[tKey];
+                    contentHtml += `
+                        <div class="flex justify-between items-center bg-white border border-amber-100 px-2 py-1 rounded text-[11px]">
+                            <span class="font-bold text-slate-700 uppercase">[${kategoriTitipan}] ${tItem.namabarang}</span>
+                            <span class="font-black text-amber-600">${tItem.qty} pcs</span>
+                        </div>
+                    `;
+                });
+            });
+
+            contentHtml += `
+                    </div>
+                </div>
+            `;
+        }
+
+        contentHtml += `
+                </div>
+
+                <!-- Footer Modal -->
+                <div class="bg-slate-100 p-3 flex flex-wrap justify-between items-center border-t flex-shrink-0 gap-2">
+                    <div class="flex items-center gap-2">
+                        <select id="select-hapus-arsip-target" class="bg-white border border-slate-300 rounded px-2 py-1 text-[10px] font-bold text-slate-700 focus:outline-none focus:border-red-500">
+                            ${optionsDropdownHtml}
+                        </select>
+                        <button onclick="eksekusiHapusArsip('${kategori}', '${muatId}')" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-[10px] font-black uppercase tracking-wider transition shadow">
+                            Hapus
+                        </button>
+                        <button onclick="cetakUlangArsip('${kategori}', '${muatId}')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-[10px] font-black uppercase tracking-wider transition shadow flex items-center gap-1">
+                            <i class="fa-solid fa-print"></i> Cetak Ulang
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="text-[11px] font-bold text-slate-700">TOTAL MUAT: <span class="text-orange-600 font-black">${totalAll} KRT</span></div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        modalEl.innerHTML = contentHtml;
+
+    }).catch((err) => {
+        console.error("Gagal mengambil detail arsip:", err);
+        miuiAlert("Terjadi kesalahan saat memuat detail arsip dari database!");
+    });
+};
+
+// Fungsi Eksekusi Hapus Arsip (Mendukung Hapus Semua, DO/FDN Spesifik, atau Titipan Saja)
+window.eksekusiHapusArsip = function(kategori, muatId) {
+    const selectEl = document.getElementById('select-hapus-arsip-target');
+    if (!selectEl) return;
+    const targetVal = selectEl.value;
+
+    const path = `ceklist_muat/arsip_cetak/ceklist_${kategori}/${muatId}`;
+
+    if (targetVal === 'semua') {
+        if (!confirm("Apakah Anda yakin ingin menghapus seluruh arsip muat ini dari database?")) return;
+        firebase.database().ref(path).remove().then(() => {
+            miuiAlert("Arsip berhasil dihapus sepenuhnya!");
+            document.getElementById('modal-detail-arsip').remove();
+            renderRiwayatArsipCetak();
+        }).catch(err => {
+            console.error(err);
+            miuiAlert("Gagal menghapus arsip!");
+        });
+    } else if (targetVal === 'titipan') {
+        if (!confirm("Apakah Anda yakin ingin menghapus data titipan dari arsip ini?")) return;
+        firebase.database().ref(`${path}/titipan`).remove().then(() => {
+            miuiAlert("Data titipan berhasil dihapus dari arsip!");
+            previewArsipDetail(kategori, muatId); // Refresh modal
+            renderRiwayatArsipCetak(); // Refresh popover
+        }).catch(err => {
+            console.error(err);
+            miuiAlert("Gagal menghapus data titipan!");
+        });
+    } else {
+        if (!confirm(`Apakah Anda yakin ingin menghapus nomor DO/FDN (${targetVal}) dari arsip ini?`)) return;
+        const subPath = `${path}/${targetVal}`;
+        firebase.database().ref(subPath).remove().then(() => {
+            firebase.database().ref(path).once('value').then(snap => {
+                const val = snap.val() || {};
+                const remainingKeys = Object.keys(val).filter(k => k !== 'meta' && k !== 'titipan' && k !== 'total_muat_keseluruhan');
+                
+                if (remainingKeys.length === 0 && !val.titipan) {
+                    // Jika semua item DO/FDN dan titipan habis, hapus seluruh node muatId
+                    firebase.database().ref(path).remove().then(() => {
+                        document.getElementById('modal-detail-arsip').remove();
+                        renderRiwayatArsipCetak();
+                    });
+                } else {
+                    // Hitung ulang total muat keseluruhan dari DO/FDN yang tersisa
+                    let newTotal = 0;
+                    remainingKeys.forEach(rk => {
+                        newTotal += (val[rk]?.meta?.total_muat || 0);
+                    });
+                    firebase.database().ref(path).update({ total_muat_keseluruhan: newTotal }).then(() => {
+                        previewArsipDetail(kategori, muatId); // Refresh modal
+                        renderRiwayatArsipCetak(); // Refresh popover
+                    });
+                }
+            });
+            miuiAlert("Item DO/FDN terpilih berhasil dihapus dari arsip!");
+        }).catch(err => {
+            console.error(err);
+            miuiAlert("Gagal menghapus item DO/FDN!");
+        });
+    }
+};
+
+// Fungsi Cetak Ulang Arsip (Memuat ulang data ke cache preview lalu memicu window.print())
+window.cetakUlangArsip = function(kategori, muatId) {
+    const path = `ceklist_muat/arsip_cetak/ceklist_${kategori}/${muatId}`;
+    firebase.database().ref(path).once('value').then((snapshot) => {
+        if (!snapshot.exists()) {
+            miuiAlert("Data arsip tidak ditemukan untuk dicetak ulang!");
+            return;
+        }
+
+        const data = snapshot.val();
+        
+        // Masukkan kembali ke cache DO/FDN aktif untuk dirender di halaman utama
+        if (kategori === 'do') {
+            cacheCeklistDO = {};
+            Object.keys(data).forEach(k => {
+                if (k !== 'meta' && k !== 'titipan' && k !== 'total_muat_keseluruhan') {
+                    cacheCeklistDO[k] = data[k];
+                }
+            });
+        } else {
+            cacheCeklistFDN = {};
+            Object.keys(data).forEach(k => {
+                if (k !== 'meta' && k !== 'titipan' && k !== 'total_muat_keseluruhan') {
+                    cacheCeklistFDN[k] = data[k];
+                }
+            });
+        }
+
+        // Muat data titipan jika ada
+        if (data.titipan && typeof dataTitipanList !== 'undefined') {
+            dataTitipanList = [];
+            Object.keys(data.titipan).forEach(katT => {
+                Object.keys(data.titipan[katT]).forEach(tk => {
+                    dataTitipanList.push(data.titipan[katT][tk]);
+                });
+            });
+        }
+
+        // Render ulang tampilan utama
+        if (typeof renderDaftarDOPreview === 'function') renderDaftarDOPreview();
+        if (typeof renderTabelItemMuatOtomatis === 'function') renderTabelItemMuatOtomatis();
+        if (typeof renderTitipan === 'function') renderTitipan();
+
+        // Tutup modal lalu cetak
+        document.getElementById('modal-detail-arsip').remove();
+        miuiAlert("Data arsip dimuat kembali ke halaman utama. Membuka dialog cetak...");
+        setTimeout(() => {
+            window.print();
+        }, 500);
+
+    }).catch(err => {
+        console.error(err);
+        miuiAlert("Gagal memuat data untuk cetak ulang!");
+    });
+};
 
 
 
@@ -368,29 +668,82 @@ window.importDO = function() {
 };
 
 
-// 1. Perbarui Fungsi Proses Data WHNB-2 agar Menyesuaikan ID Muat dengan Customer DO yang Ada
+// 1. Perbarui Fungsi Proses Data WHNB-2 dengan Verifikasi Metadata DO Terpisah
 window.prosesDataWHNB2 = function() {
-    const textarea = document.querySelector('textarea[placeholder*="Paste data WHNB-2"]');
-    if (!textarea) return;
+    const metaTextarea = document.getElementById('ta-bosnet-meta');
+    const itemTextarea = document.getElementById('ta-bosnet-input');
+    
+    if (!metaTextarea || !itemTextarea) return;
 
-    const rawText = textarea.value.trim();
-    if (!rawText) {
-        miuiAlert("Silakan paste data WHNB-2 dari Bosnet terlebih dahulu!");
+    const metaRaw = metaTextarea.value.trim();
+    const itemRaw = itemTextarea.value.trim();
+
+    if (!metaRaw) {
+        miuiAlert("Silakan paste Header/Metadata DO terlebih dahulu pada kolom atas!");
         return;
     }
 
-    const lines = rawText.split('\n');
+    if (!itemRaw) {
+        miuiAlert("Silakan paste detail item WHNB-2 pada kolom bawah!");
+        return;
+    }
+
+    // A. Parse Metadata DO dari teks yang dipaste
+    const matchNoDoMeta = metaRaw.match(/(DO-[A-Z0-9\-]+|DN-[A-Z0-9\-]+)/);
+    if (!matchNoDoMeta) {
+        metaTextarea.value = '';
+        itemTextarea.value = '';
+        miuiAlert("Format Nomor DO tidak valid pada metadata yang dipaste!");
+        return;
+    }
+    const metaNoDo = matchNoDoMeta[1].trim().toUpperCase();
+
+    const matchTglMeta = metaRaw.match(/(\d{2}\/\d{2}\/\d{4})/);
+    const metaTanggal = matchTglMeta ? matchTglMeta[1] : '';
+
+    let metaCustomer = 'PELANGGAN UMUM';
+    const idxNoDoEnd = metaRaw.indexOf(metaNoDo) + metaNoDo.length;
+    let sisaMeta = metaRaw.substring(idxNoDoEnd).trim();
+    if (metaTanggal) {
+        sisaMeta = sisaMeta.replace(metaTanggal, '').trim();
+    }
+    sisaMeta = sisaMeta.replace(/^[A-Z0-9\-]+/, '').trim();
+    if (sisaMeta) {
+        metaCustomer = sisaMeta.toUpperCase();
+    }
+
+    let tglFormatted = '';
+    let tglDisplay = metaTanggal || '15/10/2026';
+    if (metaTanggal) {
+        const partsTgl = metaTanggal.split('/');
+        if (partsTgl.length === 3) {
+            tglFormatted = `${partsTgl[2]}_${partsTgl[1]}_${partsTgl[0]}`;
+        }
+    }
+    if (!tglFormatted) {
+        const d = new Date();
+        tglFormatted = `${d.getFullYear()}_${String(d.getMonth()+1).padStart(2,'0')}_${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    // B. Parsing Baris Item WHNB-2 dan Validasi Pencocokan No DO
+    const lines = itemRaw.split('\n');
     let importedCount = 0;
+    let mismatchDetected = false;
 
     lines.forEach((line) => {
         if (!line.includes('WHNB-2')) return;
 
-        try {
-            const matchNoDo = line.match(/(DO-[A-Z0-9\-]+|DN-[A-Z0-9\-]+)/);
-            if (!matchNoDo) return;
-            const noBukti = matchNoDo[1].trim().toUpperCase();
-            const gudang = 'WHNB-2';
+        const matchNoDoLine = line.match(/(DO-[A-Z0-9\-]+|DN-[A-Z0-9\-]+)/);
+        if (!matchNoDoLine) return;
+        const lineNoDo = matchNoDoLine[1].trim().toUpperCase();
 
+        if (lineNoDo !== metaNoDo) {
+            mismatchDetected = true;
+            return;
+        }
+
+        try {
+            const gudang = 'WHNB-2';
             const bagianSebelumGudang = line.substring(0, line.indexOf('WHNB-2'));
             const matchesQty = bagianSebelumGudang.match(/(\d+\/\d+\/\d+\/\d+)/g);
             if (!matchesQty || matchesQty.length === 0) return;
@@ -401,60 +754,34 @@ window.prosesDataWHNB2 = function() {
 
             if (qtyKarton <= 0) return;
 
-            const idxNoDo = bagianSebelumGudang.indexOf(noBukti);
+            const idxNoDo = bagianSebelumGudang.indexOf(lineNoDo);
             const idxQty = bagianSebelumGudang.lastIndexOf(qtyStr);
             if (idxNoDo === -1 || idxQty === -1) return;
 
-            let sisaTengah = bagianSebelumGudang.substring(idxNoDo + noBukti.length, idxQty).trim();
+            let sisaTengah = bagianSebelumGudang.substring(idxNoDo + lineNoDo.length, idxQty).trim();
             const tokens = sisaTengah.split(/\s+/);
             const kodeBarang = tokens[0] ? tokens[0].toUpperCase() : '';
 
             if (!kodeBarang) return;
 
-            // Cari apakah nomor DO ini sudah ada di cache DO Excel yang diimport sebelumnya
-            let matchedDOKey = null;
-            Object.keys(cacheCeklistDO).forEach((k) => {
-                if (cacheCeklistDO[k].meta.nobukti === noBukti) {
-                    matchedDOKey = k;
-                }
-            });
+            const noBuktiDigits = metaNoDo.replace(/\D/g, '');
+            const last5NoBukti = noBuktiDigits.length >= 5 ? noBuktiDigits.slice(-5) : noBuktiDigits;
+            
+            let cleanCust = metaCustomer.replace(/\bMT\b/g, '').replace(/[\/\-\_\.\s]+/g, '_').replace(/^_+|_+\$/g, '');
+            const targetCacheKey = `${tglFormatted}_${cleanCust}_${last5NoBukti}`.toUpperCase();
 
-            let targetCacheKey = matchedDOKey;
-
-            // Jika belum ada di DO Excel, buatkan di cache dengan mencarikan customer umum / default
-            if (!targetCacheKey) {
-                const noBuktiDigits = noBukti.replace(/\D/g, '');
-                const last5NoBukti = noBuktiDigits.length >= 5 ? noBuktiDigits.slice(-5) : noBuktiDigits;
-                
-                const sekarang = new Date();
-                const thn = sekarang.getFullYear();
-                const bln = String(sekarang.getMonth() + 1).padStart(2, '0');
-                const tgl = String(sekarang.getDate()).padStart(2, '0');
-                const tglFormatted = `${thn}_${bln}_${tgl}`;
-                const tglDisplay = `${tgl}/${bln}/${thn}`;
-
-                // Coba gunakan nama customer dari DO pertama yang sudah ada jika ada, agar menyatu
-                let defaultCust = 'UMUM';
-                const existingKeys = Object.keys(cacheCeklistDO);
-                if (existingKeys.length > 0) {
-                    defaultCust = cacheCeklistDO[existingKeys[0]].meta.namacustomer;
-                }
-
-                const custClean = defaultCust.replace(/[\/\s]+/g, '_').toUpperCase();
-                targetCacheKey = `${tglFormatted}_${custClean}_${last5NoBukti}`.toUpperCase();
-
+            if (!cacheCeklistDO[targetCacheKey]) {
                 cacheCeklistDO[targetCacheKey] = {
                     meta: {
-                        nobukti: noBukti,
+                        nobukti: metaNoDo,
                         tgl: tglDisplay,
-                        namacustomer: defaultCust
+                        namacustomer: metaCustomer
                     },
                     data: {},
                     total_muat: 0
                 };
             }
 
-            // Masukkan item ke cache
             if (!cacheCeklistDO[targetCacheKey].data[kodeBarang]) {
                 cacheCeklistDO[targetCacheKey].data[kodeBarang] = {
                     kodebarang: kodeBarang,
@@ -474,17 +801,28 @@ window.prosesDataWHNB2 = function() {
             importedCount++;
 
         } catch (err) {
-            console.error("Gagal memparsing baris WHNB-2:", line, err);
+            console.error("Gagal memproses baris WHNB-2:", line, err);
         }
     });
 
+    // Jika terjadi ketidakcocokan nomor DO, kosongkan kedua textarea dan beri peringatan
+    if (mismatchDetected) {
+        metaTextarea.value = '';
+        itemTextarea.value = '';
+        miuiAlert("Peringatan: Nomor DO Tujuan tidak sama dengan Nomor DO item WHNB-2 yang dipaste!, Silakan periksa kembali data yang dipaste.");
+        return;
+    }
+
     if (importedCount > 0) {
-        textarea.value = '';
+        metaTextarea.value = '';
+        itemTextarea.value = '';
         renderDaftarDOPreview();
         renderTabelItemMuatOtomatis();
-        miuiAlert(`Berhasil memproses ${importedCount} item data WHNB-2!`);
+        miuiAlert(`Berhasil memproses ${importedCount} item WHNB-2 untuk ${metaCustomer}!`);
     } else {
-        miuiAlert("Tidak ditemukan baris data 'WHNB-2' yang valid pada teks yang dipaste!");
+        metaTextarea.value = '';
+        itemTextarea.value = '';
+        miuiAlert("Tidak ditemukan data WHNB-2 valid atau verifikasi nomor DO gagal!");
     }
 };
 
