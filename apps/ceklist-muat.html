@@ -59,18 +59,27 @@
                 <!-- Panel Daftar Nomor FDN / Tujuan -->
                 <div class="border border-orange-300 rounded-lg p-2 bg-slate-50 space-y-1">
                     <label class="text-[9px] font-black text-slate-500 uppercase tracking-wider block">Daftar Nomor FDN / DO</label>
-                    <div id="container-list-fdn-ceklist" class="w-full h-[175px] max-h-[175px] bg-white border border-orange-300 rounded p-1.5 overflow-y-auto miui-custom-scroll text-[10px] font-mono text-slate-700 shadow-inner">
+                    <div id="container-list-fdn-ceklist" class="w-full h-[130px] max-h-[130px] bg-white border border-orange-300 rounded p-1.5 overflow-y-auto miui-custom-scroll text-[10px] font-mono text-slate-700 shadow-inner">
                         <div class="text-slate-400 text-xs">Belum ada data DO atau FDN diimport...</div>
                     </div>
                 </div>
 
                 <!-- Panel Paste Data Bosnet & Tombol Aksi -->
-                <div class="border border-orange-300 rounded-lg p-2 bg-slate-50 space-y-1">
-                    <label class="text-[9px] font-black text-slate-500 uppercase tracking-wider block">Pastekan data bosnet kesini:</label>
+                <div class="border border-orange-300 rounded-lg p-2 bg-slate-50 space-y-1.5">
+                    <label class="text-[9px] font-black text-slate-500 uppercase tracking-wider block">Pastekan Data Bosnet WHNB-2:</label>
+                    
+                    <!-- Textarea khusus untuk Header / Metadata DO -->
+                    <div>
+                        <textarea id="ta-bosnet-meta" 
+                            class="w-full h-[30px] p-1.5 bg-white border border-orange-300 rounded text-[10px] font-medium text-slate-700 focus:border-orange-500 transition-all resize-none shadow-inner"
+                            placeholder="Paste Konfirmasi DO di sini (Cth: DO-HO001-... - Nama Customer - Tanggal)..."></textarea>
+                    </div>
+
                     <div class="flex gap-2">
+                        <!-- Textarea untuk Item Detail Barang -->
                         <textarea id="ta-bosnet-input" 
                             class="w-full h-[70px] p-2 bg-white border border-orange-300 rounded text-[10px] font-medium text-slate-700 focus:border-orange-500 transition-all resize-none shadow-inner"
-                            placeholder="Paste data WHNB-2 dari Bosnet di sini..."></textarea>
+                            placeholder="Paste baris detail item WHNB-2 di sini..."></textarea>
                         
                         <div class="flex flex-col gap-1.5 flex-shrink-0 w-24">
                             <button onclick="prosesDataWHNB2()" class="h-[34px] bg-orange-600 hover:bg-orange-700 text-white rounded font-black text-[9px] uppercase tracking-wider flex items-center justify-center gap-1 shadow transition">
