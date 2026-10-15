@@ -1034,13 +1034,18 @@ function bukaSubPageCeklistMuat() {
 
     const subpage = document.getElementById('subpage-ceklist-muat');
 
+    // Jika sudah ada (sudah pernah di-fetch), langsung buka
     if (subpage) {
         subpage.classList.remove('translate-x-full');
         return;
     }
 
-    // Menggunakan path absolut root server
-    fetch('/apps/ceklist-muat.html') 
+    // Menggunakan penentuan path dinamis agar aman di GitHub Pages maupun Live Server lokal
+    const basePath = window.location.pathname.includes('/warelogos.github.io') ? '/warelogos.github.io/apps/ceklist-muat.html' : 'apps/ceklist-muat.html';
+    const scriptPath = window.location.pathname.includes('/warelogos.github.io') ? '/warelogos.github.io/js/ceklist-muat.js' : 'js/ceklist-muat.js';
+
+    // 2. Fetch file HTML subpage Ceklist Muat
+    fetch(basePath) 
         .then(response => {
             if (!response.ok) throw new Error("Gagal mengambil file apps/ceklist-muat.html");
             return response.text();
@@ -1048,10 +1053,12 @@ function bukaSubPageCeklistMuat() {
         .then(htmlContent => {
             container.innerHTML = htmlContent;
 
+            // 3. Suntikkan script JS-nya
             const script = document.createElement('script');
-            script.src = "js/ceklist-muat.js"; 
+            script.src = scriptPath; 
             
             script.onload = () => {
+                // Panggil fungsi inisialisasi modul Ceklist Muat
                 if (typeof window.initCeklistMuat === 'function') {
                     window.initCeklistMuat();
                 }
