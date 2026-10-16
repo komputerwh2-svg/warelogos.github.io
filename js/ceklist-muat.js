@@ -54,135 +54,249 @@ window.addEventListener('click', function(e) {
     }
 });
 
-// Fungsi untuk Mengambil dan Merender Daftar Arsip Cetak dengan Urutan Tanggal Terbaru ke Terlama
-function renderRiwayatArsipCetak() {
+// Variabel cache global untuk menyimpan data arsip sementara agar pencarian real-time instan
+window.cacheArsipCetakGlobal = { do: null, fdn: null };
+
+// 1. Fungsi Builder Utama (Dipanggil sekali saat popover dibuka atau cache dibersihkan)
+window.renderRiwayatArsipCetak = function() {
     const container = document.getElementById('container-list-arsip-ceklist');
     if (!container) return;
 
-    container.innerHTML = `<div class="text-slate-400 italic text-[10px] text-center py-4">Memuat data arsip...</div>`;
+    if (!window.cacheArsipCetakGlobal.do || !window.cacheArsipCetakGlobal.fdn) {
+        container.innerHTML = `<div class="text-slate-400 italic text-[10px] text-center py-4">Memuat data arsip...</div>`;
 
-    const dbRefDO = firebase.database().ref('ceklist_muat/arsip_cetak/ceklist_do');
-    const dbRefFDN = firebase.database().ref('ceklist_muat/arsip_cetak/ceklist_fdn');
+        const dbRefDO = firebase.database().ref('ceklist_muat/arsip_cetak/ceklist_do');
+        const dbRefFDN = firebase.database().ref('ceklist_muat/arsip_cetak/ceklist_fdn');
 
-    Promise.all([
-        dbRefDO.once('value'),
-        dbRefFDN.once('value')
-    ]).then(([snapshotDO, snapshotFDN]) => {
-        let groupedByDate = {};
-        let hasData = false;
-
-        // Helper untuk memetakan tanggal (DD/MM/YYYY) menjadi format pembanding angka (YYYYMMDD) untuk sorting descending
-        function getSortableDateKey(tglStr) {
-            if (!tglStr || tglStr === 'N/A') return '00000000';
-            const parts = tglStr.split('/');
-            if (parts.length === 3) {
-                // Format YYYYMMDD agar secara string comparison langsung bisa diurutkan dari yang terbaru
-                return `${parts[2]}${parts[1]}${parts[0]}`;
-            }
-            return '00000000';
-        }
-
-        let rawGroups = {};
-
-        // Helper untuk memasukkan data ke penampung grup tanggal mentah
-        function addToRawGroup(tgl, itemHtml) {
-            const dateKey = tgl || 'TANGGAL LAINNYA';
-            if (!rawGroups[dateKey]) {
-                rawGroups[dateKey] = {
-                    sortKey: getSortableDateKey(tgl),
-                    items: []
-                };
-            }
-            rawGroups[dateKey].items.push(itemHtml);
-        }
-
-        // 1. Proses Arsip DO
-        if (snapshotDO.exists()) {
-            snapshotDO.forEach((childSnap) => {
-                hasData = true;
-                const muatId = childSnap.key;
-                const val = childSnap.val();
-                const meta = val.meta || {};
-                const tgl = meta.tgl || 'N/A';
-                const customer = meta.namacustomer || muatId;
-                const totalKeseluruhan = val.total_muat_keseluruhan || 0;
-
-                const listNoDO = Object.keys(val).filter(k => k !== 'meta' && k !== 'titipan' && k !== 'total_muat_keseluruhan');
-                const noDoBadge = listNoDO.length > 0 ? listNoDO.join(', ') : '-';
-
-                const cardHtml = `
-                    <div onclick="previewArsipDetail('do', '${muatId}')" class="bg-orange-50/50 hover:bg-orange-100/70 border border-orange-200 rounded-lg p-2 transition cursor-pointer mb-1.5">
-                        <div class="flex items-center justify-between font-bold text-slate-800 text-[11px] mb-1">
-                            <span class="truncate pr-2">[DO] ${customer}</span>
-                            <span class="bg-orange-600 text-white px-1.5 py-0.5 rounded text-[9px] font-black shrink-0">${totalKeseluruhan} KRT</span>
-                        </div>
-                        <div class="flex items-center justify-between text-[10px] text-slate-500 font-mono">
-                            <span>No DO: ${noDoBadge}</span>
-                        </div>
-                    </div>
-                `;
-                addToRawGroup(tgl, cardHtml);
-            });
-        }
-
-        // 2. Proses Arsip FDN
-        if (snapshotFDN.exists()) {
-            snapshotFDN.forEach((childSnap) => {
-                hasData = true;
-                const muatId = childSnap.key;
-                const val = childSnap.val();
-                const meta = val.meta || {};
-                const tgl = meta.tgl || 'N/A';
-                const customer = meta.namacustomer || muatId;
-                const totalKeseluruhan = val.total_muat_keseluruhan || 0;
-
-                const listNoFDN = Object.keys(val).filter(k => k !== 'meta' && k !== 'titipan' && k !== 'total_muat_keseluruhan');
-                const noFdnBadge = listNoFDN.length > 0 ? listNoFDN.join(', ') : '-';
-
-                const cardHtml = `
-                    <div onclick="previewArsipDetail('fdn', '${muatId}')" class="bg-blue-50/50 hover:bg-blue-100/70 border border-blue-200 rounded-lg p-2 transition cursor-pointer mb-1.5">
-                        <div class="flex items-center justify-between font-bold text-slate-800 text-[11px] mb-1">
-                            <span class="truncate pr-2">[FDN] ${customer}</span>
-                            <span class="bg-blue-600 text-white px-1.5 py-0.5 rounded text-[9px] font-black shrink-0">${totalKeseluruhan} KRT</span>
-                        </div>
-                        <div class="flex items-center justify-between text-[10px] text-slate-500 font-mono">
-                            <span>No FDN: ${noFdnBadge}</span>
-                        </div>
-                    </div>
-                `;
-                addToRawGroup(tgl, cardHtml);
-            });
-        }
-
-        if (!hasData) {
-            container.innerHTML = `<div class="text-slate-400 italic text-[10px] text-center py-4">Belum ada riwayat arsip tersimpan...</div>`;
-            return;
-        }
-
-        // Urutkan key tanggal dari yang terbaru ke terlama (Descending: Tanggal besar/baru di atas)
-        const sortedDates = Object.keys(rawGroups).sort((a, b) => {
-            return rawGroups[b].sortKey.localeCompare(rawGroups[a].sortKey);
+        Promise.all([
+            dbRefDO.once('value'),
+            dbRefFDN.once('value')
+        ]).then(([snapshotDO, snapshotFDN]) => {
+            window.cacheArsipCetakGlobal.do = snapshotDO;
+            window.cacheArsipCetakGlobal.fdn = snapshotFDN;
+            buildArsipUIAndFilter();
+        }).catch((err) => {
+            console.error("Gagal membaca data arsip dari Firebase:", err);
+            container.innerHTML = `<div class="text-red-400 italic text-[10px] text-center py-4">Gagal memuat riwayat arsip.</div>`;
         });
+    } else {
+        buildArsipUIAndFilter();
+    }
+};
 
-        // Render HTML dengan grup tanggal terurut dari atas ke bawah (terbaru ke terlama)
-        let finalHtml = '';
-        sortedDates.forEach((tanggal) => {
-            finalHtml += `
-                <div class="mb-3">
-                    <div class="text-[10px] font-black text-orange-700 bg-orange-100/80 px-2 py-0.5 rounded mb-1.5 sticky top-0 uppercase tracking-wider">
-                        📅 ${tanggal}
+// 2. Fungsi Builder & Real-time Filter UI
+window.buildArsipUIAndFilter = function() {
+    const container = document.getElementById('container-list-arsip-ceklist');
+    if (!container) return;
+
+    const snapshotDO = window.cacheArsipCetakGlobal.do;
+    const snapshotFDN = window.cacheArsipCetakGlobal.fdn;
+
+    const searchInput = document.getElementById('search-arsip-input');
+    const searchText = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+    const dateInput = document.getElementById('filter-tanggal-arsip-input');
+    const selectedDateValue = dateInput ? dateInput.value : '';
+
+    let targetDateStr = '';
+    let labelTanggalDisplay = 'Semua Tanggal 📅';
+
+    if (selectedDateValue) {
+        const [y, m, d] = selectedDateValue.split('-');
+        targetDateStr = `${d}/${m}/${y}`;
+        labelTanggalDisplay = `${targetDateStr} 📅`;
+    }
+
+    let rawGroups = {};
+    let hasData = false;
+
+    function getSortableDateKey(tglStr) {
+        if (!tglStr || tglStr === 'N/A') return '00000000';
+        const parts = tglStr.split('/');
+        if (parts.length === 3) {
+            return `${parts[2]}${parts[1]}${parts[0]}`;
+        }
+        return '00000000';
+    }
+
+    function addToRawGroup(tgl, customer, noBuktiList, itemHtml) {
+        if (targetDateStr && tgl !== targetDateStr) return;
+
+        if (searchText) {
+            const matchCustomer = customer.toLowerCase().includes(searchText);
+            const matchNoBukti = noBuktiList.some(nb => nb.toLowerCase().includes(searchText));
+            if (!matchCustomer && !matchNoBukti) return;
+        }
+
+        const dateKey = tgl || 'TANGGAL LAINNYA';
+        if (!rawGroups[dateKey]) {
+            rawGroups[dateKey] = {
+                sortKey: getSortableDateKey(tgl),
+                items: []
+            };
+        }
+        rawGroups[dateKey].items.push(itemHtml);
+    }
+
+    // A. Proses Arsip DO
+    if (snapshotDO && snapshotDO.exists()) {
+        snapshotDO.forEach((childSnap) => {
+            const muatId = childSnap.key;
+            const val = childSnap.val();
+            const meta = val.meta || {};
+            const tgl = meta.tgl || 'N/A';
+            const customer = meta.namacustomer || muatId;
+            const totalKeseluruhan = val.total_muat_keseluruhan || 0;
+
+            const listNoDO = Object.keys(val).filter(k => k !== 'meta' && k !== 'titipan' && k !== 'total_muat_keseluruhan');
+            let badgeInfoItems = [];
+            if (listNoDO.length > 0) badgeInfoItems.push(`No DO: ${listNoDO.join(', ')}`);
+
+            const titipanObj = val.titipan || {};
+            const kategoriTitipanKeys = Object.keys(titipanObj);
+            if (kategoriTitipanKeys.length > 0) {
+                badgeInfoItems.push(kategoriTitipanKeys.map(k => k.toUpperCase()).join(', '));
+            }
+
+            const badgeText = badgeInfoItems.length > 0 ? badgeInfoItems.join(' | ') : '-';
+
+            const cardHtml = `
+                <div onclick="previewArsipDetail('do', '${muatId}')" class="bg-orange-50/50 hover:bg-orange-100/70 border border-orange-200 rounded-lg p-2 transition cursor-pointer mb-1.5">
+                    <div class="flex items-center justify-between font-bold text-slate-800 text-[11px] mb-1">
+                        <span class="truncate text-orange-600 pr-2">[DO] ${customer}</span>
+                        <span class="bg-orange-600 text-white px-1.5 py-0.5 rounded text-[9px] font-black shrink-0">${totalKeseluruhan} KRT</span>
                     </div>
-                    <div>${rawGroups[tanggal].items.join('')}</div>
+                    <div class="flex items-center justify-between text-[10px] text-slate-500 font-mono">
+                        <span class="truncate">${badgeText}</span>
+                    </div>
                 </div>
             `;
+            addToRawGroup(tgl, customer, listNoDO, cardHtml);
         });
+    }
 
-        container.innerHTML = finalHtml;
+    // B. Proses Arsip FDN
+    if (snapshotFDN && snapshotFDN.exists()) {
+        snapshotFDN.forEach((childSnap) => {
+            const muatId = childSnap.key;
+            const val = childSnap.val();
+            const meta = val.meta || {};
+            const tgl = meta.tgl || 'N/A';
+            const customer = meta.namacustomer || muatId;
+            const totalKeseluruhan = val.total_muat_keseluruhan || 0;
 
-    }).catch((err) => {
-        console.error("Gagal membaca data arsip dari Firebase:", err);
-        container.innerHTML = `<div class="text-red-400 italic text-[10px] text-center py-4">Gagal memuat riwayat arsip.</div>`;
+            const listNoFDN = Object.keys(val).filter(k => k !== 'meta' && k !== 'titipan' && k !== 'total_muat_keseluruhan');
+            let badgeInfoItemsFDN = [];
+            if (listNoFDN.length > 0) badgeInfoItemsFDN.push(`No FDN: ${listNoFDN.join(', ')}`);
+
+            const titipanObjFDN = val.titipan || {};
+            const kategoriTitipanKeysFDN = Object.keys(titipanObjFDN);
+            if (kategoriTitipanKeysFDN.length > 0) {
+                badgeInfoItemsFDN.push(kategoriTitipanKeysFDN.map(k => k.toUpperCase()).join(', '));
+            }
+
+            const badgeTextFDN = badgeInfoItemsFDN.length > 0 ? badgeInfoItemsFDN.join(' | ') : '-';
+
+            const cardHtml = `
+                <div onclick="previewArsipDetail('fdn', '${muatId}')" class="bg-slate-50/80 hover:bg-slate-100/90 border border-slate-300 rounded-lg p-2 transition cursor-pointer mb-1.5">
+                    <div class="flex items-center justify-between font-bold text-slate-800 text-[11px] mb-1">
+                        <span class="truncate text-slate-600 pr-2">[FDN] ${customer}</span>
+                        <span class="bg-slate-600 text-white px-1.5 py-0.5 rounded text-[9px] font-black shrink-0">${totalKeseluruhan} KRT</span>
+                    </div>
+                    <div class="flex items-center justify-between text-[10px] text-slate-500 font-mono">
+                        <span class="truncate">${badgeTextFDN}</span>
+                    </div>
+                </div>
+            `;
+            addToRawGroup(tgl, customer, listNoFDN, cardHtml);
+        });
+    }
+
+    const sortedDates = Object.keys(rawGroups).sort((a, b) => {
+        return rawGroups[b].sortKey.localeCompare(rawGroups[a].sortKey);
     });
+
+    sortedDates.forEach(dateKey => {
+        if (rawGroups[dateKey].items.length > 0) hasData = true;
+    });
+
+    // C. Header Filter 1 Baris Sejajar
+    let headerFilterHtml = `
+        <div class="bg-orange-50 border border-orange-200 rounded p-1.5 mb-2.5 sticky top-0 z-10 shadow-sm flex items-center gap-1.5 text-[10px]">
+            <span class="font-bold text-orange-800 uppercase shrink-0 text-[9px]">FILTER TANGGAL/CARI:</span>
+            
+            <div class="relative flex-1 min-w-0 flex items-center">
+                <input type="text" id="search-arsip-input" value="${searchText}" oninput="buildArsipUIAndFilter()" placeholder="Cari Customer / No DO / No FDN..." class="w-full text-[10px] border border-orange-300 rounded px-2 py-0.5 text-slate-700 focus:outline-none focus:border-orange-500 bg-white truncate">
+                ${searchText ? `<button type="button" onclick="event.stopPropagation(); clearSearchArsip();" class="absolute right-1 text-[9px] text-slate-400 hover:text-slate-600 font-bold px-1" title="Clear">✕</button>` : ''}
+            </div>
+
+            <div class="h-4 border-r border-orange-200 shrink-0"></div>
+
+            <div class="relative shrink-0 flex items-center">
+                <button type="button" class="bg-white border border-orange-300 hover:border-orange-500 text-slate-700 rounded px-2 py-0.5 font-mono text-[10px] font-bold flex items-center space-x-1 shadow-sm">
+                    <span>${labelTanggalDisplay}</span>
+                </button>
+                <input type="date" id="filter-tanggal-arsip-input" value="${selectedDateValue}" onchange="buildArsipUIAndFilter()" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+            </div>
+
+            ${selectedDateValue ? `
+                <button type="button" onclick="event.stopPropagation(); resetFilterArsip();" class="text-[9px] bg-slate-200 hover:bg-slate-300 text-slate-600 px-1.5 py-0.5 rounded font-bold transition shrink-0" title="Reset ke Semua Tanggal">✕</button>
+            ` : ''}
+        </div>
+    `;
+
+    if (!hasData) {
+        container.innerHTML = headerFilterHtml + `<div class="text-slate-400 italic text-[10px] text-center py-6">Tidak ada riwayat arsip yang sesuai...</div>`;
+        return;
+    }
+
+    let finalHtml = headerFilterHtml;
+    sortedDates.forEach((tanggal) => {
+        const groupData = rawGroups[tanggal];
+        if (groupData.items.length > 0) {
+            finalHtml += `
+                <div class="mb-3">
+                    <div class="text-[10px] font-black text-orange-700 bg-orange-100/80 px-2 py-0.5 rounded mb-1.5 uppercase tracking-wider flex items-center justify-between">
+                        <span>📅 ${tanggal}</span>
+                        <span class="text-[9px] font-normal text-slate-500">${groupData.items.length} Dokumen</span>
+                    </div>
+                    <div>${groupData.items.join('')}</div>
+                </div>
+            `;
+        }
+    });
+
+    container.innerHTML = finalHtml;
+
+    if (searchText) {
+        const currentSearchInput = document.getElementById('search-arsip-input');
+        if (currentSearchInput) {
+            currentSearchInput.focus();
+            currentSearchInput.setSelectionRange(currentSearchInput.value.length, currentSearchInput.value.length);
+        }
+    }
+};
+
+// 3. Fungsi Helper untuk Reset (Tanpa menutup popover & mencegah event bubbling)
+window.clearSearchArsip = function() {
+    const searchInput = document.getElementById('search-arsip-input');
+    if (searchInput) {
+        searchInput.value = '';
+        searchInput.focus();
+    }
+    buildArsipUIAndFilter();
+};
+
+window.resetFilterArsip = function() {
+    const filterInput = document.getElementById('filter-tanggal-arsip-input');
+    if (filterInput) {
+        filterInput.value = '';
+    }
+    buildArsipUIAndFilter();
+};
+
+window.invalidateArsipCache = function() {
+    window.cacheArsipCetakGlobal = { do: null, fdn: null };
 };
 
 // Fungsi Modal Detail Arsip saat Kartu Riwayat Diklik
@@ -668,6 +782,137 @@ window.importDO = function() {
 };
 
 
+// 1. Fungsi Utama Trigger Import FDN (.txt)
+window.importFDN = function() {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.txt';
+    fileInput.multiple = true; // Mendukung multiple file txt FDN sekaligus
+    
+    fileInput.onchange = function(e) {
+        const files = e.target.files;
+        if (!files.length) return;
+
+        let processedCount = 0;
+        Array.from(files).forEach(file => {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const textContent = event.target.result;
+                parseTextFDNToCache(textContent, file.name);
+                processedCount++;
+                
+                if (processedCount === files.length) {
+                    // Render ulang tampilan DO/FDN dan tabel item otomatis menggunakan fungsi yang benar
+                    if (typeof renderDaftarDOPreview === 'function') renderDaftarDOPreview();
+                    if (typeof renderTabelItemMuatOtomatis === 'function') renderTabelItemMuatOtomatis();
+                    miuiAlert("File FDN berhasil diimpor ke cache checklist!");
+                }
+            };
+            reader.readAsText(file);
+        });
+    };
+    
+    fileInput.click();
+};
+
+// 2. Parser Teks .txt FDN ke Cache Ceklist FDN
+window.parseTextFDNToCache = function(fileContent, fileName) {
+    const lines = fileContent.split('\n');
+    let dariGudangRaw = '', nomorDokumen = '', tanggal = '', tujuanRaw = '';
+    let items = {};
+    let totalMuatDoc = 0;
+
+    lines.forEach(line => {
+        if (line.includes('DARI GUDANG')) {
+            const parts = line.split(':');
+            if (parts.length > 1) dariGudangRaw = parts[1].trim().split(/\s{2,}/)[0];
+        }
+        
+        if (line.includes('NOMOR DOKUMEN')) {
+            const lastIndex = line.lastIndexOf('NOMOR DOKUMEN');
+            const subStr = line.substring(lastIndex);
+            const parts = subStr.split(':');
+            if (parts.length > 1) {
+                nomorDokumen = parts[1].trim().split(/\s{2,}/)[0];
+            }
+        }
+        
+        if (line.includes('TANGGAL')) {
+            const match = line.match(/TANGGAL\s*:\s*([0-9\/]+)/);
+            if (match) tanggal = match[1].trim();
+        }
+        
+        if (line.includes('TUJUAN')) {
+            const lastIndex = line.lastIndexOf('TUJUAN');
+            const subStr = line.substring(lastIndex);
+            const parts = subStr.split(':');
+            if (parts.length > 1) {
+                tujuanRaw = parts[1].trim().split(/\s{2,}/)[0].toUpperCase();
+            }
+        }
+
+        // Parsing baris produk tabel
+        const trimmed = line.trim();
+        if (/^\d+\s+[a-zA-Z0-9\-_]+/.test(trimmed)) {
+            const tokens = trimmed.split(/\s+/);
+            if (tokens.length >= 2) {
+                const qtyTokenIndex = tokens.findIndex(t => /^\d+\/\d+\/\d+\/\d+$/.test(t) || (t.includes('/') && t.split('/').length === 4));
+                
+                if (qtyTokenIndex !== -1) {
+                    const kode = tokens[1].trim().toUpperCase();
+                    const qtyParts = tokens[qtyTokenIndex].split('/').map(Number);
+                    
+                    if (kode) {
+                        const qtyKrt = qtyParts[0] || 0;
+                        items[kode] = {
+                            kodebarang: kode,
+                            kodegudang: dariGudangRaw.includes("NON WMS") ? "WHNB-2" : "WH-2",
+                            qty_b: qtyKrt,
+                            sub: {
+                                bal: qtyParts[1] || 0,
+                                rtg: qtyParts[2] || 0,
+                                pcs: qtyParts[3] || 0
+                            }
+                        };
+                        totalMuatDoc += qtyKrt;
+                    }
+                }
+            }
+        }
+    });
+
+    if (!nomorDokumen) {
+        nomorDokumen = fileName.replace('.txt', '').toUpperCase();
+    }
+    if (!tujuanRaw) {
+        tujuanRaw = 'STOCK POINT';
+    }
+
+    // Format Gudang Meta
+    let metaGudang = "WH-2";
+    if (dariGudangRaw.includes("WH-2 HO NON WMS") || dariGudangRaw.includes("WH-3")) {
+        metaGudang = "WHNB-2";
+    }
+
+    // Pastikan cacheCeklistFDN tersedia secara global
+    if (typeof cacheCeklistFDN === 'undefined') {
+        window.cacheCeklistFDN = {};
+    }
+
+    // Simpan ke cache FDN aktif
+    cacheCeklistFDN[nomorDokumen] = {
+        meta: {
+            nobukti: nomorDokumen,
+            namacustomer: tujuanRaw,
+            tgl: tanggal || '-',
+            gudang: metaGudang,
+            total_muat: totalMuatDoc
+        },
+        data: items
+    };
+};
+
+
 // 1. Perbarui Fungsi Proses Data WHNB-2 dengan Verifikasi Metadata DO Terpisah
 window.prosesDataWHNB2 = function() {
     const metaTextarea = document.getElementById('ta-bosnet-meta');
@@ -826,7 +1071,25 @@ window.prosesDataWHNB2 = function() {
     }
 };
 
-// Fungsi Render Daftar DO & FDN di Kotak Preview Panel Kiri (Dengan Info Total Muat & Jumlah Item)
+// Fungsi Hapus Cache DO Spesifik
+window.hapusCacheDO = function(key) {
+    if (cacheCeklistDO[key]) {
+        delete cacheCeklistDO[key];
+        renderDaftarDOPreview();
+        renderTabelItemMuatOtomatis();
+    }
+};
+
+// Fungsi Hapus Cache FDN Spesifik
+window.hapusCacheFDN = function(key) {
+    if (cacheCeklistFDN[key]) {
+        delete cacheCeklistFDN[key];
+        renderDaftarDOPreview();
+        renderTabelItemMuatOtomatis();
+    }
+};
+
+// Fungsi Render Daftar DO & FDN di Kotak Preview Panel Kiri (Tema FDN Abu-abu & Tombol Hapus)
 function renderDaftarDOPreview() {
     const container = document.getElementById('container-list-fdn-ceklist');
     if (!container) return;
@@ -835,37 +1098,49 @@ function renderDaftarDOPreview() {
     const keysFDN = Object.keys(cacheCeklistFDN);
 
     if (keysDO.length === 0 && keysFDN.length === 0) {
-        container.innerHTML = `<div class="text-slate-400 italic text-[10px]">Belum ada data DO atau FDN diimport...</div>`;
+        container.innerHTML = `<div class="text-slate-400 italic text-[10px]">Belum ada data DO atau FDN diimpor...</div>`;
         return;
     }
 
     let html = '';
 
-    // Kelompok DO (Selalu di atas)
+    // Kelompok DO (Selalu di atas) - Tema Oranye
     if (keysDO.length > 0) {
         html += `<div class="text-[9px] font-black text-orange-700 uppercase mb-1 border-b border-orange-200 pb-0.5">Daftar DO</div>`;
         keysDO.forEach((key, index) => {
             const item = cacheCeklistDO[key];
-            const jumlahItem = Object.keys(item.data).length;
+            const jumlahItem = item.data ? Object.keys(item.data).length : 0;
+            const totalMuatDO = item.meta?.total_muat || item.total_muat || 0;
             html += `
                 <div class="flex items-center justify-between bg-white border border-orange-200 rounded p-1 mb-1 text-[10px]">
-                    <span class="font-bold text-slate-700">${index + 1}. ${item.meta.tgl} | ${item.meta.nobukti} | ${item.meta.namacustomer}</span>
-                    <span class="bg-orange-600 text-white px-1.5 py-0.5 rounded text-[9px] font-bold">TOTAL BARANG: ${item.total_muat} KRT [${jumlahItem} Item]</span>
+                    <span class="font-bold text-slate-700 truncate pr-2">${index + 1}. ${item.meta.tgl} | ${item.meta.nobukti} | ${item.meta.namacustomer}</span>
+                    <div class="flex items-center space-x-1.5 shrink-0">
+                        <span class="bg-orange-600 text-white px-1.5 py-0.5 rounded text-[9px] font-bold">TOTAL BARANG: ${totalMuatDO} KRT [${jumlahItem} Item]</span>
+                        <button onclick="hapusCacheDO('${key}')" class="text-red-500 hover:text-red-700 p-0.5 transition" title="Hapus DO ini">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </div>
                 </div>
             `;
         });
     }
 
-    // Kelompok FDN (Di bawah DO)
+    // Kelompok FDN (Di bawah DO) - Tema Abu-abu
     if (keysFDN.length > 0) {
-        html += `<div class="text-[9px] font-black text-blue-700 uppercase mt-2 mb-1 border-b border-blue-200 pb-0.5">Daftar FDN</div>`;
+        html += `<div class="text-[9px] font-black text-amber-700 uppercase mt-2 mb-1 border-b border-slate-200 pb-0.5">Daftar FDN</div>`;
         keysFDN.forEach((key, index) => {
             const item = cacheCeklistFDN[key];
-            const jumlahItem = Object.keys(item.data).length;
+            const jumlahItem = item.data ? Object.keys(item.data).length : 0;
+            const totalMuatFDN = item.meta?.total_muat || item.total_muat || 0;
             html += `
-                <div class="flex items-center justify-between bg-white border border-blue-200 rounded p-1 mb-1 text-[10px]">
-                    <span class="font-bold text-slate-700">${index + 1}. ${item.meta.tgl} | ${item.meta.nobukti} | ${item.meta.namacustomer}</span>
-                    <span class="bg-blue-600 text-white px-1.5 py-0.5 rounded text-[9px] font-bold">TOTAL BARANG: ${item.total_muat} KRT [${jumlahItem} Item]</span>
+                <div class="flex items-center justify-between bg-white border border-slate-300 rounded p-1 mb-1 text-[10px]">
+                    <span class="font-bold text-slate-700 truncate pr-2">${index + 1}. ${item.meta.tgl} | ${item.meta.nobukti} | ${item.meta.namacustomer}</span>
+                    <div class="flex items-center space-x-1.5 shrink-0">
+                        <span class="bg-amber-600 text-white px-1.5 py-0.5 rounded text-[9px] font-bold">TOTAL BARANG: ${totalMuatFDN} KRT [${jumlahItem} Item]</span>
+                        <button onclick="hapusCacheFDN('${key}')" class="text-red-500 hover:text-red-700 p-0.5 transition" title="Hapus FDN ini">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </div>
                 </div>
             `;
         });
@@ -884,6 +1159,9 @@ function renderTabelItemMuatOtomatis() {
     let hasData = false;
     let grandTotalQty = 0;
     let grandTotalItemCount = 0;
+
+    // Array penampung seluruh item untuk dikirim ke fungsi rekap kelompok
+    let semuaItemBarangAktif = [];
 
     const warnaBgList = [
         'bg-white',
@@ -923,6 +1201,12 @@ function renderTabelItemMuatOtomatis() {
             grandTotalQty += qty;
             grandTotalItemCount += 1;
 
+            // Masukkan ke array penampung rekap
+            semuaItemBarangAktif.push({
+                kodebarang: row.kodebarang,
+                qty_b: qty
+            });
+
             html += `
                 <tr class="border-b ${warnaBg} hover:opacity-90 text-[11px] transition-colors">
                     <td class="p-1.5 border font-bold text-slate-800">${row.kodebarang}</td>
@@ -948,6 +1232,12 @@ function renderTabelItemMuatOtomatis() {
             grandTotalQty += qty;
             grandTotalItemCount += 1;
 
+            // Masukkan ke array penampung rekap
+            semuaItemBarangAktif.push({
+                kodebarang: row.kodebarang,
+                qty_b: qty
+            });
+
             html += `
                 <tr class="border-b ${warnaBg} hover:opacity-90 text-[11px] transition-colors">
                     <td class="p-1.5 border font-bold text-slate-800">${row.kodebarang}</td>
@@ -962,6 +1252,11 @@ function renderTabelItemMuatOtomatis() {
     if (!hasData) {
         tbody.innerHTML = `<tr><td colspan="4" class="p-3 text-center text-slate-400 italic text-xs">Belum ada data barang...</td></tr>`;
         if (infoTotalEl) infoTotalEl.innerText = `TOTAL MUAT KESELURUHAN: 0 KRT [0 Item]`;
+        
+        // Kosongkan juga rekap kelompok jika data kosong
+        if (typeof updateRekapKelompok === 'function') {
+            updateRekapKelompok({});
+        }
         return;
     }
 
@@ -969,11 +1264,148 @@ function renderTabelItemMuatOtomatis() {
     if (infoTotalEl) {
         infoTotalEl.innerText = `TOTAL MUAT KESELURUHAN: ${grandTotalQty} KRT [${grandTotalItemCount} Item]`;
     }
+
+    // Panggil fungsi rekap kelompok yang sudah kita buat sebelumnya di sini!
+    if (typeof updateRekapKelompok === 'function') {
+        updateRekapKelompok(semuaItemBarangAktif, grandTotalQty);
+    }
 }
 
+// Fungsi Helper Menentukan Kelompok Sesuai Aturan
+function hitungKelompokKodeBarang(kodeBarang) {
+    const kode = String(kodeBarang || '').toUpperCase().trim();
+    
+    if (kode.startsWith('MRL') || kode.startsWith('MTL') || kode.startsWith('ISEL') || kode.startsWith('MEL')) {
+        return 'DIY';
+    }
+    if (kode.startsWith('MTR')) {
+        return 'MTR';
+    }
+    if (kode.startsWith('PDR')) {
+        return 'PDR';
+    }
+    
+    const isMRR_CRR_THR = kode.startsWith('MRR') || kode.startsWith('CRR') || kode.startsWith('THR');
+    if (isMRR_CRR_THR) {
+        if (kode.endsWith('EA')) {
+            return 'MRR/CRR EA';
+        } else {
+            return 'MRR/CRR';
+        }
+    }
+    
+    if (kode.startsWith('MOR') || kode.startsWith('MOB')) {
+        return 'MOR/MOB';
+    }
+    if (kode.startsWith('MP') || kode.startsWith('LTGR') || kode.startsWith('MTGR')) {
+        return 'MP/LTGR/MTGR';
+    }
+    if (kode.startsWith('MJR')) {
+        return 'MJR';
+    }
+    
+    return 'Lainnya';
+}
 
-// Fungsi Tombol Cetak: Menyimpan Arsip Final Terstruktur ke RTDB (Termasuk WHNB-2 masuk ke No DO)
-// Fungsi Tombol Cetak dengan Normalisasi Nama Customer untuk Menyatukan Varian (seperti MT)
+// Perbarui fungsi updateRekapKelompok dengan parameter targetTotal (grandTotalQty)
+window.updateRekapKelompok = function(listBarangObj, targetTotal = 0) {
+    let rekap = {
+        'DIY': 0, 'MTR': 0, 'PDR': 0, 'MRR/CRR': 0,
+        'MRR/CRR EA': 0, 'MOR/MOB': 0, 'MP/LTGR/MTGR': 0, 'MJR': 0
+    };
+
+    let totalSemuaKelompok = 0;
+    const itemsArray = Array.isArray(listBarangObj) ? listBarangObj : Object.values(listBarangObj || {});
+
+    itemsArray.forEach(item => {
+        const kode = item.kodebarang || item.kode || '';
+        const qty = Number(item.qty_b || item.qty || 0);
+        const kelompok = hitungKelompokKodeBarang(kode);
+
+        if (rekap.hasOwnProperty(kelompok)) {
+            rekap[kelompok] += qty;
+        }
+        totalSemuaKelompok += qty;
+    });
+
+    // Render Nilai ke Kotak Grid
+    document.getElementById('val-grp-diy').innerText = rekap['DIY'] > 0 ? rekap['DIY'] : '-';
+    document.getElementById('val-grp-mtr').innerText = rekap['MTR'] > 0 ? rekap['MTR'] : '-';
+    document.getElementById('val-grp-pdr').innerText = rekap['PDR'] > 0 ? rekap['PDR'] : '-';
+    document.getElementById('val-grp-mrrcrr').innerText = rekap['MRR/CRR'] > 0 ? rekap['MRR/CRR'] : '-';
+    document.getElementById('val-grp-mrrcrrea').innerText = rekap['MRR/CRR EA'] > 0 ? rekap['MRR/CRR EA'] : '-';
+    document.getElementById('val-grp-mormob').innerText = rekap['MOR/MOB'] > 0 ? rekap['MOR/MOB'] : '-';
+    document.getElementById('val-grp-mpltgrmtgr').innerText = rekap['MP/LTGR/MTGR'] > 0 ? rekap['MP/LTGR/MTGR'] : '-';
+    document.getElementById('val-grp-mjr').innerText = rekap['MJR'] > 0 ? rekap['MJR'] : '-';
+    
+    const totalQtyEl = document.getElementById('rekap-total-qty');
+    if (totalQtyEl) totalQtyEl.innerText = `TOTAL = ${totalSemuaKelompok} KRT`;
+
+    // Validasi Pencocokan dengan Total Keseluruhan di Atas
+    const statusBadge = document.getElementById('status-rekap-kelompok');
+    if (statusBadge) {
+        if (targetTotal === 0 && totalSemuaKelompok === 0) {
+            statusBadge.innerText = '';
+            statusBadge.className = '';
+        } else if (totalSemuaKelompok === targetTotal) {
+            statusBadge.innerText = '[ SESUAI ]';
+            statusBadge.className = 'text-[8px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold';
+        } else {
+            const selisih = totalSemuaKelompok - targetTotal;
+            const ket = selisih > 0 ? `[ LEBIH ${selisih} ]` : `[ KURANG ${Math.abs(selisih)} ]`;
+            statusBadge.innerText = ket;
+            statusBadge.className = 'text-[8px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-bold';
+        }
+    }
+};
+
+// Fungsi Update Rekap Qty Kelompok Barang di Bawah Tabel Kanan
+window.updateRekapKelompok = function(listBarangObj) {
+    let rekap = {
+        'DIY': 0, 
+        'MTR': 0, 
+        'PDR': 0, 
+        'MRR/CRR': 0,
+        'MRR/CRR EA': 0, 
+        'MOR/MOB': 0, 
+        'MP/LTGR/MTGR': 0, 
+        'MJR': 0
+    };
+
+    let totalSemua = 0;
+
+    // Iterasi data barang (bisa berupa object dari cache atau array)
+    const itemsArray = Array.isArray(listBarangObj) ? listBarangObj : Object.values(listBarangObj || {});
+
+    itemsArray.forEach(item => {
+        // Sesuaikan properti penamaan kode barang pada objek data Anda (misal: kodebarang atau kode)
+        const kode = item.kodebarang || item.kode || '';
+        const qty = Number(item.qty_b || item.qty || item.qty_utama || 0);
+        
+        const kelompok = hitungKelompokKodeBarang(kode);
+
+        if (rekap.hasOwnProperty(kelompok)) {
+            rekap[kelompok] += qty;
+        }
+        totalSemua += qty;
+    });
+
+    // Perbarui Tampilan DOM Berdasarkan ID di HTML
+    document.getElementById('val-grp-diy').innerText = rekap['DIY'] > 0 ? rekap['DIY'] : '-';
+    document.getElementById('val-grp-mtr').innerText = rekap['MTR'] > 0 ? rekap['MTR'] : '-';
+    document.getElementById('val-grp-pdr').innerText = rekap['PDR'] > 0 ? rekap['PDR'] : '-';
+    document.getElementById('val-grp-mrrcrr').innerText = rekap['MRR/CRR'] > 0 ? rekap['MRR/CRR'] : '-';
+    document.getElementById('val-grp-mrrcrrea').innerText = rekap['MRR/CRR EA'] > 0 ? rekap['MRR/CRR EA'] : '-';
+    document.getElementById('val-grp-mormob').innerText = rekap['MOR/MOB'] > 0 ? rekap['MOR/MOB'] : '-';
+    document.getElementById('val-grp-mpltgrmtgr').innerText = rekap['MP/LTGR/MTGR'] > 0 ? rekap['MP/LTGR/MTGR'] : '-';
+    document.getElementById('val-grp-mjr').innerText = rekap['MJR'] > 0 ? rekap['MJR'] : '-';
+    
+    const totalQtyEl = document.getElementById('rekap-total-qty');
+    if (totalQtyEl) totalQtyEl.innerText = `TOTAL = ${totalSemua} KRT`;
+};
+
+
+// Fungsi Utama Cetak Ceklist Muat (Simpan Rekap ke RTDB)
 window.cetakCeklistMuat = function() {
     const keysDO = Object.keys(cacheCeklistDO);
     const keysFDN = Object.keys(cacheCeklistFDN);
@@ -990,24 +1422,19 @@ window.cetakCeklistMuat = function() {
     const timestampNow = new Date().toISOString();
     let savedPromises = [];
 
-    // Fungsi helper untuk membersihkan dan menyeragamkan nama customer (misal buang 'MT', spasi ganda, dll)
     function normalizeCustomerName(rawName) {
         let clean = String(rawName || '').toUpperCase();
-        // Hapus kata tambahan umum seperti MT, REG di akhir atau bagian tertentu jika diinginkan
-        // Contoh: Mengganti spasi berlebih atau simbol khusus
         clean = clean.replace(/\bMT\b/g, '').replace(/[\/\-\_\.\s]+/g, '_').replace(/^_+|_+\$/g, '');
         return clean;
     }
 
-    // 1. Kelompokkan data DO berdasarkan ID Muat yang sudah dinormalisasi
+    // 1. Kelompokkan data DO berdasarkan ID Muat
     const groupedDO = {};
     keysDO.forEach((key) => {
         const item = cacheCeklistDO[key];
         const parts = key.split('_');
         if (parts.length >= 4) {
             const tglPart = `${parts[0]}_${parts[1]}_${parts[2]}`;
-            
-            // Normalisasi nama customer agar "SUMBER ALAM BARABAY MT" dan "SUMBER ALAM BARABAY" menjadi satu ID Muat
             const rawCust = item.meta.namacustomer;
             const custNormalized = normalizeCustomerName(rawCust);
             const muatId = `${tglPart}_${custNormalized}`.toUpperCase();
@@ -1016,11 +1443,12 @@ window.cetakCeklistMuat = function() {
                 groupedDO[muatId] = {
                     meta: {
                         tgl: item.meta.tgl,
-                        namacustomer: rawCust, // Tetap simpan nama aslinya di meta
+                        namacustomer: rawCust,
                         timestamp_update: timestampNow
                     },
                     payloadDO: {},
-                    total_muat_all: 0
+                    total_muat_all: 0,
+                    allItems: [] // Penampung item untuk hitung rekap
                 };
             }
 
@@ -1031,7 +1459,11 @@ window.cetakCeklistMuat = function() {
             let totalMuatDO = 0;
             Object.keys(item.data).forEach((kb) => {
                 itemsData[kb] = item.data[kb];
-                totalMuatDO += Number(item.data[kb].qty_b || 0);
+                const qty = Number(item.data[kb].qty_b || 0);
+                totalMuatDO += qty;
+
+                // Masukkan ke penampung rekap kelompok
+                groupedDO[muatId].allItems.push({ kodebarang: kb, qty_b: qty });
             });
 
             if (groupedDO[muatId].payloadDO[last5NoBukti]) {
@@ -1078,14 +1510,54 @@ window.cetakCeklistMuat = function() {
         });
     }
 
-    // 3. Simpan DO ke RTDB dengan ID Muat yang disatukan
+    // Helper untuk membuat objek rekap kelompok aman dari karakter terlarang RTDB ('/', '#', '$', '.', '[', ']')
+    function generateRekapPayload(itemsArray) {
+        let rekap = {
+            'DIY': 0, 
+            'MTR': 0, 
+            'PDR': 0, 
+            'MRR_CRR': 0,       // Aman (menggantikan MRR/CRR)
+            'MRR_CRR_EA': 0,    // Aman (menggantikan MRR/CRR EA)
+            'MOR_MOB': 0,       // Aman (menggantikan MOR/MOB)
+            'MP_LTGR_MTGR': 0,  // Aman (menggantikan MP/LTGR/MTGR)
+            'MJR': 0,
+            'LAINNYA': 0
+        };
+
+        itemsArray.forEach(item => {
+            const kelompok = hitungKelompokKodeBarang(item.kodebarang);
+            
+            // Petakan semua kemungkinan kelompok ke format key RTDB yang bersih tanpa karakter '/'
+            let rtdbKey = 'LAINNYA';
+            if (kelompok === 'DIY') rtdbKey = 'DIY';
+            else if (kelompok === 'MTR') rtdbKey = 'MTR';
+            else if (kelompok === 'PDR') rtdbKey = 'PDR';
+            else if (kelompok === 'MRR/CRR') rtdbKey = 'MRR_CRR';
+            else if (kelompok === 'MRR/CRR EA') rtdbKey = 'MRR_CRR_EA';
+            else if (kelompok === 'MOR/MOB') rtdbKey = 'MOR_MOB';
+            else if (kelompok === 'MP/LTGR/MTGR') rtdbKey = 'MP_LTGR_MTGR';
+            else if (kelompok === 'MJR') rtdbKey = 'MJR';
+
+            if (rekap.hasOwnProperty(rtdbKey)) {
+                rekap[rtdbKey] += Number(item.qty_b || 0);
+            } else {
+                rekap['LAINNYA'] += Number(item.qty_b || 0);
+            }
+        });
+        return rekap;
+    }
+
+    // 3. Simpan DO ke RTDB (Termasuk node 'rekap')
     Object.keys(groupedDO).forEach((muatId) => {
         const group = groupedDO[muatId];
         const dbRef = firebase.database().ref(`ceklist_muat/arsip_cetak/ceklist_do/${muatId}`);
 
+        const rekapHasil = generateRekapPayload(group.allItems);
+
         const finalPayload = Object.assign({
             meta: group.meta
         }, group.payloadDO, {
+            rekap: rekapHasil, // <-- Rekap Kelompok Masuk Sini
             titipan: titipanDataObj,
             total_muat_keseluruhan: group.total_muat_all
         });
@@ -1093,58 +1565,70 @@ window.cetakCeklistMuat = function() {
         savedPromises.push(dbRef.set(finalPayload));
     });
 
-    // 4. Lakukan hal serupa untuk FDN jika ada
+    // 4. Lakukan hal serupa untuk FDN
     const groupedFDN = {};
     keysFDN.forEach((key) => {
         const item = cacheCeklistFDN[key];
-        const parts = key.split('_');
-        if (parts.length >= 4) {
-            const tglPart = `${parts[0]}_${parts[1]}_${parts[2]}`;
-            const custNormalized = normalizeCustomerName(item.meta.namacustomer);
-            const muatId = `${tglPart}_${custNormalized}`.toUpperCase();
-
-            if (!groupedFDN[muatId]) {
-                groupedFDN[muatId] = {
-                    meta: {
-                        tgl: item.meta.tgl,
-                        namacustomer: item.meta.namacustomer,
-                        timestamp_update: timestampNow
-                    },
-                    payloadFDN: {},
-                    total_muat_all: 0
-                };
-            }
-
-            const noBuktiDigits = item.meta.nobukti.replace(/\D/g, '');
-            const last5NoBukti = noBuktiDigits.length >= 5 ? noBuktiDigits.slice(-5) : noBuktiDigits;
-
-            const itemsData = {};
-            let totalMuatFDN = 0;
-            Object.keys(item.data).forEach((kb) => {
-                itemsData[kb] = item.data[kb];
-                totalMuatFDN += Number(item.data[kb].qty_b || 0);
-            });
-
-            groupedFDN[muatId].payloadFDN[last5NoBukti] = {
-                meta: {
-                    nobukti: item.meta.nobukti,
-                    tgl: item.meta.tgl,
-                    total_muat: totalMuatFDN
-                },
-                data: itemsData
-            };
-
-            groupedFDN[muatId].total_muat_all += totalMuatFDN;
+        const meta = item.meta || {};
+        
+        const rawTgl = meta.tgl || '';
+        let tglPart = rawTgl.replace(/\//g, '_');
+        if (!tglPart || tglPart === '-') {
+            tglPart = '16_10_2026';
         }
+
+        const rawCust = meta.namacustomer || key;
+        const custNormalized = normalizeCustomerName(rawCust);
+        const muatId = `${tglPart}_${custNormalized}`.toUpperCase();
+
+        if (!groupedFDN[muatId]) {
+            groupedFDN[muatId] = {
+                meta: {
+                    tgl: meta.tgl,
+                    namacustomer: rawCust,
+                    timestamp_update: timestampNow
+                },
+                payloadFDN: {},
+                total_muat_all: 0,
+                allItems: []
+            };
+        }
+
+        const noBuktiDigits = String(meta.nobukti || key).replace(/\D/g, '');
+        const last5NoBukti = noBuktiDigits.length >= 5 ? noBuktiDigits.slice(-5) : noBuktiDigits;
+
+        const itemsData = {};
+        let totalMuatFDN = 0;
+        Object.keys(item.data || {}).forEach((kb) => {
+            itemsData[kb] = item.data[kb];
+            const qty = Number(item.data[kb].qty_b || item.data[kb].qty_utama || 0);
+            totalMuatFDN += qty;
+
+            groupedFDN[muatId].allItems.push({ kodebarang: kb, qty_b: qty });
+        });
+
+        groupedFDN[muatId].payloadFDN[last5NoBukti] = {
+            meta: {
+                nobukti: meta.nobukti || key,
+                tgl: meta.tgl,
+                total_muat: totalMuatFDN
+            },
+            data: itemsData
+        };
+
+        groupedFDN[muatId].total_muat_all += totalMuatFDN;
     });
 
-Object.keys(groupedFDN).forEach((muatId) => {
+    Object.keys(groupedFDN).forEach((muatId) => {
         const group = groupedFDN[muatId];
         const dbRef = firebase.database().ref(`ceklist_muat/arsip_cetak/ceklist_fdn/${muatId}`);
+
+        const rekapHasil = generateRekapPayload(group.allItems);
 
         const finalPayload = Object.assign({
             meta: group.meta
         }, group.payloadFDN, {
+            rekap: rekapHasil, // <-- Rekap Kelompok Masuk Sini
             titipan: titipanDataObj,
             total_muat_keseluruhan: group.total_muat_all
         });
@@ -1152,54 +1636,32 @@ Object.keys(groupedFDN).forEach((muatId) => {
         savedPromises.push(dbRef.set(finalPayload));
     });
 
-    // Perbarui bagian akhir fungsi cetakCeklistMuat untuk membersihkan cache dan tampilan
+    // 5. Eksekusi Simpan & Bersihkan Cache
     Promise.all(savedPromises).then(() => {
-        miuiAlert("Arsip cetak berhasil disimpan ke Database!");
-        console.log("Arsip cetak berhasil disimpan.");
+        miuiAlert("Arsip cetak beserta rekap kelompok berhasil disimpan ke Database!");
         
-        // 1. Bersihkan Cache DO & FDN
         cacheCeklistDO = {};
         cacheCeklistFDN = {};
-
-        // 2. Kosongkan Array Titipan (Coba berbagai variasi nama variabel global yang mungkin digunakan)
         if (typeof dataTitipanList !== 'undefined') dataTitipanList = [];
-        if (typeof titipanList !== 'undefined') titipanList = [];
-        if (typeof listTitipan !== 'undefined') listTitipan = [];
 
-        // 3. Reset Tampilan Panel Kiri & Tabel Kanan
+        // Reset Tampilan
         const containerDO = document.getElementById('container-list-fdn-ceklist');
-        if (containerDO) {
-            containerDO.innerHTML = `<div class="text-slate-400 italic text-[10px]">Belum ada data DO atau FDN diimport...</div>`;
-        }
+        if (containerDO) containerDO.innerHTML = `<div class="text-slate-400 italic text-[10px]">Belum ada data DO atau FDN diimport...</div>`;
 
         const tbody = document.getElementById('tabel-item-ceklist-body');
-        if (tbody) {
-            tbody.innerHTML = `<tr><td colspan="4" class="p-3 text-center text-slate-400 italic text-xs">Belum ada data barang...</td></tr>`;
-        }
+        if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="p-3 text-center text-slate-400 italic text-xs">Belum ada data barang...</td></tr>`;
 
         const infoTotalEl = document.getElementById('info-total-muat-keseluruhan');
-        if (infoTotalEl) {
-            infoTotalEl.innerText = `TOTAL MUAT KESELURUHAN: 0 KRT [0 Item]`;
+        if (infoTotalEl) infoTotalEl.innerText = `TOTAL MUAT KESELURUHAN: 0 KRT [0 Item]`;
+
+        if (typeof updateRekapKelompok === 'function') {
+            updateRekapKelompok([], 0);
         }
 
-        // 4. Panggil fungsi render titipan bawaan aplikasi Anda jika ada, 
-        // atau kosongkan container-nya secara langsung
-        if (typeof renderTitipan === 'function') {
-            renderTitipan();
-        } else if (typeof renderListTitipan === 'function') {
-            renderListTitipan();
-        } else {
-            // Cari elemen pembungkus list titipan dan kosongkan paksa
-            const containers = document.querySelectorAll('.space-y-2');
-            containers.forEach(el => {
-                if (el.innerHTML.includes('PKT-') || el.innerHTML.includes('PROMOSI') || el.innerHTML.includes('HRD')) {
-                    el.innerHTML = `<div class="text-slate-400 italic text-[10px] text-center py-2">Belum ada item titipan ditambahkan...</div>`;
-                }
-            });
+        // Invalidate cache arsip agar riwayat langsung memperbarui data terbaru
+        if (typeof invalidateArsipCache === 'function') {
+            invalidateArsipCache();
         }
-
-        // 5. Trigger print browser (opsional)
-        // window.print();
 
     }).catch((err) => {
         console.error("Gagal menyimpan arsip ke Firebase:", err);
