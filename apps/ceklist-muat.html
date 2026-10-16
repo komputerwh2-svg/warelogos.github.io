@@ -24,12 +24,15 @@
                 <span>Arsip Ceklist</span>
             </button>
 
-            <!-- Popover Daftar Arsip Ceklist Berdasarkan Tanggal (Diperlebar) -->
-            <div id="popover-arsip-ceklist" class="hidden absolute right-0 mt-2 w-[380px] bg-white rounded-xl shadow-2xl border border-orange-300 p-3 z-50 text-slate-700 font-sans">
-                <div class="flex items-center justify-between pb-2 mb-2 border-b border-orange-200">
+            <!-- Popover Daftar Arsip Ceklist Berdasarkan Tanggal (Direvisi agar panjang container & list pas) -->
+            <div id="popover-arsip-ceklist" class="hidden absolute right-0 mt-2 w-[500px] h-[600px] bg-white rounded-xl shadow-2xl border border-orange-300 p-3 z-50 text-slate-700 font-sans flex flex-col">
+                <!-- Header Popover (Fixed / Flex-shrink-0) -->
+                <div class="flex items-center justify-between pb-2 mb-2 border-b border-orange-200 flex-shrink-0">
                     <span class="text-[11px] font-black uppercase text-orange-700">Riwayat Arsip Cetak</span>
                 </div>
-                <div id="container-list-arsip-ceklist" class="max-h-72 overflow-y-auto miui-custom-scroll space-y-2 text-xs">
+                
+                <!-- Container List (Flex-1 & miui-custom-scroll untuk mengisi sisa tinggi secara presisi) -->
+                <div id="container-list-arsip-ceklist" class="flex-1 overflow-y-auto miui-custom-scroll space-y-2 text-xs pr-1">
                     <div class="text-slate-400 italic text-[10px] text-center py-4">Belum ada riwayat arsip tersimpan...</div>
                 </div>
             </div>
@@ -138,9 +141,9 @@
             </div>
         </div>
 
-        <!-- PANEL KANAN (40%): Tabel Item Barang -->
+        <!-- PANEL KANAN (40%): Tabel Item Barang & Ringkasan Kelompok -->
         <div class="w-[40%] bg-white rounded-xl shadow-sm border border-orange-500 p-3 flex flex-col overflow-hidden">
-            <!-- Ubah bagian header tabel kanan di file HTML menjadi seperti ini: -->
+            <!-- Header Tabel -->
             <div class="flex items-center justify-between mb-2">
                 <h3 class="text-[10px] font-black text-slate-700 uppercase tracking-wider">Item Barang Muat</h3>
                 <span id="info-total-muat-keseluruhan" class="text-[10px] font-black text-orange-600 bg-orange-100 px-2 py-0.5 rounded shadow-inner">
@@ -148,7 +151,8 @@
                 </span>
             </div>
             
-            <div class="flex-1 overflow-x-auto overflow-y-auto miui-custom-scroll border border-orange-200 rounded-lg">
+            <!-- Tabel Item Barang -->
+            <div class="flex-1 overflow-x-auto overflow-y-auto miui-custom-scroll border border-orange-200 rounded-lg mb-2">
                 <table class="w-full text-left border-collapse text-[10px]">
                     <thead>
                         <tr class="bg-orange-100 text-slate-700 uppercase font-black sticky top-0 z-10">
@@ -164,6 +168,27 @@
                         </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- REKAP KELOMPOK (Sesuai Format Aplikasi Lama) -->
+            <div class="bg-orange-50/70 border border-orange-200 rounded-lg p-2 flex-shrink-0">
+                <div class="text-[9px] font-black text-orange-800 uppercase mb-1.5 border-b border-orange-200 pb-0.5 flex justify-between items-center">
+                    <div class="flex items-center space-x-2">
+                        <span>Rekap Qty Kelompok Barang</span>
+                        <span id="status-rekap-kelompok" class="text-[8px] px-1.5 py-0.5 rounded font-bold"></span>
+                    </div>
+                    <span id="rekap-total-qty" class="font-mono font-bold text-slate-700">TOTAL = 0 KRT</span>
+                </div>
+                <div class="grid grid-cols-4 gap-1 text-[9px] font-mono text-slate-700">
+                    <div class="bg-white border border-orange-200 rounded p-1 text-center"><span class="block font-bold text-[8px] text-orange-700">DIY</span><span id="val-grp-diy">-</span></div>
+                    <div class="bg-white border border-orange-200 rounded p-1 text-center"><span class="block font-bold text-[8px] text-orange-700">MTR</span><span id="val-grp-mtr">-</span></div>
+                    <div class="bg-white border border-orange-200 rounded p-1 text-center"><span class="block font-bold text-[8px] text-orange-700">PDR</span><span id="val-grp-pdr">-</span></div>
+                    <div class="bg-white border border-orange-200 rounded p-1 text-center"><span class="block font-bold text-[8px] text-orange-700">MRR/CRR</span><span id="val-grp-mrrcrr">-</span></div>
+                    <div class="bg-white border border-orange-200 rounded p-1 text-center"><span class="block font-bold text-[8px] text-orange-700">MRR/CRR EA</span><span id="val-grp-mrrcrrea">-</span></div>
+                    <div class="bg-white border border-orange-200 rounded p-1 text-center"><span class="block font-bold text-[8px] text-orange-700">MOR/MOB</span><span id="val-grp-mormob">-</span></div>
+                    <div class="bg-white border border-orange-200 rounded p-1 text-center"><span class="block font-bold text-[8px] text-orange-700">MP/LTGR/MTGR</span><span id="val-grp-mpltgrmtgr">-</span></div>
+                    <div class="bg-white border border-orange-200 rounded p-1 text-center"><span class="block font-bold text-[8px] text-orange-700">MJR</span><span id="val-grp-mjr">-</span></div>
+                </div>
             </div>
         </div>
 
