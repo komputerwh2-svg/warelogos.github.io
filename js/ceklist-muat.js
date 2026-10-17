@@ -161,6 +161,13 @@ window.buildArsipUIAndFilter = function() {
             }
 
             const badgeText = badgeInfoItems.length > 0 ? badgeInfoItems.join(' | ') : '-';
+            
+            // Hitung total seluruh item dari semua DO dalam arsip ini
+            let totalItemDO = 0;
+            listNoDO.forEach(noDoKey => {
+                const itemDOObj = val[noDoKey]?.data || {};
+                totalItemDO += Object.keys(itemDOObj).length;
+            });
 
             const cardHtml = `
                 <div onclick="previewArsipDetail('do', '${muatId}')" class="bg-orange-50/50 hover:bg-orange-100/70 border border-orange-200 rounded-lg p-2 transition cursor-pointer mb-1.5">
@@ -170,6 +177,7 @@ window.buildArsipUIAndFilter = function() {
                     </div>
                     <div class="flex items-center justify-between text-[10px] text-slate-500 font-mono">
                         <span class="truncate">${badgeText}</span>
+                        <span class="text-[9px] font-bold text-slate-400 shrink-0">(${totalItemDO} Item)</span>
                     </div>
                 </div>
             `;
@@ -199,6 +207,13 @@ window.buildArsipUIAndFilter = function() {
 
             const badgeTextFDN = badgeInfoItemsFDN.length > 0 ? badgeInfoItemsFDN.join(' | ') : '-';
 
+            // Hitung total seluruh item dari semua FDN dalam arsip ini
+            let totalItemFDN = 0;
+            listNoFDN.forEach(noFdnKey => {
+                const itemFDNObj = val[noFdnKey]?.data || {};
+                totalItemFDN += Object.keys(itemFDNObj).length;
+            });
+
             const cardHtml = `
                 <div onclick="previewArsipDetail('fdn', '${muatId}')" class="bg-slate-50/80 hover:bg-slate-100/90 border border-slate-300 rounded-lg p-2 transition cursor-pointer mb-1.5">
                     <div class="flex items-center justify-between font-bold text-slate-800 text-[11px] mb-1">
@@ -207,6 +222,7 @@ window.buildArsipUIAndFilter = function() {
                     </div>
                     <div class="flex items-center justify-between text-[10px] text-slate-500 font-mono">
                         <span class="truncate">${badgeTextFDN}</span>
+                        <span class="text-[9px] font-bold text-slate-400 shrink-0">(${totalItemFDN} Item)</span>
                     </div>
                 </div>
             `;
@@ -370,12 +386,15 @@ window.previewArsipDetail = function(kategori, muatId) {
             const doObj = data[noBuktiKey];
             const doMeta = doObj.meta || {};
             const items = doObj.data || {};
+            
+            // Hitung jumlah item barang pada nomor DO/FDN ini
+            const jumlahItem = Object.keys(items).length;
 
             contentHtml += `
                 <div class="border border-orange-200 rounded p-2 bg-white shadow-sm">
                     <div class="flex justify-between items-center font-bold text-orange-800 text-[11px] border-b pb-1 mb-1.5">
                         <span>${doMeta.nobukti || noBuktiKey}</span>
-                        <span>Total: ${doMeta.total_muat || 0} KRT</span>
+                        <span>Total: ${doMeta.total_muat || 0} KRT <span class="text-slate-600 text-[10px] font-bold">(${jumlahItem} Item)</span></span>
                     </div>
                     <table class="w-full text-left text-[10px]">
                         <thead>
@@ -415,7 +434,7 @@ window.previewArsipDetail = function(kategori, muatId) {
         if (hasTitipan) {
             contentHtml += `
                 <div class="bg-amber-50 border border-amber-200 rounded p-2.5">
-                    <div class="font-bold text-amber-800 mb-1.5">📦 Data Titipan:</div>
+                    <div class="font-bold text-amber-800 mb-1.5">📦 Data Titipan / Tinggalan:</div>
                     <div class="space-y-1.5">
             `;
 
@@ -423,9 +442,13 @@ window.previewArsipDetail = function(kategori, muatId) {
                 const itemsTitipan = titipanObj[kategoriTitipan];
                 Object.keys(itemsTitipan).forEach((tKey) => {
                     const tItem = itemsTitipan[tKey];
+                    
+                    // Bersihkan karakter _ menjadi spasi normal
+                    const namaBarangBersih = String(tItem.namabarang || '').replace(/_/g, ' ');
+
                     contentHtml += `
                         <div class="flex justify-between items-center bg-white border border-amber-100 px-2 py-1 rounded text-[11px]">
-                            <span class="font-bold text-slate-700 uppercase">[${kategoriTitipan}] ${tItem.namabarang}</span>
+                            <span class="font-bold text-slate-700 uppercase">[${kategoriTitipan}] ${namaBarangBersih}</span>
                             <span class="font-black text-amber-600">${tItem.qty} KRT</span>
                         </div>
                     `;
@@ -477,56 +500,83 @@ window.eksekusiHapusArsip = function(kategori, muatId) {
 
     const path = `ceklist_muat/arsip_cetak/ceklist_${kategori}/${muatId}`;
 
-    if (targetVal === 'semua') {
-        if (!confirm("Apakah Anda yakin ingin menghapus seluruh arsip muat ini dari database?")) return;
-        firebase.database().ref(path).remove().then(() => {
-            miuiAlert("Arsip berhasil dihapus sepenuhnya!");
-            document.getElementById('modal-detail-arsip').remove();
+    // Helper untuk reset cache arsip agar list di panel kanan benar-benar fresh dari database
+    const triggerRefreshList = function() {
+        // Kosongkan variabel cache arsip jika ada di aplikasi Anda (sesuaikan nama variabelnya jika berbeda)
+        if (typeof window.cacheArsipCetak !== 'undefined') window.cacheArsipCetak = null;
+        if (typeof window.allArsipCache !== 'undefined') window.allArsipCache = null;
+        if (typeof invalidateArsipCache === 'function') invalidateArsipCache();
+
+        // Panggil render ulang list riwayat
+        if (typeof renderRiwayatArsipCetak === 'function') {
             renderRiwayatArsipCetak();
-        }).catch(err => {
-            console.error(err);
-            miuiAlert("Gagal menghapus arsip!");
+        }
+    };
+
+    if (targetVal === 'semua') {
+        miuiConfirm("Apakah Anda yakin ingin menghapus seluruh arsip muat ini dari database?", function() {
+            firebase.database().ref(path).remove().then(() => {
+                miuiAlert("Arsip berhasil dihapus sepenuhnya!");
+                
+                const modalDetail = document.getElementById('modal-detail-arsip');
+                if (modalDetail) modalDetail.remove();
+
+                triggerRefreshList();
+            }).catch(err => {
+                console.error(err);
+                miuiAlert("Gagal menghapus arsip!");
+            });
         });
     } else if (targetVal === 'titipan') {
-        if (!confirm("Apakah Anda yakin ingin menghapus data titipan dari arsip ini?")) return;
-        firebase.database().ref(`${path}/titipan`).remove().then(() => {
-            miuiAlert("Data titipan berhasil dihapus dari arsip!");
-            previewArsipDetail(kategori, muatId); // Refresh modal
-            renderRiwayatArsipCetak(); // Refresh popover
-        }).catch(err => {
-            console.error(err);
-            miuiAlert("Gagal menghapus data titipan!");
+        miuiConfirm("Apakah Anda yakin ingin menghapus data titipan dari arsip ini?", function() {
+            firebase.database().ref(`${path}/titipan`).remove().then(() => {
+                miuiAlert("Data titipan berhasil dihapus dari arsip!");
+                
+                if (typeof previewArsipDetail === 'function') previewArsipDetail(kategori, muatId);
+                triggerRefreshList();
+            }).catch(err => {
+                console.error(err);
+                miuiAlert("Gagal menghapus data titipan!");
+            });
         });
     } else {
-        if (!confirm(`Apakah Anda yakin ingin menghapus nomor DO/FDN (${targetVal}) dari arsip ini?`)) return;
-        const subPath = `${path}/${targetVal}`;
-        firebase.database().ref(subPath).remove().then(() => {
-            firebase.database().ref(path).once('value').then(snap => {
-                const val = snap.val() || {};
-                const remainingKeys = Object.keys(val).filter(k => k !== 'meta' && k !== 'titipan' && k !== 'total_muat_keseluruhan');
-                
-                if (remainingKeys.length === 0 && !val.titipan) {
-                    // Jika semua item DO/FDN dan titipan habis, hapus seluruh node muatId
-                    firebase.database().ref(path).remove().then(() => {
-                        document.getElementById('modal-detail-arsip').remove();
-                        renderRiwayatArsipCetak();
-                    });
-                } else {
-                    // Hitung ulang total muat keseluruhan dari DO/FDN yang tersisa
-                    let newTotal = 0;
-                    remainingKeys.forEach(rk => {
-                        newTotal += (val[rk]?.meta?.total_muat || 0);
-                    });
-                    firebase.database().ref(path).update({ total_muat_keseluruhan: newTotal }).then(() => {
-                        previewArsipDetail(kategori, muatId); // Refresh modal
-                        renderRiwayatArsipCetak(); // Refresh popover
-                    });
-                }
+        miuiConfirm(`Apakah Anda yakin ingin menghapus nomor DO/FDN (${targetVal}) dari arsip ini?`, function() {
+            const subPath = `${path}/${targetVal}`;
+            
+            firebase.database().ref(subPath).remove().then(() => {
+                firebase.database().ref(path).once('value').then(snap => {
+                    const val = snap.val() || {};
+                    const remainingKeys = Object.keys(val).filter(k => k !== 'meta' && k !== 'titipan' && k !== 'total_muat_keseluruhan');
+                    
+                    if (remainingKeys.length === 0 && !val.titipan) {
+                        // Jika semua item DO/FDN dan titipan habis, hapus seluruh node muatId
+                        firebase.database().ref(path).remove().then(() => {
+                            miuiAlert("Item DO/FDN terpilih berhasil dihapus dari arsip!");
+                            
+                            const modalDetail = document.getElementById('modal-detail-arsip');
+                            if (modalDetail) modalDetail.remove();
+
+                            triggerRefreshList();
+                        });
+                    } else {
+                        // Hitung ulang total muat keseluruhan dari DO/FDN yang tersisa
+                        let newTotal = 0;
+                        remainingKeys.forEach(rk => {
+                            newTotal += (val[rk]?.meta?.total_muat || 0);
+                        });
+                        
+                        firebase.database().ref(path).update({ total_muat_keseluruhan: newTotal }).then(() => {
+                            miuiAlert("Item DO/FDN terpilih berhasil dihapus dari arsip!");
+                            
+                            if (typeof previewArsipDetail === 'function') previewArsipDetail(kategori, muatId);
+                            triggerRefreshList();
+                        });
+                    }
+                });
+            }).catch(err => {
+                console.error(err);
+                miuiAlert("Gagal menghapus item DO/FDN!");
             });
-            miuiAlert("Item DO/FDN terpilih berhasil dihapus dari arsip!");
-        }).catch(err => {
-            console.error(err);
-            miuiAlert("Gagal menghapus item DO/FDN!");
         });
     }
 };
@@ -606,12 +656,16 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                         const rawQty = Number(tItem.qty || tItem.qty_b || tItem.qty_utama || 0);
                         
                         // Jika DIY, QTY untuk perhitungan rekap/total dibagi 2
-                        // Sedangkan QTY untuk tampilan tabel ditampilkan format terbagi (misal 60:2 atau nilai bagi 2)
-                        const effectiveQty = isDiy ? rawQty / 2 : rawQty;
+                        // Dibagi 2 lalu dibulatkan ke atas menggunakan Math.ceil() (33 / 2 = 16.5 -> dibulatkan jadi 17)
+                        const effectiveQty = isDiy ? Math.ceil(rawQty / 2) : rawQty;
                         const displayQtyStr = isDiy ? `${rawQty}:2` : `${rawQty}`;
 
+                        // Ambil nama barang dan ubah karakter underscore (_) menjadi spasi normal
+                        let namaBarangRaw = tItem.namabarang || tItem.kodebarang || labelGudang;
+                        let namaBarangClean = String(namaBarangRaw).replace(/_/g, ' ');
+
                         tinggalanDiyArray.push({
-                            kodebarang: tItem.namabarang || tItem.kodebarang || labelGudang,
+                            kodebarang: namaBarangClean, // Nama barang sudah bersih tanpa _
                             qty_b: effectiveQty, // Qty efektif untuk perhitungan
                             display_qty: displayQtyStr, // Qty untuk tampilan tabel
                             kodegudang: labelGudang,
@@ -642,7 +696,7 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                     if (itemsT) {
                         let rawLabel = kTitipan.toUpperCase();
                         let labelTitipan = rawLabel;
-                        if (rawLabel.includes('HRD')) labelTitipan = 'HRD';
+                        if (rawLabel.includes('HRD')) labelTitipan = 'HRD / ATK';
                         else if (rawLabel.includes('PROMOSI')) labelTitipan = 'PROMOSI';
 
                         Object.values(itemsT).forEach(tItem => {
@@ -793,8 +847,14 @@ window.cetakUlangArsip = async function(kategori, muatId) {
             chunkItems.forEach(item => {
                 if (item._isTitipan || item._isEmptySpacer) return;
                 const kelompok = typeof hitungKelompokKodeBarang === 'function' ? hitungKelompokKodeBarang(item.kodebarang) : 'Lainnya';
-                const qty = Number(item.qty_b || item.qty_utama || 0);
-                if (r.hasOwnProperty(kelompok)) r[kelompok] += qty;
+                
+                // Ambil qty, jika item DIY gunakan effective_qty yang sudah dibulatkan Math.ceil
+                let qty = Number(item.effective_qty !== undefined ? item.effective_qty : (item.qty_b || item.qty_utama || 0));
+                
+                const isDiyItem = (item.kodegudang === 'DIY' || kelompok === 'DIY');
+                const rKey = isDiyItem ? 'DIY' : kelompok;
+
+                if (r.hasOwnProperty(rKey)) r[rKey] += qty;
                 totalHalaman += qty;
             });
 
@@ -874,7 +934,7 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                                             <td style="padding: 3px 6px; border: none;">
                                                 <div style="display: flex;">
                                                     <span style="width: 95px; display: inline-block;">Tanggal Muat</span>
-                                                    <span>: ${tgl}</span>
+                                                    <span>: </span>
                                                 </div>
                                             </td>
                                         </tr>
@@ -1864,7 +1924,7 @@ window.cetakCeklistMuat = function() {
 
         function normalizeCustomerName(rawName) {
             let clean = String(rawName || '').toUpperCase();
-            clean = clean.replace(/\bMT\b/g, '').replace(/[\/\-\_\.\s]+/g, '_').replace(/^_+|_+\$ /g, '');
+            clean = clean.replace(/\bMT\b/g, '').replace(/[\/\-\_\.\s]+/g, '_').replace(/^_+|_+\$/g, '');
             return clean;
         }
 
@@ -1928,83 +1988,7 @@ window.cetakCeklistMuat = function() {
             }
         });
 
-        // 2. Pisahkan Titipan: TINGGALAN & DIY masuk ke muatan utama, HRD & PROMOSI tetap di titipan
-        const titipanDataObj = {};
-        if (Array.isArray(dataTitipanList) && dataTitipanList.length > 0) {
-            dataTitipanList.forEach((t) => {
-                const kategori = String(t.kategori || 'PROMOSI').toLowerCase();
-                const namaBarang = String(t.nama || '').replace(/[\/\s]+/g, '_').toUpperCase();
-                const qty = Number(t.qty || 0);
-
-                if (kategori.includes('tinggalan') || kategori.includes('diy')) {
-                    // Masukkan ke dalam muatan utama DO / FDN pertama yang ditemukan
-                    const targetGroup = Object.values(groupedDO)[0] || Object.values(groupedFDN)[0];
-                    if (targetGroup) {
-                        targetGroup.allItems.push({ kodebarang: namaBarang, qty_b: qty });
-                        targetGroup.total_muat_all += qty;
-                    }
-                } else {
-                    // Masukkan ke node titipan murni (HRD & PROMOSI)
-                    if (!titipanDataObj[kategori]) {
-                        titipanDataObj[kategori] = {};
-                    }
-                    const titipanKey = `${namaBarang}_${qty}`;
-                    titipanDataObj[kategori][titipanKey] = {
-                        namabarang: namaBarang,
-                        qty: qty
-                    };
-                }
-            });
-        }
-
-        // Helper rekap kelompok
-        function generateRekapPayload(itemsArray) {
-            let rekap = {
-                'DIY': 0, 'MTR': 0, 'PDR': 0, 
-                'MRR_CRR': 0, 'MRR_CRR_EA': 0, 
-                'MOR_MOB': 0, 'MP_LTGR_MTGR': 0, 
-                'MJR': 0, 'LAINNYA': 0
-            };
-
-            itemsArray.forEach(item => {
-                const kelompok = typeof hitungKelompokKodeBarang === 'function' ? hitungKelompokKodeBarang(item.kodebarang) : 'LAINNYA';
-                let rtdbKey = 'LAINNYA';
-                if (kelompok === 'DIY') rtdbKey = 'DIY';
-                else if (kelompok === 'MTR') rtdbKey = 'MTR';
-                else if (kelompok === 'PDR') rtdbKey = 'PDR';
-                else if (kelompok === 'MRR/CRR') rtdbKey = 'MRR_CRR';
-                else if (kelompok === 'MRR/CRR EA') rtdbKey = 'MRR_CRR_EA';
-                else if (kelompok === 'MOR/MOB') rtdbKey = 'MOR_MOB';
-                else if (kelompok === 'MP/LTGR/MTGR') rtdbKey = 'MP_LTGR_MTGR';
-                else if (kelompok === 'MJR') rtdbKey = 'MJR';
-
-                if (rekap.hasOwnProperty(rtdbKey)) {
-                    rekap[rtdbKey] += Number(item.qty_b || 0);
-                } else {
-                    rekap['LAINNYA'] += Number(item.qty_b || 0);
-                }
-            });
-            return rekap;
-        }
-
-        // 3. Simpan DO ke RTDB
-        Object.keys(groupedDO).forEach((muatId) => {
-            const group = groupedDO[muatId];
-            const dbRef = firebase.database().ref(`ceklist_muat/arsip_cetak/ceklist_do/${muatId}`);
-            const rekapHasil = generateRekapPayload(group.allItems);
-
-            const finalPayload = Object.assign({
-                meta: group.meta
-            }, group.payloadDO, {
-                rekap: rekapHasil,
-                titipan: titipanDataObj,
-                total_muat_keseluruhan: group.total_muat_all
-            });
-
-            savedPromises.push(dbRef.set(finalPayload));
-        });
-
-        // 4. Simpan FDN ke RTDB
+        // 2. Kelompokkan data FDN DIUCAPKAN LEBIH AWAL agar targetGroup bisa mendeteksinya
         const groupedFDN = {};
         keysFDN.forEach((key) => {
             const item = cacheCeklistFDN[key];
@@ -2057,6 +2041,75 @@ window.cetakCeklistMuat = function() {
             groupedFDN[muatId].total_muat_all += totalMuatFDN;
         });
 
+        // 3. Simpan SEMUA jenis titipan ke dalam node titipanDataObj secara murni
+        const titipanDataObj = {};
+        if (Array.isArray(dataTitipanList) && dataTitipanList.length > 0) {
+            dataTitipanList.forEach((t) => {
+                const rawKat = String(t.kategori || 'PROMOSI').toLowerCase();
+                const kategoriClean = rawKat.replace(/[\/\s]+/g, '_').toUpperCase();
+                
+                const namaBarang = String(t.nama || '').replace(/[\/\s]+/g, '_').toUpperCase();
+                const rawQty = Number(t.qty || 0); // QTY Asli
+
+                if (!titipanDataObj[kategoriClean]) {
+                    titipanDataObj[kategoriClean] = {};
+                }
+                const titipanKey = `${namaBarang}_${rawQty}`;
+                titipanDataObj[kategoriClean][titipanKey] = {
+                    namabarang: namaBarang,
+                    qty: rawQty
+                };
+            });
+        }
+
+        // Helper rekap kelompok
+        function generateRekapPayload(itemsArray) {
+            let rekap = {
+                'DIY': 0, 'MTR': 0, 'PDR': 0, 
+                'MRR_CRR': 0, 'MRR_CRR_EA': 0, 
+                'MOR_MOB': 0, 'MP_LTGR_MTGR': 0, 
+                'MJR': 0, 'LAINNYA': 0
+            };
+
+            itemsArray.forEach(item => {
+                const kelompok = typeof hitungKelompokKodeBarang === 'function' ? hitungKelompokKodeBarang(item.kodebarang) : 'LAINNYA';
+                let rtdbKey = 'LAINNYA';
+                if (kelompok === 'DIY') rtdbKey = 'DIY';
+                else if (kelompok === 'MTR') rtdbKey = 'MTR';
+                else if (kelompok === 'PDR') rtdbKey = 'PDR';
+                else if (kelompok === 'MRR/CRR') rtdbKey = 'MRR_CRR';
+                else if (kelompok === 'MRR/CRR EA') rtdbKey = 'MRR_CRR_EA';
+                else if (kelompok === 'MOR/MOB') rtdbKey = 'MOR_MOB';
+                else if (kelompok === 'MP/LTGR/MTGR') rtdbKey = 'MP_LTGR_MTGR';
+                else if (kelompok === 'MJR') rtdbKey = 'MJR';
+
+                if (rekap.hasOwnProperty(rtdbKey)) {
+                    rekap[rtdbKey] += Number(item.qty_b || 0);
+                } else {
+                    rekap['LAINNYA'] += Number(item.qty_b || 0);
+                }
+            });
+            return rekap;
+        }
+
+        // 4. Simpan DO ke RTDB
+        Object.keys(groupedDO).forEach((muatId) => {
+            const group = groupedDO[muatId];
+            const dbRef = firebase.database().ref(`ceklist_muat/arsip_cetak/ceklist_do/${muatId}`);
+            const rekapHasil = generateRekapPayload(group.allItems);
+
+            const finalPayload = Object.assign({
+                meta: group.meta
+            }, group.payloadDO, {
+                rekap: rekapHasil,
+                titipan: titipanDataObj,
+                total_muat_keseluruhan: group.total_muat_all
+            });
+
+            savedPromises.push(dbRef.set(finalPayload));
+        });
+
+        // 5. Simpan FDN ke RTDB
         Object.keys(groupedFDN).forEach((muatId) => {
             const group = groupedFDN[muatId];
             const dbRef = firebase.database().ref(`ceklist_muat/arsip_cetak/ceklist_fdn/${muatId}`);
@@ -2073,9 +2126,9 @@ window.cetakCeklistMuat = function() {
             savedPromises.push(dbRef.set(finalPayload));
         });
 
-        // 5. Eksekusi Simpan & Reset UI
+        // 6. Eksekusi Simpan & Reset UI
         Promise.all(savedPromises).then(() => {
-            if (typeof miuiAlert === 'function') miuiAlert("Arsip cetak berhasil disimpan!");
+            if (typeof miuiAlert === 'function') miuiAlert("Arsip cetak beserta titipan berhasil disimpan!");
             
             cacheCeklistDO = {};
             cacheCeklistFDN = {};
