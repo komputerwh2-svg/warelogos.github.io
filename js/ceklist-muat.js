@@ -702,8 +702,13 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                         Object.values(itemsT).forEach(tItem => {
                             const qtyT = Number(tItem.qty || tItem.qty_b || tItem.qty_utama || 0);
                             totalQtyTitipan += qtyT;
+
+                            // Ambil nama barang mentah dan bersihkan karakter underscore (_) menjadi spasi
+                            let namaBarangRaw = tItem.namabarang || tItem.kodebarang || kTitipan;
+                            let namaBarangClean = String(namaBarangRaw).replace(/_/g, ' ');
+
                             titipanMurniArray.push({
-                                kodebarang: tItem.namabarang || tItem.kodebarang || kTitipan,
+                                kodebarang: namaBarangClean, // Sudah bersih tanpa tanda _
                                 qty_b: qtyT,
                                 kodegudang: labelTitipan,
                                 _isTitipan: true // Titipan Murni (HRD / PROMOSI)
@@ -714,11 +719,11 @@ window.cetakUlangArsip = async function(kategori, muatId) {
             });
         });
 
-        // --- GABUNGKAN DENGAN TITIPAN MURNI (DIJARKAN 5 BARIS KOSONG) ---
+        // --- GABUNGKAN DENGAN TITIPAN MURNI (DIJARKAN 2 BARIS KOSONG) ---
         let combinedRows = [...coreItemsCombined];
         if (titipanMurniArray.length > 0) {
-            for (let i = 0; i < 5; i++) {
-                combinedRows.push({ _isEmptySpacer: true }); // Jarak 5 baris kosong
+            for (let i = 0; i < 2; i++) {
+                combinedRows.push({ _isEmptySpacer: true }); // Jarak 2 baris kosong
             }
             combinedRows = combinedRows.concat(titipanMurniArray);
         }
@@ -748,8 +753,8 @@ window.cetakUlangArsip = async function(kategori, muatId) {
         const nowFormatted = new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'medium' });
         const logoUrl = "https://raw.githubusercontent.com/komputerwh2-svg/warelogos.github.io/main/uth.png";
 
-        // --- CHUNKING DATA: Maksimal 50 item per halaman ---
-        const ITEMS_PER_PAGE = 50;
+        // --- CHUNKING DATA: Maksimal 45 item per halaman (menyesuaikan font 10pt) ---
+        const ITEMS_PER_PAGE = 45;
         const pageChunks = [];
         for (let i = 0; i < combinedRows.length; i += ITEMS_PER_PAGE) {
             pageChunks.push(combinedRows.slice(i, i + ITEMS_PER_PAGE));
@@ -767,7 +772,7 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                 // Jika baris kosong pemisah, jangan tampilkan nomor urut
                 if (row._isEmptySpacer) {
                     rowsHtml += `
-                        <tr style="border-bottom: 1px solid #cbd5e1; font-size: 8.5pt;">
+                        <tr style="border-bottom: 1px solid #cbd5e1; font-size: 10pt;">
                             <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center;">&nbsp;</td>
                             <td style="border-right: 1px solid #000; padding: 1px 2px;"></td>
                             <td style="border-right: 1px solid #000; padding: 1px 2px;"></td>
@@ -786,16 +791,18 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                 // Render Baris Titipan Murni (HRD & PROMOSI)
                 if (row._isTitipan) {
                     rowsHtml += `
-                        <tr style="border-bottom: 1px solid #94a3b8; font-size: 8.5pt;">
-                            <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center; width: 28px;">${validItemCounter}</td>
-                            <td style="border-right: 1px solid #000; padding: 1px 5px; font-weight: bold; font-size: 9pt;">${row.kodebarang}</td>
-                            <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center; width: 24px;"></td>
-                            <td style="border-right: 1px solid #000; padding: 1px 5px; text-align: left; font-weight: bold; width: 45px; font-size: 9pt;">${row.qty_b}</td>
-                            <td style="border-right: 1px solid #000; padding: 1px 5px; text-align: left; width: 90px; font-size: 8pt; font-weight: bold;">
-                                ${row.kodegudang}
+                        <tr style="border-bottom: 1px solid #94a3b8; font-size: 10pt;">
+                            <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center; width: 32px;">${validItemCounter}</td>
+                            <td style="border-right: 1px solid #000; padding: 1px 5px; font-size: 10pt; font-weight: bold; font-family: Trebuchet MS;">${row.kodebarang}</td>
+                            <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center; width: 26px;"></td>
+                            <td style="border-right: 1px solid #000; padding: 1px 5px; text-align: center; width: 50px; font-size: 10pt; font-weight: bold; font-family: Trebuchet MS;">
+                                ${row.qty_b}
+                            </td>
+                            <td style="border-right: 1px solid #000; padding: 1px 5px; text-align: center; width: 90px; font-size: 10pt;">
+                                <span style="font-weight: bold; font-family: Trebuchet MS;">${row.kodegudang}</span>
                             </td>
                             <td style="border-right: 1px solid #000; padding: 1px 2px;"></td>
-                            <td style="padding: 1px 2px; width: 60px;"></td>
+                            <td style="padding: 1px 2px; width: 65px;"></td>
                         </tr>
                     `;
                     return;
@@ -805,30 +812,32 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                 let digits = String(row._nobuktiAsli || '').replace(/\D/g, '');
                 let subNoBukti = digits.length >= 5 ? digits.slice(-5) : digits;
                 let gudangTeks = row.kodegudang || 'WH-2';
-                let sourceTag = (row._nobuktiAsli === 'TITIPAN') ? '' : `<span style="font-family: monospace; font-size: 7pt; color: #334155;">(${subNoBukti})</span>`;
+                let sourceTag = (row._nobuktiAsli === 'TITIPAN') ? '' : `<span style="font-family: Trebuchet MS; font-size: 6pt; color: #334155;">(${subNoBukti})</span>`;
 
                 // Tentukan tampilan QTY: jika ada display_qty (untuk DIY), gunakan itu; jika tidak, ambil qty biasa
                 let qtyTampil = row.display_qty ? row.display_qty : (row.qty_b || row.qty_utama || 0);
 
                 rowsHtml += `
-                    <tr style="border-bottom: 1px solid #94a3b8; font-size: 8.5pt;">
-                        <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center; width: 28px;">${validItemCounter}</td>
-                        <td style="border-right: 1px solid #000; padding: 1px 5px; font-weight: bold; font-size: 9pt;">${row.kodebarang}</td>
-                        <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center; width: 24px;"></td>
-                        <td style="border-right: 1px solid #000; padding: 1px 5px; text-align: left; font-weight: bold; width: 45px; font-size: 9pt;">${qtyTampil}</td>
-                        <td style="border-right: 1px solid #000; padding: 1px 5px; text-align: left; width: 90px; font-size: 8pt;">
-                            <span style="font-weight: bold;">${gudangTeks}</span> ${sourceTag}
+                    <tr style="border-bottom: 1px solid #94a3b8; font-size: 10pt;">
+                        <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center; width: 32px;">${validItemCounter}</td>
+                        <td style="border-right: 1px solid #000; padding: 1px 5px; font-size: 10pt; font-weight: bold; font-family: Trebuchet MS;">${row.kodebarang}</td>
+                        <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center; width: 26px;"></td>
+                        <td style="border-right: 1px solid #000; padding: 1px 5px; text-align: center; width: 50px; font-size: 10pt; font-weight: bold; font-family: Trebuchet MS;">
+                            ${qtyTampil}
+                        </td>
+                        <td style="border-right: 1px solid #000; padding: 1px 5px; text-align: center; width: 90px; font-size: 10pt;">
+                            <span style="font-weight: bold; font-family: Trebuchet MS;">${gudangTeks}</span> ${sourceTag}
                         </td>
                         <td style="border-right: 1px solid #000; padding: 1px 2px;"></td>
-                        <td style="padding: 1px 2px; width: 60px;"></td>
+                        <td style="padding: 1px 2px; width: 65px;"></td>
                     </tr>
                 `;
             });
 
-            // Baris kosong penyeimbang agar tabel pas memenuhi 50 baris per halaman
+            // Baris kosong penyeimbang agar tabel pas memenuhi 45 baris per halaman
             for (let i = chunkItems.length; i < ITEMS_PER_PAGE; i++) {
                 rowsHtml += `
-                    <tr style="border-bottom: 1px solid #cbd5e1; font-size: 8.5pt;">
+                    <tr style="border-bottom: 1px solid #cbd5e1; font-size: 10pt;">
                         <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center;">&nbsp;</td>
                         <td style="border-right: 1px solid #000; padding: 1px 2px;"></td>
                         <td style="border-right: 1px solid #000; padding: 1px 2px;"></td>
@@ -841,7 +850,16 @@ window.cetakUlangArsip = async function(kategori, muatId) {
             }
 
             // --- HITUNG REKAP KELOMPOK (Mencakup DO/FDN, TINGGALAN, dan DIY) ---
-            let r = { 'DIY': 0, 'MTR': 0, 'PDR': 0, 'MRR/CRR': 0, 'MRR/CRR EA': 0, 'MOR/MOB': 0, 'MP/LTGR/MTGR': 0, 'MJR': 0 };
+            let r = { 
+                'DIY': 0, 
+                'MTR/PDR': 0, 
+                'CRR/THR': 0, 
+                'MRR/CRR EA': 0, 
+                'MRR EA': 0, 
+                'MOR/MOB': 0, 
+                'MP/LTGR/MTGR': 0, 
+                'MJR': 0 
+            };
             let totalHalaman = 0;
             
             chunkItems.forEach(item => {
@@ -866,45 +884,54 @@ window.cetakUlangArsip = async function(kategori, muatId) {
             });
 
             let infoTotalTeks = (pageChunks.length > 1) 
-                ? `${totalHalaman} KRT Dari Total Muatan : ${totalSemuaItem} KRT` 
-                : `${totalHalaman} KRT Dari Total Muatan : ${totalSemuaItem} KRT`;
+                ? `${totalHalaman} KRT / Total Muat : ${totalSemuaItem} KRT` 
+                : `${totalHalaman} KRT / Total Muat : ${totalSemuaItem} KRT`;
 
             const rekapHtml = `
-                <div style="border-top: 2px solid #000; font-family: 'Century Gothic', Arial, sans-serif; font-size: 9.5pt; margin-top: 2px;">
+                <div style="border-top: 2px solid #000; font-family: 'Trebuchet MS', Arial, sans-serif; font-size: 10pt; margin-top: 2px;">
                     <table style="width: 100%; border-collapse: collapse; border-bottom: 1px solid #000;">
                         <tr>
-                            <td style="width: 320px; border-right: 1px solid #000; padding: 0; vertical-align: top;">
-                                <div style="border-bottom: 1px solid #000; padding: 5px 6px; font-weight: bold; font-size: 8.5pt; line-height: 1.3;">
+                            <!-- Kolom Kiri dengan lebar 276px, menggunakan border vertikal tepat di bawah garis QTY -->
+                            <td style="width: 276px; border-right: 1px solid #000; padding: 0; vertical-align: top;">
+                                <table style="width: 100%; border-collapse: collapse;">
+                                    <tr style="border-bottom: 1px solid #000;">
+                                        <td style="padding: 4px 6px; font-weight: bold; font-size: 10pt; text-align: left;">TOTAL CHECKLIST</td>
+                                        <td style="padding: 4px 6px; font-weight: bold; font-size: 12pt; text-align: center; width: 55px; border-left: 1px solid #000; text-decoration: underline;">
+                                            ${totalHalaman}
+                                        </td>
+                                    </tr>
+                                </table>
+                                <div style="padding: 4px 6px; font-weight: bold; font-size: 8.5pt; line-height: 1.2;">
                                     Total Titipan : ${totalQtyTitipan > 0 ? totalQtyTitipan + ' KRT' : '-'}
                                 </div>
-                                <div style="padding: 5px 6px; font-weight: bold; font-size: 8.5pt; line-height: 1.3;">
+                                <div style="padding: 2px 6px 4px 6px; font-weight: bold; font-size: 8.5pt; line-height: 1.2;">
                                     Total Checklist : ${infoTotalTeks}
                                 </div>
                             </td>
-                            <td style="border-right: 1px solid #000; padding: 4px 5px; font-style: italic; font-size: 7pt; vertical-align: top; width: 210px; line-height: 1.2;">
+                            <td style="border-right: 1px solid #000; padding: 4px 5px; font-style: italic; font-size: 7pt; vertical-align: top; width: 170px; line-height: 1.2;">
                                 Barang yang telah dimuat di armada dan diperiksa bersama, setelah meninggalkan gudang sepenuhnya menjadi tanggung jawab driver.
                             </td>
                             <td style="border-right: 1px solid #000; padding: 4px; text-align: center; vertical-align: top;">
-                                <div style="font-weight: bold; margin-bottom: 26px;">TTD Checker</div>
+                                <div style="font-weight: bold; margin-bottom: 22px;">TTD Checker</div>
                                 <span style="border-top: 1px solid #000; display: inline-block; width: 110px;"></span>
                             </td>
                             <td style="padding: 4px; text-align: center; vertical-align: top;">
-                                <div style="font-weight: bold; margin-bottom: 26px;">TTD Driver</div>
+                                <div style="font-weight: bold; margin-bottom: 22px;">TTD Driver</div>
                                 <span style="border-top: 1px solid #000; display: inline-block; width: 110px;"></span>
                             </td>
                         </tr>
                     </table>
                     <div style="border-bottom: 1px solid #000;">
-                        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid #000; text-align: center; font-size: 7pt;">
-                            <div style="border-right: 1px solid #000; padding: 2px;">DIY = ${r['DIY'] > 0 ? r['DIY'] : '-'}</div>
-                            <div style="border-right: 1px solid #000; padding: 2px;">MRR/CRR EA = ${r['MRR/CRR EA'] > 0 ? r['MRR/CRR EA'] : '-'}</div>
-                            <div style="border-right: 1px solid #000; padding: 2px;">CRR/MRR/THR = ${r['MRR/CRR'] > 0 ? r['MRR/CRR'] : '-'}</div>
+                        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid #000; text-align: center; font-size: 8pt; font-family: 'Trebuchet MS', Arial, sans-serif;">
+                            <div style="border-right: 1px solid #0000008e; padding: 2px;">DIY = ${r['DIY'] > 0 ? r['DIY'] : '-'}</div>
+                            <div style="border-right: 1px solid #0000008e; padding: 2px;">MRR/CRR EA = ${r['MRR/CRR EA'] > 0 ? r['MRR/CRR EA'] : '-'}</div>
+                            <div style="border-right: 1px solid #0000008e; padding: 2px;">CRR/THR = ${r['CRR/THR'] > 0 ? r['CRR/THR'] : '-'}</div>
                             <div style="padding: 2px;">MOR/MOB = ${r['MOR/MOB'] > 0 ? r['MOR/MOB'] : '-'}</div>
                         </div>
-                        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); text-align: center; font-size: 7pt;">
-                            <div style="border-right: 1px solid #000; padding: 2px;">MTR = ${r['MTR'] > 0 ? r['MTR'] : '-'}</div>
-                            <div style="border-right: 1px solid #000; padding: 2px;">PDR = ${r['PDR'] > 0 ? r['PDR'] : '-'}</div>
-                            <div style="border-right: 1px solid #000; padding: 2px;">MJR = ${r['MJR'] > 0 ? r['MJR'] : '-'}</div>
+                        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); text-align: center; font-size: 8pt; font-family: 'Trebuchet MS', Arial, sans-serif;">
+                            <div style="border-right: 1px solid #0000008e; padding: 2px;">MTR/PDR = ${r['MTR/PDR'] > 0 ? r['MTR/PDR'] : '-'}</div>
+                            <div style="border-right: 1px solid #0000008e; padding: 2px;">MRR EA = ${r['MRR EA'] > 0 ? r['MRR EA'] : '-'}</div>
+                            <div style="border-right: 1px solid #0000008e; padding: 2px;">MJR = ${r['MJR'] > 0 ? r['MJR'] : '-'}</div>
                             <div style="padding: 2px;">MP/LTGR/MTGR = ${r['MP/LTGR/MTGR'] > 0 ? r['MP/LTGR/MTGR'] : '-'}</div>
                         </div>
                     </div>
@@ -915,7 +942,7 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                 <div class="page">
                     <div>
                         <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #000; padding-bottom: 3px; margin-bottom: 5px;">
-                            <div style="width: 120px;"><img src="${logoUrl}" class="logo-kop" style="height: 25px; object-fit: contain;"></div>
+                            <div style="width: 120px;"><img src="${logoUrl}" class="logo-kop" style="height: 30px; object-fit: contain;"></div>
                             <h2 style="font-size: 14pt; font-weight: 900; text-transform: uppercase; margin: 0; text-align: center; flex-grow: 1; letter-spacing: 0.5px;">${headerTitle}</h2>
                             <div style="width: 160px; text-align: right; font-size: 6pt; font-family: monospace; line-height: 1.2;">print date : ${nowFormatted}</div>
                         </div>
@@ -924,7 +951,7 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                             <tr>
                                 <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 3px 6px; width: 50%;">
                                     <div style="display: flex;">
-                                        <span style="width: 110px; display: inline-block;">Ekspedisi & Nopol</span>
+                                        <span style="width: 110px; display: inline-block; font-family: Century Gothic;">Ekspedisi & Nopol</span>
                                         <span>: </span>
                                     </div>
                                 </td>
@@ -933,7 +960,7 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                                         <tr>
                                             <td style="padding: 3px 6px; border: none;">
                                                 <div style="display: flex;">
-                                                    <span style="width: 95px; display: inline-block;">Tanggal Muat</span>
+                                                    <span style="width: 95px; display: inline-block; font-family: Century Gothic;">Tanggal Muat</span>
                                                     <span>: </span>
                                                 </div>
                                             </td>
@@ -944,7 +971,7 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                             <tr>
                                 <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 3px 6px;">
                                     <div style="display: flex;">
-                                        <span style="width: 110px; display: inline-block;">Nama Driver</span>
+                                        <span style="width: 110px; display: inline-block; font-family: Century Gothic;">Nama Driver</span>
                                         <span>: </span>
                                     </div>
                                 </td>
@@ -953,13 +980,13 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                                         <tr>
                                             <td style="border-right: 1px solid #000; padding: 3px 6px; width: 50%; border: none;">
                                                 <div style="display: flex;">
-                                                    <span style="width: 95px; display: inline-block;">Jam Muat</span>
+                                                    <span style="width: 95px; display: inline-block; font-family: Century Gothic;">Jam Muat</span>
                                                     <span>: </span>
                                                 </div>
                                             </td>
                                             <td style="padding: 3px 6px; width: 50%; border: none;">
                                                 <div style="display: flex;">
-                                                    <span style="width: 95px; display: inline-block;">Jam Selesai</span>
+                                                    <span style="width: 95px; display: inline-block; font-family: Century Gothic;">Jam Selesai</span>
                                                     <span>: </span>
                                                 </div>
                                             </td>
@@ -969,24 +996,24 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                             </tr>
                             <tr>
                                 <td style="border-right: 1px solid #000; padding: 3px 6px; vertical-align: top;">
-                                    <div style="margin-bottom: 2px;">Nomor DO & Kota Tujuan :</div>
-                                    <div style="font-weight: bold; font-size: 10pt; font-family: monospace; padding-top: 2px;">${formattedNoDoc}</div>
+                                    <div style="margin-bottom: 2px; font-family: Century Gothic;">Nomor DO & Kota Tujuan :</div>
+                                    <div style="font-weight: bold; font-size: 11pt; font-family: Trebuchet MS; padding-top: 2px;">${formattedNoDoc}</div>
                                 </td>
                                 <td style="padding: 0px; vertical-align: top;">
                                     <table style="width: 100%; border-collapse: collapse;">
                                         <tr>
-                                            <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 3px 6px; width: 50%; border-top: none; border-left: none;">
+                                            <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 3px 6px; width: 50%; border-top: none; border-left: none; font-family: Century Gothic;">
                                                 Driver Check : &nbsp; Ya &nbsp;&nbsp; Tidak
                                             </td>
                                             <td style="border-bottom: 1px solid #000; padding: 3px 6px; width: 50%; border-top: none; border-left: none; border-right: none;">
                                                 <div style="display: flex;">
-                                                    <span style="width: 95px; display: inline-block;">Muat Pintu</span>
+                                                    <span style="width: 95px; display: inline-block; font-family: Century Gothic;">Muat Pintu</span>
                                                     <span>: </span>
                                                 </div>
                                             </td>
                                         </tr>
                                         <tr>
-                                            <td colspan="2" style="padding: 4px 6px; border: none; font-weight: bold; font-size: 10pt;">
+                                            <td colspan="2" style="padding: 4px 6px; border: none; font-weight: bold; font-size: 11pt;">
                                                 ${customerOrTujuan}
                                             </td>
                                         </tr>
@@ -997,7 +1024,7 @@ window.cetakUlangArsip = async function(kategori, muatId) {
 
                         <table style="border: 1px solid #000;">
                             <thead>
-                                <tr style="background-color: #fef08a; text-transform: uppercase; font-weight: 800; text-align: center; font-size: 10pt;">
+                                <tr style="background-color: #e6e6e6; text-align: center; font-size: 13pt; font-family: 'Trebuchet MS'; font-weight: normal;">
                                     <th style="border: 1px solid #000; padding: 2px; width: 28px;">No</th>
                                     <th style="border: 1px solid #000; padding: 2px; width: 145px;">Kode Rasa</th>
                                     <th style="border: 1px solid #000; padding: 2px; width: 24px;">v</th>
@@ -1015,7 +1042,7 @@ window.cetakUlangArsip = async function(kategori, muatId) {
 
                     <div>
                         ${rekapHtml}
-                        <div style="display: flex; justify-content: space-between; font-size: 7pt; font-family: monospace; margin-top: 4px; color: #475569;">
+                        <div style="display: flex; justify-content: space-between; font-size: 8pt; font-family: Arial; margin-top: 4px; color: #475569;">
                             <span>No. Form : 25.UM/05-02-25/01/0</span>
                             <span>Halaman ${pageIdx + 1} dari ${pageChunks.length}</span>
                         </div>
@@ -1035,7 +1062,7 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                         margin: 5mm 4mm 4mm 4mm;
                     }
                     body { 
-                        font-family: 'Century Gothic', Arial, sans-serif; 
+                        font-family: 'Trebuchet MS', Arial, sans-serif; 
                         font-size: 10pt; 
                         color: #000; 
                         margin: 0; 
@@ -1774,27 +1801,32 @@ function renderTabelItemMuatOtomatis() {
     }
 }
 
-// Fungsi Helper Menentukan Kelompok Sesuai Aturan
+// Fungsi Helper Menentukan Kelompok Sesuai Aturan Terbaru
 function hitungKelompokKodeBarang(kodeBarang) {
     const kode = String(kodeBarang || '').toUpperCase().trim();
     
     if (kode.startsWith('MRL') || kode.startsWith('MTL') || kode.startsWith('ISEL') || kode.startsWith('MEL')) {
         return 'DIY';
     }
-    if (kode.startsWith('MTR')) {
-        return 'MTR';
-    }
-    if (kode.startsWith('PDR')) {
-        return 'PDR';
+    
+    // MTR dan PDR digabung menjadi MTR/PDR
+    if (kode.startsWith('MTR') || kode.startsWith('PDR')) {
+        return 'MTR/PDR';
     }
     
-    const isMRR_CRR_THR = kode.startsWith('MRR') || kode.startsWith('CRR') || kode.startsWith('THR');
-    if (isMRR_CRR_THR) {
-        if (kode.endsWith('EA')) {
-            return 'MRR/CRR EA';
-        } else {
-            return 'MRR/CRR';
-        }
+    // MRR berakhiran EA masuk ke grup "MRR EA"
+    if (kode.startsWith('MRR') && kode.endsWith('EA')) {
+        return 'MRR EA';
+    }
+
+    // MRR murni (tanpa EA) atau CRR berakhiran EA masuk ke "MRR/CRR EA"
+    if (kode.startsWith('MRR') || (kode.startsWith('CRR') && kode.endsWith('EA'))) {
+        return 'MRR/CRR EA';
+    }
+
+    // CRR murni (tanpa EA) atau THR masuk ke "CRR/THR"
+    if (kode.startsWith('CRR') || kode.startsWith('THR')) {
+        return 'CRR/THR';
     }
     
     if (kode.startsWith('MOR') || kode.startsWith('MOB')) {
@@ -1810,11 +1842,17 @@ function hitungKelompokKodeBarang(kodeBarang) {
     return 'Lainnya';
 }
 
-// Perbarui fungsi updateRekapKelompok dengan parameter targetTotal (grandTotalQty)
+// Fungsi Update Rekap Qty Kelompok Barang
 window.updateRekapKelompok = function(listBarangObj, targetTotal = 0) {
     let rekap = {
-        'DIY': 0, 'MTR': 0, 'PDR': 0, 'MRR/CRR': 0,
-        'MRR/CRR EA': 0, 'MOR/MOB': 0, 'MP/LTGR/MTGR': 0, 'MJR': 0
+        'DIY': 0, 
+        'MTR/PDR': 0, 
+        'CRR/THR': 0,
+        'MRR/CRR EA': 0, 
+        'MRR EA': 0,
+        'MOR/MOB': 0, 
+        'MP/LTGR/MTGR': 0, 
+        'MJR': 0
     };
 
     let totalSemuaKelompok = 0;
@@ -1822,7 +1860,7 @@ window.updateRekapKelompok = function(listBarangObj, targetTotal = 0) {
 
     itemsArray.forEach(item => {
         const kode = item.kodebarang || item.kode || '';
-        const qty = Number(item.qty_b || item.qty || 0);
+        const qty = Number(item.qty_b || item.qty || item.qty_utama || 0);
         const kelompok = hitungKelompokKodeBarang(kode);
 
         if (rekap.hasOwnProperty(kelompok)) {
@@ -1831,12 +1869,12 @@ window.updateRekapKelompok = function(listBarangObj, targetTotal = 0) {
         totalSemuaKelompok += qty;
     });
 
-    // Render Nilai ke Kotak Grid
+    // Render Nilai ke Kotak Grid (Pastikan ID elemen di HTML Anda sudah disesuaikan)
     document.getElementById('val-grp-diy').innerText = rekap['DIY'] > 0 ? rekap['DIY'] : '-';
-    document.getElementById('val-grp-mtr').innerText = rekap['MTR'] > 0 ? rekap['MTR'] : '-';
-    document.getElementById('val-grp-pdr').innerText = rekap['PDR'] > 0 ? rekap['PDR'] : '-';
-    document.getElementById('val-grp-mrrcrr').innerText = rekap['MRR/CRR'] > 0 ? rekap['MRR/CRR'] : '-';
+    document.getElementById('val-grp-mtrpdr').innerText = rekap['MTR/PDR'] > 0 ? rekap['MTR/PDR'] : '-';
+    document.getElementById('val-grp-crrthr').innerText = rekap['CRR/THR'] > 0 ? rekap['CRR/THR'] : '-';
     document.getElementById('val-grp-mrrcrrea').innerText = rekap['MRR/CRR EA'] > 0 ? rekap['MRR/CRR EA'] : '-';
+    document.getElementById('val-grp-mrrea').innerText = rekap['MRR EA'] > 0 ? rekap['MRR EA'] : '-';
     document.getElementById('val-grp-mormob').innerText = rekap['MOR/MOB'] > 0 ? rekap['MOR/MOB'] : '-';
     document.getElementById('val-grp-mpltgrmtgr').innerText = rekap['MP/LTGR/MTGR'] > 0 ? rekap['MP/LTGR/MTGR'] : '-';
     document.getElementById('val-grp-mjr').innerText = rekap['MJR'] > 0 ? rekap['MJR'] : '-';
@@ -1844,7 +1882,7 @@ window.updateRekapKelompok = function(listBarangObj, targetTotal = 0) {
     const totalQtyEl = document.getElementById('rekap-total-qty');
     if (totalQtyEl) totalQtyEl.innerText = `TOTAL = ${totalSemuaKelompok} KRT`;
 
-    // Validasi Pencocokan dengan Total Keseluruhan di Atas
+    // Validasi Pencocokan dengan Total Keseluruhan
     const statusBadge = document.getElementById('status-rekap-kelompok');
     if (statusBadge) {
         if (targetTotal === 0 && totalSemuaKelompok === 0) {
@@ -1860,51 +1898,6 @@ window.updateRekapKelompok = function(listBarangObj, targetTotal = 0) {
             statusBadge.className = 'text-[8px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-bold';
         }
     }
-};
-
-// Fungsi Update Rekap Qty Kelompok Barang di Bawah Tabel Kanan
-window.updateRekapKelompok = function(listBarangObj) {
-    let rekap = {
-        'DIY': 0, 
-        'MTR': 0, 
-        'PDR': 0, 
-        'MRR/CRR': 0,
-        'MRR/CRR EA': 0, 
-        'MOR/MOB': 0, 
-        'MP/LTGR/MTGR': 0, 
-        'MJR': 0
-    };
-
-    let totalSemua = 0;
-
-    // Iterasi data barang (bisa berupa object dari cache atau array)
-    const itemsArray = Array.isArray(listBarangObj) ? listBarangObj : Object.values(listBarangObj || {});
-
-    itemsArray.forEach(item => {
-        // Sesuaikan properti penamaan kode barang pada objek data Anda (misal: kodebarang atau kode)
-        const kode = item.kodebarang || item.kode || '';
-        const qty = Number(item.qty_b || item.qty || item.qty_utama || 0);
-        
-        const kelompok = hitungKelompokKodeBarang(kode);
-
-        if (rekap.hasOwnProperty(kelompok)) {
-            rekap[kelompok] += qty;
-        }
-        totalSemua += qty;
-    });
-
-    // Perbarui Tampilan DOM Berdasarkan ID di HTML
-    document.getElementById('val-grp-diy').innerText = rekap['DIY'] > 0 ? rekap['DIY'] : '-';
-    document.getElementById('val-grp-mtr').innerText = rekap['MTR'] > 0 ? rekap['MTR'] : '-';
-    document.getElementById('val-grp-pdr').innerText = rekap['PDR'] > 0 ? rekap['PDR'] : '-';
-    document.getElementById('val-grp-mrrcrr').innerText = rekap['MRR/CRR'] > 0 ? rekap['MRR/CRR'] : '-';
-    document.getElementById('val-grp-mrrcrrea').innerText = rekap['MRR/CRR EA'] > 0 ? rekap['MRR/CRR EA'] : '-';
-    document.getElementById('val-grp-mormob').innerText = rekap['MOR/MOB'] > 0 ? rekap['MOR/MOB'] : '-';
-    document.getElementById('val-grp-mpltgrmtgr').innerText = rekap['MP/LTGR/MTGR'] > 0 ? rekap['MP/LTGR/MTGR'] : '-';
-    document.getElementById('val-grp-mjr').innerText = rekap['MJR'] > 0 ? rekap['MJR'] : '-';
-    
-    const totalQtyEl = document.getElementById('rekap-total-qty');
-    if (totalQtyEl) totalQtyEl.innerText = `TOTAL = ${totalSemua} KRT`;
 };
 
 
