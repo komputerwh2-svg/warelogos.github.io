@@ -901,10 +901,10 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                                         </td>
                                     </tr>
                                 </table>
-                                <div style="padding: 4px 6px; font-weight: bold; font-size: 8.5pt; line-height: 1.2;">
+                                <div style="padding: 4px 6px; font-weight: bold; font-size: 8pt; line-height: 1.2;">
                                     Total Titipan : ${totalQtyTitipan > 0 ? totalQtyTitipan + ' KRT' : '-'}
                                 </div>
-                                <div style="padding: 2px 6px 4px 6px; font-weight: bold; font-size: 8.5pt; line-height: 1.2;">
+                                <div style="padding: 2px 6px 4px 6px; font-weight: bold; font-size: 8pt; line-height: 1.2;">
                                     Total Checklist : ${infoTotalTeks}
                                 </div>
                             </td>
@@ -1059,7 +1059,7 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                 <style>
                     @page { 
                         size: 215mm 330mm portrait; 
-                        margin: 5mm 4mm 4mm 4mm;
+                        margin: 5mm 5mm 5mm 5mm;
                     }
                     body { 
                         font-family: 'Trebuchet MS', Arial, sans-serif; 
@@ -1074,7 +1074,6 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                         display: flex; 
                         flex-direction: column; 
                         justify-content: space-between; 
-                        border: 1px solid #000; 
                         padding: 8px 10px; 
                         height: 321mm; 
                         box-sizing: border-box; 
@@ -1335,7 +1334,6 @@ window.importFDN = function() {
                     // Render ulang tampilan DO/FDN dan tabel item otomatis menggunakan fungsi yang benar
                     if (typeof renderDaftarDOPreview === 'function') renderDaftarDOPreview();
                     if (typeof renderTabelItemMuatOtomatis === 'function') renderTabelItemMuatOtomatis();
-                    miuiAlert("File FDN berhasil diimpor ke cache checklist!");
                 }
             };
             reader.readAsText(file);
@@ -1454,7 +1452,7 @@ window.prosesDataWHNB2 = function() {
     const itemRaw = itemTextarea.value.trim();
 
     if (!metaRaw) {
-        miuiAlert("Silakan paste Header/Metadata DO terlebih dahulu pada kolom atas!");
+        miuiAlert("Silakan paste dari DO Bosnet terlebih dahulu pada kolom atas!");
         return;
     }
 
@@ -1476,7 +1474,7 @@ window.prosesDataWHNB2 = function() {
     const matchTglMeta = metaRaw.match(/(\d{2}\/\d{2}\/\d{4})/);
     const metaTanggal = matchTglMeta ? matchTglMeta[1] : '';
 
-    let metaCustomer = 'PELANGGAN UMUM';
+    let metaCustomer = 'NAMA TUJUAN';
     const idxNoDoEnd = metaRaw.indexOf(metaNoDo) + metaNoDo.length;
     let sisaMeta = metaRaw.substring(idxNoDoEnd).trim();
     if (metaTanggal) {
@@ -1901,7 +1899,11 @@ window.updateRekapKelompok = function(listBarangObj, targetTotal = 0) {
 };
 
 
+// ==========================================
+// 2. FUNGSI UTAMA CETAK & SIMPAN CEKLIST MUAT
+// ==========================================
 window.cetakCeklistMuat = function() {
+    console.log("--> Eksekusi cetakCeklistMuat dipanggil.");
     const keysDO = Object.keys(cacheCeklistDO || {});
     const keysFDN = Object.keys(cacheCeklistFDN || {});
 
@@ -1911,14 +1913,16 @@ window.cetakCeklistMuat = function() {
         return;
     }
 
-    const prosesSimpanCeklist = function() {
+    const eksekusiSimpan = function() {
+        console.log("--> Memproses Penyimpanan Data ke Firebase...");
         const timestampNow = new Date().toISOString();
         let savedPromises = [];
 
         function normalizeCustomerName(rawName) {
             let clean = String(rawName || '').toUpperCase();
-            clean = clean.replace(/\bMT\b/g, '').replace(/[\/\-\_\.\s]+/g, '_').replace(/^_+|_+\$/g, '');
-            return clean;
+            return clean.replace(/\bMT\b/g, '')
+                        .replace(/[\/\-\_\.\s]+/g, '_')
+                        .replace(/^_+|_+\$/g, '');
         }
 
         // 1. Kelompokkan data DO
@@ -1934,14 +1938,8 @@ window.cetakCeklistMuat = function() {
 
                 if (!groupedDO[muatId]) {
                     groupedDO[muatId] = {
-                        meta: {
-                            tgl: item.meta.tgl,
-                            namacustomer: rawCust,
-                            timestamp_update: timestampNow
-                        },
-                        payloadDO: {},
-                        total_muat_all: 0,
-                        allItems: []
+                        meta: { tgl: item.meta.tgl, namacustomer: rawCust, timestamp_update: timestampNow },
+                        payloadDO: {}, total_muat_all: 0, allItems: []
                     };
                 }
 
@@ -1968,30 +1966,21 @@ window.cetakCeklistMuat = function() {
                     groupedDO[muatId].payloadDO[last5NoBukti].meta.total_muat += totalMuatDO;
                 } else {
                     groupedDO[muatId].payloadDO[last5NoBukti] = {
-                        meta: {
-                            nobukti: item.meta.nobukti,
-                            tgl: item.meta.tgl,
-                            total_muat: totalMuatDO
-                        },
+                        meta: { nobukti: item.meta.nobukti, tgl: item.meta.tgl, total_muat: totalMuatDO },
                         data: itemsData
                     };
                 }
-
                 groupedDO[muatId].total_muat_all += totalMuatDO;
             }
         });
 
-        // 2. Kelompokkan data FDN DIUCAPKAN LEBIH AWAL agar targetGroup bisa mendeteksinya
+        // 2. Kelompokkan data FDN
         const groupedFDN = {};
         keysFDN.forEach((key) => {
             const item = cacheCeklistFDN[key];
             const meta = item.meta || {};
-            
             const rawTgl = meta.tgl || '';
-            let tglPart = rawTgl.replace(/\//g, '_');
-            if (!tglPart || tglPart === '-') {
-                tglPart = '16_10_2026';
-            }
+            let tglPart = rawTgl.replace(/\//g, '_') || '19_10_2026';
 
             const rawCust = meta.namacustomer || key;
             const custNormalized = normalizeCustomerName(rawCust);
@@ -1999,14 +1988,8 @@ window.cetakCeklistMuat = function() {
 
             if (!groupedFDN[muatId]) {
                 groupedFDN[muatId] = {
-                    meta: {
-                        tgl: meta.tgl,
-                        namacustomer: rawCust,
-                        timestamp_update: timestampNow
-                    },
-                    payloadFDN: {},
-                    total_muat_all: 0,
-                    allItems: []
+                    meta: { tgl: meta.tgl, namacustomer: rawCust, timestamp_update: timestampNow },
+                    payloadFDN: {}, total_muat_all: 0, allItems: []
                 };
             }
 
@@ -2023,116 +2006,94 @@ window.cetakCeklistMuat = function() {
             });
 
             groupedFDN[muatId].payloadFDN[last5NoBukti] = {
-                meta: {
-                    nobukti: meta.nobukti || key,
-                    tgl: meta.tgl,
-                    total_muat: totalMuatFDN
-                },
+                meta: { nobukti: meta.nobukti || key, tgl: meta.tgl, total_muat: totalMuatFDN },
                 data: itemsData
             };
-
             groupedFDN[muatId].total_muat_all += totalMuatFDN;
         });
 
-        // 3. Simpan SEMUA jenis titipan ke dalam node titipanDataObj secara murni
+        // 3. Titipan
         const titipanDataObj = {};
         if (Array.isArray(dataTitipanList) && dataTitipanList.length > 0) {
             dataTitipanList.forEach((t) => {
                 const rawKat = String(t.kategori || 'PROMOSI').toLowerCase();
                 const kategoriClean = rawKat.replace(/[\/\s]+/g, '_').toUpperCase();
-                
                 const namaBarang = String(t.nama || '').replace(/[\/\s]+/g, '_').toUpperCase();
-                const rawQty = Number(t.qty || 0); // QTY Asli
+                const rawQty = Number(t.qty || 0);
 
-                if (!titipanDataObj[kategoriClean]) {
-                    titipanDataObj[kategoriClean] = {};
-                }
+                if (!titipanDataObj[kategoriClean]) titipanDataObj[kategoriClean] = {};
                 const titipanKey = `${namaBarang}_${rawQty}`;
-                titipanDataObj[kategoriClean][titipanKey] = {
-                    namabarang: namaBarang,
-                    qty: rawQty
-                };
+                titipanDataObj[kategoriClean][titipanKey] = { namabarang: namaBarang, qty: rawQty };
             });
         }
 
-        // Helper rekap kelompok
         function generateRekapPayload(itemsArray) {
-            let rekap = {
-                'DIY': 0, 'MTR': 0, 'PDR': 0, 
-                'MRR_CRR': 0, 'MRR_CRR_EA': 0, 
-                'MOR_MOB': 0, 'MP_LTGR_MTGR': 0, 
-                'MJR': 0, 'LAINNYA': 0
-            };
-
+            let rekap = { 'DIY': 0, 'MTR_PDR': 0, 'CRR_THR': 0, 'MRR_CRR_EA': 0, 'MRR_EA': 0, 'MOR_MOB': 0, 'MP_LTGR_MTGR': 0, 'MJR': 0, 'LAINNYA': 0 };
             itemsArray.forEach(item => {
                 const kelompok = typeof hitungKelompokKodeBarang === 'function' ? hitungKelompokKodeBarang(item.kodebarang) : 'LAINNYA';
                 let rtdbKey = 'LAINNYA';
                 if (kelompok === 'DIY') rtdbKey = 'DIY';
-                else if (kelompok === 'MTR') rtdbKey = 'MTR';
-                else if (kelompok === 'PDR') rtdbKey = 'PDR';
-                else if (kelompok === 'MRR/CRR') rtdbKey = 'MRR_CRR';
+                else if (kelompok === 'MTR/PDR') rtdbKey = 'MTR_PDR';
+                else if (kelompok === 'CRR/THR') rtdbKey = 'CRR_THR';
                 else if (kelompok === 'MRR/CRR EA') rtdbKey = 'MRR_CRR_EA';
+                else if (kelompok === 'MRR EA') rtdbKey = 'MRR_EA';
                 else if (kelompok === 'MOR/MOB') rtdbKey = 'MOR_MOB';
                 else if (kelompok === 'MP/LTGR/MTGR') rtdbKey = 'MP_LTGR_MTGR';
                 else if (kelompok === 'MJR') rtdbKey = 'MJR';
 
-                if (rekap.hasOwnProperty(rtdbKey)) {
-                    rekap[rtdbKey] += Number(item.qty_b || 0);
-                } else {
-                    rekap['LAINNYA'] += Number(item.qty_b || 0);
-                }
+                if (rekap.hasOwnProperty(rtdbKey)) rekap[rtdbKey] += Number(item.qty_b || 0);
+                else rekap['LAINNYA'] += Number(item.qty_b || 0);
             });
             return rekap;
         }
 
-        // 4. Simpan DO ke RTDB
+        let printPayloads = [];
+
         Object.keys(groupedDO).forEach((muatId) => {
             const group = groupedDO[muatId];
             const dbRef = firebase.database().ref(`ceklist_muat/arsip_cetak/ceklist_do/${muatId}`);
-            const rekapHasil = generateRekapPayload(group.allItems);
-
-            const finalPayload = Object.assign({
-                meta: group.meta
-            }, group.payloadDO, {
-                rekap: rekapHasil,
+            const finalPayload = Object.assign({ meta: group.meta }, group.payloadDO, {
+                rekap: generateRekapPayload(group.allItems),
                 titipan: titipanDataObj,
                 total_muat_keseluruhan: group.total_muat_all
             });
 
             savedPromises.push(dbRef.set(finalPayload));
+            printPayloads.push({ nodePath: 'ceklist_do', muatId: muatId, payload: finalPayload });
         });
 
-        // 5. Simpan FDN ke RTDB
         Object.keys(groupedFDN).forEach((muatId) => {
             const group = groupedFDN[muatId];
             const dbRef = firebase.database().ref(`ceklist_muat/arsip_cetak/ceklist_fdn/${muatId}`);
-            const rekapHasil = generateRekapPayload(group.allItems);
-
-            const finalPayload = Object.assign({
-                meta: group.meta
-            }, group.payloadFDN, {
-                rekap: rekapHasil,
+            const finalPayload = Object.assign({ meta: group.meta }, group.payloadFDN, {
+                rekap: generateRekapPayload(group.allItems),
                 titipan: titipanDataObj,
                 total_muat_keseluruhan: group.total_muat_all
             });
 
             savedPromises.push(dbRef.set(finalPayload));
+            printPayloads.push({ nodePath: 'ceklist_fdn', muatId: muatId, payload: finalPayload });
         });
 
-        // 6. Eksekusi Simpan & Reset UI
+        // SIMPAN KE FIREBASE TERLEBIH DAHULU, KEMUDIAN RENDER CETAK & RESET UI
         Promise.all(savedPromises).then(() => {
-            if (typeof miuiAlert === 'function') miuiAlert("Arsip cetak beserta titipan berhasil disimpan!");
-            
+            console.log("--> Arsip berhasil disimpan ke Firebase.");
+
+            // 1. LANGSUNG RENDER DAN CETAK OTOMATIS BERDASARKAN DATA YANG BARU DISIMPAN
+            // Kita panggil fungsi cetakUlangArsip untuk setiap muatId yang baru disimpan
+            printPayloads.forEach(item => {
+                if (typeof window.cetakUlangArsip === 'function') {
+                    window.cetakUlangArsip(item.nodePath, item.muatId);
+                }
+            });
+
+            // 2. BERSIHKAN / RESET CACHE & INPUT FORM SECARA TOTAL
             cacheCeklistDO = {};
             cacheCeklistFDN = {};
+            if (typeof dataTitipanList !== 'undefined') dataTitipanList = [];
 
-            if (typeof dataTitipanList !== 'undefined') {
-                dataTitipanList = [];
-            }
             const containerTitipan = document.getElementById('container-list-titipan');
-            if (containerTitipan) {
-                containerTitipan.innerHTML = `<div class="text-slate-400 text-xs">Belum ada item titipan ditambahkan...</div>`;
-            }
+            if (containerTitipan) containerTitipan.innerHTML = `<div class="text-slate-400 text-xs">Belum ada item titipan ditambahkan...</div>`;
 
             const containerDO = document.getElementById('container-list-fdn-ceklist');
             if (containerDO) containerDO.innerHTML = `<div class="text-slate-400 italic text-[10px]">Belum ada data DO atau FDN diimport...</div>`;
@@ -2143,21 +2104,17 @@ window.cetakCeklistMuat = function() {
             const infoTotalEl = document.getElementById('info-total-muat-keseluruhan');
             if (infoTotalEl) infoTotalEl.innerText = `TOTAL MUAT KESELURUHAN: 0 KRT [0 Item]`;
 
-            if (typeof updateRekapKelompok === 'function') {
-                updateRekapKelompok([], 0);
-            }
-
-            if (typeof invalidateArsipCache === 'function') {
-                invalidateArsipCache();
-            }
+            if (typeof updateRekapKelompok === 'function') updateRekapKelompok([], 0);
+            if (typeof invalidateArsipCache === 'function') invalidateArsipCache();
 
         }).catch((err) => {
-            console.error("Gagal menyimpan arsip ke Firebase:", err);
-            if (typeof miuiAlert === 'function') miuiAlert("Terjadi kesalahan saat menyimpan arsip ke Database!");
+            console.error("Gagal menyimpan ke database:", err);
+            if (typeof miuiAlert === 'function') miuiAlert("Gagal menyimpan arsip ke Database!");
+            else alert("Gagal menyimpan arsip ke Database!");
         });
     };
 
-    // Panggil modal konfirmasi MIUI
+    // Modal Konfirmasi MIUI
     const modalConfirm = document.getElementById('modal-miuiAlert') || document.getElementById('miui-global-miuiAlert');
     const msgEl = document.getElementById('miui-miuiAlert-message');
     const containerOk = document.getElementById('miui-container-ok');
@@ -2178,7 +2135,7 @@ window.cetakCeklistMuat = function() {
 
         newBtnYa.addEventListener('click', function() {
             modalConfirm.classList.add('hidden');
-            prosesSimpanCeklist();
+            eksekusiSimpan();
         });
 
         newBtnTidak.addEventListener('click', function() {
@@ -2186,264 +2143,74 @@ window.cetakCeklistMuat = function() {
         });
     } else {
         if (confirm("Apakah Anda yakin ingin memproses cetak dan menyimpan arsip data ke Database?")) {
-            prosesSimpanCeklist();
+            eksekusiSimpan();
         }
     }
 };
 
 
-
-window.triggerPrintoutCeklist = function() {
-    const container = document.getElementById('print-area-container');
-    if (!container) return;
-
-    let pagesHtml = '';
-    let pageCounter = 1;
-
-    // Helper hitung rekap kelompok per kumpulan item
-    function getRekapHtml(itemsArray) {
-        let r = { 'DIY': 0, 'MTR': 0, 'PDR': 0, 'MRR/CRR': 0, 'MRR/CRR EA': 0, 'MOR/MOB': 0, 'MP/LTGR/MTGR': 0, 'MJR': 0 };
-        let total = 0;
-        
-        itemsArray.forEach(item => {
-            const kelompok = hitungKelompokKodeBarang(item.kodebarang);
-            const qty = Number(item.qty_b || item.qty_utama || 0);
-            if (r.hasOwnProperty(kelompok)) r[kelompok] += qty;
-            total += qty;
-        });
-
-        return {
-            total: total,
-            html: `
-                <div class="border-t-2 border-slate-800 text-[9px] font-mono">
-                    <div class="grid grid-cols-4 border-b border-slate-800 text-center font-bold">
-                        <div class="border-r border-slate-800 p-1">TOTAL = ${total}</div>
-                        <div class="border-r border-slate-800 p-1 text-[8px] italic text-left col-span-1">NB : Barang yang telah dimuat dan diperiksa bersama, sepenuhnya tanggung jawab driver.</div>
-                        <div class="border-r border-slate-800 p-1">TTD Checker<div class="h-6"></div><span class="border-t border-slate-400 inline-block w-20"></span></div>
-                        <div class="p-1">TTD Driver<div class="h-6"></div><span class="border-t border-slate-400 inline-block w-20"></span></div>
-                    </div>
-                    <div class="grid grid-cols-4 border-b border-slate-800 text-center">
-                        <div class="border-r border-slate-800 p-0.5">DIY = ${r['DIY'] > 0 ? r['DIY'] : '-'}</div>
-                        <div class="border-r border-slate-800 p-0.5">MRR/CRR EA = ${r['MRR/CRR EA'] > 0 ? r['MRR/CRR EA'] : '-'}</div>
-                        <div class="border-r border-slate-800 p-0.5">CRR / THR = ${r['MRR/CRR'] > 0 ? r['MRR/CRR'] : '-'}</div>
-                        <div class="p-0.5">MOR/MOB = ${r['MOR/MOB'] > 0 ? r['MOR/MOB'] : '-'}</div>
-                    </div>
-                    <div class="grid grid-cols-4 text-center">
-                        <div class="border-r border-slate-800 p-0.5">MTR = ${r['MTR'] > 0 ? r['MTR'] : '-'}</div>
-                        <div class="border-r border-slate-800 p-0.5">PDR = ${r['PDR'] > 0 ? r['PDR'] : '-'}</div>
-                        <div class="border-r border-slate-800 p-0.5">MJR = ${r['MJR'] > 0 ? r['MJR'] : '-'}</div>
-                        <div class="p-0.5">MP/LTGR/MTGR = ${r['MP/LTGR/MTGR'] > 0 ? r['MP/LTGR/MTGR'] : '-'}</div>
-                    </div>
-                </div>
-            `
-        };
-    }
-
-    // 1. Cek apakah ada data DO
-    const keysDO = Object.keys(cacheCeklistDO);
-    const keysFDN = Object.keys(cacheCeklistFDN);
-
-    if (keysDO.length === 0 && keysFDN.length === 0) {
-        miuiAlert("Tidak ada data untuk dicetak!");
+// Aksi Kirim tugas cetak ke Print Server (Firebase Realtime Database)
+window.executeCetak2Copy = async function() {
+    const jobs = window._currentPrintJobs || [];
+    if (jobs.length === 0) {
+        if (typeof miuiAlert === 'function') miuiAlert("Tidak ada data untuk dicetak!");
+        else alert("Tidak ada data untuk dicetak!");
         return;
     }
 
-    // Jika ADA DATA DO (Gabungkan FDN di bawah DO jika diperlukan, atau cetak per DO)
-    keysDO.forEach(key => {
-        const doObj = cacheCeklistDO[key];
-        const meta = doObj.meta || {};
-        const items = doObj.data || {};
-        let combinedItemsArray = Object.values(items);
+    try {
+        const now = new Date();
+        const tgl = String(now.getDate()).padStart(2, '0');
+        const blnIndex = now.getMonth();
+        const thn = now.getFullYear();
+        const jam = String(now.getHours()).padStart(2, '0');
+        const menit = String(now.getMinutes()).padStart(2, '0');
+        const detik = String(now.getSeconds()).padStart(2, '0');
+        const formatWaktuLengkap = `${tgl}/${String(blnIndex + 1).padStart(2, '0')}/${thn} ${jam}:${menit}:${detik}`;
 
-        // Jika ada FDN aktif, kita bisa gabungkan item FDN ke bawah item DO dalam satu lembar muat
-        keysFDN.forEach(fdnKey => {
-            const fdnObj = cacheCeklistFDN[fdnKey];
-            const fdnItems = Object.values(fdnObj.data || {});
-            combinedItemsArray = combinedItemsArray.concat(fdnItems);
-        });
+        let promises = [];
 
-        const noBukti = meta.nobukti || key;
-        const customer = meta.namacustomer || '-';
-        const tgl = meta.tgl || new Date().toLocaleDateString();
-        const rekapData = getRekapHtml(combinedItemsArray);
+        jobs.forEach((j, index) => {
+            const judulTugas = `Cetak Ceklist Muatan - ${j.muatId || 'Dokumen'}`;
+            const safeKeyName = `Cetak_Muat_${j.muatId || index}_${tgl}-${String(blnIndex + 1).padStart(2, '0')}-${thn}_${jam}-${menit}-${detik}`;
 
-        let rowsHtml = '';
-        combinedItemsArray.forEach((row, idx) => {
-            rowsHtml += `
-                <tr class="border-b border-slate-400 text-[10px]">
-                    <td class="border-r border-slate-800 p-0.5 text-center w-8">${idx + 1}</td>
-                    <td class="border-r border-slate-800 p-0.5 font-bold pl-1">${row.kodebarang}</td>
-                    <td class="border-r border-slate-800 p-0.5 text-center w-6"></td>
-                    <td class="border-r border-slate-800 p-0.5 text-center font-bold w-12">${row.qty_b || row.qty_utama || 0}</td>
-                    <td class="border-r border-slate-800 p-0.5 text-center w-20">${row.kodegudang || '-'}</td>
-                    <td class="border-r border-slate-800 p-0.5"></td>
-                    <td class="p-0.5 w-16"></td>
-                </tr>
-            `;
-        });
-
-        // Baris kosong penyeimbang tinggi halaman cetak
-        for (let i = combinedItemsArray.length; i < 22; i++) {
-            rowsHtml += `
-                <tr class="border-b border-slate-300 text-[10px]">
-                    <td class="border-r border-slate-800 p-0.5 text-center">&nbsp;</td>
-                    <td class="border-r border-slate-800 p-0.5"></td>
-                    <td class="border-r border-slate-800 p-0.5"></td>
-                    <td class="border-r border-slate-800 p-0.5"></td>
-                    <td class="border-r border-slate-800 p-0.5"></td>
-                    <td class="border-r border-slate-800 p-0.5"></td>
-                    <td></td>
-                </tr>
-            `;
-        }
-
-        pagesHtml += `
-            <div class="print-page flex flex-col justify-between border border-slate-800 p-2">
-                <div>
-                    <div class="flex justify-between items-center border-b-2 border-slate-800 pb-1 mb-1">
-                        <h2 class="text-sm font-black uppercase tracking-wide">CHECKLIST MUATAN Gd. WH-2</h2>
-                        <span class="text-[9px] font-mono">print date: ${new Date().toLocaleDateString()}</span>
-                    </div>
-                    <table class="w-full border border-slate-800 text-[9px] mb-2">
-                        <tr>
-                            <td class="border-r border-b border-slate-800 p-1 w-1/2">Exp & Nopol : </td>
-                            <td class="border-b border-slate-800 p-1 w-1/2">Tanggal Muat : ${tgl}</td>
-                        </tr>
-                        <tr>
-                            <td class="border-r border-b border-slate-800 p-1">Nama Driver : </td>
-                            <td class="border-b border-slate-800 p-1">Jam Muat : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Jam Selesai : </td>
-                        </tr>
-                        <tr>
-                            <td class="border-r border-slate-800 p-1 font-bold">${noBukti}</td>
-                            <td class="p-1 font-bold">${customer}</td>
-                        </tr>
-                    </table>
-
-                    <table class="w-full border-collapse border border-slate-800 text-[10px]">
-                        <thead>
-                            <tr class="bg-amber-200 text-slate-900 uppercase font-black text-center">
-                                <th class="border border-slate-800 p-0.5 w-8">No</th>
-                                <th class="border border-slate-800 p-0.5">Kode Rasa</th>
-                                <th class="border border-slate-800 p-0.5 w-6">v</th>
-                                <th class="border border-slate-800 p-0.5 w-12">QTY</th>
-                                <th class="border border-slate-800 p-0.5 w-20">Gudang</th>
-                                <th class="border border-slate-800 p-0.5">Checklist</th>
-                                <th class="border border-slate-800 p-0.5 w-16">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${rowsHtml}
-                        </tbody>
-                    </table>
-                </div>
-
-                <div>
-                    ${rekapData.html}
-                    <div class="flex justify-between text-[8px] font-mono mt-1 text-slate-600">
-                        <span>No. Form : 25.UM/05-02-25/01/0</span>
-                        <span>Halaman ${pageCounter++} dari N</span>
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-
-    // 2. Jika HANYA ADA FDN (Tanpa DO sama sekali)
-    if (keysDO.length === 0 && keysFDN.length > 0) {
-        keysFDN.forEach(key => {
-            const fdnObj = cacheCeklistFDN[key];
-            const meta = fdnObj.meta || {};
-            const items = fdnObj.data || {};
-            const itemsArray = Object.values(items);
-
-            if (itemsArray.length === 0) return;
-
-            const noBukti = meta.nobukti || key;
-            const tujuan = meta.namacustomer || 'SP SOLO';
-            const tgl = meta.tgl || new Date().toLocaleDateString();
-            const rekapData = getRekapHtml(itemsArray);
-
-            let rowsHtml = '';
-            itemsArray.forEach((row, idx) => {
-                rowsHtml += `
-                    <tr class="border-b border-slate-400 text-[10px]">
-                        <td class="border-r border-slate-800 p-0.5 text-center w-8">${idx + 1}</td>
-                        <td class="border-r border-slate-800 p-0.5 font-bold pl-1">${row.kodebarang}</td>
-                        <td class="border-r border-slate-800 p-0.5 text-center w-6"></td>
-                        <td class="border-r border-slate-800 p-0.5 text-center font-bold w-12">${row.qty_b || row.qty_utama || 0}</td>
-                        <td class="border-r border-slate-800 p-0.5 text-center w-20">${row.kodegudang || '-'}</td>
-                        <td class="border-r border-slate-800 p-0.5"></td>
-                        <td class="p-0.5 w-16"></td>
-                    </tr>
-                `;
+            const fetchPromise = fetch(`https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs/${safeKeyName}.json`, {
+                method: 'PUT',
+                body: JSON.stringify({ 
+                    judul: judulTugas,
+                    waktu_teks: formatWaktuLengkap,
+                    html: j.htmlContent, 
+                    status: 'PENDING',
+                    timestamp: Date.now() 
+                }),
+                headers: { 'Content-Type': 'application/json' }
             });
 
-            for (let i = itemsArray.length; i < 22; i++) {
-                rowsHtml += `
-                    <tr class="border-b border-slate-300 text-[10px]">
-                        <td class="border-r border-slate-800 p-0.5 text-center">&nbsp;</td>
-                        <td class="border-r border-slate-800 p-0.5"></td>
-                        <td class="border-r border-slate-800 p-0.5"></td>
-                        <td class="border-r border-slate-800 p-0.5"></td>
-                        <td class="border-r border-slate-800 p-0.5"></td>
-                        <td class="border-r border-slate-800 p-0.5"></td>
-                        <td></td>
-                    </tr>
-                `;
-            }
-
-            pagesHtml += `
-                <div class="print-page flex flex-col justify-between border border-slate-800 p-2">
-                    <div>
-                        <div class="flex justify-between items-center border-b-2 border-slate-800 pb-1 mb-1">
-                            <h2 class="text-sm font-black uppercase tracking-wide">CHECKLIST MUATAN DEPO / STOCK POINT Gd. WH-2</h2>
-                            <span class="text-[9px] font-mono">print date: ${new Date().toLocaleDateString()}</span>
-                        </div>
-                        <table class="w-full border border-slate-800 text-[9px] mb-2">
-                            <tr>
-                                <td class="border-r border-b border-slate-800 p-1 w-1/2">Exp & Nopol : </td>
-                                <td class="border-b border-slate-800 p-1 w-1/2">Tanggal Muat : ${tgl}</td>
-                            </tr>
-                            <tr>
-                                <td class="border-r border-b border-slate-800 p-1">Nama Driver : </td>
-                                <td class="border-b border-slate-800 p-1">Jam Muat : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Jam Selesai : </td>
-                            </tr>
-                            <tr>
-                                <td class="border-r border-slate-800 p-1 font-bold">DN - ${noBukti}</td>
-                                <td class="p-1 font-bold">${tujuan}</td>
-                            </tr>
-                        </table>
-
-                        <table class="w-full border-collapse border border-slate-800 text-[10px]">
-                            <thead>
-                                <tr class="bg-amber-200 text-slate-900 uppercase font-black text-center">
-                                    <th class="border border-slate-800 p-0.5 w-8">No</th>
-                                    <th class="border border-slate-800 p-0.5">Kode Rasa</th>
-                                    <th class="border border-slate-800 p-0.5 w-6">v</th>
-                                    <th class="border border-slate-800 p-0.5 w-12">QTY</th>
-                                    <th class="border border-slate-800 p-0.5 w-20">Gudang</th>
-                                    <th class="border border-slate-800 p-0.5">Checklist</th>
-                                    <th class="border border-slate-800 p-0.5 w-16">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${rowsHtml}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div>
-                        ${rekapData.html}
-                        <div class="flex justify-between text-[8px] font-mono mt-1 text-slate-600">
-                            <span>No. Form : 25.UM/05-02-25/01/0</span>
-                            <span>Halaman ${pageCounter++} dari N</span>
-                        </div>
-                    </div>
-                </div>
-            `;
+            promises.push(fetchPromise);
         });
-    }
 
-    container.innerHTML = pagesHtml;
-    window.print();
+        await Promise.all(promises);
+
+        if (typeof miuiAlert === 'function') {
+            miuiAlert("Tugas cetak berhasil dikirim ke print server!");
+        } else {
+            alert("Tugas cetak berhasil dikirim ke print server!");
+        }
+
+        // Tutup modal preview setelah berhasil
+        if (typeof window.closePrintPreview === 'function') {
+            window.closePrintPreview();
+        } else {
+            const modalEl = document.getElementById('printPreviewModal');
+            if (modalEl) modalEl.classList.add('hidden');
+        }
+
+    } catch (err) {
+        console.error("Gagal mengirim perintah cetak ke server:", err);
+        if (typeof miuiAlert === 'function') {
+            miuiAlert("Gagal mengirim perintah cetak ke server.");
+        } else {
+            alert("Gagal mengirim perintah cetak ke server.");
+        }
+    }
 };
