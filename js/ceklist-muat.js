@@ -340,10 +340,23 @@ window.previewArsipDetail = function(kategori, muatId) {
         const tanggal = meta.tgl || '-';
         const totalAll = data.total_muat_keseluruhan || 0;
 
-        // --- DIPERBAIKI: Tambahkan 'rekap' ke dalam filter pengecualian ---
         const keysNoBukti = Object.keys(data).filter(k => k !== 'meta' && k !== 'titipan' && k !== 'total_muat_keseluruhan' && k !== 'rekap');
+        
+        // --- PISAHKAN FDN_GABUNGAN DARI TITIPAN MURNI ---
         const titipanObj = data.titipan || {};
-        const hasTitipan = Object.keys(titipanObj).length > 0;
+        let fdnGabunganItems = {};
+        let titipanMurniObj = {};
+
+        Object.keys(titipanObj).forEach(kategoriKey => {
+            if (kategoriKey.toUpperCase() === 'FDN_GABUNGAN') {
+                fdnGabunganItems = titipanObj[kategoriKey];
+            } else {
+                titipanMurniObj[kategoriKey] = titipanObj[kategoriKey];
+            }
+        });
+
+        const hasTitipanMurni = Object.keys(titipanMurniObj).length > 0;
+        const hasFdnGabungan = Object.keys(fdnGabunganItems).length > 0;
 
         // Buat opsi dropdown DO/FDN & Titipan secara terpisah
         let optionsDropdownHtml = `<option value="semua">-- Hapus Semua Arsip --</option>`;
@@ -351,8 +364,8 @@ window.previewArsipDetail = function(kategori, muatId) {
             const noBuktiVal = data[k]?.meta?.nobukti || k;
             optionsDropdownHtml += `<option value="${k}">Hapus: ${noBuktiVal}</option>`;
         });
-        if (hasTitipan) {
-            optionsDropdownHtml += `<option value="titipan">Hapus Data Titipan Saja</option>`;
+        if (hasTitipanMurni || hasFdnGabungan) {
+            optionsDropdownHtml += `<option value="titipan">Hapus Data Titipan / Gabungan Saja</option>`;
         }
 
         // Buat elemen Modal Popup jika belum ada
@@ -369,8 +382,8 @@ window.previewArsipDetail = function(kategori, muatId) {
                 <!-- Header Modal -->
                 <div class="bg-gradient-to-b from-[#323232] to-[#202020] text-white p-3 flex justify-between items-center flex-shrink-0">
                     <div>
-                        <div class="text-xs font-black uppercase tracking-wider">DETAIL ARSIP ${kategori.toUpperCase()}</div>
-                        <div class="text-[10px] opacity-90">Tujuan: ${customer} | Tanggal: ${tanggal}</div>
+                        <div class="text-[16px] font-black uppercase tracking-wider">DETAIL ARSIP ${kategori.toUpperCase()}</div>
+                        <div class="text-[15px] text-orange-400 opacity-100">Tujuan: ${customer} | Tanggal: ${tanggal}</div>
                     </div>
                     <button onclick="document.getElementById('modal-detail-arsip').remove()" class="text-white hover:text-red-400 font-bold text-lg">✕</button>
                 </div>
@@ -382,12 +395,11 @@ window.previewArsipDetail = function(kategori, muatId) {
                         <div class="space-y-3">
         `;
 
+        // 1. RENDER DAFTAR NOMOR DO / FDN UTAMA
         keysNoBukti.forEach((noBuktiKey) => {
             const doObj = data[noBuktiKey];
             const doMeta = doObj.meta || {};
             const items = doObj.data || {};
-            
-            // Hitung jumlah item barang pada nomor DO/FDN ini
             const jumlahItem = Object.keys(items).length;
 
             contentHtml += `
@@ -411,9 +423,9 @@ window.previewArsipDetail = function(kategori, muatId) {
                 const item = items[kbKey];
                 contentHtml += `
                     <tr class="border-b border-slate-100">
-                        <td class="py-1 font-mono font-bold text-slate-700">${item.kodebarang || kbKey}</td>
-                        <td class="py-1 text-center text-slate-500">${item.kodegudang || '-'}</td>
-                        <td class="py-1 text-right font-bold text-orange-600">${item.qty_b || 0}</td>
+                        <td class="py-1 text-[11px] font-mono font-bold text-slate-700">${item.kodebarang || kbKey}</td>
+                        <td class="py-1 text-[11px] text-center text-slate-500">${item.kodegudang || '-'}</td>
+                        <td class="py-1 text-[11px] text-right font-bold text-orange-600">${item.qty_b || 0}</td>
                     </tr>
                 `;
             });
@@ -425,25 +437,72 @@ window.previewArsipDetail = function(kategori, muatId) {
             `;
         });
 
+        // 2. RENDER FDN GABUNGAN SEBAGAI BLOK DOKUMEN LENGKAP
+        if (hasFdnGabungan) {
+            const groupedByBukti = {};
+            Object.values(fdnGabunganItems).forEach(item => {
+                const nb = item.nobukti || 'FDN';
+                const tuj = item.tujuan || '';
+                const groupKey = `${nb}_${tuj}`;
+                if (!groupedByBukti[groupKey]) {
+                    groupedByBukti[groupKey] = { nobukti: nb, tujuan: tuj, items: [], totalQty: 0 };
+                }
+                groupedByBukti[groupKey].items.push(item);
+                groupedByBukti[groupKey].totalQty += Number(item.qty || 0);
+            });
+
+            Object.values(groupedByBukti).forEach(group => {
+                let rowsSubHtml = '';
+                group.items.forEach(it => {
+                    rowsSubHtml += `
+                        <tr class="border-b border-slate-100">
+                            <td class="py-1 text-[11px] font-mono font-bold text-slate-700">${it.kodebarang}</td>
+                            <td class="py-1 text-[11px] text-center text-slate-500">WH-2</td>
+                            <td class="py-1 text-[11px] text-right font-bold text-orange-600">${it.qty}</td>
+                        </tr>
+                    `;
+                });
+
+                contentHtml += `
+                    <div class="border border-slate-200 rounded p-2 bg-white shadow-sm mt-3">
+                        <div class="flex justify-between items-center font-bold text-orange-800 text-[11px] border-b pb-1 mb-1.5">
+                            <span>DN-${group.nobukti} <span class="text-orange-700 font-bold">[ ${group.tujuan} ]</span></span>
+                            <span>Total: ${group.totalQty} KRT <span class="text-slate-600 text-[10px] font-bold">(${group.items.length} Item)</span></span>
+                        </div>
+                        <table class="w-full text-left text-[10px]">
+                            <thead>
+                                <tr class="text-slate-400 border-b">
+                                    <th class="pb-1">KODE BARANG</th>
+                                    <th class="pb-1 text-center">GUDANG</th>
+                                    <th class="pb-1 text-right">QTY (KRT)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rowsSubHtml}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            });
+        }
+
         contentHtml += `
                         </div>
                     </div>
         `;
 
-        // Bagian Titipan di Paling Bawah (jika ada)
-        if (hasTitipan) {
+        // 3. RENDER DATA TITIPAN MURNI (PROMOSI / HRD / TINGGALAN / DIY)
+        if (hasTitipanMurni) {
             contentHtml += `
                 <div class="bg-amber-50 border border-amber-200 rounded p-2.5">
                     <div class="font-bold text-amber-800 mb-1.5">📦 Data Titipan / Tinggalan:</div>
                     <div class="space-y-1.5">
             `;
 
-            Object.keys(titipanObj).forEach((kategoriTitipan) => {
-                const itemsTitipan = titipanObj[kategoriTitipan];
+            Object.keys(titipanMurniObj).forEach((kategoriTitipan) => {
+                const itemsTitipan = titipanMurniObj[kategoriTitipan];
                 Object.keys(itemsTitipan).forEach((tKey) => {
                     const tItem = itemsTitipan[tKey];
-                    
-                    // Bersihkan karakter _ menjadi spasi normal
                     const namaBarangBersih = String(tItem.namabarang || '').replace(/_/g, ' ');
 
                     contentHtml += `
@@ -581,7 +640,9 @@ window.eksekusiHapusArsip = function(kategori, muatId) {
     }
 };
 
-// Fungsi Cetak Ulang Arsip (Membuka Tab Baru dengan Data dari Firebase)
+// ==========================================
+// FUNGSI CETAK ULANG ARSIP (MENDUKUNG FDN GABUNGAN)
+// ==========================================
 window.cetakUlangArsip = async function(kategori, muatId) {
     console.log("Tombol Cetak Ulang Diklik!", kategori, muatId);
 
@@ -603,7 +664,6 @@ window.cetakUlangArsip = async function(kategori, muatId) {
 
         const dataArsip = snapshot.val();
         const meta = dataArsip.meta || {};
-        const tgl = meta.tgl || new Date().toLocaleDateString();
         const customerOrTujuan = meta.namacustomer || muatId;
 
         // Kumpulkan semua nomor bukti unik dan item barang utama (DO / FDN)
@@ -640,8 +700,30 @@ window.cetakUlangArsip = async function(kategori, muatId) {
             return 0;
         });
 
-        // --- KUMPULKAN DATA TINGGALAN & DIY (Masuk Data Utama dengan 1 Baris Kosong Pemisah) ---
         const titipanObj = dataArsip.titipan || {};
+
+        // --- KUMPULKAN FDN GABUNGAN (JIKA ADA CHECKBOX GABUNG SAAT SIMPAN) ---
+        const fdnGabungObj = titipanObj.FDN_GABUNGAN || {};
+        let fdnGabungArray = [];
+        let namaTujuanFdnGabung = '';
+
+        Object.keys(fdnGabungObj).forEach(k => {
+            const item = fdnGabungObj[k];
+            if (!namaTujuanFdnGabung && item.tujuan) {
+                // Ubah STOCK POINT menjadi SP, biarkan DEPO tetap
+                let cleanTujuan = String(item.tujuan).toUpperCase().replace(/STOCK POINT/g, 'SP');
+                namaTujuanFdnGabung = cleanTujuan;
+            }
+            fdnGabungArray.push({
+                kodebarang: String(item.kodebarang || '').replace(/_/g, ' '),
+                qty_b: Number(item.qty || 0),
+                kodegudang: 'WH-2',
+                _nobuktiAsli: item.nobukti || 'FDN',
+                _isTitipan: false
+            });
+        });
+
+        // --- KUMPULKAN DATA TINGGALAN & DIY ---
         let tinggalanDiyArray = [];
 
         Object.keys(titipanObj).forEach(kTitipan => {
@@ -654,20 +736,16 @@ window.cetakUlangArsip = async function(kategori, muatId) {
 
                     Object.values(itemsT).forEach(tItem => {
                         const rawQty = Number(tItem.qty || tItem.qty_b || tItem.qty_utama || 0);
-                        
-                        // Jika DIY, QTY untuk perhitungan rekap/total dibagi 2
-                        // Dibagi 2 lalu dibulatkan ke atas menggunakan Math.ceil() (33 / 2 = 16.5 -> dibulatkan jadi 17)
                         const effectiveQty = isDiy ? Math.ceil(rawQty / 2) : rawQty;
                         const displayQtyStr = isDiy ? `${rawQty}:2` : `${rawQty}`;
 
-                        // Ambil nama barang dan ubah karakter underscore (_) menjadi spasi normal
                         let namaBarangRaw = tItem.namabarang || tItem.kodebarang || labelGudang;
                         let namaBarangClean = String(namaBarangRaw).replace(/_/g, ' ');
 
                         tinggalanDiyArray.push({
-                            kodebarang: namaBarangClean, // Nama barang sudah bersih tanpa _
-                            qty_b: effectiveQty, // Qty efektif untuk perhitungan
-                            display_qty: displayQtyStr, // Qty untuk tampilan tabel
+                            kodebarang: namaBarangClean,
+                            qty_b: effectiveQty,
+                            display_qty: displayQtyStr,
                             kodegudang: labelGudang,
                             _nobuktiAsli: 'TITIPAN',
                             _isTitipan: false
@@ -677,11 +755,22 @@ window.cetakUlangArsip = async function(kategori, muatId) {
             }
         });
 
-        // Gabungkan data DO/FDN dengan TINGGALAN / DIY (Diikuti 1 baris kosong pemisah)
+        // Gabungkan data DO/FDN Utama dengan TINGGALAN / DIY
         let coreItemsCombined = [...allItemsArray];
         if (tinggalanDiyArray.length > 0) {
-            coreItemsCombined.push({ _isEmptySpacer: true }); // Jarak 1 baris kosong pemisah
+            coreItemsCombined.push({ _isEmptySpacer: true });
             coreItemsCombined = coreItemsCombined.concat(tinggalanDiyArray);
+        }
+
+        // --- SISIPKAN FDN GABUNGAN DI BAWAH DO (2 Baris Kosong + Header Judul FDN) ---
+        if (fdnGabungArray.length > 0) {
+            coreItemsCombined.push({ _isEmptySpacer: true });
+            coreItemsCombined.push({ _isEmptySpacer: true });
+            
+            const titleHeaderFdn = namaTujuanFdnGabung ? `=== ${namaTujuanFdnGabung} ===` : `=== DATA FDN GABUNGAN ===`;
+            coreItemsCombined.push({ _isHeaderTitle: true, titleTeks: titleHeaderFdn });
+            
+            coreItemsCombined = coreItemsCombined.concat(fdnGabungArray);
         }
 
         // --- KUMPULKAN TITIPAN MURNI (HRD & PROMOSI) ---
@@ -703,15 +792,14 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                             const qtyT = Number(tItem.qty || tItem.qty_b || tItem.qty_utama || 0);
                             totalQtyTitipan += qtyT;
 
-                            // Ambil nama barang mentah dan bersihkan karakter underscore (_) menjadi spasi
                             let namaBarangRaw = tItem.namabarang || tItem.kodebarang || kTitipan;
                             let namaBarangClean = String(namaBarangRaw).replace(/_/g, ' ');
 
                             titipanMurniArray.push({
-                                kodebarang: namaBarangClean, // Sudah bersih tanpa tanda _
+                                kodebarang: namaBarangClean,
                                 qty_b: qtyT,
                                 kodegudang: labelTitipan,
-                                _isTitipan: true // Titipan Murni (HRD / PROMOSI)
+                                _isTitipan: true
                             });
                         });
                     }
@@ -719,11 +807,11 @@ window.cetakUlangArsip = async function(kategori, muatId) {
             });
         });
 
-        // --- GABUNGKAN DENGAN TITIPAN MURNI (DIJARKAN 2 BARIS KOSONG) ---
+        // --- GABUNGKAN TITIPAN MURNI (DIBERI 2 BARIS KOSONG) ---
         let combinedRows = [...coreItemsCombined];
         if (titipanMurniArray.length > 0) {
             for (let i = 0; i < 2; i++) {
-                combinedRows.push({ _isEmptySpacer: true }); // Jarak 2 baris kosong
+                combinedRows.push({ _isEmptySpacer: true });
             }
             combinedRows = combinedRows.concat(titipanMurniArray);
         }
@@ -753,7 +841,7 @@ window.cetakUlangArsip = async function(kategori, muatId) {
         const nowFormatted = new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'medium' });
         const logoUrl = "https://raw.githubusercontent.com/komputerwh2-svg/warelogos.github.io/main/uth.png";
 
-        // --- CHUNKING DATA: Maksimal 45 item per halaman (menyesuaikan font 10pt) ---
+        // --- CHUNKING DATA: Maksimal 45 item per halaman ---
         const ITEMS_PER_PAGE = 45;
         const pageChunks = [];
         for (let i = 0; i < combinedRows.length; i += ITEMS_PER_PAGE) {
@@ -762,14 +850,28 @@ window.cetakUlangArsip = async function(kategori, muatId) {
         if (pageChunks.length === 0) pageChunks.push([]);
 
         let pagesHtml = '';
-
-        let validItemCounter = 0; // Inisialisasi penghitung nomor urut khusus item valid
+        let validItemCounter = 0;
 
         pageChunks.forEach((chunkItems, pageIdx) => {
             let rowsHtml = '';
-            chunkItems.forEach((row, itemIdx) => {
+            chunkItems.forEach((row) => {
 
-                // Jika baris kosong pemisah, jangan tampilkan nomor urut
+                // 1. Render Baris Judul Pemisah FDN (Merge dari Kode Rasa sampai Gudang)
+                if (row._isHeaderTitle) {
+                    rowsHtml += `
+                        <tr style="border-bottom: 1px solid #000; background-color: #f8fafc; font-weight: bold;">
+                            <td style="border-right: 1px solid #000; padding: 2px;"></td>
+                            <td colspan="4" style="border-right: 1px solid #000; padding: 3px; text-align: center; font-size: 10pt; font-family: Trebuchet MS; letter-spacing: 0.5px;">
+                                ${row.titleTeks}
+                            </td>
+                            <td style="border-right: 1px solid #000; padding: 2px;"></td>
+                            <td style="padding: 2px;"></td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                // 2. Render Baris Kosong Pemisah
                 if (row._isEmptySpacer) {
                     rowsHtml += `
                         <tr style="border-bottom: 1px solid #cbd5e1; font-size: 10pt;">
@@ -785,19 +887,16 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                     return;
                 }
 
-                // Jika baris valid (baik barang utama, TINGGALAN, DIY, maupun Titipan Murni), naikkan nomor urut
                 validItemCounter++;
 
-                // Render Baris Titipan Murni (HRD & PROMOSI)
+                // 3. Render Baris Titipan Murni (HRD & PROMOSI)
                 if (row._isTitipan) {
                     rowsHtml += `
                         <tr style="border-bottom: 1px solid #94a3b8; font-size: 10pt;">
                             <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center; width: 32px;">${validItemCounter}</td>
                             <td style="border-right: 1px solid #000; padding: 1px 5px; font-size: 10pt; font-weight: bold; font-family: Trebuchet MS;">${row.kodebarang}</td>
                             <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center; width: 26px;"></td>
-                            <td style="border-right: 1px solid #000; padding: 1px 5px; text-align: center; width: 50px; font-size: 10pt; font-weight: bold; font-family: Trebuchet MS;">
-                                ${row.qty_b}
-                            </td>
+                            <td style="border-right: 1px solid #000; padding: 1px 5px; text-align: center; width: 50px; font-size: 10pt; font-weight: bold; font-family: Trebuchet MS;">${row.qty_b}</td>
                             <td style="border-right: 1px solid #000; padding: 1px 5px; text-align: center; width: 90px; font-size: 10pt;">
                                 <span style="font-weight: bold; font-family: Trebuchet MS;">${row.kodegudang}</span>
                             </td>
@@ -808,13 +907,11 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                     return;
                 }
 
-                // Render Baris Data Utama Normal (DO/FDN, TINGGALAN, & DIY)
+                // 4. Render Baris Barang Normal (DO / FDN Gabungan / TINGGALAN / DIY)
                 let digits = String(row._nobuktiAsli || '').replace(/\D/g, '');
                 let subNoBukti = digits.length >= 5 ? digits.slice(-5) : digits;
                 let gudangTeks = row.kodegudang || 'WH-2';
                 let sourceTag = (row._nobuktiAsli === 'TITIPAN') ? '' : `<span style="font-family: Trebuchet MS; font-size: 6pt; color: #334155;">(${subNoBukti})</span>`;
-
-                // Tentukan tampilan QTY: jika ada display_qty (untuk DIY), gunakan itu; jika tidak, ambil qty biasa
                 let qtyTampil = row.display_qty ? row.display_qty : (row.qty_b || row.qty_utama || 0);
 
                 rowsHtml += `
@@ -822,9 +919,7 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                         <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center; width: 32px;">${validItemCounter}</td>
                         <td style="border-right: 1px solid #000; padding: 1px 5px; font-size: 10pt; font-weight: bold; font-family: Trebuchet MS;">${row.kodebarang}</td>
                         <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center; width: 26px;"></td>
-                        <td style="border-right: 1px solid #000; padding: 1px 5px; text-align: center; width: 50px; font-size: 10pt; font-weight: bold; font-family: Trebuchet MS;">
-                            ${qtyTampil}
-                        </td>
+                        <td style="border-right: 1px solid #000; padding: 1px 5px; text-align: center; width: 50px; font-size: 10pt; font-weight: bold; font-family: Trebuchet MS;">${qtyTampil}</td>
                         <td style="border-right: 1px solid #000; padding: 1px 5px; text-align: center; width: 90px; font-size: 10pt;">
                             <span style="font-weight: bold; font-family: Trebuchet MS;">${gudangTeks}</span> ${sourceTag}
                         </td>
@@ -834,7 +929,7 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                 `;
             });
 
-            // Baris kosong penyeimbang agar tabel pas memenuhi 45 baris per halaman
+            // Isian baris penyeimbang 45 baris per halaman
             for (let i = chunkItems.length; i < ITEMS_PER_PAGE; i++) {
                 rowsHtml += `
                     <tr style="border-bottom: 1px solid #cbd5e1; font-size: 10pt;">
@@ -849,26 +944,17 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                 `;
             }
 
-            // --- HITUNG REKAP KELOMPOK (Mencakup DO/FDN, TINGGALAN, dan DIY) ---
+            // --- REKAP KELOMPOK (Termasuk FDN Gabungan) ---
             let r = { 
-                'DIY': 0, 
-                'MTR/PDR': 0, 
-                'CRR/THR': 0, 
-                'MRR/CRR EA': 0, 
-                'MRR EA': 0, 
-                'MOR/MOB': 0, 
-                'MP/LTGR/MTGR': 0, 
-                'MJR': 0 
+                'DIY': 0, 'MTR/PDR': 0, 'CRR/THR': 0, 'MRR/CRR EA': 0, 
+                'MRR EA': 0, 'MOR/MOB': 0, 'MP/LTGR/MTGR': 0, 'MJR': 0 
             };
             let totalHalaman = 0;
             
             chunkItems.forEach(item => {
-                if (item._isTitipan || item._isEmptySpacer) return;
+                if (item._isTitipan || item._isEmptySpacer || item._isHeaderTitle) return;
                 const kelompok = typeof hitungKelompokKodeBarang === 'function' ? hitungKelompokKodeBarang(item.kodebarang) : 'Lainnya';
-                
-                // Ambil qty, jika item DIY gunakan effective_qty yang sudah dibulatkan Math.ceil
                 let qty = Number(item.effective_qty !== undefined ? item.effective_qty : (item.qty_b || item.qty_utama || 0));
-                
                 const isDiyItem = (item.kodegudang === 'DIY' || kelompok === 'DIY');
                 const rKey = isDiyItem ? 'DIY' : kelompok;
 
@@ -878,20 +964,17 @@ window.cetakUlangArsip = async function(kategori, muatId) {
 
             let totalSemuaItem = 0;
             coreItemsCombined.forEach(item => {
-                if (!item._isEmptySpacer) {
+                if (!item._isEmptySpacer && !item._isHeaderTitle) {
                     totalSemuaItem += Number(item.qty_b || item.qty_utama || 0);
                 }
             });
 
-            let infoTotalTeks = (pageChunks.length > 1) 
-                ? `${totalHalaman} KRT / Total Muat : ${totalSemuaItem} KRT` 
-                : `${totalHalaman} KRT / Total Muat : ${totalSemuaItem} KRT`;
+            let infoTotalTeks = `${totalHalaman} KRT / Total Muat : ${totalSemuaItem} KRT`;
 
             const rekapHtml = `
                 <div style="border-top: 2px solid #000; font-family: 'Trebuchet MS', Arial, sans-serif; font-size: 10pt; margin-top: 2px;">
                     <table style="width: 100%; border-collapse: collapse; border-bottom: 1px solid #000;">
                         <tr>
-                            <!-- Kolom Kiri dengan lebar 276px, menggunakan border vertikal tepat di bawah garis QTY -->
                             <td style="width: 276px; border-right: 1px solid #000; padding: 0; vertical-align: top;">
                                 <table style="width: 100%; border-collapse: collapse;">
                                     <tr style="border-bottom: 1px solid #000;">
@@ -1059,7 +1142,7 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                 <style>
                     @page { 
                         size: 215mm 330mm portrait; 
-                        margin: 5mm 5mm 5mm 5mm;
+                        margin: 5mm 5mm 4mm 5mm;
                     }
                     body { 
                         font-family: 'Trebuchet MS', Arial, sans-serif; 
@@ -1106,8 +1189,6 @@ window.cetakUlangArsip = async function(kategori, muatId) {
         if (typeof miuiAlert === 'function') miuiAlert("Terjadi kesalahan saat memuat data arsip untuk dicetak ulang.");
     }
 };
-
-
 
 // Variabel global untuk menyimpan data titipan sementara
 let dataTitipanList = [];
@@ -1900,7 +1981,7 @@ window.updateRekapKelompok = function(listBarangObj, targetTotal = 0) {
 
 
 // ==========================================
-// 2. FUNGSI UTAMA CETAK & SIMPAN CEKLIST MUAT
+// FUNGSI UTAMA CETAK CEKLIST MUAT (DENGAN DETEKSI TUJUAN BERBEDA)
 // ==========================================
 window.cetakCeklistMuat = function() {
     console.log("--> Eksekusi cetakCeklistMuat dipanggil.");
@@ -1913,8 +1994,31 @@ window.cetakCeklistMuat = function() {
         return;
     }
 
-    const eksekusiSimpan = function() {
-        console.log("--> Memproses Penyimpanan Data ke Firebase...");
+    const hasDO = keysDO.length > 0;
+    const hasFDN = keysFDN.length > 0;
+
+    // --- DETEKSI APAKAH ADA TUJUAN/CUSTOMER YANG BERBEDA ---
+    const listTujuanUnik = new Set();
+    
+    keysDO.forEach(k => {
+        const item = cacheCeklistDO[k];
+        if (item?.meta?.namacustomer) {
+            listTujuanUnik.add(String(item.meta.namacustomer).trim().toUpperCase());
+        }
+    });
+
+    keysFDN.forEach(k => {
+        const item = cacheCeklistFDN[k];
+        if (item?.meta?.namacustomer) {
+            listTujuanUnik.add(String(item.meta.namacustomer).trim().toUpperCase());
+        }
+    });
+
+    // Opsi gabung aktif HANYA JIKA ada lebih dari 1 nama tujuan/alamat berbeda
+    const canMerge = listTujuanUnik.size > 1;
+
+    const eksekusiSimpan = function(isMerged) {
+        console.log("--> Memproses Penyimpanan & Penggabungan Data (isMerged:", isMerged, ")...");
         const timestampNow = new Date().toISOString();
         let savedPromises = [];
 
@@ -1925,7 +2029,7 @@ window.cetakCeklistMuat = function() {
                         .replace(/^_+|_+\$/g, '');
         }
 
-        // 1. Kelompokkan data DO
+        // 1. Olah Data DO
         const groupedDO = {};
         keysDO.forEach((key) => {
             const item = cacheCeklistDO[key];
@@ -1974,13 +2078,13 @@ window.cetakCeklistMuat = function() {
             }
         });
 
-        // 2. Kelompokkan data FDN
+        // 2. Olah Data FDN
         const groupedFDN = {};
         keysFDN.forEach((key) => {
             const item = cacheCeklistFDN[key];
             const meta = item.meta || {};
             const rawTgl = meta.tgl || '';
-            let tglPart = rawTgl.replace(/\//g, '_') || '19_10_2026';
+            let tglPart = rawTgl.replace(/\//g, '_') || '21_10_2026';
 
             const rawCust = meta.namacustomer || key;
             const custNormalized = normalizeCustomerName(rawCust);
@@ -2049,45 +2153,116 @@ window.cetakCeklistMuat = function() {
 
         let printPayloads = [];
 
-        Object.keys(groupedDO).forEach((muatId) => {
-            const group = groupedDO[muatId];
-            const dbRef = firebase.database().ref(`ceklist_muat/arsip_cetak/ceklist_do/${muatId}`);
-            const finalPayload = Object.assign({ meta: group.meta }, group.payloadDO, {
-                rekap: generateRekapPayload(group.allItems),
+        // JIKA CHECKBOX GABUNG DICENTANG & TUJUAN BERBEDA
+        if (isMerged && listTujuanUnik.size > 1) {
+            let mainNodePath = '';
+            let mainKey = '';
+            let mainGroup = null;
+
+            // Tentukan Induk Utama (Prioritas DO, Jika Tidak Ada Gunakan FDN Pertama)
+            if (hasDO) {
+                mainNodePath = 'ceklist_do';
+                mainKey = Object.keys(groupedDO)[0];
+                mainGroup = groupedDO[mainKey];
+            } else {
+                mainNodePath = 'ceklist_fdn';
+                mainKey = Object.keys(groupedFDN)[0];
+                mainGroup = groupedFDN[mainKey];
+            }
+
+            const mergedFdnObj = {};
+
+            // Gabungkan DO lain (jika ada lebih dari 1 DO beda alamat) atau FDN lain
+            Object.keys(groupedDO).forEach((doMuatId) => {
+                if (hasDO && doMuatId === mainKey) return; // Lewati induk utama
+                const doGroup = groupedDO[doMuatId];
+                const tujuanNama = String(doGroup.meta.namacustomer || doMuatId).toUpperCase().replace(/STOCK POINT/g, 'SP');
+
+                Object.keys(doGroup.payloadDO).forEach((subNoBukti) => {
+                    const subObj = doGroup.payloadDO[subNoBukti];
+                    Object.keys(subObj.data || {}).forEach((kb) => {
+                        const itm = subObj.data[kb];
+                        const keyUnique = `DO_${subNoBukti}_${kb}`;
+                        const qtyVal = Number(itm.qty_b || 0);
+
+                        mergedFdnObj[keyUnique] = { kodebarang: kb, qty: qtyVal, nobukti: subNoBukti, tujuan: tujuanNama };
+                        mainGroup.allItems.push({ kodebarang: kb, qty_b: qtyVal });
+                        mainGroup.total_muat_all += qtyVal;
+                    });
+                });
+            });
+
+            Object.keys(groupedFDN).forEach((fdnMuatId) => {
+                if (!hasDO && fdnMuatId === mainKey) return; // Lewati induk utama jika sesama FDN
+                const fdnGroup = groupedFDN[fdnMuatId];
+                const tujuanNama = String(fdnGroup.meta.namacustomer || fdnMuatId).toUpperCase().replace(/STOCK POINT/g, 'SP');
+
+                Object.keys(fdnGroup.payloadFDN).forEach((subNoBukti) => {
+                    const fdnSubObj = fdnGroup.payloadFDN[subNoBukti];
+                    Object.keys(fdnSubObj.data || {}).forEach((kb) => {
+                        const itm = fdnSubObj.data[kb];
+                        const keyUnique = `FDN_${subNoBukti}_${kb}`;
+                        const qtyVal = Number(itm.qty_b || itm.qty_utama || 0);
+
+                        mergedFdnObj[keyUnique] = { kodebarang: kb, qty: qtyVal, nobukti: subNoBukti, tujuan: tujuanNama };
+                        mainGroup.allItems.push({ kodebarang: kb, qty_b: qtyVal });
+                        mainGroup.total_muat_all += qtyVal;
+                    });
+                });
+            });
+
+            titipanDataObj['FDN_GABUNGAN'] = mergedFdnObj;
+
+            const dbRef = firebase.database().ref(`ceklist_muat/arsip_cetak/${mainNodePath}/${mainKey}`);
+            const finalPayload = Object.assign({ meta: mainGroup.meta }, (mainNodePath === 'ceklist_do' ? mainGroup.payloadDO : mainGroup.payloadFDN), {
+                rekap: generateRekapPayload(mainGroup.allItems),
                 titipan: titipanDataObj,
-                total_muat_keseluruhan: group.total_muat_all
+                total_muat_keseluruhan: mainGroup.total_muat_all
             });
 
             savedPromises.push(dbRef.set(finalPayload));
-            printPayloads.push({ nodePath: 'ceklist_do', muatId: muatId, payload: finalPayload });
-        });
+            printPayloads.push({ nodePath: mainNodePath, muatId: mainKey, payload: finalPayload });
 
-        Object.keys(groupedFDN).forEach((muatId) => {
-            const group = groupedFDN[muatId];
-            const dbRef = firebase.database().ref(`ceklist_muat/arsip_cetak/ceklist_fdn/${muatId}`);
-            const finalPayload = Object.assign({ meta: group.meta }, group.payloadFDN, {
-                rekap: generateRekapPayload(group.allItems),
-                titipan: titipanDataObj,
-                total_muat_keseluruhan: group.total_muat_all
+        } else {
+            // PROSES TERPISAH NORMAL (TIDAK DICENTANG / TUJUAN SAMA)
+            Object.keys(groupedDO).forEach((muatId) => {
+                const group = groupedDO[muatId];
+                const dbRef = firebase.database().ref(`ceklist_muat/arsip_cetak/ceklist_do/${muatId}`);
+                const finalPayload = Object.assign({ meta: group.meta }, group.payloadDO, {
+                    rekap: generateRekapPayload(group.allItems),
+                    titipan: titipanDataObj,
+                    total_muat_keseluruhan: group.total_muat_all
+                });
+
+                savedPromises.push(dbRef.set(finalPayload));
+                printPayloads.push({ nodePath: 'ceklist_do', muatId: muatId, payload: finalPayload });
             });
 
-            savedPromises.push(dbRef.set(finalPayload));
-            printPayloads.push({ nodePath: 'ceklist_fdn', muatId: muatId, payload: finalPayload });
-        });
+            Object.keys(groupedFDN).forEach((muatId) => {
+                const group = groupedFDN[muatId];
+                const dbRef = firebase.database().ref(`ceklist_muat/arsip_cetak/ceklist_fdn/${muatId}`);
+                const finalPayload = Object.assign({ meta: group.meta }, group.payloadFDN, {
+                    rekap: generateRekapPayload(group.allItems),
+                    titipan: titipanDataObj,
+                    total_muat_keseluruhan: group.total_muat_all
+                });
 
-        // SIMPAN KE FIREBASE TERLEBIH DAHULU, KEMUDIAN RENDER CETAK & RESET UI
+                savedPromises.push(dbRef.set(finalPayload));
+                printPayloads.push({ nodePath: 'ceklist_fdn', muatId: muatId, payload: finalPayload });
+            });
+        }
+
+        // SIMPAN KE FIREBASE & RENDER CETAK OTOMATIS
         Promise.all(savedPromises).then(() => {
-            console.log("--> Arsip berhasil disimpan ke Firebase.");
+            console.log("--> Data berhasil disimpan.");
 
-            // 1. LANGSUNG RENDER DAN CETAK OTOMATIS BERDASARKAN DATA YANG BARU DISIMPAN
-            // Kita panggil fungsi cetakUlangArsip untuk setiap muatId yang baru disimpan
             printPayloads.forEach(item => {
                 if (typeof window.cetakUlangArsip === 'function') {
                     window.cetakUlangArsip(item.nodePath, item.muatId);
                 }
             });
 
-            // 2. BERSIHKAN / RESET CACHE & INPUT FORM SECARA TOTAL
+            // RESET CACHE & INPUT FORM SECARA TOTAL
             cacheCeklistDO = {};
             cacheCeklistFDN = {};
             if (typeof dataTitipanList !== 'undefined') dataTitipanList = [];
@@ -2108,13 +2283,13 @@ window.cetakCeklistMuat = function() {
             if (typeof invalidateArsipCache === 'function') invalidateArsipCache();
 
         }).catch((err) => {
-            console.error("Gagal menyimpan ke database:", err);
+            console.error("Gagal menyimpan data:", err);
             if (typeof miuiAlert === 'function') miuiAlert("Gagal menyimpan arsip ke Database!");
             else alert("Gagal menyimpan arsip ke Database!");
         });
     };
 
-    // Modal Konfirmasi MIUI
+    // Modal Konfirmasi dengan Checkbox Penggabungan Berdasarkan Perbedaan Tujuan
     const modalConfirm = document.getElementById('modal-miuiAlert') || document.getElementById('miui-global-miuiAlert');
     const msgEl = document.getElementById('miui-miuiAlert-message');
     const containerOk = document.getElementById('miui-container-ok');
@@ -2123,7 +2298,19 @@ window.cetakCeklistMuat = function() {
     const btnTidak = document.getElementById('miui-btn-tidak');
 
     if (modalConfirm && msgEl && containerConfirm) {
-        msgEl.textContent = "Apakah Anda yakin ingin memproses cetak dan menyimpan arsip data ke Database?";
+        let textMsg = "Apakah Anda yakin ingin memproses cetak dan menyimpan arsip data ke Database?";
+        
+        let mergeCheckboxHtml = '';
+        if (canMerge) {
+            mergeCheckboxHtml = `
+                <div class="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-left text-xs font-semibold text-amber-900 flex items-center gap-2">
+                    <input type="checkbox" id="chk-gabung-fdn-do" class="w-4 h-4 text-slate-600 text-[16px] rounded cursor-pointer" style="width:30px; height:30px; cursor:pointer;">
+                    <label for="chk-gabung-fdn-do" class="cursor-pointer select-none">Gabungkan dokumen dengan alamat/tujuan berbeda ke satu lembar?</label>
+                </div>
+            `;
+        }
+
+        msgEl.innerHTML = textMsg + mergeCheckboxHtml;
         if (containerOk) containerOk.classList.add('hidden');
         containerConfirm.classList.remove('hidden');
         modalConfirm.classList.remove('hidden');
@@ -2134,17 +2321,21 @@ window.cetakCeklistMuat = function() {
         if (btnTidak.parentNode) btnTidak.parentNode.replaceChild(newBtnTidak, btnTidak);
 
         newBtnYa.addEventListener('click', function() {
+            const chkEl = document.getElementById('chk-gabung-fdn-do');
+            const isMergedChecked = chkEl ? chkEl.checked : false;
             modalConfirm.classList.add('hidden');
-            eksekusiSimpan();
+            eksekusiSimpan(isMergedChecked);
         });
 
         newBtnTidak.addEventListener('click', function() {
             modalConfirm.classList.add('hidden');
         });
     } else {
-        if (confirm("Apakah Anda yakin ingin memproses cetak dan menyimpan arsip data ke Database?")) {
-            eksekusiSimpan();
+        let isMerged = false;
+        if (canMerge) {
+            isMerged = confirm("Terdeteksi dokumen dengan alamat/tujuan berbeda.\n\nKlik 'OK' jika ingin MENGGABUNGKAN ke satu lembar.\nKlik 'Batal' untuk mencetak terpisah.");
         }
+        eksekusiSimpan(isMerged);
     }
 };
 
