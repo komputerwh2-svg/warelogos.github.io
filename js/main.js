@@ -1394,6 +1394,68 @@ window.bukaSubPageDoTrobel = bukaSubPageDoTrobel;
 window.tutupSubPageDoTrobel = tutupSubPageDoTrobel;
 
 
+
+// Fungsi untuk membuka subpage Barang Export
+function bukaSubPageExport() {
+    const container = document.getElementById('subpage-export-container'); 
+    
+    if (!container) {
+        console.error("Wadah 'subpage-export-container' tidak ditemukan di index.html!");
+        return;
+    }
+
+    const subpage = document.getElementById('subpage-export');
+
+    // Jika sudah ada (sudah pernah di-fetch), langsung buka
+    if (subpage) {
+        subpage.classList.remove('translate-x-full');
+        return;
+    }
+
+    // Fetch file HTML subpage Barang Export (sesuaikan path folder jika diletakkan di dalam folder apps/)
+    fetch('apps/export.html') 
+        .then(response => {
+            if (!response.ok) throw new Error("Gagal mengambil file apps/export.html");
+            return response.text();
+        })
+        .then(htmlContent => {
+            container.innerHTML = htmlContent;
+
+            // Suntikkan script JS-nya
+            const script = document.createElement('script');
+            script.src = "js/export.js"; 
+            
+            script.onload = () => {
+                // Panggil fungsi inisialisasi modul Barang Export
+                if (typeof window.initExport === 'function') {
+                    window.initExport();
+                }
+                
+                const elemenBaru = document.getElementById('subpage-export');
+                if (elemenBaru) {
+                    elemenBaru.classList.remove('translate-x-full');
+                }
+            };
+            document.body.appendChild(script);
+        })
+        .catch(error => {
+            console.error(error);
+            miuiAlert("Sistem Gagal Memuat Template Barang Export!");
+        });
+}
+
+// Fungsi untuk menutup subpage Barang Export
+window.tutupSubPageExport = function() {
+    const subpage = document.getElementById('subpage-export');
+    if (subpage) {
+        subpage.classList.add('translate-x-full');
+    }
+};
+
+window.bukaSubPageExport = bukaSubPageExport;
+window.tutupSubPageExport = tutupSubPageExport;
+
+
 // Fungsi untuk membuka subpage Aplikasi Mutasi
 function bukaSubPageMutasi() {
     // 1. Tentukan kontenernya (pastikan ada <div id="subpage-mutasi-container"></div> di index.html Anda)
