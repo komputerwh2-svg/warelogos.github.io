@@ -199,7 +199,7 @@
 
         <!-- Panel Bawah: Rekap Stok Realtime & Sisa Stok Per Tanggal Muat -->
         <div class="grid grid-cols-12 gap-3 mt-4">
-    
+
             <!-- Kiri Bawah: Riwayat Input Masuk & Rekap Stok Berjalan (Dibagi 2 Kolom) -->
             <div class="col-span-6 bg-white rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col">
                 <div class="bg-gradient-to-b from-slate-50 to-slate-100 px-3 py-2 border-b border-[#e5e5e5] flex justify-between items-center">
@@ -212,9 +212,10 @@
                     <!-- Kolom Kiri: Riwayat Input Masuk (6 Kolom) -->
                     <div class="col-span-6 flex flex-col space-y-1">
                         <span class="text-[9px] font-bold text-slate-500 uppercase">RIWAYAT INPUT MASUK:</span>
-                        <div class="max-h-100 overflow-y-auto border border-slate-200 rounded bg-white miui-custom-scroll">
+                        <!-- Menggunakan h-80 (20rem / 320px) agar kotak tinggi & konsisten -->
+                        <div class="h-80 overflow-y-auto border border-slate-200 rounded bg-white miui-custom-scroll">
                             <table class="w-full text-left text-[9px] border-collapse">
-                                <thead class="sticky top-0 bg-slate-100">
+                                <thead class="sticky top-0 bg-slate-100 z-10">
                                     <tr class="text-slate-600 uppercase font-bold">
                                         <th class="p-1.5 px-2">Tgl / PIN</th>
                                         <th class="p-1.5 px-2">Kode</th>
@@ -232,9 +233,9 @@
                     <!-- Kolom Kanan: Rekap Stok Realtime Berjalan (6 Kolom) -->
                     <div class="col-span-6 flex flex-col space-y-1">
                         <span class="text-[9px] font-bold text-slate-500 uppercase">REKAP STOK REALTIME (1 PLT = 153 KRT):</span>
-                        <div class="max-h-100 overflow-y-auto border border-slate-200 rounded bg-white miui-custom-scroll">
+                        <div class="h-80 overflow-y-auto border border-slate-200 rounded bg-white miui-custom-scroll">
                             <table class="w-full text-left text-[9px] border-collapse">
-                                <thead class="sticky top-0 bg-slate-100">
+                                <thead class="sticky top-0 bg-slate-100 z-10">
                                     <tr class="text-slate-600 uppercase font-bold">
                                         <th class="p-1.5 px-2">KODE</th>
                                         <th class="p-1.5 px-2 text-center">IN</th>
@@ -253,7 +254,7 @@
                 </div>
             </div>
 
-            <!-- Kanan Bawah: Panel Sisa Stok Per Tanggal Muat (Dibagi 2 Kolom Tanpa Kotak Dalam) -->
+            <!-- Kanan Bawah: Panel Sisa Stok Per Tanggal Muat (Dibagi 2 Kolom) -->
             <div class="col-span-6 bg-white rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col">
                 <div class="bg-gradient-to-b from-slate-50 to-slate-100 px-3 py-2 border-b border-[#e5e5e5] flex justify-between items-center">
                     <span class="text-[10px] font-bold text-slate-700 uppercase tracking-wider">RIWAYAT MUAT DAN SISA STOK</span>
@@ -265,9 +266,9 @@
                     <!-- Kolom Kiri: Riwayat Muat (6 Kolom) -->
                     <div class="col-span-6 flex flex-col space-y-1">
                         <span class="text-[9px] font-bold text-slate-500 uppercase">RIWAYAT MUAT:</span>
-                        <div class="max-h-100 overflow-y-auto border border-slate-200 rounded bg-white miui-custom-scroll">
+                        <div class="h-80 overflow-y-auto border border-slate-200 rounded bg-white miui-custom-scroll">
                             <table class="w-full text-left text-[9px] border-collapse">
-                                <thead class="sticky top-0 bg-slate-100">
+                                <thead class="sticky top-0 bg-slate-100 z-10">
                                     <tr class="text-slate-600 uppercase font-bold">
                                         <th class="p-1.5 px-2">TGL MUAT</th>
                                         <th class="p-1.5 px-2">BUYER & TUJUAN</th>
@@ -283,9 +284,9 @@
                     <!-- Kolom Kanan: Catatan Sisa Stok (6 Kolom) -->
                     <div class="col-span-6 flex flex-col space-y-1">
                         <span class="text-[9px] font-bold text-slate-500 uppercase">CATATAN SISA STOK:</span>
-                        <div class="max-h-100 overflow-y-auto border border-slate-200 rounded bg-white miui-custom-scroll">
+                        <div class="h-80 overflow-y-auto border border-slate-200 rounded bg-white miui-custom-scroll">
                             <table class="w-full text-left text-[9px] border-collapse">
-                                <thead class="sticky top-0 bg-slate-100">
+                                <thead class="sticky top-0 bg-slate-100 z-10">
                                     <tr class="text-slate-600 uppercase font-bold">
                                         <th class="p-1.5 px-2">TGL / BATCH</th>
                                         <th class="p-1.5 px-2 text-center">RINCIAN SISA STOK</th>
