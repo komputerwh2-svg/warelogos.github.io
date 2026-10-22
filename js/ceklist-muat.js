@@ -893,15 +893,15 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                 if (row._isTitipan) {
                     rowsHtml += `
                         <tr style="border-bottom: 1px solid #94a3b8; font-size: 10pt;">
-                            <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center; width: 32px;">${validItemCounter}</td>
-                            <td style="border-right: 1px solid #000; padding: 1px 5px; font-size: 10pt; font-weight: bold; font-family: Trebuchet MS;">${row.kodebarang}</td>
+                            <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center; width: 30px;">${validItemCounter}</td>
+                            <td style="border-right: 1px solid #000; padding: 1px 5px; font-size: 10pt; width: 45px; font-weight: bold; font-family: Trebuchet MS;">${row.kodebarang}</td>
                             <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center; width: 26px;"></td>
-                            <td style="border-right: 1px solid #000; padding: 1px 5px; text-align: center; width: 50px; font-size: 10pt; font-weight: bold; font-family: Trebuchet MS;">${row.qty_b}</td>
-                            <td style="border-right: 1px solid #000; padding: 1px 5px; text-align: center; width: 90px; font-size: 10pt;">
+                            <td style="border-right: 1px solid #000; padding: 1px 18px; text-align: center; width: 50px; font-size: 10pt; font-weight: bold; font-family: Trebuchet MS;">${row.qty_b}</td>
+                            <td style="border-right: 1px solid #000; padding: 1px 5px; text-align: center; width: 80px; font-size: 10pt;">
                                 <span style="font-weight: bold; font-family: Trebuchet MS;">${row.kodegudang}</span>
                             </td>
                             <td style="border-right: 1px solid #000; padding: 1px 2px;"></td>
-                            <td style="padding: 1px 2px; width: 65px;"></td>
+                            <td style="padding: 1px 2px; width: 50px;"></td>
                         </tr>
                     `;
                     return;
@@ -916,15 +916,15 @@ window.cetakUlangArsip = async function(kategori, muatId) {
 
                 rowsHtml += `
                     <tr style="border-bottom: 1px solid #94a3b8; font-size: 10pt;">
-                        <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center; width: 32px;">${validItemCounter}</td>
-                        <td style="border-right: 1px solid #000; padding: 1px 5px; font-size: 10pt; font-weight: bold; font-family: Trebuchet MS;">${row.kodebarang}</td>
+                        <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center; width: 30px;">${validItemCounter}</td>
+                        <td style="border-right: 1px solid #000; padding: 1px 5px; font-size: 10pt; width: 45px; font-weight: bold; font-family: Trebuchet MS;">${row.kodebarang}</td>
                         <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center; width: 26px;"></td>
-                        <td style="border-right: 1px solid #000; padding: 1px 5px; text-align: center; width: 50px; font-size: 10pt; font-weight: bold; font-family: Trebuchet MS;">${qtyTampil}</td>
-                        <td style="border-right: 1px solid #000; padding: 1px 5px; text-align: center; width: 90px; font-size: 10pt;">
+                        <td style="border-right: 1px solid #000; padding: 1px 18px; text-align: center; width: 50px; font-size: 10pt; font-weight: bold; font-family: Trebuchet MS;">${qtyTampil}</td>
+                        <td style="border-right: 1px solid #000; padding: 1px 5px; text-align: center; width: 80px; font-size: 10pt;">
                             <span style="font-weight: bold; font-family: Trebuchet MS;">${gudangTeks}</span> ${sourceTag}
                         </td>
                         <td style="border-right: 1px solid #000; padding: 1px 2px;"></td>
-                        <td style="padding: 1px 2px; width: 65px;"></td>
+                        <td style="padding: 1px 2px; width: 50px;"></td>
                     </tr>
                 `;
             });
@@ -979,7 +979,7 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                                 <table style="width: 100%; border-collapse: collapse;">
                                     <tr style="border-bottom: 1px solid #000;">
                                         <td style="padding: 4px 6px; font-weight: bold; font-size: 10pt; text-align: left;">TOTAL CHECKLIST</td>
-                                        <td style="padding: 4px 6px; font-weight: bold; font-size: 12pt; text-align: center; width: 55px; border-left: 1px solid #000; text-decoration: underline;">
+                                        <td style="padding: 4px 6px; font-weight: bold; font-size: 12pt; text-align: center; width: 65px; border-left: 1px solid #000; text-decoration: underline;">
                                             ${totalHalaman}
                                         </td>
                                     </tr>
@@ -991,7 +991,7 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                                     Total Checklist : ${infoTotalTeks}
                                 </div>
                             </td>
-                            <td style="border-right: 1px solid #000; padding: 4px 5px; font-style: italic; font-size: 7pt; vertical-align: top; width: 170px; line-height: 1.2;">
+                            <td style="border-right: 1px solid #000; padding: 4px 5px; font-style: italic; font-size: 7pt; vertical-align: top; width: 160px; line-height: 1.2;">
                                 Barang yang telah dimuat di armada dan diperiksa bersama, setelah meninggalkan gudang sepenuhnya menjadi tanggung jawab driver.
                             </td>
                             <td style="border-right: 1px solid #000; padding: 4px; text-align: center; vertical-align: top;">
@@ -1171,6 +1171,17 @@ window.cetakUlangArsip = async function(kategori, muatId) {
             </head>
             <body>
                 ${pagesHtml}
+                <script>
+                    window.onload = function() {
+                        setTimeout(function() {
+                            window.print();
+                        }, 300);
+                    };
+                    // Otomatis menutup tab setelah cetak selesai atau dialog print ditutup
+                    window.onafterprint = function() {
+                        window.close();
+                    };
+                </script>
             </body>
             </html>
         `;
