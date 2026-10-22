@@ -95,9 +95,9 @@
                     <!-- Kolom Kanan: Cache Batch Masuk (6 Kolom) -->
                     <div class="col-span-6 flex flex-col justify-between">
                         <div>
-                            <span class="text-[9px] font-bold text-slate-500 uppercase block mb-1">CACHE BATCH MASUK:</span>
+                            <span class="text-[10px] font-bold text-slate-500 uppercase block mb-1">DAFTAR ITEM MASUK:</span>
                             <div class="overflow-y-auto border border-slate-200 rounded bg-white" style="max-height: 200px; min-height: 200px;">
-                                <table class="w-full text-left text-[9px] border-collapse">
+                                <table class="w-full text-left text-[10px] border-collapse">
                                     <thead class="sticky top-0 bg-slate-100">
                                         <tr class="text-slate-600 uppercase font-bold">
                                             <th class="p-1 px-1.5">Kode</th>
@@ -175,9 +175,9 @@
                     <!-- Kolom Kanan: Tabel Cache Batch Item Keluar (6 Kolom) -->
                     <div class="col-span-6 flex flex-col justify-between">
                         <div>
-                            <span class="text-[9px] font-bold text-slate-500 uppercase block mb-1">CACHE BATCH KELUAR:</span>
+                            <span class="text-[10px] font-bold text-slate-500 uppercase block mb-1">DAFTAR ITEM KELUAR:</span>
                             <div class="overflow-y-auto border border-slate-200 rounded bg-white" style="max-height: 200px; min-height: 200px;">
-                                <table class="w-full text-left text-[9px] border-collapse">
+                                <table class="w-full text-left text-[10px] border-collapse">
                                     <thead class="sticky top-0 bg-slate-100">
                                         <tr class="text-slate-600 uppercase font-bold">
                                             <th class="p-1 px-1.5">Kode Barang</th>
@@ -211,10 +211,10 @@
                     
                     <!-- Kolom Kiri: Riwayat Input Masuk (6 Kolom) -->
                     <div class="col-span-6 flex flex-col space-y-1">
-                        <span class="text-[9px] font-bold text-slate-500 uppercase">RIWAYAT INPUT MASUK:</span>
+                        <span class="text-[10px] font-bold text-slate-500 uppercase">RIWAYAT INPUT MASUK:</span>
                         <!-- Menggunakan h-80 (20rem / 320px) agar kotak tinggi & konsisten -->
                         <div class="h-80 overflow-y-auto border border-slate-200 rounded bg-white miui-custom-scroll">
-                            <table class="w-full text-left text-[9px] border-collapse">
+                            <table class="w-full text-left text-[10px] border-collapse">
                                 <thead class="sticky top-0 bg-slate-100 z-10">
                                     <tr class="text-slate-600 uppercase font-bold">
                                         <th class="p-1.5 px-2">Tgl / PIN</th>
@@ -232,9 +232,9 @@
 
                     <!-- Kolom Kanan: Rekap Stok Realtime Berjalan (6 Kolom) -->
                     <div class="col-span-6 flex flex-col space-y-1">
-                        <span class="text-[9px] font-bold text-slate-500 uppercase">REKAP STOK REALTIME (1 PLT = 153 KRT):</span>
+                        <span class="text-[10px] font-bold text-slate-500 uppercase">REKAP STOK TERSEDIA:</span>
                         <div class="h-80 overflow-y-auto border border-slate-200 rounded bg-white miui-custom-scroll">
-                            <table class="w-full text-left text-[9px] border-collapse">
+                            <table class="w-full text-left text-[10px] border-collapse">
                                 <thead class="sticky top-0 bg-slate-100 z-10">
                                     <tr class="text-slate-600 uppercase font-bold">
                                         <th class="p-1.5 px-2">KODE</th>
@@ -265,13 +265,13 @@
                     
                     <!-- Kolom Kiri: Riwayat Muat (6 Kolom) -->
                     <div class="col-span-6 flex flex-col space-y-1">
-                        <span class="text-[9px] font-bold text-slate-500 uppercase">RIWAYAT MUAT:</span>
+                        <span class="text-[10px] font-bold text-slate-500 uppercase">RIWAYAT MUAT:</span>
                         <div class="h-80 overflow-y-auto border border-slate-200 rounded bg-white miui-custom-scroll">
-                            <table class="w-full text-left text-[9px] border-collapse">
+                            <table class="w-full text-left text-[10px] border-collapse">
                                 <thead class="sticky top-0 bg-slate-100 z-10">
                                     <tr class="text-slate-600 uppercase font-bold">
-                                        <th class="p-1.5 px-2">TGL MUAT</th>
-                                        <th class="p-1.5 px-2">BUYER & TUJUAN</th>
+                                        <th class="p-1.5 px-2">BUYER / TUJUAN</th>
+                                        <th class="p-1.5 px-2">KODE / QTY</th>
                                     </tr>
                                 </thead>
                                 <tbody id="table-riwayat-muat-export" class="divide-y divide-slate-100 font-medium text-slate-800">
@@ -283,9 +283,14 @@
 
                     <!-- Kolom Kanan: Catatan Sisa Stok (6 Kolom) -->
                     <div class="col-span-6 flex flex-col space-y-1">
-                        <span class="text-[9px] font-bold text-slate-500 uppercase">CATATAN SISA STOK:</span>
+                        <div class="flex justify-between items-center mb-2 px-1">
+                            <span class="text-[10px] font-bold text-slate-500 uppercase">CATATAN SISA STOK:</span>
+                            <button onclick="simpanSisaStokAktif()" class="bg-blue-600 hover:bg-blue-700 text-white text-[9px] font-bold px-2.5 py-1 rounded shadow transition flex items-center gap-1">
+                                <i class="fa-solid fa-floppy-disk"></i> SIMPAN SISA STOK
+                            </button>
+                        </div>
                         <div class="h-80 overflow-y-auto border border-slate-200 rounded bg-white miui-custom-scroll">
-                            <table class="w-full text-left text-[9px] border-collapse">
+                            <table class="w-full text-left text-[10px] border-collapse">
                                 <thead class="sticky top-0 bg-slate-100 z-10">
                                     <tr class="text-slate-600 uppercase font-bold">
                                         <th class="p-1.5 px-2">TGL / BATCH</th>
