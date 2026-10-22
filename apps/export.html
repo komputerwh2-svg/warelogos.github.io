@@ -1,0 +1,306 @@
+<div id="subpage-export" class="fixed inset-0 z-40 translate-x-full transition-transform duration-300 ease-in-out flex flex-col font-sans select-none overflow-hidden" style="background-color: #ffedd5;">
+    
+    <!-- Header dengan Tab Slider Brand (MEXA, MXR, PUXR) -->
+    <div class="w-full h-auto min-h-[60px] flex items-center justify-between px-3 shadow-md relative z-10" 
+        style="background: linear-gradient(to bottom, #3c3c3c, #2a2a2a); border-bottom: 1px solid #1a1a1a;">
+            
+        <div class="flex items-center gap-3 py-2">
+            <button onclick="tutupSubPageExport()" class="miui-btn-back flex items-center justify-center gap-1 px-3 py-1.5 rounded text-xs font-bold text-orange-400 shadow-inner">
+                <i class="fa-solid fa-chevron-left text-sm"></i>
+                <span>Kembali</span>
+            </button>
+            <div class="h-6 w-[1px] bg-white/10 mx-1"></div>
+            <h1 class="text-white font-bold text-[13px] tracking-wide drop-shadow-md">
+                Pencatatan & Rekap Barang Export
+            </h1>
+        </div>
+
+        <!-- Tab Slider Kategori Brand (Hanya MEXA & PUXR) -->
+        <div class="flex items-center bg-black/35 p-1 rounded-xl border border-black/30 shadow-inner gap-0.5">
+            <div class="flex items-center gap-1">
+                <!-- Tab 1: MEXA -->
+                <label class="relative flex items-center justify-center px-4 py-1.5 rounded-lg text-[11px] font-black uppercase cursor-pointer transition-all">
+                    <input type="radio" name="rb-export-kategori" value="MEXA" checked onchange="gantiKategoriExportSlider(this.value)" class="sr-only peer">
+                    <span class="z-10 text-gray-300 peer-checked:text-white transition-colors">MEXA (MARIMAS)</span>
+                    <div class="absolute inset-0 rounded-lg shadow-md opacity-0 scale-95 peer-checked:opacity-100 peer-checked:scale-100 transition-all duration-200" style="background: linear-gradient(to bottom, #ff8b00, #f36c00);"></div>
+                </label>
+
+                <!-- Tab 2: PUXR -->
+                <label class="relative flex items-center justify-center px-4 py-1.5 rounded-lg text-[11px] font-black uppercase cursor-pointer transition-all">
+                    <input type="radio" name="rb-export-kategori" value="PUXR" onchange="gantiKategoriExportSlider(this.value)" class="sr-only peer">
+                    <span class="z-10 text-gray-300 peer-checked:text-white transition-colors">PUXR (POP UP)</span>
+                    <div class="absolute inset-0 rounded-lg shadow-md opacity-0 scale-95 peer-checked:opacity-100 peer-checked:scale-100 transition-all duration-200" style="background: linear-gradient(to bottom, #3b82f6, #1d4ed8);"></div>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Area dengan Summary Cards di Atas -->
+    <div class="flex-1 overflow-y-auto p-3 space-y-3 pb-10">
+        
+        <!-- Panel Form Input (Kiri: Masuk | Kanan: Keluar Batch) -->
+        <div class="grid grid-cols-12 gap-3">
+            
+            <!-- Panel Kiri: Input Barang Masuk (Produksi / IN) -->
+            <div class="col-span-6 bg-emerald-50/60 rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col">
+                <div class="p-2.5 border-b border-[#eaeaea] bg-slate-50 flex justify-between items-center h-10">
+                    <span class="text-[10px] font-bold text-emerald-700 uppercase tracking-wide">Input Barang Masuk (Produksi / IN)</span>
+                    <span class="text-[9px] font-bold text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded uppercase">MASUK</span>
+                </div>
+
+                <div class="p-3 grid grid-cols-12 gap-3 flex-1">
+                    
+                    <!-- Kolom Kiri: Form Input & Tombol Simpan (6 Kolom) -->
+                    <div class="col-span-6 space-y-2 flex flex-col justify-between">
+                        <div class="space-y-2">
+                            <!-- Tanggal Produksi (1 Baris Penuh) -->
+                            <div>
+                                <label class="text-[9px] font-bold text-slate-600 block mb-0.5">Tanggal Produksi</label>
+                                <input type="date" id="in-batch-tanggal" class="w-full bg-white border border-[#c8c8c8] rounded-md py-1 px-1.5 text-[11px] font-bold text-slate-800 outline-none focus:border-emerald-500">
+                            </div>
+
+                            <!-- No. Bukti / PIN (1 Baris Penuh) -->
+                            <div>
+                                <label class="text-[9px] font-bold text-slate-600 block mb-0.5">No. Bukti / PIN</label>
+                                <input type="text" id="in-batch-pin" placeholder="PIN-..." class="w-full bg-white border border-[#c8c8c8] rounded-md py-1 px-1.5 text-[11px] font-bold text-slate-800 outline-none focus:border-emerald-500 uppercase">
+                            </div>
+                            
+                            <!-- Kode Barang & Qty Sejajar Kiri-Kanan -->
+                            <div class="grid grid-cols-12 gap-1.5 items-end">
+                                <div class="col-span-8">
+                                    <label class="text-[9px] font-bold text-slate-600 block mb-0.5">Kode Barang</label>
+                                    <select id="in-item-kode" class="w-full bg-white border border-[#c8c8c8] rounded-md py-1 px-1 text-[11px] font-bold text-slate-800 outline-none">
+                                        <option value="">Pilih Kode...</option>
+                                    </select>
+                                </div>
+                                <div class="col-span-4">
+                                    <label class="text-[9px] font-bold text-slate-600 block mb-0.5">Qty Krt</label>
+                                    <input type="number" id="in-item-qty" placeholder="0" class="w-full bg-white border border-[#c8c8c8] rounded-md py-1 px-1 text-[11px] font-bold text-slate-800 outline-none">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tombol Tambah & Tombol Simpan Utama -->
+                        <div class="space-y-1.5">
+                            <button onclick="tambahItemCacheMasuk()" class="w-full py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded shadow transition uppercase">
+                                <i class="fa-solid fa-plus mr-1"></i> Tambah Item
+                            </button>
+
+                            <button onclick="simpanBatchMasukExport()" class="w-full py-1.5 bg-gradient-to-b from-[#10b981] to-[#059669] text-white font-bold text-[10px] rounded-lg shadow-md border border-emerald-600 uppercase tracking-wide">
+                                Simpan & Proses Masuk
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Kolom Kanan: Cache Batch Masuk (6 Kolom) -->
+                    <div class="col-span-6 flex flex-col justify-between">
+                        <div>
+                            <span class="text-[9px] font-bold text-slate-500 uppercase block mb-1">CACHE BATCH MASUK:</span>
+                            <div class="overflow-y-auto border border-slate-200 rounded bg-white" style="max-height: 200px; min-height: 200px;">
+                                <table class="w-full text-left text-[9px] border-collapse">
+                                    <thead class="sticky top-0 bg-slate-100">
+                                        <tr class="text-slate-600 uppercase font-bold">
+                                            <th class="p-1 px-1.5">Kode</th>
+                                            <th class="p-1 px-1.5 text-center">Qty</th>
+                                            <th class="p-1 px-1.5 text-center">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="table-cache-masuk" class="divide-y divide-slate-100 font-medium text-slate-800 miui-custom-scrollbar">
+                                        <tr><td colspan="3" class="text-center py-4 text-slate-400 italic">Belum ada data diinput...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Panel Kanan: Form Barang Keluar (OUT / Batch Loading Per Buyer) - Re-layout 2 Kolom -->
+            <div class="col-span-6 bg-rose-50/60 rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col">
+                <div class="p-2.5 border-b border-[#eaeaea] bg-slate-50 flex justify-between items-center h-10">
+                    <span class="text-[10px] font-bold text-rose-700 uppercase tracking-wide">Input Barang Keluar (Pengiriman / Out)</span>
+                    <span class="text-[9px] font-bold text-rose-600 bg-rose-100 px-1.5 py-0.5 rounded uppercase">KELUAR</span>
+                </div>
+
+                <div class="p-3 grid grid-cols-12 gap-3 flex-1">
+                    
+                    <!-- Kolom Kiri: Form Input Data Keluar (6 Kolom) -->
+                    <div class="col-span-6 flex flex-col justify-between space-y-2">
+                        <div class="space-y-2">
+                            <!-- Baris 1: Tgl Loading & Nama Buyer -->
+                            <div class="grid grid-cols-12 gap-1.5">
+                                <div class="col-span-5">
+                                    <label class="text-[9px] font-bold text-slate-500 block mb-0.5">Tgl Loading</label>
+                                    <input type="date" id="out-tanggal-muat" class="w-full bg-white border border-[#c8c8c8] rounded-md py-1 px-1.5 text-[11px] font-bold text-slate-800 outline-none focus:border-rose-500">
+                                </div>
+                                <div class="col-span-7">
+                                    <label class="text-[9px] font-bold text-slate-500 block mb-0.5">Nama Buyer</label>
+                                    <input type="text" id="out-buyer" placeholder="Nama Buyer..." class="w-full bg-white border border-[#c8c8c8] rounded-md py-1 px-1.5 text-[11px] font-bold text-slate-800 outline-none focus:border-rose-500">
+                                </div>
+                            </div>
+
+                            <!-- Baris 2: Tujuan / Alamat -->
+                            <div>
+                                <label class="text-[9px] font-bold text-slate-500 block mb-0.5">Tujuan / Alamat</label>
+                                <input type="text" id="out-tujuan" placeholder="Kota / Alamat..." class="w-full bg-white border border-[#c8c8c8] rounded-md py-1 px-1.5 text-[11px] font-bold text-slate-800 outline-none focus:border-rose-500">
+                            </div>
+
+                            <!-- Baris 3: Kode Barang & Qty Karton -->
+                            <div class="grid grid-cols-12 gap-1.5">
+                                <div class="col-span-8">
+                                    <label class="text-[9px] font-bold text-slate-500 block mb-0.5">Kode Barang</label>
+                                    <select id="out-item-kode" class="w-full bg-white border border-[#c8c8c8] rounded-md py-1 px-1 text-[11px] font-bold text-slate-800 outline-none">
+                                        <option value="">Pilih Kode...</option>
+                                    </select>
+                                </div>
+                                <div class="col-span-4">
+                                    <label class="text-[9px] font-bold text-slate-500 block mb-0.5">Qty Krt</label>
+                                    <input type="number" id="out-item-qty" placeholder="0" class="w-full bg-white border border-[#c8c8c8] rounded-md py-1 px-1.5 text-[11px] font-bold text-slate-800 outline-none">
+                                </div>
+                            </div>
+
+                            <!-- Tombol Tambah Item Cache -->
+                            <button onclick="tambahItemCacheKeluar()" class="w-full py-1 bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold rounded shadow transition flex items-center justify-center gap-1">
+                                <i class="fa-solid fa-plus text-[9px]"></i> TAMBAH ITEM
+                            </button>
+                        </div>
+
+                        <!-- Tombol Simpan & Proses Pengiriman -->
+                        <div>
+                            <button onclick="simpanBatchKeluarExport()" class="w-full py-1.5 bg-gradient-to-b from-[#f43f5e] to-[#e11d48] text-white font-bold text-[10px] rounded-lg shadow-md border border-rose-600 uppercase tracking-wide hover:brightness-105 transition">SIMPAN & PROSES PENGIRIMAN</button>
+                        </div>
+                    </div>
+
+                    <!-- Kolom Kanan: Tabel Cache Batch Item Keluar (6 Kolom) -->
+                    <div class="col-span-6 flex flex-col justify-between">
+                        <div>
+                            <span class="text-[9px] font-bold text-slate-500 uppercase block mb-1">CACHE BATCH KELUAR:</span>
+                            <div class="overflow-y-auto border border-slate-200 rounded bg-white" style="max-height: 200px; min-height: 200px;">
+                                <table class="w-full text-left text-[9px] border-collapse">
+                                    <thead class="sticky top-0 bg-slate-100">
+                                        <tr class="text-slate-600 uppercase font-bold">
+                                            <th class="p-1 px-1.5">Kode Barang</th>
+                                            <th class="p-1 px-1.5 text-center">Qty (KRT)</th>
+                                            <th class="p-1 px-1.5 text-center">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="table-cache-keluar" class="divide-y divide-slate-100 font-medium text-slate-800 miui-custom-scrollbar">
+                                        <tr><td colspan="3" class="text-center py-4 text-slate-400 italic">Belum ada item ditambahkan ke batch ini</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel Bawah: Rekap Stok Realtime & Sisa Stok Per Tanggal Muat -->
+        <div class="grid grid-cols-12 gap-3 mt-4">
+    
+            <!-- Kiri Bawah: Riwayat Input Masuk & Rekap Stok Berjalan (Dibagi 2 Kolom) -->
+            <div class="col-span-6 bg-white rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col">
+                <div class="bg-gradient-to-b from-slate-50 to-slate-100 px-3 py-2 border-b border-[#e5e5e5] flex justify-between items-center">
+                    <span class="text-[10px] font-bold text-slate-700 uppercase tracking-wider">RIWAYAT MASUK & REKAP STOK BERJALAN</span>
+                    <span id="lbl-nama-kategori-badge" class="text-[9px] bg-orange-50 px-2 py-0.5 rounded font-black text-orange-600 border border-orange-200">KATEGORI: MEXA</span>
+                </div>
+
+                <div class="p-3 grid grid-cols-12 gap-3 flex-1">
+                    
+                    <!-- Kolom Kiri: Riwayat Input Masuk (6 Kolom) -->
+                    <div class="col-span-6 flex flex-col space-y-1">
+                        <span class="text-[9px] font-bold text-slate-500 uppercase">RIWAYAT INPUT MASUK:</span>
+                        <div class="max-h-60 overflow-y-auto border border-slate-200 rounded bg-white miui-custom-scroll">
+                            <table class="w-full text-left text-[9px] border-collapse">
+                                <thead class="sticky top-0 bg-slate-100">
+                                    <tr class="text-slate-600 uppercase font-bold">
+                                        <th class="p-1.5 px-2">Tgl / PIN</th>
+                                        <th class="p-1.5 px-2">Kode</th>
+                                        <th class="p-1.5 px-2 text-center">Qty</th>
+                                        <th class="p-1.5 px-2 text-center">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-riwayat-masuk-export" class="divide-y divide-slate-100 font-medium text-slate-800">
+                                    <tr><td colspan="4" class="text-center py-6 text-slate-400 italic">Belum ada riwayat tersimpan</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Kolom Kanan: Rekap Stok Realtime Berjalan (6 Kolom) -->
+                    <div class="col-span-6 flex flex-col space-y-1">
+                        <span class="text-[9px] font-bold text-slate-500 uppercase">REKAP STOK REALTIME (1 PLT = 153 KRT):</span>
+                        <div class="max-h-60 overflow-y-auto border border-slate-200 rounded bg-white miui-custom-scroll">
+                            <table class="w-full text-left text-[9px] border-collapse">
+                                <thead class="sticky top-0 bg-slate-100">
+                                    <tr class="text-slate-600 uppercase font-bold">
+                                        <th class="p-1.5 px-2">KODE</th>
+                                        <th class="p-1.5 px-2 text-center">IN</th>
+                                        <th class="p-1.5 px-2 text-center">OUT</th>
+                                        <th class="p-1.5 px-2 text-center">AKHIR</th>
+                                        <th class="p-1.5 px-2 text-center">PLT|BEC</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-rekap-stok-export" class="divide-y divide-slate-100 font-medium text-slate-800">
+                                    <tr><td colspan="5" class="text-center py-6 text-slate-400 italic">Belum ada data stok</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Kanan Bawah: Panel Sisa Stok Per Tanggal Muat (Dibagi 2 Kolom Tanpa Kotak Dalam) -->
+            <div class="col-span-6 bg-white rounded-xl border border-[#dcdcdc] shadow-sm overflow-hidden flex flex-col">
+                <div class="bg-gradient-to-b from-slate-50 to-slate-100 px-3 py-2 border-b border-[#e5e5e5] flex justify-between items-center">
+                    <span class="text-[10px] font-bold text-slate-700 uppercase tracking-wider">RIWAYAT MUAT DAN SISA STOK</span>
+                    <span class="text-[9px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">HISTORI PERIODE</span>
+                </div>
+
+                <div class="p-3 grid grid-cols-12 gap-3 flex-1">
+                    
+                    <!-- Kolom Kiri: Riwayat Muat (6 Kolom) -->
+                    <div class="col-span-6 flex flex-col space-y-1">
+                        <span class="text-[9px] font-bold text-slate-500 uppercase">RIWAYAT MUAT:</span>
+                        <div class="max-h-60 overflow-y-auto border border-slate-200 rounded bg-white miui-custom-scroll">
+                            <table class="w-full text-left text-[9px] border-collapse">
+                                <thead class="sticky top-0 bg-slate-100">
+                                    <tr class="text-slate-600 uppercase font-bold">
+                                        <th class="p-1.5 px-2">TGL MUAT</th>
+                                        <th class="p-1.5 px-2">BUYER & TUJUAN</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-riwayat-muat-export" class="divide-y divide-slate-100 font-medium text-slate-800">
+                                    <tr><td colspan="2" class="text-center py-6 text-slate-400 italic">Belum ada riwayat muat</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Kolom Kanan: Catatan Sisa Stok (6 Kolom) -->
+                    <div class="col-span-6 flex flex-col space-y-1">
+                        <span class="text-[9px] font-bold text-slate-500 uppercase">CATATAN SISA STOK:</span>
+                        <div class="max-h-60 overflow-y-auto border border-slate-200 rounded bg-white miui-custom-scroll">
+                            <table class="w-full text-left text-[9px] border-collapse">
+                                <thead class="sticky top-0 bg-slate-100">
+                                    <tr class="text-slate-600 uppercase font-bold">
+                                        <th class="p-1.5 px-2">TGL / BATCH</th>
+                                        <th class="p-1.5 px-2 text-center">RINCIAN SISA STOK</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-sisa-stok-export" class="divide-y divide-slate-100 font-medium text-slate-800">
+                                    <tr><td colspan="2" class="text-center py-6 text-slate-400 italic">Belum ada catatan sisa stok</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
