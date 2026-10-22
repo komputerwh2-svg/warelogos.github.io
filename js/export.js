@@ -68,6 +68,11 @@ window.initExport = async function() {
 
     // Set default langsung ke MEXA saat pertama kali dibuka
     window.gantiKategoriExportSlider("MEXA");
+
+    // Pastikan catatan sisa stok ikut termuat saat inisialisasi
+    if (typeof loadDanRenderCatatanSisaStok === 'function') {
+        loadDanRenderCatatanSisaStok(window.selectedKategoriExport || "MEXA");
+    }
 };
 
 // Fungsi Slider / Ganti Kategori MEXA / PUXR
@@ -100,6 +105,16 @@ window.gantiKategoriExportSlider = function(kategori) {
     // Render ulang data tabel bawah (Riwayat Masuk & Rekap Stok) agar ikut terfilter
     if (typeof prosesDanRenderDataExport === 'function') {
         prosesDanRenderDataExport(kategori);
+    }
+
+    // Render ulang data Riwayat Muat (OUT) agar ikut terfilter berdasarkan kategori aktif
+    if (typeof prosesDanRenderDataExportOUT === 'function') {
+        prosesDanRenderDataExportOUT(kategori);
+    }
+
+    // Render ulang Catatan Sisa Stok sesuai kategori aktif
+    if (typeof loadDanRenderCatatanSisaStok === 'function') {
+        loadDanRenderCatatanSisaStok(kategori);
     }
 };
 
@@ -450,15 +465,28 @@ function renderRiwayatMasuk(riwayatList) {
     });
 
     let html = "";
-    // Urutkan tanggal dari yang terbaru
+    // Urutkan tanggal dari yang terbaru secara sistem (tetap YYYY-MM-DD)
     const sortedDates = Object.keys(groupedByDate).sort().reverse();
 
+    // Daftar nama hari dalam bahasa Indonesia
+    const namaHari = ["MINGGU", "SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU"];
+
     sortedDates.forEach((tgl) => {
-        // Baris Header Grup Tanggal
+        // Ambil nama hari dan format tanggal DD-MM-YYYY
+        let tglFormatted = tgl;
+        let hariStr = "";
+        if (tgl && tgl.includes("-") && tgl.split("-").length === 3) {
+            const parts = tgl.split("-"); // [YYYY, MM, DD]
+            const dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+            hariStr = namaHari[dateObj.getDay()];
+            tglFormatted = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+
+        // Baris Header Grup Tanggal dengan Hari
         html += `
             <tr class="bg-slate-200/80 font-bold text-slate-700">
-                <td colspan="4" class="p-1.5 px-2 text-[10px] uppercase tracking-wider text-slate-800 border-t border-b border-slate-300">
-                    <i class="fa-regular fa-calendar-days mr-1 text-orange-600"></i> TANGGAL: ${tgl}
+                <td colspan="4" class="p-1.5 px-2 text-[10px] uppercase tracking-wider text-slate-800 border-t border-b border-orange-300">
+                    <i class="fa-regular fa-calendar-days mr-1 text-orange-600"></i>${hariStr}, ${tglFormatted}
                 </td>
             </tr>
         `;
@@ -475,26 +503,26 @@ function renderRiwayatMasuk(riwayatList) {
                 
                 // Kolom PIN (hanya ditampilkan di baris pertama batch tersebut)
                 if (index === 0) {
-                    html += `<td class="p-1.5 px-2 font-semibold text-slate-600 align-top whitespace-nowrap pl-4">${pinOnly}</td>`;
+                    html += `<td class="p-1.5 px-2 text-[10px] font-semibold text-slate-600 align-top whitespace-nowrap pl-4">${pinOnly}</td>`;
                 } else {
-                    html += `<td class="p-1.5 px-2 text-slate-300 align-top"></td>`;
+                    html += `<td class="p-1.5 px-2 text-[10px] text-slate-300 align-top"></td>`;
                 }
 
                 // Kolom Kode & Qty
                 html += `
-                    <td class="p-1.5 px-2 font-semibold text-emerald-700">${item.kode}</td>
-                    <td class="p-1.5 px-2 text-center font-bold text-slate-800">${item.qty}</td>
+                    <td class="p-1.5 px-2 text-[10px] font-semibold text-emerald-700">${item.kode}</td>
+                    <td class="p-1.5 px-2 text-[10px] text-center font-bold text-slate-800">${item.qty}</td>
                 `;
 
                 // Tombol Hapus (hanya di baris pertama batch)
                 if (index === 0) {
                     html += `
-                        <td class="p-1.5 px-2 text-center align-top">
+                        <td class="p-1.5 px-2 text-[10px] text-center align-top">
                             <button onclick="hapusBatchRiwayatMasuk('${batch.batchId}')" class="text-red-500 hover:text-red-700 font-bold" title="Hapus Batch Ini"><i class="fa-solid fa-trash"></i></button>
                         </td>
                     `;
                 } else {
-                    html += `<td class="p-1.5 px-2 text-center align-top"></td>`;
+                    html += `<td class="p-1.5 px-2 text-[10px] text-center align-top"></td>`;
                 }
 
                 html += `</tr>`;
@@ -548,10 +576,324 @@ window.hapusBatchRiwayatMasuk = function(batchId) {
     if (confirm("Apakah Anda yakin ingin menghapus seluruh batch/PIN ini?")) {
         firebase.database().ref(`barang_export/IN/${batchId}`).remove()
             .then(() => {
-                alert("Batch riwayat berhasil dihapus!");
+                miuiAlert("Batch riwayat berhasil dihapus!");
             })
             .catch(error => {
-                alert("Gagal menghapus: " + error.message);
+                miuiAlert("Gagal menghapus: " + error.message);
             });
     }
 };
+
+
+
+// --- FUNGSI PEMPROSESAN & RENDER DATA OUT (RIWAYAT MUAT) ---
+function prosesDanRenderDataExportOUT(kategoriAktif) {
+    const data = globalFirebaseDataExport;
+    let listRiwayatMuat = [];
+    const targetKategori = (kategoriAktif || "MEXA").toUpperCase();
+
+    if (data.OUT) {
+        Object.keys(data.OUT).forEach(batchId => {
+            const batch = data.OUT[batchId];
+            const tglMuat = batch.tanggal || '-';
+            const buyerVal = batch.buyer || '-';
+            const tujuanVal = batch.tujuan || '-';
+            let kategoriBatch = (batch.kategori || "").toUpperCase();
+
+            let itemsInBatch = [];
+            let totalQtyBatch = 0;
+            let isValidCategory = false;
+
+            Object.keys(batch).forEach(key => {
+                const lowerKey = key.toLowerCase();
+                if (lowerKey !== "tanggal" && lowerKey !== "buyer" && lowerKey !== "tujuan" && lowerKey !== "kategori" && lowerKey !== "timestamp" && lowerKey !== "tipe") {
+                    const item = batch[key];
+                    if (item && item.kode) {
+                        let currentKat = kategoriBatch;
+                        if (!currentKat) {
+                            currentKat = item.kode.startsWith("PUXR") ? "PUXR" : "MEXA";
+                        }
+
+                        if (currentKat === targetKategori) {
+                            isValidCategory = true;
+                            const qtyNum = parseInt(item.qty || 0);
+                            totalQtyBatch += qtyNum;
+                            itemsInBatch.push({
+                                kode: item.kode,
+                                qty: qtyNum
+                            });
+                        }
+                    }
+                }
+            });
+
+            if (isValidCategory && itemsInBatch.length > 0) {
+                listRiwayatMuat.push({
+                    batchId: batchId,
+                    tglMuat: tglMuat,
+                    buyer: buyerVal,
+                    tujuan: tujuanVal,
+                    totalQty: totalQtyBatch,
+                    items: itemsInBatch
+                });
+            }
+        });
+    }
+
+    renderRiwayatMuat(listRiwayatMuat);
+}
+
+// --- RENDER TABEL RIWAYAT MUAT (DENGAN TOTAL MUAT) ---
+function renderRiwayatMuat(riwayatList) {
+    const tbody = document.getElementById("table-riwayat-muat-export");
+    if (!tbody) return;
+
+    if (riwayatList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="2" class="text-center py-6 text-slate-400 italic">Belum ada riwayat muat</td></tr>`;
+        return;
+    }
+
+    // Kelompokkan data berdasarkan Tanggal Muat
+    let groupedByDate = {};
+    riwayatList.forEach((batch) => {
+        const tglOnly = batch.tglMuat.trim();
+        if (!groupedByDate[tglOnly]) {
+            groupedByDate[tglOnly] = [];
+        }
+        groupedByDate[tglOnly].push(batch);
+    });
+
+    let html = "";
+    const sortedDates = Object.keys(groupedByDate).sort().reverse();
+    const namaHari = ["MINGGU", "SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU"];
+
+    sortedDates.forEach((tgl) => {
+        let tglFormatted = tgl;
+        let hariStr = "";
+        if (tgl && tgl.includes("-") && tgl.split("-").length === 3) {
+            const parts = tgl.split("-");
+            const dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+            hariStr = namaHari[dateObj.getDay()];
+            tglFormatted = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+
+        // Baris Header Grup Tanggal Muat
+        html += `
+            <tr class="bg-slate-200/80 font-bold text-slate-700">
+                <td colspan="2" class="p-1.5 px-2 text-[10px] uppercase tracking-wider text-slate-800 border-t border-b border-blue-300">
+                    <i class="fa-regular fa-calendar-days mr-1 text-blue-600"></i>${hariStr ? hariStr + ', ' : ''}${tglFormatted}
+                </td>
+            </tr>
+        `;
+
+        groupedByDate[tgl].forEach((batch) => {
+            batch.items.forEach((item, index) => {
+                html += `
+                    <tr class="hover:bg-slate-50 border-t border-slate-100">
+                `;
+                
+                // Kolom Kiri: Buyer (Atas) & Tujuan + Total Muat (Bawah) - Hanya di baris pertama batch
+                if (index === 0) {
+                    html += `
+                        <td class="p-1.5 px-2 align-top pl-4">
+                            <div class="font-bold text-slate-800 uppercase">${batch.buyer}</div>
+                            <div class="text-[10px] font-medium text-slate-600 uppercase">
+                                ${batch.tujuan} <span class="font-bold text-blue-700 ml-1">| Total : ${batch.totalQty.toLocaleString('id-ID')} Krt</span>
+                            </div>
+                        </td>
+                    `;
+                } else {
+                    html += `<td class="p-1.5 px-2 text-slate-300 align-top"></td>`;
+                }
+
+                // Kolom Kanan: Kode Barang (Atas) & Qty Krt (Bawah)
+                html += `
+                    <td class="p-1.5 px-2 text-right align-top whitespace-nowrap">
+                        <div class="font-bold text-emerald-700">${item.kode}</div>
+                        <div class="text-[10px] font-bold text-blue-600">${item.qty.toLocaleString('id-ID')} Krt</div>
+                    </td>
+                `;
+
+                html += `</tr>`;
+            });
+        });
+    });
+
+    tbody.innerHTML = html;
+}
+
+
+
+// --- FUNGSI SIMPAN SISA STOK DARI TABEL REKAP BERJALAN ---
+window.simpanSisaStokAktif = function() {
+    const kategori = (window.selectedKategoriExport || "MEXA").toUpperCase();
+    const nodeTarget = kategori === "PUXR" ? "barang_export/SISA_PUXR" : "barang_export/SISA_MEXA";
+    
+    let dataSisaPayload = {};
+    let adaData = false;
+
+    const tbodyRekap = document.getElementById("table-rekap-stok-export"); 
+    if (!tbodyRekap) {
+        miuiAlert("Tabel rekap stok tidak ditemukan!");
+        return;
+    }
+
+    const trs = tbodyRekap.querySelectorAll("tr");
+    if (!trs || trs.length === 0) {
+        miuiAlert("Belum ada data sisa stok untuk disimpan!");
+        return;
+    }
+
+    // Buat ID unik berdasarkan tanggal & timestamp (format: yyyy_mm_dd_timestamp)
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const timestamp = now.getTime();
+    const uniqueId = `${yyyy}_${mm}_${dd}_${timestamp}`;
+
+    dataSisaPayload.tanggal = `${yyyy}-${mm}-${dd}`;
+    dataSisaPayload.kategori = kategori;
+    dataSisaPayload.timestamp = timestamp;
+
+    trs.forEach((tr) => {
+        const cols = tr.querySelectorAll("td");
+        // Kolom rekap biasanya: [Kode, IN, OUT, AKHIR, PLT|BEC]
+        if (cols.length >= 4) {
+            const kode = cols[0].innerText.trim();
+            const qtySisa = parseInt(cols[3].innerText.trim().replace(/\./g, '')) || 0;
+            const pltBec = cols[4] ? cols[4].innerText.trim() : "-";
+
+            if (kode && kode !== "KODE" && !kode.includes("Belum")) {
+                // Simpan menggunakan kode barang langsung sebagai kunci (key) payload
+                dataSisaPayload[kode] = {
+                    kode: kode,
+                    qty_sisa: qtySisa,
+                    plt_bec: pltBec
+                };
+                adaData = true;
+            }
+        }
+    });
+
+    if (!adaData) {
+        miuiAlert("Tidak ada rincian sisa stok yang valid untuk disimpan.");
+        return;
+    }
+
+    // Menggunakan miuiConfirm kustom
+    miuiConfirm(`Simpan catatan sisa stok untuk kategori ${kategori} tanggal ${yyyy}-${mm}-${dd}?`, () => {
+        firebase.database().ref(`${nodeTarget}/${uniqueId}`).set(dataSisaPayload)
+            .then(() => {
+                miuiAlert("Catatan sisa stok berhasil disimpan dan dikunci!");
+                if (typeof loadDanRenderCatatanSisaStok === 'function') {
+                    loadDanRenderCatatanSisaStok(kategori);
+                }
+            })
+            .catch(error => {
+                miuiAlert("Gagal menyimpan sisa stok: " + error.message);
+            });
+    });
+};
+
+
+// --- FUNGSI LOAD & RENDER CATATAN SISA STOK (HANYA QTY > 0) ---
+window.loadDanRenderCatatanSisaStok = function(kategoriAktif) {
+    const kategori = (kategoriAktif || window.selectedKategoriExport || "MEXA").toUpperCase();
+    const nodeTarget = kategori === "PUXR" ? "barang_export/sisa_puxr" : "barang_export/sisa_mexa";
+    
+    const tbodyCatatan = document.getElementById("table-sisa-stok-export");
+    if (!tbodyCatatan) return;
+
+    firebase.database().ref(nodeTarget).once("value", snapshot => {
+        if (!snapshot.exists()) {
+            const nodeFallback = kategori === "PUXR" ? "barang_export/SISA_PUXR" : "barang_export/SISA_MEXA";
+            firebase.database().ref(nodeFallback).once("value", snapFallback => {
+                if (!snapFallback.exists()) {
+                    tbodyCatatan.innerHTML = `<tr><td colspan="2" class="text-center py-6 text-slate-400 italic">Belum ada catatan sisa stok</td></tr>`;
+                    return;
+                }
+                prosesDanRenderSnap(snapFallback, tbodyCatatan);
+            });
+            return;
+        }
+        prosesDanRenderSnap(snapshot, tbodyCatatan);
+    });
+};
+
+function prosesDanRenderSnap(snapshot, tbodyCatatan) {
+    let dataSisaList = [];
+    snapshot.forEach(childSnap => {
+        const val = childSnap.val();
+        if (val) {
+            dataSisaList.push({
+                id: childSnap.key,
+                timestamp: val.timestamp || 0,
+                ...val
+            });
+        }
+    });
+
+    if (dataSisaList.length === 0) {
+        tbodyCatatan.innerHTML = `<tr><td colspan="2" class="text-center py-6 text-slate-400 italic">Belum ada catatan sisa stok</td></tr>`;
+        return;
+    }
+
+    dataSisaList.sort((a, b) => b.timestamp - a.timestamp);
+
+    let html = "";
+    const namaHari = ["MINGGU", "SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU"];
+
+    dataSisaList.forEach(record => {
+        let tgl = record.tanggal || "-";
+        let tglFormatted = tgl;
+        let hariStr = "";
+        
+        if (tgl && tgl.includes("-") && tgl.split("-").length === 3) {
+            const parts = tgl.split("-");
+            const dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+            hariStr = namaHari[dateObj.getDay()];
+            tglFormatted = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+
+        // Kumpulkan item yang qty_sisa > 0 terlebih dahulu untuk dicek
+        let validItemsHtml = "";
+        let countValid = 0;
+
+        Object.keys(record).forEach(key => {
+            if (key !== "tanggal" && key !== "kategori" && key !== "timestamp") {
+                const detail = record[key];
+                const qtySisa = parseInt(detail && detail.qty_sisa ? detail.qty_sisa : 0);
+                
+                // HANYA TAMPILKAN JIKA QTY > 0
+                if (detail && detail.kode && qtySisa > 0) {
+                    countValid++;
+                    validItemsHtml += `
+                        <tr class="hover:bg-slate-50 border-t border-slate-100">
+                            <td class="p-1.5 px-2 font-semibold text-emerald-700 pl-4">${detail.kode}</td>
+                            <td class="p-1.5 px-2 text-right font-bold text-slate-800">${qtySisa.toLocaleString('id-ID')} Krt</td>
+                        </tr>
+                    `;
+                }
+            }
+        });
+
+        // Tampilkan header tanggal hanya jika ada item dengan qty > 0 di batch tersebut
+        if (countValid > 0) {
+            html += `
+                <tr class="bg-slate-200/80 font-bold text-slate-700">
+                    <td colspan="2" class="p-1.5 px-2 text-[10px] uppercase tracking-wider text-slate-800 border-t border-b border-slate-300">
+                        <i class="fa-regular fa-calendar-check mr-1 text-emerald-600"></i>${hariStr ? hariStr + ', ' : ''}${tglFormatted} (SISA STOK)
+                    </td>
+                </tr>
+            `;
+            html += validItemsHtml;
+        }
+    });
+
+    if (html === "") {
+        tbodyCatatan.innerHTML = `<tr><td colspan="2" class="text-center py-6 text-slate-400 italic">Tidak ada sisa stok > 0</td></tr>`;
+    } else {
+        tbodyCatatan.innerHTML = html;
+    }
+}
