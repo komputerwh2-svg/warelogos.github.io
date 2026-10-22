@@ -363,39 +363,44 @@ function prosesDanRenderDataExport(kategoriAktif) {
         Object.keys(data.IN).forEach(batchId => {
             const batch = data.IN[batchId];
             const tglPin = `${batch.tanggal || '-'} / ${batch.no_bukti || '-'}`;
-            
-            // Ambil kategori dari level utama batch, jika kosong deteksi dari item pertamanya
             let kategoriBatch = (batch.kategori || "").toUpperCase();
+
+            let itemsInBatch = [];
+            let isValidCategory = false;
 
             Object.keys(batch).forEach(key => {
                 if (key !== "tanggal" && key !== "no_bukti" && key !== "kategori" && key !== "timestamp" && key !== "tipe") {
                     const item = batch[key];
                     if (item && item.kode) {
-                        // Fallback deteksi dari awalan kode jika kategori batch belum ada
                         let currentKat = kategoriBatch;
                         if (!currentKat) {
                             currentKat = item.kode.startsWith("PUXR") ? "PUXR" : "MEXA";
                         }
 
-                        // Filter ketat berdasarkan kategori yang sedang aktif dibuka
                         if (currentKat === targetKategori) {
-                            listRiwayatMasuk.push({
-                                tglPin: tglPin,
+                            isValidCategory = true;
+                            itemsInBatch.push({
                                 kode: item.kode,
                                 qty: item.qty,
-                                batchId: batchId,
                                 childKey: key
                             });
-
                             dataInMap[item.kode] = (dataInMap[item.kode] || 0) + parseInt(item.qty || 0);
                         }
                     }
                 }
             });
+
+            if (isValidCategory && itemsInBatch.length > 0) {
+                listRiwayatMasuk.push({
+                    batchId: batchId,
+                    tglPin: tglPin,
+                    items: itemsInBatch
+                });
+            }
         });
     }
 
-    // Parsing Data OUT
+    // Parsing Data OUT (Tetap)
     if (data.OUT) {
         Object.keys(data.OUT).forEach(batchId => {
             const batch = data.OUT[batchId];
@@ -423,7 +428,7 @@ function prosesDanRenderDataExport(kategoriAktif) {
     renderRekapStokBerjalan(dataInMap, dataOutMap, targetKategori);
 }
 
-// --- RENDER TABEL RIWAYAT INPUT MASUK ---
+// --- RENDER TABEL RIWAYAT INPUT MASUK (PENGELOMPOKKAN BERDASARKAN TANGGAL) ---
 function renderRiwayatMasuk(riwayatList) {
     const tbody = document.getElementById("table-riwayat-masuk-export");
     if (!tbody) return;
@@ -433,20 +438,70 @@ function renderRiwayatMasuk(riwayatList) {
         return;
     }
 
+    // Kelompokkan data berdasarkan Tanggal
+    let groupedByDate = {};
+    riwayatList.forEach((batch) => {
+        // Ambil bagian tanggal saja dari string "YYYY-MM-DD / PIN-..."
+        const tglOnly = batch.tglPin.split(" / ")[0].trim();
+        if (!groupedByDate[tglOnly]) {
+            groupedByDate[tglOnly] = [];
+        }
+        groupedByDate[tglOnly].push(batch);
+    });
+
     let html = "";
-    // Urutkan dari yang terbaru (berdasarkan urutan array)
-    riwayatList.reverse().forEach((row) => {
+    // Urutkan tanggal dari yang terbaru
+    const sortedDates = Object.keys(groupedByDate).sort().reverse();
+
+    sortedDates.forEach((tgl) => {
+        // Baris Header Grup Tanggal
         html += `
-            <tr class="hover:bg-slate-50">
-                <td class="p-1.5 px-2 font-bold text-slate-700">${row.tglPin}</td>
-                <td class="p-1.5 px-2 font-semibold text-emerald-700">${row.kode}</td>
-                <td class="p-1.5 px-2 text-center font-bold text-slate-800">${row.qty}</td>
-                <td class="p-1.5 px-2 text-center">
-                    <button onclick="hapusItemRiwayatMasuk('${row.batchId}', '${row.childKey}')" class="text-red-500 hover:text-red-700 font-bold" title="Hapus Item"><i class="fa-solid fa-trash"></i></button>
+            <tr class="bg-slate-200/80 font-bold text-slate-700">
+                <td colspan="4" class="p-1.5 px-2 text-[10px] uppercase tracking-wider text-slate-800 border-t border-b border-slate-300">
+                    <i class="fa-regular fa-calendar-days mr-1 text-orange-600"></i> TANGGAL: ${tgl}
                 </td>
             </tr>
         `;
+
+        groupedByDate[tgl].forEach((batch) => {
+            // Ambil nomor PIN saja (membuang tanggal di depan jika ada)
+            const parts = batch.tglPin.split(" / ");
+            const pinOnly = parts.length > 1 ? parts[1] : batch.tglPin;
+
+            batch.items.forEach((item, index) => {
+                html += `
+                    <tr class="hover:bg-slate-50 border-t border-slate-100">
+                `;
+                
+                // Kolom PIN (hanya ditampilkan di baris pertama batch tersebut)
+                if (index === 0) {
+                    html += `<td class="p-1.5 px-2 font-semibold text-slate-600 align-top whitespace-nowrap pl-4">${pinOnly}</td>`;
+                } else {
+                    html += `<td class="p-1.5 px-2 text-slate-300 align-top"></td>`;
+                }
+
+                // Kolom Kode & Qty
+                html += `
+                    <td class="p-1.5 px-2 font-semibold text-emerald-700">${item.kode}</td>
+                    <td class="p-1.5 px-2 text-center font-bold text-slate-800">${item.qty}</td>
+                `;
+
+                // Tombol Hapus (hanya di baris pertama batch)
+                if (index === 0) {
+                    html += `
+                        <td class="p-1.5 px-2 text-center align-top">
+                            <button onclick="hapusBatchRiwayatMasuk('${batch.batchId}')" class="text-red-500 hover:text-red-700 font-bold" title="Hapus Batch Ini"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    `;
+                } else {
+                    html += `<td class="p-1.5 px-2 text-center align-top"></td>`;
+                }
+
+                html += `</tr>`;
+            });
+        });
     });
+
     tbody.innerHTML = html;
 }
 
@@ -488,12 +543,12 @@ function renderRekapStokBerjalan(dataInMap, dataOutMap, kategoriAktif) {
     tbody.innerHTML = html;
 }
 
-// --- HAPUS ITEM RIWAYAT MASUK DARI RTDB ---
-window.hapusItemRiwayatMasuk = function(batchId, childKey) {
-    if (confirm("Apakah Anda yakin ingin menghapus item riwayat masuk ini?")) {
-        firebase.database().ref(`barang_export/IN/${batchId}/${childKey}`).remove()
+// --- HAPUS SATU BATCH UTUH RIWAYAT MASUK DARI RTDB ---
+window.hapusBatchRiwayatMasuk = function(batchId) {
+    if (confirm("Apakah Anda yakin ingin menghapus seluruh batch/PIN ini?")) {
+        firebase.database().ref(`barang_export/IN/${batchId}`).remove()
             .then(() => {
-                alert("Item riwayat berhasil dihapus!");
+                alert("Batch riwayat berhasil dihapus!");
             })
             .catch(error => {
                 alert("Gagal menghapus: " + error.message);
