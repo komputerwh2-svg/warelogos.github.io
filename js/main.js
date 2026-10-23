@@ -3531,6 +3531,222 @@ window.muatUlangHistori = function() {
 
 
 
+// Variabel Pilihan Forklift Aktif
+let selectedForklift = "TOYOTA";
+let cacheDataSolar = { TOYOTA: [], NISSAN: [] };
+
+// --- BUKA MODAL SOLAR ---
+window.bukaModalSolar = function() {
+    const modal = document.getElementById("modalFormSolar");
+    if (modal) modal.classList.remove("hidden");
+
+    // Set default tanggal hari ini
+    const todayStr = new Date().toISOString().split("T")[0];
+    document.getElementById("solarTanggalIsi").value = todayStr;
+    document.getElementById("solarQtyIsi").value = "1";
+    document.getElementById("solarJamKerja").value = "";
+
+    pilihForkliftSolar("TOYOTA");
+    loadDataRealtimeSolar();
+};
+
+// --- PILIH FORKLIFT (TOYOTA / NISSAN) ---
+window.pilihForkliftSolar = function(jenis) {
+    selectedForklift = jenis;
+    const btnToyota = document.getElementById("btnForkliftToyota");
+    const btnNissan = document.getElementById("btnForkliftNissan");
+
+    if (jenis === "TOYOTA") {
+        btnToyota.className = "py-2 text-xs font-black rounded border transition shadow-sm bg-gradient-to-b from-amber-500 to-orange-600 text-white border-orange-400 flex items-center justify-center gap-1.5";
+        btnNissan.className = "py-2 text-xs font-black rounded border transition shadow-sm bg-white text-slate-700 border-slate-400 hover:bg-slate-100 flex items-center justify-center gap-1.5";
+    } else {
+        btnNissan.className = "py-2 text-xs font-black rounded border transition shadow-sm bg-gradient-to-b from-amber-500 to-orange-600 text-white border-orange-400 flex items-center justify-center gap-1.5";
+        btnToyota.className = "py-2 text-xs font-black rounded border transition shadow-sm bg-white text-slate-700 border-slate-400 hover:bg-slate-100 flex items-center justify-center gap-1.5";
+    }
+
+    hitungEstimasiPemakaian();
+};
+
+// --- SIMPAN DATA SOLAR KE FIREBASE (ID BERBASIS TANGGAL & WAKTU) ---
+window.simpanDataSolar = function() {
+    const tanggal = document.getElementById("solarTanggalIsi").value;
+    const qty = parseInt(document.getElementById("solarQtyIsi").value) || 1;
+    const jamKerja = parseFloat(document.getElementById("solarJamKerja").value);
+
+    if (!tanggal) {
+        miuiAlert("Tanggal pengisian solar wajib diisi!");
+        return;
+    }
+    if (isNaN(jamKerja) || jamKerja <= 0) {
+        miuiAlert("Masukkan nilai Jam Kerja / Hour Meter (HM) dengan benar!");
+        return;
+    }
+
+    // Ambil record terakhir untuk hitung selisih pemakaian HM
+    const listHistorical = cacheDataSolar[selectedForklift] || [];
+    let pakaiHm = 0;
+    if (listHistorical.length > 0) {
+        const hmTerakhir = parseFloat(listHistorical[0].jamKerja || 0);
+        if (jamKerja > hmTerakhir) {
+            pakaiHm = parseFloat((jamKerja - hmTerakhir).toFixed(1));
+        }
+    }
+
+    const now = new Date();
+    const timestamp = now.getTime();
+    
+    // Format ID unik berbasis tanggal dan waktu: YYYY-MM-DD_HH-mm-ss-ms
+    const jam = String(now.getHours()).padStart(2, '0');
+    const menit = String(now.getMinutes()).padStart(2, '0');
+    const detik = String(now.getSeconds()).padStart(2, '0');
+    const idTanggalWaktu = `${tanggal}_${jam}-${menit}-${detik}_${timestamp}`;
+
+    const payload = {
+        forklift: selectedForklift,
+        tanggal: tanggal,
+        qty: qty,
+        jamKerja: jamKerja,
+        pakaiHm: pakaiHm,
+        timestamp: timestamp
+    };
+
+    firebase.database().ref(`data_solar/${selectedForklift}/${idTanggalWaktu}`).set(payload)
+        .then(() => {
+            miuiAlert(`Data Pengisian Solar ${selectedForklift} Berhasil Disimpan!`);
+            document.getElementById("solarJamKerja").value = "";
+        })
+        .catch(error => {
+            miuiAlert("Gagal menyimpan data: " + error.message);
+        });
+};
+
+// --- LOAD DATA REALTIME FIREBASE ---
+function loadDataRealtimeSolar() {
+    firebase.database().ref("data_solar").on("value", snapshot => {
+        const data = snapshot.val() || {};
+        cacheDataSolar = { TOYOTA: [], NISSAN: [] };
+
+        if (data.TOYOTA) {
+            Object.keys(data.TOYOTA).forEach(key => {
+                cacheDataSolar.TOYOTA.push({ key, ...data.TOYOTA[key] });
+            });
+            cacheDataSolar.TOYOTA.sort((a, b) => b.timestamp - a.timestamp);
+        }
+
+        if (data.NISSAN) {
+            Object.keys(data.NISSAN).forEach(key => {
+                cacheDataSolar.NISSAN.push({ key, ...data.NISSAN[key] });
+            });
+            cacheDataSolar.NISSAN.sort((a, b) => b.timestamp - a.timestamp);
+        }
+
+        renderHistoriSolar("TOYOTA");
+        renderHistoriSolar("NISSAN");
+        hitungEstimasiPemakaian();
+    });
+}
+
+// --- RENDER TABEL HISTORI SISI KIRI (NISSAN) & KANAN (TOYOTA) ---
+function renderHistoriSolar(jenis) {
+    const container = document.getElementById(jenis === "NISSAN" ? "containerHistoriNissan" : "containerHistoriToyota");
+    const countBadge = document.getElementById(jenis === "NISSAN" ? "countHistoriNissan" : "countHistoriToyota");
+    const avgBadge = document.getElementById(jenis === "NISSAN" ? "avgNissanLabel" : "avgToyotaLabel");
+
+    if (!container) return;
+    const list = cacheDataSolar[jenis] || [];
+
+    countBadge.innerText = `(${list.length} DATA)`;
+
+    if (list.length === 0) {
+        container.innerHTML = `<div class="text-center text-[10px] text-slate-400 py-6 italic">Belum ada riwayat ${jenis}</div>`;
+        avgBadge.innerText = `RATA-RATA: - H`;
+        return;
+    }
+
+    // Hitung Rata-rata Pemakaian HM
+    let totalPakai = 0;
+    let countPakai = 0;
+    let html = "";
+
+    list.forEach(item => {
+        if (item.pakaiHm > 0) {
+            totalPakai += item.pakaiHm;
+            countPakai++;
+        }
+
+        // Format tanggal ke DD-MM-YYYY
+        let tglFmt = item.tanggal;
+        if (item.tanggal && item.tanggal.includes("-")) {
+            const p = item.tanggal.split("-");
+            tglFmt = `${p[2]}-${p[1]}-${p[0]}`;
+        }
+
+        html += `
+            <div class="bg-white border border-slate-200 rounded-lg p-2.5 shadow-xs flex flex-col gap-1 text-xs hover:border-orange-300 transition">
+                <div class="flex justify-between items-center">
+                    <span class="font-black text-slate-800"><i class="fa-regular fa-calendar-days text-orange-500 mr-1"></i>${tglFmt}</span>
+                    <span class="bg-slate-100 text-slate-700 font-bold px-1.5 py-0.5 rounded text-[10px]">QTY: ${item.qty || 1}</span>
+                </div>
+                <div class="flex justify-between items-center text-[11px] pt-1 border-t border-slate-100">
+                    <span class="text-slate-600">Jam Kerja: <b class="text-slate-900">${item.jamKerja}</b></span>
+                    <span class="font-black ${item.pakaiHm > 0 ? 'text-emerald-600' : 'text-slate-400'}">
+                        Pemakaian: ${item.pakaiHm > 0 ? item.pakaiHm : '-'}
+                    </span>
+                    <button onclick="hapusDataSolar('${jenis}', '${item.key}')" class="text-red-400 hover:text-red-600 ml-1" title="Hapus"><i class="fa-solid fa-trash text-[10px]"></i></button>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+
+    const avg = countPakai > 0 ? (totalPakai / countPakai).toFixed(1) : "-";
+    avgBadge.innerText = `RATA-RATA: ${avg} H`;
+}
+
+// --- HITUNG ESTIMASI PEMAKAIAN SECARA REALTIME SAAT TYPING ---
+document.getElementById("solarJamKerja")?.addEventListener("input", hitungEstimasiPemakaian);
+
+function hitungEstimasiPemakaian() {
+    const valHm = parseFloat(document.getElementById("solarJamKerja").value);
+    const lblTerakhir = document.getElementById("lblHmTerakhir");
+    const lblPakai = document.getElementById("lblEstimasiPakai");
+
+    const list = cacheDataSolar[selectedForklift] || [];
+
+    if (list.length > 0) {
+        const hmTerakhir = parseFloat(list[0].jamKerja || 0);
+        lblTerakhir.innerText = `${hmTerakhir}`;
+
+        if (!isNaN(valHm) && valHm > hmTerakhir) {
+            const selisih = (valHm - hmTerakhir).toFixed(1);
+            lblPakai.innerText = `${selisih}`;
+        } else {
+            lblPakai.innerText = `0`;
+        }
+    } else {
+        lblTerakhir.innerText = "Belum ada data";
+        lblPakai.innerText = `0`;
+    }
+}
+
+// --- HAPUS DATA SOLAR (MENGGUNAKAN MIUICONFIRM) ---
+window.hapusDataSolar = function(jenis, key) {
+    miuiConfirm(`Apakah Anda yakin ingin menghapus catatan solar ${jenis} ini?`, () => {
+        firebase.database().ref(`data_solar/${jenis}/${key}`).remove()
+            .then(() => miuiAlert("Catatan berhasil dihapus!"))
+            .catch(err => miuiAlert("Gagal menghapus: " + err.message));
+    });
+};
+
+window.resetFormSolar = function() {
+    document.getElementById("solarJamKerja").value = "";
+    tutupModal("modalFormSolar");
+};
+
+
+
+
 
 // Helper Global Modal Progress Cetak
 window.showCetakProgress = function(pesan = "Memproses Cetak...") {
