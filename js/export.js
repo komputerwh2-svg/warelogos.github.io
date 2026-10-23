@@ -359,8 +359,14 @@ function loadRealtimeDataExport() {
         const data = snapshot.val();
         globalFirebaseDataExport = data || { IN: {}, OUT: {} };
         
-        // Jalankan proses render berdasarkan kategori aktif saat ini
-        prosesDanRenderDataExport(window.selectedKategoriExport || "MEXA");
+        const kategoriAktif = window.selectedKategoriExport || "MEXA";
+
+        // Jalankan proses render untuk semua tabel berdasarkan kategori aktif saat ini
+        prosesDanRenderDataExport(kategoriAktif);
+        
+        if (typeof prosesDanRenderDataExportOUT === 'function') {
+            prosesDanRenderDataExportOUT(kategoriAktif);
+        }
     });
 }
 
@@ -556,14 +562,22 @@ function renderRekapStokBerjalan(dataInMap, dataOutMap, kategoriAktif) {
         const pltKrt = master.pltKrt || 153;
         const jumlahPlt = Math.floor(stokAkhir / pltKrt);
         const sisaKrt = stokAkhir % pltKrt;
-        const formatPltBec = `${jumlahPlt} Plt ${sisaKrt > 0 ? sisaKrt + ' Krt' : ''}`;
+        
+        let formatPltBec = "-";
+        if (stokAkhir !== 0) {
+            formatPltBec = `${jumlahPlt} Plt / ${sisaKrt > 0 ? sisaKrt + ' Krt' : ''} `.trim();
+        }
+
+        const displayIn = totalIn > 0 ? totalIn.toLocaleString('id-ID') : '-';
+        const displayOut = totalOut > 0 ? totalOut.toLocaleString('id-ID') : '-';
+        const displayAkhir = stokAkhir !== 0 ? stokAkhir.toLocaleString('id-ID') : '-';
 
         html += `
             <tr class="hover:bg-slate-50">
                 <td class="p-1.5 px-2 font-bold text-slate-800">${kode}</td>
-                <td class="p-1.5 px-2 text-center font-semibold text-emerald-600">${totalIn}</td>
-                <td class="p-1.5 px-2 text-center font-semibold text-rose-600">${totalOut}</td>
-                <td class="p-1.5 px-2 text-center font-bold text-slate-900">${stokAkhir}</td>
+                <td class="p-1.5 px-2 text-center font-semibold text-emerald-600">${displayIn}</td>
+                <td class="p-1.5 px-2 text-center font-semibold text-rose-600">${displayOut}</td>
+                <td class="p-1.5 px-2 text-center font-bold text-slate-900">${displayAkhir}</td>
                 <td class="p-1.5 px-2 text-center text-blue-600 font-semibold">${formatPltBec}</td>
             </tr>
         `;
@@ -897,3 +911,517 @@ function prosesDanRenderSnap(snapshot, tbodyCatatan) {
         tbodyCatatan.innerHTML = html;
     }
 }
+
+
+
+
+// --- MODAL & FUNGSI FULLSCREEN CETAK LAPORAN STOK EXPORT ---
+window.bukaModalCetakLaporan = function() {
+    const kategori = (window.selectedKategoriExport || "MEXA").toUpperCase();
+    
+    let modalEl = document.getElementById('modal-cetak-laporan-export');
+    if (!modalEl) {
+        const div = document.createElement('div');
+        div.id = 'modal-cetak-laporan-export';
+        div.className = 'fixed inset-0 bg-slate-900/80 z-50 flex flex-col hidden';
+        div.innerHTML = `
+            <!-- Header Modal -->
+            <div class="bg-slate-900 text-white px-6 py-3 flex justify-between items-center shadow-md">
+                <h3 class="font-bold text-sm uppercase flex items-center gap-2">
+                    <i class="fa-solid fa-print text-orange-400"></i> Preview & Cetak Laporan Stok Export (<span id="modal-lbl-kategori">${kategori}</span>)
+                </h3>
+                <button onclick="tutupModalCetak()" class="text-white hover:text-red-400 font-bold text-lg">✕</button>
+            </div>
+
+            <!-- Konten Fullscreen (Split: Kiri Preview F4, Kanan Panel Kontrol) -->
+            <div class="flex flex-1 overflow-hidden">
+                <!-- Sebelah Kiri: Area Print Preview (F4 Portrait) -->
+                <div class="flex-1 bg-slate-700 p-6 overflow-y-auto flex justify-center">
+                    <div id="print-preview-paper" class="bg-white shadow-2xl rounded text-xs text-black" style="width: 210mm; min-height: 330mm; padding: 10mm; box-sizing: border-box; miui-custom-scrollbar: thin;">
+                        <!-- Konten preview akan dirender di sini -->
+                    </div>
+                </div>
+
+                <!-- Sebelah Kanan: Panel Pengaturan & Tombol Aksi -->
+                <div class="w-80 bg-white border-l border-slate-200 p-5 flex flex-col justify-between shadow-xl overflow-y-auto">
+                    <div class="space-y-4">
+                        <h4 class="font-bold text-slate-900 uppercase text-xs border-b pb-2 flex items-center gap-1.5">
+                            <i class="fa-solid fa-sliders text-orange-600"></i> Pengaturan Filter Laporan
+                        </h4>
+
+                        <div>
+                            <label class="block font-bold text-slate-900 mb-1 text-[11px]">Pilih Kode Tampil:</label>
+                            <select id="print-filter-tipe-kode" onchange="updatePrintPreviewHTML()" class="w-full border border-slate-300 rounded p-2 text-xs bg-white text-slate-900 font-bold shadow-sm">
+                                <!-- Opsi akan diisi dinamis -->
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block font-bold text-slate-900 mb-1 text-[11px]">Dari Tanggal Masuk:</label>
+                            <input type="date" id="print-tgl-mulai" onchange="updatePrintPreviewHTML()" class="w-full border border-slate-300 rounded p-2 text-xs bg-white text-slate-900 font-bold shadow-sm">
+                        </div>
+
+                        <div>
+                            <label class="block font-bold text-slate-900 mb-1 text-[11px]">Sampai Tanggal Masuk:</label>
+                            <input type="date" id="print-tgl-selesai" onchange="updatePrintPreviewHTML()" class="w-full border border-slate-300 rounded p-2 text-xs bg-white text-slate-900 font-bold shadow-sm">
+                        </div>
+
+                        <div>
+                            <label class="block font-bold text-slate-900 mb-1 text-[11px]">Pilih Tanggal Sisa Stok:</label>
+                            <select id="print-select-sisa-stok" onchange="updatePrintPreviewHTML()" class="w-full border border-slate-300 rounded p-2 text-xs bg-white text-slate-900 font-bold shadow-sm">
+                                <option value="">-- Memuat Sisa Stok --</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 border-t space-y-2">
+                        <button onclick="kirimCetakKePrintJobs()" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-2.5 px-4 rounded shadow flex items-center justify-center gap-2 text-xs transition">
+                            <i class="fa-solid fa-print"></i> CETAK LAPORAN
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CSS Khusus Ukuran F4 Portrait & Margin Minimum untuk Print -->
+            <style>
+                @page {
+                    size: 210mm 330mm;
+                    margin: 5mm;
+                }
+                @media print {
+                    body * { visibility: hidden; }
+                    #print-preview-paper, #print-preview-paper * { visibility: visible; }
+                    #print-preview-paper { 
+                        position: absolute; 
+                        left: 0; 
+                        top: 0; 
+                        width: 210mm !important; 
+                        min-height: 330mm !important; 
+                        margin: 0 !important; 
+                        padding: 8mm !important; 
+                        box-shadow: none !important; 
+                        background: white !important;
+                    }
+                }
+            </style>
+        `;
+        document.body.appendChild(div);
+        modalEl = div;
+    }
+
+    modalEl.classList.remove('hidden');
+    document.getElementById('modal-lbl-kategori').innerText = kategori;
+
+    const selectFilterKode = document.getElementById('print-filter-tipe-kode');
+    if (kategori === "MEXA") {
+        selectFilterKode.innerHTML = `
+            <option value="ALL">Tampilkan Semua Kode Barang</option>
+            <option value="MEXA">Hanya MEXA</option>
+            <option value="MXR">Hanya MXR</option>
+        `;
+    } else {
+        selectFilterKode.innerHTML = `
+            <option value="ALL">Tampilkan Semua Kode Barang</option>
+            <option value="PUXR">Hanya PUXR</option>
+            <option value="PUXRS">Hanya PUXRS</option>
+        `;
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    document.getElementById('print-tgl-mulai').value = todayStr;
+    document.getElementById('print-tgl-selesai').value = todayStr;
+
+    populateDropdownSisaStokModal(kategori);
+};
+
+window.tutupModalCetak = function() {
+    const modalEl = document.getElementById('modal-cetak-laporan-export');
+    if (modalEl) modalEl.classList.add('hidden');
+};
+
+function populateDropdownSisaStokModal(kategori) {
+    const selectEl = document.getElementById('print-select-sisa-stok');
+    if (!selectEl) return;
+
+    const nodeCapital = kategori === "PUXR" ? "barang_export/SISA_PUXR" : "barang_export/SISA_MEXA";
+    const nodeLower = kategori === "PUXR" ? "barang_export/sisa_puxr" : "barang_export/sisa_mexa";
+
+    firebase.database().ref(nodeCapital).once("value", snapshot => {
+        if (!snapshot.exists()) {
+            firebase.database().ref(nodeLower).once("value", snapFallback => {
+                renderDropdownOptions(snapFallback, selectEl, kategori);
+            });
+            return;
+        }
+        renderDropdownOptions(snapshot, selectEl, kategori);
+    });
+}
+
+function renderDropdownOptions(snapshot, selectEl, kategori) {
+    let optionsHtml = '<option value="">-- Pilih Tanggal Sisa Stok --</option>';
+    if (snapshot.exists()) {
+        let listData = [];
+        snapshot.forEach(child => {
+            listData.push({ id: child.key, ...child.val() });
+        });
+        listData.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+        listData.forEach(item => {
+            let tglRaw = item.tanggal || "";
+            let tglFormatted = tglRaw;
+            if (tglRaw.includes("-") && tglRaw.split("-").length === 3) {
+                const parts = tglRaw.split("-");
+                tglFormatted = `${parts[2]}-${parts[1]}-${parts[0]}`;
+            }
+            optionsHtml += `<option value="${item.id}">${tglFormatted} (${item.kategori || kategori})</option>`;
+        });
+    }
+    selectEl.innerHTML = optionsHtml;
+    updatePrintPreviewHTML();
+}
+
+// --- FUNGSI FORMAT TANGGAL DD-MM-YYYY ---
+function formatDateIndo(dateStr) {
+    if (!dateStr || !dateStr.includes("-")) return dateStr;
+    const parts = dateStr.split("-");
+    if (parts.length === 3) {
+        return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    return dateStr;
+}
+
+// --- FUNGSI UPDATE PREVIEW SECARA LIVE ---
+window.updatePrintPreviewHTML = function() {
+    const tglMulai = document.getElementById('print-tgl-mulai').value;
+    const tglSelesai = document.getElementById('print-tgl-selesai').value;
+    const sisaStokKey = document.getElementById('print-select-sisa-stok').value;
+    const filterTipeKode = document.getElementById('print-filter-tipe-kode').value;
+    const kategori = (window.selectedKategoriExport || "MEXA").toUpperCase();
+    const previewPaper = document.getElementById('print-preview-paper');
+
+    if (!previewPaper) return;
+
+    const data = globalFirebaseDataExport || {};
+    let filteredMasuk = [];
+
+    function isCodeMatchFilter(kode) {
+        if (!kode) return false;
+        const upper = kode.toUpperCase();
+        if (filterTipeKode === "ALL") return true;
+        if (filterTipeKode === "MEXA") return upper.startsWith("MEXA");
+        if (filterTipeKode === "MXR") return upper.startsWith("MXR");
+        if (filterTipeKode === "PUXR") return upper.startsWith("PUXR") && !upper.endsWith("S");
+        if (filterTipeKode === "PUXRS") return upper.startsWith("PUXR") && upper.endsWith("S");
+        return true;
+    }
+
+    if (data.IN) {
+        Object.keys(data.IN).forEach(batchId => {
+            const batch = data.IN[batchId];
+            const tglBatch = batch.tanggal || "";
+            let katBatch = (batch.kategori || "").toUpperCase();
+
+            if (tglBatch >= tglMulai && tglBatch <= tglSelesai) {
+                Object.keys(batch).forEach(key => {
+                    if (key !== "tanggal" && key !== "no_bukti" && key !== "kategori" && key !== "timestamp" && key !== "tipe") {
+                        const item = batch[key];
+                        if (item && item.kode) {
+                            if (!katBatch) katBatch = item.kode.startsWith("PUXR") ? "PUXR" : "MEXA";
+                            if (katBatch === kategori && isCodeMatchFilter(item.kode)) {
+                                filteredMasuk.push({
+                                    tanggal: formatDateIndo(tglBatch),
+                                    pin: batch.no_bukti || "-",
+                                    kode: item.kode,
+                                    qty: parseInt(item.qty || 0)
+                                });
+                            }
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+    const masterMasterItems = listKodeBarangExport[kategori] || [];
+    const masterItems = masterMasterItems.filter(m => isCodeMatchFilter(m.kode));
+
+    let dataInMap = {};
+    let dataOutMap = {};
+
+    if (data.IN) {
+        Object.keys(data.IN).forEach(id => {
+            const b = data.IN[id];
+            let kat = (b.kategori || "").toUpperCase();
+            Object.keys(b).forEach(k => {
+                if (k !== "tanggal" && k !== "no_bukti" && k !== "kategori" && k !== "timestamp" && k !== "tipe") {
+                    const itm = b[k];
+                    if (itm && itm.kode) {
+                        if (!kat) kat = itm.kode.startsWith("PUXR") ? "PUXR" : "MEXA";
+                        if (kat === kategori) dataInMap[itm.kode] = (dataInMap[itm.kode] || 0) + parseInt(itm.qty || 0);
+                    }
+                }
+            });
+        });
+    }
+    if (data.OUT) {
+        Object.keys(data.OUT).forEach(id => {
+            const b = data.OUT[id];
+            let kat = (b.kategori || "").toUpperCase();
+            Object.keys(b).forEach(k => {
+                if (k !== "tanggal" && k !== "buyer" && k !== "tujuan" && k !== "kategori" && k !== "timestamp" && k !== "tipe") {
+                    const itm = b[k];
+                    if (itm && itm.kode) {
+                        if (!kat) kat = itm.kode.startsWith("PUXR") ? "PUXR" : "MEXA";
+                        if (kat === kategori) dataOutMap[itm.kode] = (dataOutMap[itm.kode] || 0) + parseInt(itm.qty || 0);
+                    }
+                }
+            });
+        });
+    }
+
+    const nodeCapital = kategori === "PUXR" ? "barang_export/SISA_PUXR" : "barang_export/SISA_MEXA";
+    const nodeLower = kategori === "PUXR" ? "barang_export/sisa_puxr" : "barang_export/sisa_mexa";
+
+    if (sisaStokKey) {
+        firebase.database().ref(`${nodeCapital}/${sisaStokKey}`).once("value", snap => {
+            let sisaData = snap.val();
+            if (!sisaData) {
+                firebase.database().ref(`${nodeLower}/${sisaStokKey}`).once("value", snap2 => {
+                    sisaData = snap2.val();
+                    renderPreviewHTMLContent(previewPaper, filteredMasuk, masterItems, dataInMap, dataOutMap, sisaData, tglMulai, tglSelesai, kategori, isCodeMatchFilter);
+                });
+            } else {
+                renderPreviewHTMLContent(previewPaper, filteredMasuk, masterItems, dataInMap, dataOutMap, sisaData, tglMulai, tglSelesai, kategori, isCodeMatchFilter);
+            }
+        });
+    } else {
+        renderPreviewHTMLContent(previewPaper, filteredMasuk, masterItems, dataInMap, dataOutMap, null, tglMulai, tglSelesai, kategori, isCodeMatchFilter);
+    }
+};
+
+function renderPreviewHTMLContent(container, filteredMasuk, masterItems, dataInMap, dataOutMap, sisaData, tglMulai, tglSelesai, kategori, isCodeMatchFilter) {
+    const tglMulaiFmt = formatDateIndo(tglMulai);
+    const tglSelesaiFmt = formatDateIndo(tglSelesai);
+    const sisaTglFmt = sisaData && sisaData.tanggal ? formatDateIndo(sisaData.tanggal) : 'Pilih Tanggal';
+
+    let html = `
+        <style>
+            .preview-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 11px; }
+            .preview-table th, .preview-table td { border: 1px solid #1e293bc4; padding: 3px 5px; text-align: left; }
+            .preview-table th { background-color: #f1f5f9; text-transform: uppercase; font-size: 11px; font-weight: bold; }
+            .text-right { text-align: right; }
+            .text-center { text-align: center; }
+            .font-bold { font-weight: bold; }
+            .section-box { font-weight: bold; font-size: 11px; margin-bottom: 4px; background: #cbd5e1d8; padding: 3px 5px; border: 1px solid #1e293b; text-transform: uppercase; }
+        </style>
+
+        <h2 style="text-align: center; margin-bottom: 2px; text-transform: uppercase; font-size: 14px; font-weight: bold;">LAPORAN STOK EXPORT ${kategori}</h2>
+        <div style="text-align: center; margin-bottom: 10px; font-size: 11px; font-weight: bold; color: #334155;">Periode Stok: ${tglMulaiFmt} s/d ${tglSelesaiFmt}</div>
+
+        <div style="display: flex; gap: 12px; width: 100%;">
+            <!-- SEBELAH KIRI: RIWAYAT MASUK -->
+            <div style="width: 48%;">
+                <div class="section-box">DATA STOK MASUK (IN)</div>
+                <table class="preview-table">
+                    <thead>
+                        <tr>
+                            <th>TANGGAL MASUK</th>
+                            <th>No. Bukti</th>
+                            <th>Kode</th>
+                            <th class="text-center">Qty</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+
+    if (filteredMasuk.length === 0) {
+        html += `<tr><td colspan="4" class="text-center italic" style="padding: 10px;">Tidak ada data masuk pada rentang tanggal tersebut</td></tr>`;
+    } else {
+        filteredMasuk.forEach(item => {
+            html += `
+                <tr>
+                    <td>${item.tanggal}</td>
+                    <td>${item.pin}</td>
+                    <td class="font-bold">${item.kode}</td>
+                    <td class="text-center">${item.qty.toLocaleString('id-ID')}</td>
+                </tr>
+            `;
+        });
+    }
+
+    html += `
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- SEBELAH KANAN: REKAP STOK (KODE, AKHIR, PLT/BEC) & SISA STOK -->
+            <div style="width: 48%;">
+                <div class="section-box">REKAP STOK TERSEDIA</div>
+                <table class="preview-table">
+                    <thead>
+                        <tr>
+                            <th>Kode Barang</th>
+                            <th class="text-center">Stok Akhir</th>
+                            <th class="text-center">Palet / Beceran</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+
+    masterItems.forEach(master => {
+        const kode = master.kode;
+        const totalIn = dataInMap[kode] || 0;
+        const totalOut = dataOutMap[kode] || 0;
+        const stokAkhir = totalIn - totalOut;
+        const pltKrt = master.pltKrt || 153;
+        const jumlahPlt = Math.floor(stokAkhir / pltKrt);
+        const sisaKrt = stokAkhir % pltKrt;
+        const formatPltBec = stokAkhir !== 0 ? `${jumlahPlt} Plt / ${sisaKrt > 0 ? sisaKrt + ' Krt' : ''}` : '-';
+
+        html += `
+            <tr>
+                <td class="font-bold">${kode}</td>
+                <td class="text-center font-bold">${stokAkhir !== 0 ? stokAkhir.toLocaleString('id-ID') : '-'}</td>
+                <td class="text-center">${formatPltBec}</td>
+            </tr>
+        `;
+    });
+
+    html += `
+                    </tbody>
+                </table>
+
+                <div class="section-box">CATATAN SISA STOK PER TANGGAL ${sisaTglFmt}</div>
+                <table class="preview-table">
+                    <thead>
+                        <tr>
+                            <th>Kode Barang</th>
+                            <th class="text-right">Qty Sisa</th>
+                            <th class="text-center">Palet / Beceran</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+
+    if (!sisaData) {
+        html += `<tr><td colspan="3" class="text-center italic" style="padding: 8px;">Belum ada data sisa stok yang dipilih</td></tr>`;
+    } else {
+        let hasItem = false;
+        Object.keys(sisaData).forEach(k => {
+            if (k !== "tanggal" && k !== "kategori" && k !== "timestamp") {
+                const det = sisaData[k];
+                if (det && det.kode && (det.qty_sisa || 0) > 0 && isCodeMatchFilter(det.kode)) {
+                    hasItem = true;
+                    html += `
+                        <tr>
+                            <td class="font-bold">${det.kode}</td>
+                            <td class="text-right font-bold">${(det.qty_sisa || 0).toLocaleString('id-ID')} Krt</td>
+                            <td class="text-center">${det.plt_bec || '-'}</td>
+                        </tr>
+                    `;
+                }
+            }
+        });
+        if (!hasItem) {
+            html += `<tr><td colspan="3" class="text-center italic" style="padding: 8px;">Tidak ada sisa stok > 0 pada catatan ini</td></tr>`;
+        }
+    }
+
+    html += `
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+
+// --- FUNGSI KIRIM KE PRINT JOBS FIREBASE ---
+window.kirimCetakKePrintJobs = async function() {
+    const kategori = (window.selectedKategoriExport || "MEXA").toUpperCase();
+    const previewEl = document.getElementById('print-preview-paper');
+    if (!previewEl) {
+        miuiAlert("Area preview tidak ditemukan!");
+        return;
+    }
+
+    const now = new Date();
+    const daftarHari = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    const hari = daftarHari[now.getDay()];
+    
+    const tgl = String(now.getDate()).padStart(2, '0');
+    const blnIndex = now.getMonth();
+    const thn = now.getFullYear();
+    
+    const namaBulan = [
+        "Januari", "Februari", "Maret", "April", "Mei", "Juni", 
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ];
+    const bulan = namaBulan[blnIndex];
+
+    const jam = String(now.getHours()).padStart(2, '0');
+    const menit = String(now.getMinutes()).padStart(2, '0');
+    const detik = String(now.getSeconds()).padStart(2, '0');
+    
+    const formatWaktuLengkap = `${hari}, ${tgl} ${bulan} ${thn} ${jam}.${menit}.${detik}`;
+
+    const htmlIsi = previewEl.innerHTML;
+
+    const finalHtml = `
+    <html>
+    <head>
+        <title>Cetak Laporan Stok Export ${kategori}</title>
+        <style>
+            @page { 
+                size: 210mm 330mm portrait; 
+                margin: 10mm 5mm 5mm 5mm; 
+                @bottom-right {
+                    content: "Halaman " counter(page) " dari " counter(pages);
+                    font-family: Arial, sans-serif;
+                    font-size: 8pt;
+                    color: #000;
+                }
+            }
+            body { 
+                font-family: Arial, sans-serif; 
+                font-size: 12pt; 
+                margin: 0; 
+                padding: 0; 
+                color: #000; 
+            }
+            .sub-header { 
+                margin-bottom: 10px; 
+                font-size: 8pt; 
+                text-align: right;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="sub-header">Dicetak pada: ${formatWaktuLengkap}</div>
+        ${htmlIsi}
+    </body>
+    </html>`;
+
+    const judulTugas = `Cetak Stok Export ${kategori}`;
+    const safeKeyName = `Export_${kategori}_${tgl}-${String(blnIndex + 1).padStart(2, '0')}-${thn}_${jam}-${menit}-${detik}`;
+
+    try {
+        await fetch(`https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs/${safeKeyName}.json`, {
+            method: 'PUT',
+            body: JSON.stringify({ 
+                judul: judulTugas,
+                waktu_teks: formatWaktuLengkap,
+                html: finalHtml, 
+                status: 'PENDING',
+                timestamp: Date.now() 
+            }),
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        miuiAlert("Perintah cetak berhasil dikirim ke Print Server (Firebase)!");
+        tutupModalCetak();
+    } catch (error) {
+        miuiAlert("Gagal mengirim perintah cetak: " + error.message);
+    }
+};
