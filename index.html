@@ -212,7 +212,7 @@
                 <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Mutasi</span>
             </div>
 
-            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="miuiAlert('Coming Soon : Dalam pengembangan, fitur ini akan segera hadir.')">
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="bukaModalSolar()">
                 <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all">
                     <img src="img/solar.png" alt="Solar" class="w-full h-full object-cover">
                 </div>
@@ -1204,6 +1204,116 @@
                     <div id="container_histori" class="flex flex-col gap-2">
                         <div class="text-center text-xs text-slate-500 py-6 italic">Belum ada histori tersimpan.</div>
                     </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- MODAL UTAMA SOLAR FORKLIFT (3 PANEL - UKURAN PAS SESUAI KONTEN) -->
+    <div id="modalFormSolar" class="hidden fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 select-none animate-fade-in">
+        <div class="flex flex-col lg:flex-row gap-3 items-center justify-center max-w-[1100px] w-full my-auto overflow-hidden">
+            
+            <!-- PANEL KIRI: HISTORI SOLAR NISSAN -->
+            <div class="relative bg-[#e4e4e4] w-full lg:w-[350px] rounded-[14px] shadow-2xl border border-[#b2b2b2] flex flex-col font-sans text-slate-800 overflow-hidden shrink-0">
+                <!-- Segitiga Penunjuk di Kanan -->
+                <div class="hidden lg:block absolute -right-[7px] top-12 w-0 h-0 border-t-[7px] border-t-transparent border-b-[7px] border-b-transparent border-l-[7px] border-l-[#e4e4e4] z-10"></div>
+
+                <!-- Header Histori Nissan -->
+                <div class="bg-[#e4e4e4] px-3.5 py-2.5 flex items-center justify-between border-b border-[#cfcfcf] shrink-0">
+                    <h3 class="text-slate-800 font-black text-xs tracking-wide flex items-center gap-1.5">
+                        <i class="fa-solid fa-truck-monster text-amber-600 text-xs"></i> RIWAYAT NISSAN
+                        <span id="countHistoriNissan" class="text-amber-700 font-bold">(0)</span>
+                    </h3>
+                    <span id="avgNissanLabel" class="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-extrabold border border-amber-300">RATA-RATA PAKAI: - Jam</span>
+                </div>
+
+                <!-- List Konten Histori Nissan dengan miui-custom-scroll -->
+                <div id="containerHistoriNissan" class="p-2.5 flex flex-col gap-2 max-h-[420px] overflow-y-auto bg-[#ededed] miui-custom-scroll">
+                    <div class="text-center text-xs text-slate-400 py-6 italic">Memuat riwayat Nissan...</div>
+                </div>
+            </div>
+
+            <!-- PANEL TENGAH: FORM INPUT UTAMA (Tinggi Pas / Snug) -->
+            <div class="bg-[#e4e4e4] w-full lg:w-[360px] rounded-[14px] shadow-2xl border border-[#b2b2b2] flex flex-col font-sans text-slate-800 relative shrink-0 overflow-hidden">
+                <!-- Header Modal Form -->
+                <div class="bg-gradient-to-b from-[#323232] to-[#202020] px-4 py-3 flex items-center justify-between border-b border-[#151515] shrink-0">
+                    <h3 class="text-white font-bold text-xs tracking-wide flex items-center gap-2 uppercase">
+                        <i class="fa-solid fa-gas-pump text-orange-400 text-sm"></i> ISI SOLAR FORKLIFT
+                    </h3>
+                    <button onclick="tutupModal('modalFormSolar')" class="text-white hover:text-red-400 font-bold text-lg leading-none">✕</button>
+                </div>
+
+                <!-- Body Form Input -->
+                <div class="p-4 flex flex-col gap-3.5">
+                    <!-- Pilihan Jenis Forklift -->
+                    <div>
+                        <label class="text-[10px] font-black text-slate-600 uppercase tracking-wider block mb-1">Pilih Forklift:</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button type="button" id="btnForkliftNissan" onclick="pilihForkliftSolar('NISSAN')" class="py-2 text-xs font-black rounded border transition shadow-sm bg-white text-slate-700 border-slate-400 hover:bg-slate-100 flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-truck-monster"></i> NISSAN
+                            </button>
+                            <button type="button" id="btnForkliftToyota" onclick="pilihForkliftSolar('TOYOTA')" class="py-2 text-xs font-black rounded border transition shadow-sm bg-gradient-to-b from-amber-500 to-orange-600 text-white border-orange-400 flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-truck-pickup"></i> TOYOTA
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tanggal Isi -->
+                    <div>
+                        <label class="text-[10px] font-black text-slate-600 uppercase tracking-wider block mb-1">Tanggal Isi:</label>
+                        <input type="date" id="solarTanggalIsi" class="w-full bg-white border border-[#c8c8c8] rounded py-1.5 px-2.5 text-xs font-bold text-slate-900 shadow-inner focus:outline-none focus:border-orange-500">
+                    </div>
+
+                    <!-- QTY Isi -->
+                    <div>
+                        <label class="text-[10px] font-black text-slate-600 uppercase tracking-wider block mb-1">QTY Isi (Jerigen/Drum):</label>
+                        <input type="number" id="solarQtyIsi" value="1" min="1" class="w-full bg-white border border-[#c8c8c8] rounded py-1.5 px-2.5 text-xs font-bold text-slate-900 shadow-inner focus:outline-none focus:border-orange-500">
+                    </div>
+
+                    <!-- Jam Kerja (HM) Terbaru -->
+                    <div>
+                        <label class="text-[10px] font-black text-slate-600 uppercase tracking-wider block mb-1">Jam Kerja / Hour Meter (HM):</label>
+                        <input type="number" step="0.1" id="solarJamKerja" placeholder="Contoh: 5466.8" class="w-full bg-white border border-[#c8c8c8] rounded py-1.5 px-2.5 text-sm font-black text-slate-900 shadow-inner focus:outline-none focus:border-orange-500">
+                    </div>
+
+                    <!-- Info Estimasi Pemakaian Otomatis (Selalu Tampil) -->
+                    <div id="solarInfoEstimasi" class="bg-orange-50/80 border border-orange-200 rounded p-2 text-[11px] text-slate-700">
+                        <div class="flex justify-between items-center font-semibold">
+                            <span>Jam Kerja Terakhir: <b id="lblHmTerakhir">-</b></span>
+                            <span class="text-orange-700">Pemakaian: <b id="lblEstimasiPakai">0</b></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer Tombol Simpan & Batal -->
+                <div class="grid grid-cols-2 border-t border-[#d0d0d0] bg-[#dbdbdb] shrink-0">
+                    <button onclick="simpanDataSolar()" class="py-3 text-[13px] font-bold text-white bg-gradient-to-b from-amber-500 to-orange-600 border-r border-orange-700 transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] hover:from-amber-600 hover:to-orange-700 flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-floppy-disk"></i> Simpan
+                    </button>
+                    <button onclick="resetFormSolar()" class="py-3 text-[13px] font-bold text-slate-700 bg-gradient-to-b from-[#f2f2f2] to-[#e0e0e0] border-l border-[#c4c4c4] transition-all hover:bg-slate-300 hover:text-slate-900">
+                        Batal
+                    </button>
+                </div>
+            </div>
+
+            <!-- PANEL KANAN: HISTORI SOLAR TOYOTA -->
+            <div class="relative bg-[#e4e4e4] w-full lg:w-[350px] rounded-[14px] shadow-2xl border border-[#b2b2b2] flex flex-col font-sans text-slate-800 overflow-hidden shrink-0">
+                <!-- Segitiga Penunjuk di Kiri -->
+                <div class="hidden lg:block absolute -left-[7px] top-12 w-0 h-0 border-t-[7px] border-t-transparent border-b-[7px] border-b-transparent border-r-[7px] border-r-[#e4e4e4] z-10"></div>
+
+                <!-- Header Histori Toyota -->
+                <div class="bg-[#e4e4e4] px-3.5 py-2.5 flex items-center justify-between border-b border-[#cfcfcf] shrink-0">
+                    <h3 class="text-slate-800 font-black text-xs tracking-wide flex items-center gap-1.5">
+                        <i class="fa-solid fa-truck-pickup text-blue-600 text-xs"></i> RIWAYAT TOYOTA
+                        <span id="countHistoriToyota" class="text-blue-700 font-bold">(0)</span>
+                    </h3>
+                    <span id="avgToyotaLabel" class="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-extrabold border border-blue-300">RATA2: - Jam</span>
+                </div>
+
+                <!-- List Konten Histori Toyota dengan miui-custom-scroll -->
+                <div id="containerHistoriToyota" class="p-2.5 flex flex-col gap-2 max-h-[420px] overflow-y-auto bg-[#ededed] miui-custom-scroll">
+                    <div class="text-center text-xs text-slate-400 py-6 italic">Memuat riwayat Toyota...</div>
                 </div>
             </div>
 
