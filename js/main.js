@@ -1023,6 +1023,70 @@ window.aktifkanCloudPrintEngine = aktifkanCloudPrintEngine;
 // ENGINE SUB-PAGE DYNAMIC LOADING (MODULAR APPS)
 // =========================================================================
 
+
+// --- SWITCH SLIDE MENGGUNAKAN EFEK SLIDER ---
+window.switchRecallSlide = function(mode) {
+    const slider = document.getElementById('slider-content-recall');
+    if (!slider) return;
+
+    if (mode === 'CARI') {
+        slider.style.transform = 'translateX(0%)';
+    } else if (mode === 'DETAIL') {
+        slider.style.transform = 'translateX(-50%)';
+    }
+};
+
+// --- BUKA & TUTUP SUBPAGE RECALL (EFEK GESER) ---
+window.bukaSubPageRecall = function() {
+    let container = document.getElementById('subpage-recall-container'); 
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'subpage-recall-container';
+        document.body.appendChild(container);
+    }
+
+    const subpage = document.getElementById('subpageRecall');
+    if (subpage) {
+        subpage.classList.remove('translate-x-full');
+        return;
+    }
+
+    const basePath = window.location.pathname.includes('/warelogos.github.io') ? '/warelogos.github.io/apps/recall.html' : 'apps/recall.html';
+    const scriptPath = window.location.pathname.includes('/warelogos.github.io') ? '/warelogos.github.io/js/recall.js' : 'js/recall.js';
+
+    fetch(basePath) 
+        .then(response => {
+            if (!response.ok) throw new Error("Gagal mengambil file apps/recall.html");
+            return response.text();
+        })
+        .then(htmlContent => {
+            container.innerHTML = htmlContent;
+            
+            const elemenBaru = document.getElementById('subpageRecall');
+            if (elemenBaru) {
+                // Beri sedikit jeda agar DOM ter-render sebelum animasi slide masuk
+                setTimeout(() => {
+                    elemenBaru.classList.remove('translate-x-full');
+                }, 50);
+            }
+        })
+        .catch(error => {
+            console.error(error);
+            if (typeof miuiAlert === 'function') miuiAlert("Sistem Gagal Memuat Template Recall!");
+        });
+};
+
+window.tutupSubPageRecall = function() {
+    const subpage = document.getElementById('subpageRecall');
+    if (subpage) {
+        subpage.classList.add('translate-x-full');
+    }
+};
+
+window.bukaSubPageRecall = bukaSubPageRecall;
+window.tutupSubPageRecall = tutupSubPageRecall;
+
+
 // Fungsi untuk membuka subpage Ceklist Muat
 function bukaSubPageCeklistMuat() {
     const container = document.getElementById('subpage-ceklist-muat-container'); 
