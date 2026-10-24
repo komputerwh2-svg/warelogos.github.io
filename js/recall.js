@@ -1,7 +1,32 @@
 // --- INISIALISASI MODUL RECALL ---
 window.initRecall = function() {
     switchRecallSlide('cari');
+    initRecallDefaultTanggal(); // Panggil fungsi inisialisasi tanggal hari ini di sini
 };
+
+// --- INISIALISASI DEFAULT TANGGAL HARI INI ---
+function initRecallDefaultTanggal() {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const todayFormatted = `${yyyy}-${mm}-${dd}`; // Format YYYY-MM-DD untuk input date HTML
+
+    const inputMulai = document.getElementById('recallInputTglMulai');
+    const inputSelesai = document.getElementById('recallInputTglSelesai');
+
+    if (inputMulai && !inputMulai.value) {
+        inputMulai.value = todayFormatted;
+    }
+    if (inputSelesai && !inputSelesai.value) {
+        inputSelesai.value = todayFormatted;
+    }
+}
+
+// Panggil fungsi ini di dalam fungsi init / saat modul Recall pertama kali dibuka
+document.addEventListener('DOMContentLoaded', () => {
+    initRecallDefaultTanggal();
+});
 
 // --- BUKA & TUTUP SUBPAGE RECALL ---
 window.bukaSubPageRecall = function() {
@@ -112,6 +137,11 @@ window.jalankanPencarianRecall = function() {
                 });
             }
 
+            // Jika hasil pencarian kosong, tampilkan miuiAlert
+            if (hasilFilter.length === 0) {
+                miuiAlert("Kode barang di rentang tanggal yang dipilih tidak ditemukan.");
+            }
+
             renderTabelRecallCari(hasilFilter);
         })
         .catch(error => {
@@ -155,8 +185,8 @@ function renderTabelRecallCari(dataList) {
                 <td class="p-2.5 border-b border-slate-200 text-center font-black text-slate-900">${stokVal}</td>
                 <td class="p-2.5 border-b border-slate-200 text-center font-bold text-slate-700">${item.EXPDATE || '-'}</td>
                 <td class="p-2.5 border-b border-slate-200 text-center">
-                    <button onclick="event.stopPropagation(); bukaDetailRecallBarcode('${item.BARCODE}')" class="bg-orange-500 hover:bg-orange-600 text-white px-2.5 py-1 rounded text-[10px] font-black uppercase shadow transition">
-                        Detail
+                    <button onclick="bukaDetailRecallBarcode('${item.BARCODE}', '${item.KODE_PALLET}')" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-1 px-3 rounded text-xs transition">
+                        DETAIL
                     </button>
                 </td>
             </tr>
@@ -169,7 +199,7 @@ function renderTabelRecallCari(dataList) {
 }
 
 // --- FUNGSI KETIKA TOMBOL DETAIL DIKLIK (PINDAH KE SLIDE 2 & FILTER BARCODE) ---
-window.bukaDetailRecallBarcode = function(barcodeTarget) {
+window.bukaDetailRecallBarcode = function(barcodeTarget, kodePalletTarget = null) {
     // Pindah slide ke Detail Masuk / Keluar (-50%)
     window.switchRecallSlide('detail');
     
@@ -177,50 +207,112 @@ window.bukaDetailRecallBarcode = function(barcodeTarget) {
     const radioDetail = document.querySelector('input[name="rb-recall-slide"][value="detail"]');
     if (radioDetail) radioDetail.checked = true;
 
-    // Ambil seluruh data detail dari Firebase RTDB node 'recall_cache/detail' (Tanpa terpengaruh filter tanggal di Slide 1)
-    firebase.database().ref('recall_cache/detail').once('value')
-        .then(snapshot => {
-            const allDetail = snapshot.val();
-            if (!allDetail) {
-                miuiAlert("Data detail belum tersedia.");
-                return;
+    // --- RESET TABEL DETAIL SEGERA AGAR DATA LAMA TIDAK NYANGKUT ---
+    const tbodyDetail = document.getElementById('tabelBodyRecallDetail');
+    if (tbodyDetail) {
+        tbodyDetail.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-slate-400 font-semibold animate-pulse"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Memuat rincian transaksi untuk Barcode ${barcodeTarget}...</td></tr>`;
+    }
+
+    // Ambil data detail DAN rekap secara bersamaan dari Firebase RTDB
+    Promise.all([
+        firebase.database().ref('recall_cache/detail').once('value'),
+        firebase.database().ref('recall_cache/rekap').once('value')
+    ])
+    .then(async ([snapshotDetail, snapshotRekap]) => {
+        const allDetail = snapshotDetail.val();
+        const allRekap = snapshotRekap.val();
+
+        const detailArray = allDetail ? (Array.isArray(allDetail) ? allDetail : Object.values(allDetail)) : [];
+        const rekapArray = allRekap ? (Array.isArray(allRekap) ? allRekap : Object.values(allRekap)) : [];
+
+        const targetClean = String(barcodeTarget || '').trim().toUpperCase();
+        const palletTargetClean = String(kodePalletTarget || '').trim();
+
+        // 1. Filter rincian transaksi berdasarkan BARCODE
+        let filteredDetail = detailArray.filter(item => {
+            const itemBarcode = String(item.BARCODE || '').trim().toUpperCase();
+            return itemBarcode === targetClean;
+        });
+
+        // 2. Cari baris rekap yang spesifik sesuai Barcode & Kode Palet yang diklik
+        let matchingRekap = null;
+        if (palletTargetClean) {
+            matchingRekap = rekapArray.find(r => 
+                String(r.BARCODE || '').trim().toUpperCase() === targetClean &&
+                String(r.KODE_PALLET || '').trim() === palletTargetClean
+            );
+        }
+        if (!matchingRekap) {
+            // Fallback cari berdasarkan barcode saja jika pallet tidak ditemukan
+            matchingRekap = rekapArray.find(r => String(r.BARCODE || '').trim().toUpperCase() === targetClean);
+        }
+
+        // 3. Jika data rekap ditemukan dan memiliki selisih koreksi
+        if (matchingRekap) {
+            // Cek berbagai variasi nama key koreksi dari backend/cache
+            const korMinus = Number(matchingRekap.KOR_MINUS || matchingRekap.KOR_NEGATIF || matchingRekap['KOR(-)'] || 0);
+            const korPlus = Number(matchingRekap.KOR_PLUS || matchingRekap.KOR_POSITIF || matchingRekap['KOR(+)'] || 0);
+
+            if (korMinus > 0 || korPlus > 0) {
+                // Coba cari ke muat_fdn terlebih dahulu
+                const fdnResults = await fetchMuatFdnForCorrection(matchingRekap);
+                
+                if (fdnResults && fdnResults.length > 0) {
+                    filteredDetail = filteredDetail.concat(fdnResults);
+                } else {
+                    // Jika tidak ketemu di FDN, tambahkan baris manual sebagai keterangan peringatan
+                    if (korMinus > 0) {
+                        filteredDetail.push({
+                            KODE_TRANS: 'KOR(-)',
+                            TANGGAL: '-',
+                            KODE_PALLET: matchingRekap.KODE_PALLET || '-',
+                            IN: 0,
+                            OUT: korMinus,
+                            BARCODE: barcodeTarget,
+                            NAMA_CUSTOMER: 'Tidak ditemukan data FDN untuk rak tersebut (Cari manual / data langsiran)',
+                            KOTA_SHIPPING: 'MANUAL / LANGSIRAN'
+                        });
+                    }
+                    if (korPlus > 0) {
+                        filteredDetail.push({
+                            KODE_TRANS: 'KOR(+)',
+                            TANGGAL: '-',
+                            KODE_PALLET: matchingRekap.KODE_PALLET || '-',
+                            IN: korPlus,
+                            OUT: 0,
+                            BARCODE: barcodeTarget,
+                            NAMA_CUSTOMER: 'Tidak ditemukan data FDN untuk rak tersebut (Cari manual / data langsiran)',
+                            KOTA_SHIPPING: 'MANUAL / LANGSIRAN'
+                        });
+                    }
+                }
+            }
+        }
+
+        // --- 4. URUTKAN DATA: PIN dulu, lalu DO/Koreksi, urut berdasarkan Tanggal ---
+        filteredDetail.sort((a, b) => {
+            const kodeA = String(a.KODE_TRANS || '').toUpperCase();
+            const kodeB = String(b.KODE_TRANS || '').toUpperCase();
+
+            const isPinA = kodeA.startsWith('PIN') ? 0 : 1;
+            const isPinB = kodeB.startsWith('PIN') ? 0 : 1;
+
+            if (isPinA !== isPinB) {
+                return isPinA - isPinB;
             }
 
-            const detailArray = Array.isArray(allDetail) ? allDetail : Object.values(allDetail);
-            const targetClean = String(barcodeTarget || '').trim().toUpperCase();
+            const tglA = parseTanggalCustom(a.TANGGAL);
+            const tglB = parseTanggalCustom(b.TANGGAL);
 
-            // Filter HANYA berdasarkan BARCODE yang diklik (mencakup semua tanggal & semua jenis transaksi PIN/DO)
-            let filteredDetail = detailArray.filter(item => {
-                const itemBarcode = String(item.BARCODE || '').trim().toUpperCase();
-                return itemBarcode === targetClean;
-            });
-
-            // --- URUTKAN DATA: PIN dulu, lalu DO, lalu urutkan berdasarkan Tanggal Transaksi ---
-            filteredDetail.sort((a, b) => {
-                const kodeA = String(a.KODE_TRANS || '').toUpperCase();
-                const kodeB = String(b.KODE_TRANS || '').toUpperCase();
-
-                // Kategori: PIN (0) di atas, DO (1) di bawah
-                const isPinA = kodeA.startsWith('PIN') ? 0 : 1;
-                const isPinB = kodeB.startsWith('PIN') ? 0 : 1;
-
-                if (isPinA !== isPinB) {
-                    return isPinA - isPinB;
-                }
-
-                // Jika kategori sama, urutkan berdasarkan Tanggal Transaksi (DD/MM/YYYY) dari terlama ke terbaru
-                const tglA = parseTanggalCustom(a.TANGGAL);
-                const tglB = parseTanggalCustom(b.TANGGAL);
-
-                return tglA - tglB;
-            });
-
-            renderTabelRecallDetail(filteredDetail, barcodeTarget);
-        })
-        .catch(error => {
-            console.error("Gagal memuat detail recall:", error);
-            miuiAlert("Gagal memuat data detail.");
+            return tglA - tglB;
         });
+
+        renderTabelRecallDetail(filteredDetail, barcodeTarget);
+    })
+    .catch(error => {
+        console.error("Gagal memuat detail recall:", error);
+        miuiAlert("Gagal memuat data detail.");
+    });
 };
 
 // Helper untuk mengubah string tanggal "DD/MM/YYYY" ke timestamp angka
@@ -247,10 +339,32 @@ function renderTabelRecallDetail(detailList, barcode) {
     }
 
     let html = "";
+    // Di dalam renderTabelRecallDetail:
     detailList.forEach((item) => {
+        let isKoreksiFdn = String(item.KODE_TRANS || '').startsWith('KOR-FDN');
+        let trClass = isKoreksiFdn ? "bg-orange-50/80 hover:bg-orange-100/70 cursor-pointer font-semibold transition" : "hover:bg-orange-50/50 transition";
+        
+        // --- AMBIL KODE BARANG & LOKASI RAK SECARA PRESISI DARI KODE_PALLET ---
+        let kodeBrgTarget = item.KODEBRG || item.KODE || '';
+        let rakTarget = '';
+
+        if (item.KODE_PALLET) {
+            const pParts = String(item.KODE_PALLET).split(';');
+            if (pParts.length >= 3 && !kodeBrgTarget) {
+                kodeBrgTarget = pParts[2].trim(); // Ambil CRR4A04 dari elemen ke-3
+            }
+            if (pParts.length >= 5) {
+                rakTarget = pParts[4].trim(); // Ambil lokasi rak (misal 10 C 11)
+            }
+        }
+
+        let onclickAttr = isKoreksiFdn ? `onclick="bukaModalKoreksiFdn('${item.KODEBRG || item.KODE || 'CRR4A01'}', '${item.TANGGAL}', '${rakTarget}')"` : '';
+
         html += `
-            <tr class="hover:bg-orange-50/50 transition">
-                <td class="p-2.5 border-b border-slate-200 font-bold text-slate-800">${item.KODE_TRANS || '-'}</td>
+            <tr class="${trClass}" ${onclickAttr}>
+                <td class="p-2.5 border-b border-slate-200 font-bold text-slate-800">
+                    ${item.KODE_TRANS || '-'} ${isKoreksiFdn ? '<span class="text-[10px] bg-orange-600 text-white px-1.5 py-0.5 rounded ml-1">Klik Detail</span>' : ''}
+                </td>
                 <td class="p-2.5 border-b border-slate-200 text-center text-slate-600">${item.TANGGAL || '-'}</td>
                 <td class="p-2.5 border-b border-slate-200 text-slate-700 font-mono text-xs">${item.KODE_PALLET || '-'}</td>
                 <td class="p-2.5 border-b border-slate-200 text-center font-bold text-emerald-600">${item.IN || 0}</td>
@@ -264,6 +378,210 @@ function renderTabelRecallDetail(detailList, barcode) {
 
     tbodyDetail.innerHTML = html;
 }
+
+// --- FUNGSI TAMBAHAN: MELACAK KOR(-) DI MUAT_FDN ---
+async function fetchMuatFdnForCorrection(itemRekap) {
+    if (!itemRekap || !itemRekap.KODE_PALLET || !itemRekap.KOR_MINUS || Number(itemRekap.KOR_MINUS) <= 0) {
+        return [];
+    }
+
+    const palletParts = String(itemRekap.KODE_PALLET).split(';');
+    if (palletParts.length < 5) return [];
+
+    const kodeBrg = palletParts[2].trim(); // Contoh: "CRR4A01"
+    const tglProdStr = palletParts[3].trim(); // Contoh: "19/10/2026"
+    const lokasiRak = palletParts[4].trim(); // Contoh: "9 C 08"
+    const targetQty = Number(itemRekap.KOR_MINUS); // Contoh: 2
+
+    // Parse tanggal produksi (DD/MM/YYYY) ke object Date
+    const partsTgl = tglProdStr.split('/');
+    if (partsTgl.length !== 3) return [];
+    
+    let startDate = new Date(`${partsTgl[2]}-${partsTgl[1]}-${partsTgl[0]}`);
+    let endDate = new Date(); // Hari ini
+
+    if (isNaN(startDate.getTime())) return [];
+
+    let matchedResults = [];
+    let currentDate = new Date(startDate);
+
+    // Loop per hari dari tanggal produksi sampai hari ini untuk mencocokkan node muat_fdn/{yyyymmdd}/ambilrak
+    while (currentDate <= endDate) {
+        const yyyy = currentDate.getFullYear();
+        const mm = String(currentDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(currentDate.getDate()).padStart(2, '0');
+        const dateKey = `${yyyy}${mm}${dd}`; // Format YYYYMMDD
+
+        try {
+            const snapshot = await firebase.database().ref(`muat_fdn/${dateKey}/ambilrak`).once('value');
+            const dataAmbilRak = snapshot.val();
+
+            if (dataAmbilRak) {
+                const listAmbil = Array.isArray(dataAmbilRak) ? dataAmbilRak : Object.values(dataAmbilRak);
+                
+                listAmbil.forEach(entry => {
+                    if (!entry) return;
+                    const entryKode = String(entry.kode || '').trim().toUpperCase();
+                    const entryLokasi = String(entry.lokasi || '').trim().toUpperCase();
+                    const entryQty = Number(entry.qtyAmbil || 0);
+
+                    // Cocokkan kode barang, lokasi rak, dan qty ambil dengan KOR(-)
+                    if (entryKode.includes(kodeBrg.toUpperCase()) && 
+                        entryLokasi === lokasiRak.toUpperCase() && 
+                        entryQty === targetQty) {
+                        
+                        matchedResults.push({
+                            KODE_TRANS: `KOR-FDN (${dateKey})`,
+                            TANGGAL: `${dd}/${mm}/${yyyy}`,
+                            KODE_PALLET: itemRekap.KODE_PALLET,
+                            KODEBRG: kodeBrg, // Simpan KODEBRG spesifik item ini (misal: "CRR4A04")
+                            IN: 0,
+                            OUT: entryQty,
+                            BARCODE: itemRekap.BARCODE || '-',
+                            NAMA_CUSTOMER: `Koreksi Rak (${entryLokasi})`,
+                            KOTA_SHIPPING: 'MUAT FDN'
+                        });
+                    }
+                });
+            }
+        } catch (err) {
+            console.error(`Gagal mengambil muat_fdn untuk tanggal ${dateKey}:`, err);
+        }
+
+        // Lanjut ke hari berikutnya
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    return matchedResults;
+}
+
+// --- FUNGSI MODAL KOREKSI FDN ---
+window.tutupModalKoreksi = function() {
+    const modal = document.getElementById('modalInfoKoreksi');
+    if (modal) modal.classList.add('hidden');
+};
+
+// --- FUNGSI MODAL KOREKSI FDN (DENGAN HIGHLIGHT RAK TARGET) ---
+window.bukaModalKoreksiFdn = async function(kodeBrg, tanggalMuatStr, rakHighlight = '') {
+    const modal = document.getElementById('modalInfoKoreksi');
+    if (!modal) return;
+
+    // --- RESET JUDUL & TABEL MODAL TERLEBIH DAHULU ---
+    document.getElementById('modalInfoKodeBrg').innerText = `Kode Barang: ${kodeBrg}`;
+    document.getElementById('modalInfoTanggalMuat').innerText = `Tanggal Muat: ${tanggalMuatStr}`;
+    
+    const tbodyRak = document.getElementById('modalTabelRakBody');
+    const tbodyDn = document.getElementById('modalTabelDnBody');
+
+    tbodyRak.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-slate-400 italic">Memuat data rak...</td></tr>`;
+    tbodyDn.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-slate-400 italic">Memuat data DN...</td></tr>`;
+
+    modal.classList.remove('hidden');
+
+    // Konversi tanggal "DD/MM/YYYY" ke "YYYYMMDD"
+    const parts = tanggalMuatStr.split('/');
+    if (parts.length !== 3) return;
+    const dateKey = `${parts[2]}${parts[1]}${parts[0]}`;
+
+    try {
+        const snapshot = await firebase.database().ref(`muat_fdn/${dateKey}`).once('value');
+        const fdnData = snapshot.val();
+
+        if (!fdnData) {
+            tbodyRak.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-slate-400 italic">Data rak tidak ditemukan.</td></tr>`;
+            tbodyDn.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-slate-400 italic">Data DN tidak ditemukan.</td></tr>`;
+            return;
+        }
+
+        // 1. Ambil data Pengambilan Rak dari node 'ambilrak'
+        let rakResults = [];
+        if (fdnData.ambilrak) {
+            const listAmbil = Array.isArray(fdnData.ambilrak) ? fdnData.ambilrak : Object.values(fdnData.ambilrak);
+            listAmbil.forEach(item => {
+                if (item && String(item.kode || '').trim().toUpperCase() === kodeBrg.toUpperCase()) {
+                    rakResults.push({
+                        lokasi: item.lokasi || '-',
+                        qtyAmbil: item.qtyAmbil || 0,
+                        wms: 'WH-2'
+                    });
+                }
+            });
+        }
+
+        if (rakResults.length > 0) {
+            let rakHtml = "";
+            const cleanHighlight = String(rakHighlight || '').trim().toUpperCase();
+
+            rakResults.forEach(r => {
+                const isMatch = cleanHighlight && String(r.lokasi).trim().toUpperCase() === cleanHighlight;
+                
+                // Baris yang disorot beri bg orange tipis, baris biasa beri teks jelas (text-slate-800)
+                const rowStyle = isMatch 
+                    ? 'bg-orange-100/80 border-l-4 border-l-orange-500 font-bold text-orange-950' 
+                    : 'border-b border-slate-200 hover:bg-slate-50 text-slate-800 font-medium';
+
+                rakHtml += `
+                    <tr class="${rowStyle}">
+                        <td class="p-2.5 font-bold ${isMatch ? 'text-orange-950' : 'text-slate-800'}">
+                            ${r.lokasi} 
+                            ${isMatch ? '<span class="ml-2 text-[10px] bg-orange-600 text-white px-1.5 py-0.5 rounded-full font-normal">✓</span>' : ''}
+                        </td>
+                        <td class="p-2.5 text-center font-bold ${isMatch ? 'text-orange-700' : 'text-slate-800'}">${r.qtyAmbil} Krt</td>
+                        <td class="p-2.5 text-center font-semibold ${isMatch ? 'text-orange-900' : 'text-slate-700'}">${r.wms}</td>
+                    </tr>
+                `;
+            });
+            tbodyRak.innerHTML = rakHtml;
+        } else {
+            tbodyRak.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-slate-400 italic">Tidak ada rincian rak untuk kode ini.</td></tr>`;
+        }
+
+        // 2. Ambil data Alokasi DN dari node 'datatujuan'
+        let dnResults = [];
+        if (fdnData.datatujuan) {
+            const tujuanObj = fdnData.datatujuan;
+            Object.keys(tujuanObj).forEach(keyTujuan => {
+                const tujuanNode = tujuanObj[keyTujuan];
+                if (tujuanNode && tujuanNode.data) {
+                    const listDataItems = Array.isArray(tujuanNode.data) ? tujuanNode.data : Object.values(tujuanNode.data);
+                    
+                    listDataItems.forEach(it => {
+                        if (it && String(it.kode || '').trim().toUpperCase() === kodeBrg.toUpperCase()) {
+                            let noDn = keyTujuan.split('_').pop() || '-';
+                            let namaTujuan = keyTujuan.replace(`_${noDn}`, '').replace(/_/g, ' ') || '-';
+
+                            dnResults.push({
+                                noDn: noDn,
+                                tujuan: namaTujuan,
+                                qty: it.qty_utama || it.qty || 0
+                            });
+                        }
+                    });
+                }
+            });
+        }
+
+        if (dnResults.length > 0) {
+            let dnHtml = "";
+            dnResults.forEach(d => {
+                dnHtml += `
+                    <tr class="border-b border-slate-100 hover:bg-slate-50">
+                        <td class="p-2.5 font-bold text-orange-600">${d.noDn}</td>
+                        <td class="p-2.5 font-medium text-slate-800">${d.tujuan}</td>
+                        <td class="p-2.5 text-center font-bold text-slate-700">${d.qty} Krt</td>
+                    </tr>
+                `;
+            });
+            tbodyDn.innerHTML = dnHtml;
+        } else {
+            tbodyDn.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-slate-400 italic">Tidak ada data DN terkait untuk kode ini.</td></tr>`;
+        }
+
+    } catch (err) {
+        console.error("Gagal memuat rincian FDN untuk modal:", err);
+        miuiAlert("Gagal memuat rincian data FDN.");
+    }
+};
 
 // --- FUNGSI RESET PENCARIAN ---
 window.resetPencarianRecall = function() {
