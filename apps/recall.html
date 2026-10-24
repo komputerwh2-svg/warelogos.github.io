@@ -103,7 +103,7 @@
                             </thead>
                             <tbody id="tabelBodyRecallCari" class="divide-y divide-slate-200">
                                 <tr>
-                                    <td colspan="9" class="text-center py-10 text-slate-400 italic">Silakan masukkan kode barang dan tanggal expdate untuk memulai pencarian...</td>
+                                    <td colspan="9" class="text-center text-[14px] py-10 text-slate-400 italic">Silakan masukkan kode barang dan tanggal expdate untuk memulai pencarian...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -138,8 +138,8 @@
                                     <th class="p-2.5 border-b border-orange-200 text-center">IN</th>
                                     <th class="p-2.5 border-b border-orange-200 text-center">OUT</th>
                                     <th class="p-2.5 border-b border-orange-200">Barcode</th>
-                                    <th class="p-2.5 border-b border-orange-200">Customer / Tujuan</th>
-                                    <th class="p-2.5 border-b border-orange-200">Shipping / Driver</th>
+                                    <th class="p-2.5 border-b border-orange-200">Nama Customer</th>
+                                    <th class="p-2.5 border-b border-orange-200">Kota Tujuan</th>
                                 </tr>
                             </thead>
                             <tbody id="tabelBodyRecallDetail" class="divide-y divide-slate-200">
@@ -155,4 +155,69 @@
 
         </div>
     </div>
+
+    <!-- MODAL INFORMASI KOREKSI / FDN -->
+    <div id="modalInfoKoreksi" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-orange-500 overflow-hidden flex flex-col max-h-[90vh]">
+            <!-- Header Modal -->
+            <div class="bg-gradient-to-b from-[#323232] to-[#202020] px-4 py-3 flex items-center justify-between border-b border-[#151515]>
+                <h3 class="font-black text-sm uppercase tracking-wider flex items-center gap-2">
+                    <i class="fa-solid fa-circle-info"></i> Rincian Pengambilan & Surat Jalan (FDN)
+                </h3>
+                <button onclick="tutupModalKoreksi()" class="text-white hover:text-red-400 font-bold text-lg leading-none">✕</button>
+            </div>
+            
+            <!-- Body Modal -->
+            <div class="p-6 overflow-y-auto space-y-6 text-xs">
+                <!-- Info Utama -->
+                <div class="bg-orange-50 border border-orange-200 p-4 rounded-xl space-y-1">
+                    <p class="font-bold text-slate-800 text-sm" id="modalInfoKodeBrg">-</p>
+                    <p class="text-slate-600" id="modalInfoTanggalMuat">-</p>
+                </div>
+
+                <!-- Bagian 1: Data Pengambilan Rak -->
+                <div>
+                    <h4 class="font-bold text-slate-700 uppercase mb-2 flex items-center gap-1.5 text-xs">
+                        <i class="fa-solid fa-warehouse text-orange-600"></i> Akumulasi Pengambilan Rak (Muat FDN)
+                    </h4>
+                    <div class="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                                    <th class="p-2.5">Kode Rak / Lokasi</th>
+                                    <th class="p-2.5 text-center">Qty Ambil</th>
+                                    <th class="p-2.5 text-center">Gudang</th>
+                                </tr>
+                            </thead>
+                            <tbody id="modalTabelRakBody">
+                                <!-- Diisi via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Bagian 2: Data Surat Jalan / DN -->
+                <div>
+                    <h4 class="font-bold text-slate-700 uppercase mb-2 flex items-center gap-1.5 text-xs">
+                        <i class="fa-solid fa-truck-fast text-orange-600"></i> Alokasi Surat Jalan / Nomor DN Tujuan
+                    </h4>
+                    <div class="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                                    <th class="p-2.5">No. DN / FDN</th>
+                                    <th class="p-2.5">Tujuan / Customer</th>
+                                    <th class="p-2.5 text-center">Qty (Krt)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="modalTabelDnBody">
+                                <!-- Diisi via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
 </div>
