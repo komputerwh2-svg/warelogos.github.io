@@ -1024,19 +1024,6 @@ window.aktifkanCloudPrintEngine = aktifkanCloudPrintEngine;
 // =========================================================================
 
 
-// --- SWITCH SLIDE MENGGUNAKAN EFEK SLIDER ---
-window.switchRecallSlide = function(mode) {
-    const slider = document.getElementById('slider-content-recall');
-    if (!slider) return;
-
-    if (mode === 'CARI') {
-        slider.style.transform = 'translateX(0%)';
-    } else if (mode === 'DETAIL') {
-        slider.style.transform = 'translateX(-50%)';
-    }
-};
-
-// --- BUKA & TUTUP SUBPAGE RECALL (EFEK GESER) ---
 window.bukaSubPageRecall = function() {
     let container = document.getElementById('subpage-recall-container'); 
     if (!container) {
@@ -1048,6 +1035,9 @@ window.bukaSubPageRecall = function() {
     const subpage = document.getElementById('subpageRecall');
     if (subpage) {
         subpage.classList.remove('translate-x-full');
+        if (typeof window.initRecall === 'function') {
+            window.initRecall();
+        }
         return;
     }
 
@@ -1062,29 +1052,30 @@ window.bukaSubPageRecall = function() {
         .then(htmlContent => {
             container.innerHTML = htmlContent;
             
-            const elemenBaru = document.getElementById('subpageRecall');
-            if (elemenBaru) {
-                // Beri sedikit jeda agar DOM ter-render sebelum animasi slide masuk
-                setTimeout(() => {
-                    elemenBaru.classList.remove('translate-x-full');
-                }, 50);
-            }
+            // Suntikkan skrip JS secara dinamis setelah HTML termuat
+            const script = document.createElement('script');
+            script.type = "module";
+            script.src = scriptPath; 
+            
+            script.onload = () => {
+                if (typeof window.initRecall === 'function') {
+                    window.initRecall();
+                }
+                
+                const elemenBaru = document.getElementById('subpageRecall');
+                if (elemenBaru) {
+                    setTimeout(() => {
+                        elemenBaru.classList.remove('translate-x-full');
+                    }, 50);
+                }
+            };
+            document.body.appendChild(script);
         })
         .catch(error => {
             console.error(error);
             if (typeof miuiAlert === 'function') miuiAlert("Sistem Gagal Memuat Template Recall!");
         });
 };
-
-window.tutupSubPageRecall = function() {
-    const subpage = document.getElementById('subpageRecall');
-    if (subpage) {
-        subpage.classList.add('translate-x-full');
-    }
-};
-
-window.bukaSubPageRecall = bukaSubPageRecall;
-window.tutupSubPageRecall = tutupSubPageRecall;
 
 
 // Fungsi untuk membuka subpage Ceklist Muat
