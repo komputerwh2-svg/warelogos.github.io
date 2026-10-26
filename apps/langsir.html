@@ -31,13 +31,36 @@
 
             <button onclick="simpanDataLangsirRTDB()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black py-2 px-3 rounded-lg shadow transition flex items-center gap-1.5">
                 <i class="fa-solid fa-cloud-arrow-up"></i>
-                <span>Simpan</span>
+                <span>Simpan Data Langsir</span>
             </button>
 
-            <button onclick="cetakDataLangsir()" class="bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold py-2 px-3 rounded-lg shadow transition flex items-center gap-1.5">
-                <i class="fa-solid fa-print"></i>
-                <span>Cetak</span>
-            </button>
+            <!-- KONTAINER TOMBOL & POPOVER ARSIP LANGSIR -->
+            <div class="relative">
+                <button onclick="togglePopoverArsipLangsir(event)" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-black py-2 px-3 rounded-lg shadow transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-box-archive"></i>
+                    <span>Arsip Langsir</span>
+                </button>
+
+                <!-- Popover Arsip Melayang di Bawah Tombol -->
+                <div id="popoverArsipLangsir" class="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-orange-200 z-50 hidden flex-col overflow-hidden">
+                    <div class="bg-gradient-to-r from-orange-500 to-amber-500 px-4 py-2.5 text-white flex justify-between items-center">
+                        <h3 class="font-black text-xs uppercase tracking-wide flex items-center gap-1.5">
+                            <i class="fa-solid fa-box-archive"></i> Riwayat Arsip Langsir
+                        </h3>
+                        <button onclick="tutupPopoverArsipLangsir()" class="text-white hover:text-red-200 font-bold text-sm">✕</button>
+                    </div>
+
+                    <!-- Filter Tanggal -->
+                    <div class="p-2.5 bg-orange-50 border-b border-orange-100">
+                        <input type="date" id="filterArsipLangsirTgl" onchange="loadArsipLangsirList()" class="w-full border border-orange-300 rounded-lg p-1.5 text-xs font-bold text-slate-800 bg-white shadow-inner">
+                    </div>
+
+                    <!-- Daftar List Arsip -->
+                    <div class="max-h-64 overflow-y-auto p-2.5 space-y-2 miui-custom-scroll" id="containerListArsipLangsir">
+                        <div class="text-center py-10 text-slate-400 italic text-xs">Memuat daftar arsip...</div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
