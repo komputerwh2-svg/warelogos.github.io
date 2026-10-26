@@ -1627,6 +1627,61 @@ window.tutupSubPageOngkir = tutupSubPageOngkir;
 
 
 
+window.bukaSubPageLangsir = function() {
+    let container = document.getElementById('subpage-langsir-container'); 
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'subpage-langsir-container';
+        document.body.appendChild(container);
+    }
+
+    const subpage = document.getElementById('subpageLangsir');
+    if (subpage) {
+        subpage.classList.remove('translate-x-full');
+        if (typeof window.initLangsir === 'function') {
+            window.initLangsir();
+        }
+        return;
+    }
+
+    const basePath = window.location.pathname.includes('/warelogos.github.io') ? '/warelogos.github.io/apps/langsir.html' : 'apps/langsir.html';
+    const scriptPath = window.location.pathname.includes('/warelogos.github.io') ? '/warelogos.github.io/js/langsir.js' : 'js/langsir.js';
+
+    fetch(basePath) 
+        .then(response => {
+            if (!response.ok) throw new Error("Gagal mengambil file apps/langsir.html");
+            return response.text();
+        })
+        .then(htmlContent => {
+            container.innerHTML = htmlContent;
+            
+            // Suntikkan skrip JS secara dinamis setelah HTML termuat
+            const script = document.createElement('script');
+            script.type = "module";
+            script.src = scriptPath; 
+            
+            script.onload = () => {
+                if (typeof window.initLangsir === 'function') {
+                    window.initLangsir();
+                }
+                
+                const elemenBaru = document.getElementById('subpageLangsir');
+                if (elemenBaru) {
+                    setTimeout(() => {
+                        elemenBaru.classList.remove('translate-x-full');
+                    }, 50);
+                }
+            };
+            document.body.appendChild(script);
+        })
+        .catch(error => {
+            console.error(error);
+            if (typeof miuiAlert === 'function') miuiAlert("Sistem Gagal Memuat Template Langsir!");
+        });
+};
+
+
+
 // ==========================================================================
 // REGISTRASI NAVIGASI UTAMA LAUNCHER SUB-PAGE SETELAN
 // ==========================================================================
