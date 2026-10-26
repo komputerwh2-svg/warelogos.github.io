@@ -95,7 +95,7 @@ function readFileAsArrayBufferLangsir(file) {
     });
 }
 
-// Render Kartu Preview (Grid 3 Kolom - Sorted Qty & Expdate, MIUI Custom Scroll)
+// Render Kartu Preview (Grid 3 Kolom - Sorted Qty & Expdate, MIUI Custom Scroll, Tombol Hapus per Kartu)
 window.renderPreviewLangsir = function() {
     const container = document.getElementById('containerKartuLangsir');
     if (!container) return;
@@ -142,15 +142,23 @@ window.renderPreviewLangsir = function() {
 
         html += `
             <div class="bg-white rounded-2xl shadow-sm border border-orange-200 flex flex-col overflow-hidden">
-                <!-- Header Kartu -->
+                <!-- Header Kartu dengan Tombol Hapus Khusus Kartu Ini -->
                 <div class="bg-gradient-to-r from-orange-500 to-amber-500 px-4 py-3 text-white flex justify-between items-center">
                     <div>
                         <h3 class="font-bold text-sm">${kodeRasa}</h3>
-                        <p class="text-[11px] text-orange-100 truncate max-w-[170px]">${group.namaRasa}</p>
+                        <p class="text-[11px] text-orange-100 truncate max-w-[150px]">${group.namaRasa}</p>
                     </div>
-                    <span class="bg-black/20 text-white text-[11px] font-black px-2.5 py-1 rounded-full backdrop-blur-sm tracking-wide shadow-inner">
-                        TOTAL [${formattedTotalKrt} KRT] / ${totalLokasi} RAK
-                    </span>
+
+                    <div class="flex items-center space-x-2">
+                        <span class="bg-black/20 text-white text-[11px] font-black px-2.5 py-1 rounded-full backdrop-blur-sm tracking-wide shadow-inner">
+                            TOTAL [${formattedTotalKrt} KRT] / ${totalLokasi} RAK
+                        </span>
+
+                        <!-- Tombol Hapus Seluruh Data pada Kartu Ini -->
+                        <button onclick="hapusKartuLangsir('${kodeRasa}')" class="w-7 h-7 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center justify-center transition shadow-sm" title="Hapus seluruh data kartu ${kodeRasa} ini">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Daftar Baris Data dengan miui-custom-scroll -->
@@ -207,6 +215,14 @@ function parseTanggalCustomLangsir(tglStr) {
     return isNaN(dateObj.getTime()) ? 8640000000000 : dateObj.getTime();
 }
 
+// Fungsi Hapus Seluruh Kartu Berdasarkan Kode Rasa yang Dipilih
+window.hapusKartuLangsir = function(kodeRasa) {
+    if (langsirCacheData[kodeRasa]) {
+        delete langsirCacheData[kodeRasa];
+        renderPreviewLangsir();
+    }
+};
+
 window.hapusItemLangsir = function(kodeRasa, index) {
     if (langsirCacheData[kodeRasa] && langsirCacheData[kodeRasa].items) {
         langsirCacheData[kodeRasa].items.splice(index, 1);
@@ -251,19 +267,181 @@ window.simpanDataLangsirRTDB = function() {
 
     firebase.database().ref(`data_langsir/${idLangsir}`).set(payloadToSave)
         .then(() => {
-            if (typeof miuiAlert === 'function') miuiAlert(`Data langsir berhasil disimpan dengan ID: ${idLangsir}!`);
+            if (typeof miuiAlert === 'function') {
+                miuiAlert(`Data langsir berhasil disimpan dengan ID: ${idLangsir}!`);
+            } else {
+                alert(`Data langsir berhasil disimpan dengan ID: ${idLangsir}!`);
+            }
+
+            // Kosongkan cache dan refresh/reset panel preview kartu
+            langsirCacheData = {};
+            renderPreviewLangsir();
         })
         .catch(err => {
             console.error("Gagal menyimpan ke RTDB:", err);
-            if (typeof miuiAlert === 'function') miuiAlert("Gagal menyimpan data langsir ke server.");
+            if (typeof miuiAlert === 'function') {
+                miuiAlert("Gagal menyimpan data langsir ke server.");
+            } else {
+                alert("Gagal menyimpan data langsir ke server.");
+            }
         });
 };
 
-window.cetakDataLangsir = function() {
-    const keys = Object.keys(langsirCacheData);
-    if (keys.length === 0) {
-        if (typeof miuiAlert === 'function') miuiAlert("Tidak ada data untuk dicetak!");
-        return;
+
+// Toggle Popover Arsip Langsir
+window.togglePopoverArsipLangsir = function(event) {
+    event.stopPropagation();
+    const popover = document.getElementById('popoverArsipLangsir');
+    if (!popover) return;
+
+    if (popover.classList.contains('hidden')) {
+        popover.classList.remove('hidden');
+        popover.classList.add('flex');
+
+        // Set default tanggal hari ini
+        const today = new Date().toISOString().split('T')[0];
+        const dateInput = document.getElementById('filterArsipLangsirTgl');
+        if (dateInput && !dateInput.value) {
+            dateInput.value = today;
+        }
+        loadArsipLangsirList();
+    } else {
+        tutupPopoverArsipLangsir();
     }
-    window.print();
+};
+
+window.tutupPopoverArsipLangsir = function() {
+    const popover = document.getElementById('popoverArsipLangsir');
+    if (popover) {
+        popover.classList.remove('flex');
+        popover.classList.add('hidden');
+    }
+};
+
+// Tutup popover jika klik di luar area
+document.addEventListener('click', function(e) {
+    const popover = document.getElementById('popoverArsipLangsir');
+    if (popover && !popover.contains(e.target) && !e.target.closest('button[onclick*="togglePopoverArsipLangsir"]')) {
+        tutupPopoverArsipLangsir();
+    }
+});
+
+// Memuat Daftar Arsip dari RTDB dengan Format Nama LANGSIR dd/mm/yyyy
+window.loadArsipLangsirList = function() {
+    const container = document.getElementById('containerListArsipLangsir');
+    if (!container) return;
+
+    container.innerHTML = `<div class="text-center py-6 text-slate-400 italic text-xs">Mengambil data arsip...</div>`;
+
+    firebase.database().ref('data_langsir').once('value')
+        .then(snapshot => {
+            if (!snapshot.exists()) {
+                container.innerHTML = `<div class="text-center py-10 text-slate-400 italic text-xs">Belum ada arsip tersimpan.</div>`;
+                return;
+            }
+
+            const dataArsip = snapshot.val();
+            const keys = Object.keys(dataArsip).sort().reverse(); // Urutkan terbaru
+
+            let html = '';
+            keys.forEach(idLangsir => {
+                let formattedTitle = idLangsir;
+                const parts = idLangsir.split('_'); // ['langsir', '2026', '10', '26']
+                if (parts.length === 4) {
+                    formattedTitle = `LANGSIR ${parts[3]}/${parts[2]}/${parts[1]}`;
+                }
+
+                const itemsObj = dataArsip[idLangsir];
+                const itemKeys = Object.keys(itemsObj);
+                
+                let totalKartonArsip = 0;
+                itemKeys.forEach(k => {
+                    totalKartonArsip += Number(itemsObj[k].STOK || 0);
+                });
+
+                html += `
+                    <div onclick="pilihArsipLangsir('${idLangsir}')" class="bg-white border border-orange-200 rounded-xl p-2.5 shadow-xs hover:shadow-md hover:border-orange-400 cursor-pointer transition flex flex-col space-y-1.5 group">
+                        <div class="flex justify-between items-center">
+                            <span class="font-black text-slate-800 text-[11px] uppercase flex items-center gap-1.5 group-hover:text-orange-600 transition">
+                                <i class="fa-solid fa-file-lines text-orange-500"></i> ${formattedTitle}
+                            </span>
+                            <span class="bg-orange-100 text-orange-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                ${itemKeys.length} RAK / ${totalKartonArsip.toLocaleString('id-ID')} Krt
+                            </span>
+                        </div>
+                        <div class="flex justify-end gap-1.5 pt-1 border-t border-slate-100">
+                            <span class="text-[10px] text-slate-400 italic">Klik untuk muat ke preview</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        })
+        .catch(err => {
+            console.error("Gagal memuat arsip langsir:", err);
+            container.innerHTML = `<div class="text-center py-6 text-red-500 text-xs">Gagal memuat arsip.</div>`;
+        });
+};
+
+// Memuat Data Arsip yang Dipilih ke Cache & Tampilkan ke Panel Kartu Preview
+window.pilihArsipLangsir = function(idLangsir) {
+    firebase.database().ref(`data_langsir/${idLangsir}`).once('value')
+        .then(snapshot => {
+            if (!snapshot.exists()) {
+                if (typeof miuiAlert === 'function') miuiAlert("Data arsip tidak ditemukan!");
+                return;
+            }
+
+            const dataItems = snapshot.val();
+            langsirCacheData = {}; // Reset cache lokal
+
+            // Petakan kembali data dari node server ke struktur langsirCacheData
+            Object.keys(dataItems).forEach(key => {
+                const item = dataItems[key];
+                const kodeBarang = String(item.KODE || 'PRODUK').trim().toUpperCase();
+
+                if (!langsirCacheData[kodeBarang]) {
+                    langsirCacheData[kodeBarang] = {
+                        namaRasa: item.NAMA_BARANG || item.KODE || 'PRODUK',
+                        items: []
+                    };
+                }
+
+                langsirCacheData[kodeBarang].items.push({
+                    KODE_LOKASI: item.KODE_LOKASI,
+                    KODE: item.KODE,
+                    STOK: Number(item.STOK || 0),
+                    EXPDATE: item.EXPDATE,
+                    BARCODE: item.BARCODE,
+                    KODE_PALLET: item.KODE_PALLET
+                });
+            });
+
+            // Tutup popover arsip dan render ulang tampilan preview kartu
+            tutupPopoverArsipLangsir();
+            renderPreviewLangsir();
+
+            if (typeof miuiAlert === 'function') {
+                miuiAlert(`Berhasil memuat arsip ${idLangsir} ke panel preview!`);
+            }
+        })
+        .catch(err => {
+            console.error("Gagal mengambil arsip langsir:", err);
+            if (typeof miuiAlert === 'function') miuiAlert("Gagal memuat data arsip dari server.");
+        });
+};
+
+window.cetakArsipLangsir = function(idLangsir) {
+    firebase.database().ref(`data_langsir/${idLangsir}`).once('value')
+        .then(snapshot => {
+            if (!snapshot.exists()) {
+                if (typeof miuiAlert === 'function') miuiAlert("Data arsip tidak ditemukan!");
+                return;
+            }
+            window.print();
+        })
+        .catch(err => {
+            console.error("Gagal mencetak arsip:", err);
+        });
 };
