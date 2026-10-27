@@ -523,6 +523,12 @@
                     <b>Catatan:</b> Periksa waktu pembaruan (*timestamp*) pada masing-masing item untuk mendeteksi data terbaru.
                 </span>
                 <div class="flex space-x-3 w-full md:w-auto justify-end">
+                    <!-- Tombol Backup Database -->
+                    <button onclick="backupDatabaseJSON()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-download"></i> Backup Database
+                    </button>
+                    
+                    <!-- Tombol Sinkronkan Semua Data -->
                     <button onclick="jalankanSinkronisasiPenuh()" class="px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-xl shadow-md transition flex items-center justify-center gap-2">
                         <i class="fa-solid fa-cloud-arrow-down"></i> Sinkronkan Semua Data
                     </button>
