@@ -314,6 +314,198 @@ function tutupSetelan() {
 }
 
 
+// Buka Modal Akun & Ambil Data Kredensial Saat Ini dari RTDB
+window.bukaModalAkunAdmin = function() {
+    const modal = document.getElementById('modal-akun-admin');
+    if (modal) {
+        modal.classList.remove('hidden');
+        
+        // Ambil data admin yang sudah ada di server (jika ada) untuk ditampilkan di input
+        firebase.database().ref('auth/admin').once('value')
+            .then(snapshot => {
+                if (snapshot.exists()) {
+                    const data = snapshot.val();
+                    document.getElementById('input-admin-user').value = data.username || '';
+                    document.getElementById('input-admin-pass').value = data.password || '';
+                }
+            })
+            .catch(err => {
+                console.error("Gagal memuat data akun admin:", err);
+            });
+    }
+};
+
+window.tutupModalAkunAdmin = function() {
+    const modal = document.getElementById('modal-akun-admin');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+};
+
+// Simpan Kredensial Admin ke RTDB (Menggunakan .update atau path spesifik agar aman)
+window.simpanKredensialAdminRTDB = function() {
+    const userBaru = document.getElementById('input-admin-user').value.trim();
+    const passBaru = document.getElementById('input-admin-pass').value.trim();
+
+    if (!userBaru || !passBaru) {
+        if (typeof miuiAlert === 'function') {
+            miuiAlert("Username dan password tidak boleh kosong!");
+        } else {
+            alert("Username dan password tidak boleh kosong!");
+        }
+        return;
+    }
+
+    // Simpan ke node auth/admin tanpa mengganggu node lain
+    firebase.database().ref('auth/admin').set({
+        username: userBaru,
+        password: passBaru,
+        updated_at: new Date().toISOString()
+    })
+    .then(() => {
+        if (typeof miuiAlert === 'function') {
+            miuiAlert("Kredensial admin berhasil diperbarui di server!");
+        } else {
+            alert("Kredensial admin berhasil diperbarui di server!");
+        }
+        tutupModalAkunAdmin();
+    })
+    .catch(err => {
+        console.error("Gagal menyimpan kredensial:", err);
+        if (typeof miuiAlert === 'function') {
+            miuiAlert("Gagal menyimpan kredensial ke server.");
+        } else {
+            alert("Gagal menyimpan kredensial ke server.");
+        }
+    });
+};
+
+
+// Konfigurasi Keamanan Aplikasi yang Dikunci
+const APP_CONFIG = {
+    APLIKASI_KUNCI: [
+        "APP_MASTER_DATA", 
+        "APP_REKAP_BLOK", 
+        "APP_RECALL", 
+        "APP_STOK_WH", 
+        "APP_MUTASI",
+        "APP_AUTH"
+    ]
+};
+
+let pendingTargetApp = "";
+
+function requestAksesAplikasi(appId) {
+    // Cek apakah aplikasi ada di dalam daftar kunci
+    if (APP_CONFIG.APLIKASI_KUNCI.includes(appId)) {
+        // Cek status login khusus untuk aplikasi (appId) ini di sesi aktif
+        const isLogged = sessionStorage.getItem(`admin_logged_${appId}`);
+        
+        if (isLogged === 'true') {
+            // Jika modul ini sudah pernah dibuka dengan sandi di sesi ini, langsung buka
+            bukaAplikasi(appId);
+        } else {
+            // Jika belum, kunci dan tampilkan modal sandi
+            pendingTargetApp = appId;
+            const modal = document.getElementById('modal-admin-lock');
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+        }
+    } else {
+        // Jika tidak terkunci, langsung buka
+        bukaAplikasi(appId);
+    }
+}
+
+function cekLoginAdmin() {
+    const uInput = document.getElementById('admin-user').value.trim();
+    const pInput = document.getElementById('admin-pass').value.trim();
+
+    if (!uInput || !pInput) {
+        if (typeof miuiAlert === 'function') {
+            miuiAlert("Username dan password wajib diisi!");
+        } else {
+            alert("Username dan password wajib diisi!");
+        }
+        return;
+    }
+
+    // Ambil data kredensial admin dari Firebase RTDB (auth/admin)
+    firebase.database().ref('auth/admin').once('value')
+        .then(snapshot => {
+            if (!snapshot.exists()) {
+                if (typeof miuiAlert === 'function') {
+                    miuiAlert("Konfigurasi admin belum diatur di server!");
+                }
+                return;
+            }
+
+            const adminData = snapshot.val();
+            const validUser = adminData.username;
+            const validPass = adminData.password;
+
+            if (uInput === validUser && pInput === validPass) {
+                // Berhasil Login - Tandai khusus untuk modul/app target yang sedang dibuka saja
+                if (pendingTargetApp) {
+                    sessionStorage.setItem(`admin_logged_${pendingTargetApp}`, 'true');
+                }
+                
+                closeModalAdmin();
+                bukaAplikasi(pendingTargetApp);
+                
+                // Reset input form
+                document.getElementById('admin-user').value = "";
+                document.getElementById('admin-pass').value = "";
+            } else {
+                // Gagal Login
+                if (typeof miuiAlert === 'function') {
+                    miuiAlert("Username atau password salah! Akses ditolak.");
+                } else {
+                    alert("Username atau password salah! Akses ditolak.");
+                }
+            }
+        })
+        .catch(err => {
+            console.error("Gagal verifikasi login ke server:", err);
+            if (typeof miuiAlert === 'function') {
+                miuiAlert("Terjadi kesalahan koneksi server.");
+            }
+        });
+}
+
+function closeModalAdmin() {
+    const modal = document.getElementById('modal-admin-lock');
+    if (modal) {
+        modal.classList.remove('flex');
+        modal.classList.add('hidden');
+    }
+    const uEl = document.getElementById('admin-user');
+    const pEl = document.getElementById('admin-pass');
+    if (uEl) uEl.value = "";
+    if (pEl) pEl.value = "";
+}
+
+function bukaAplikasi(appId) {
+    console.log("Akses diberikan untuk:", appId);
+    
+    if (appId === 'APP_MASTER_DATA') {
+        if (typeof bukaSubPageBankData === 'function') bukaSubPageBankData();
+    } else if (appId === 'APP_REKAP_BLOK') {
+        if (typeof bukaSubPageRekapBlok === 'function') bukaSubPageRekapBlok();
+    } else if (appId === 'APP_RECALL') {
+        if (typeof bukaSubPageRecall === 'function') bukaSubPageRecall();
+    } else if (appId === 'APP_STOK_WH') {
+        if (typeof bukaSubPageStokWH === 'function') bukaSubPageStokWH();
+    } else if (appId === 'APP_MUTASI') {
+        if (typeof bukaSubPageMutasi === 'function') bukaSubPageMutasi();
+    } else if (appId === 'APP_AUTH') {
+        if (typeof bukaModalAkunAdmin === 'function') bukaModalAkunAdmin();
+    }
+}
+
+
 function formatUkuranData(data) {
     if (!data) return "0 B";
     const stringData = typeof data === 'string' ? data : JSON.stringify(data);
@@ -624,6 +816,48 @@ async function jalankanSinkronisasiPenuh() {
         }
     }
 }
+
+window.backupDatabaseJSON = function() {
+    if (typeof miuiAlert === 'function') {
+        miuiAlert("Memulai proses backup database...");
+    }
+
+    // Ambil seluruh data dari root database Firebase (/)
+    firebase.database().ref('/').once('value')
+        .then(snapshot => {
+            const data = snapshot.val();
+            if (!data) {
+                if (typeof miuiAlert === 'function') miuiAlert("Database kosong, tidak ada data untuk dibackup.");
+                return;
+            }
+
+            // Buat penamaan file otomatis berdasarkan tanggal hari ini
+            const now = new Date();
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const dd = String(now.getDate()).padStart(2, '0');
+            const fileName = `bank-data-backup-${yyyy}-${mm}-${dd}.json`;
+
+            // Ubah objek data menjadi string JSON terformat
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", fileName);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+
+            if (typeof miuiAlert === 'function') {
+                miuiAlert(`Backup database berhasil diunduh (${fileName})!`);
+            }
+        })
+        .catch(err => {
+            console.error("Gagal melakukan backup database:", err);
+            if (typeof miuiAlert === 'function') {
+                miuiAlert("Gagal mengambil data backup dari server.");
+            }
+        });
+};
 
 async function perbaruiIndikatorMenuDb() {
     const infoText = document.getElementById('info-status-db');
@@ -940,61 +1174,6 @@ window.miuiConfirm = function(pesan, callbackYa) {
     }
 };
 
-
-// Variabel penyimpan target aplikasi yang ingin dibuka
-// Konfigurasi Keamanan Lokal
-const APP_CONFIG = {
-    ADMIN_USER: "admin",
-    ADMIN_PASS: "admin",
-    APLIKASI_KUNCI: ["APP_MASTER_DATA1", "APP_REKAP_BLOK1"] // List ID aplikasi yang dikunci
-};
-
-let pendingTargetApp = "";
-
-function requestAksesAplikasi(appId) {
-    // Cek apakah aplikasi ada di dalam daftar kunci
-    if (APP_CONFIG.APLIKASI_KUNCI.includes(appId)) {
-        // Jika terkunci, tampilkan modal
-        pendingTargetApp = appId;
-        document.getElementById('modal-admin-lock').classList.remove('hidden');
-    } else {
-        // Jika tidak ada dalam daftar, langsung buka
-        bukaAplikasi(appId);
-    }
-}
-
-function cekLoginAdmin() {
-    const u = document.getElementById('admin-user').value;
-    const p = document.getElementById('admin-pass').value;
-
-    if (u === APP_CONFIG.ADMIN_USER && p === APP_CONFIG.ADMIN_PASS) {
-        // Berhasil Login
-        document.getElementById('modal-admin-lock').classList.add('hidden');
-        bukaAplikasi(pendingTargetApp);
-        
-        // Reset input
-        document.getElementById('admin-user').value = "";
-        document.getElementById('admin-pass').value = "";
-    } else {
-        // Gagal Login
-        miuiAlert("Username atau password salah! Akses ditolak.");
-    }
-}
-
-function closeModalAdmin() {
-    document.getElementById('modal-admin-lock').classList.add('hidden');
-}
-
-function bukaAplikasi(appId) {
-    console.log("Akses diberikan untuk:", appId);
-    
-   if (appId === 'APP_MASTER_DATA') {
-        bukaSubPageBankData(); // Memanggil fungsi master data
-    } else if (appId === 'APP_REKAP_BLOK') {
-        bukaSubPageRekapBlok(); // Memanggil fungsi rekap blok
-    }
-    
-}
 
 // =========================================================================
 // BRIDGE INTERFACE: EKSPOS SEMUA FUNGSI KE GLOBAL WINDOW (WAJIB JIKA MODULE)

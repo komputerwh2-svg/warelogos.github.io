@@ -341,30 +341,7 @@ window.gantiModulStokWH = function(mode) {
     const slider = document.getElementById('slider-content-stokwh');
     const btnFloatHP = document.getElementById('btnFloatingInputHP');
     
-    // Cek apakah admin sudah terbuka dalam sesi ini
-    const isAdminUnlocked = sessionStorage.getItem('admin_unlocked') === 'true';
-
-    // Jika mode bukan REKAP dan belum unlock admin, tampilkan modal admin
-    if (mode !== 'REKAP' && !isAdminUnlocked) {
-        window.tempAdminAction = {
-            type: 'SWITCH_MODE',
-            mode: mode
-        };
-
-        const inputUserId = document.getElementById('admin-userid');
-        const inputPass = document.getElementById('admin-pass');
-        const modalAdmin = document.getElementById('modal-admin-stok');
-
-        if (inputUserId) inputUserId.value = '';
-        if (inputPass) inputPass.value = '';
-        if (modalAdmin) modalAdmin.classList.remove('hidden');
-        if (inputUserId) inputUserId.focus();
-
-        console.log(`Akses ke mode ${mode} dikunci, menunggu verifikasi admin...`);
-        return; 
-    }
-
-    // Eksekusi perpindahan slider (jika REKAP atau sudah unlock admin)
+    // Eksekusi perpindahan slider langsung tanpa cek sandi lokal
     if (btnFloatHP) {
         btnFloatHP.style.display = (mode === 'WH3') ? 'flex' : 'none';
     }
@@ -1207,6 +1184,33 @@ async function eksekusiUpload(fileWh2, fileWms, url, isUpdate) {
         });
 
         if (response.ok) {
+            // --- TAMBAHKAN DI SINI UNTUK MEMPERBARUI CACHE INDEXEDDB ---
+            try {
+                // Ambil seluruh data cache saat ini atau buat objek baru
+                let allData = (await getStokWH2FromIDB()) || {};
+                
+                // Masukkan data hasil upload berdasarkan unik ID tanggalnya
+                const uniqueIdKey = url.split('/').slice(-1)[0].replace('.json', ''); 
+                // Atau sesuaikan dengan struktur key yang disimpan, misal: `stokwh2wms_${tglWh2}`
+                
+                // Cara paling aman jika struktur allData menyimpan kumpulan tanggal:
+                // Misal formatnya allData[uniqueId] = stokGabungan;
+                // Kita cari tahu struktur key di loadStokData (biasanya menggunakan key unik tanggal)
+                
+                // Sebagai contoh penulisan langsung:
+                const pathParts = url.split('/');
+                const dateKey = pathParts[pathParts.length - 1].replace('.json', '');
+                
+                allData[dateKey] = stokGabungan;
+                
+                await saveStokWH2ToIDB(allData);
+                window.currentStokData = allData;
+                console.log("Cache IndexedDB lokal berhasil diperbarui setelah upload.");
+            } catch (idbErr) {
+                console.error("Gagal memperbarui cache IndexedDB lokal:", idbErr);
+            }
+            // -----------------------------------------------------------
+
             miuiAlert(isUpdate ? "Data WH-2 berhasil di-UPDATE!" : "Data WH-2 berhasil disimpan!");
             tutupModalUploadWH2();
             resetFileInput();
@@ -1620,6 +1624,52 @@ function tampilkanKosongwh3(infoTambahan = '') {
 }
 
 
+// Helper IndexedDB untuk Cache Stok WH-2
+function openStokWH2DB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open('LogistikWH2DB', 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains('stok_store')) {
+                db.createObjectStore('stok_store');
+            }
+        };
+    });
+}
+
+async function saveStokWH2ToIDB(data) {
+    try {
+        const db = await openStokWH2DB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('stok_store', 'readwrite');
+            const store = transaction.objectStore('stok_store');
+            const request = store.put(data, 'cached_stok_wh2');
+            request.onsuccess = () => resolve(true);
+            request.onerror = () => reject(request.error);
+        });
+    } catch (err) {
+        console.error("Gagal menyimpan ke IndexedDB:", err);
+    }
+}
+
+async function getStokWH2FromIDB() {
+    try {
+        const db = await openStokWH2DB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('stok_store', 'readonly');
+            const store = transaction.objectStore('stok_store');
+            const request = store.get('cached_stok_wh2');
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    } catch (err) {
+        console.error("Gagal membaca dari IndexedDB:", err);
+        return null;
+    }
+}
+
 async function loadDataRekap() {
     const inputTglrekap = document.getElementById('select-tanggal-rekap');
     const tanggalrekap = inputTglrekap ? inputTglrekap.value : null;
@@ -1723,27 +1773,27 @@ async function loadStokData() {
 
     if (!tanggal) return;
 
-    // 1. Tentukan mode secara paksa dari DOM
-    // Mencari radio yang dicentang, jika tidak ada, default ke SEBELUM
+    // Tentukan mode secara paksa dari DOM
     const radioChecked = document.querySelector('input[name="rb-mode-wh2"]:checked');
     const mode = radioChecked ? radioChecked.value : "SEBELUM";
     
     console.log("Memuat data mode:", mode, "untuk tanggal:", tanggal);
 
     const formattedDate = tanggal.replace(/-/g, '');
-    const cacheKey = 'cached_stok_wh2';
     
     try {
         const response = await fetch(`${DB_FIREBASE_URL}stok_wh2.json`);
         const allData = await response.json();
         
         if (allData) {
-            // PANGGIL DI SINI UNTUK MONITORING UKURAN DOWNLOAD DI WIDGET
-        if (typeof updateWidgetDownloadSize === 'function') {
-            updateWidgetDownloadSize(allData);
-        }
-            // SIMPAN KE LOCALSTORAGE (Caching Lokal WH-2)
-            localStorage.setItem(cacheKey, JSON.stringify(allData));
+            // Monitor ukuran download di widget
+            if (typeof updateWidgetDownloadSize === 'function') {
+                updateWidgetDownloadSize(allData);
+            }
+            
+            // SIMPAN KE INDEXEDDB (Aman dari batasan kuota localStorage)
+            await saveStokWH2ToIDB(allData);
+            console.log("Data WH-2 berhasil disimpan ke IndexedDB.");
         }
         
         window.currentStokData = allData;
@@ -1760,21 +1810,21 @@ async function loadStokData() {
             return;
         }
 
-        // 2. Render langsung dengan mode yang sudah didapat
+        // Render langsung
         renderTabel(allData[key], mode, key);
         
     } catch (error) {
-        console.error("Gagal load data dari server, mencoba memuat dari cache lokal...", error);
+        console.error("Gagal load data dari server, mencoba memuat dari IndexedDB...", error);
         
-        // FALLBACK: Ambil dari localStorage jika offline/gagal fetch
-        const cachedData = localStorage.getItem(cacheKey);
+        // FALLBACK: Ambil dari IndexedDB jika offline/gagal fetch
+        const cachedData = await getStokWH2FromIDB();
         if (cachedData) {
-            const allData = JSON.parse(cachedData);
-            window.currentStokData = allData;
+            window.currentStokData = cachedData;
             
-            const key = Object.keys(allData).find(k => k.includes(`stokwh2wms_${formattedDate}`));
+            const key = Object.keys(cachedData).find(k => k.includes(`stokwh2wms_${formattedDate}`));
             if (key) {
-                renderTabel(allData[key], mode, key);
+                renderTabel(cachedData[key], mode, key);
+                console.log("UI WH-2 dimuat kilat dari IndexedDB lokal.");
                 return;
             }
         }
