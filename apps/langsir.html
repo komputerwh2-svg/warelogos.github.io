@@ -20,44 +20,84 @@
             </div>
         </div>
 
-        <!-- Tombol Aksi Header -->
-        <div class="flex items-center space-x-2">
-            <input type="file" id="inputExcelLangsir" accept=".xls, .xlsx, .csv" multiple class="hidden" onchange="handleFileImportLangsir(event)">
+        <!-- Header Modul Langsir -->
+        <div class="flex flex-wrap justify-between items-center">
             
-            <button onclick="document.getElementById('inputExcelLangsir').click()" class="bg-orange-600 hover:bg-orange-700 text-white text-xs font-black py-2 px-3 rounded-lg shadow transition flex items-center gap-1.5">
-                <i class="fa-solid fa-file-excel"></i>
-                <span>Import Data Langsir</span>
-            </button>
+            <!-- Judul & Badge Tanggal Aktif + Tombol Ubah Popover -->
+            <div class="flex items-center space-x-3">
+    
+                <!-- Badge Tanggal Aktif (Default Hidden, muncul saat arsip dipilih) -->
+                <div id="badgeTanggalAktifContainer" class="hidden items-center gap-2 bg-zinc-900/60 px-3 py-1 rounded-lg border border-zinc-700/60 text-xs relative">
+                    <div class="flex items-center gap-1.5 text-zinc-300">
+                        <i class="fa-regular fa-calendar text-orange-400"></i>
+                        <span>Tanggal Langsir: <strong id="label-tanggal-langsir" class="text-orange-300">Belum Dipilih</strong></span>
+                    </div>
+                    <div class="h-3.5 w-[1px] bg-zinc-600 mx-1"></div>
+                    <button onclick="bukaPopoverUbahTanggalLangsir()" class="text-orange-400 hover:text-orange-300 font-bold flex items-center gap-1 transition" title="Ubah Tanggal Langsir">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                        <span>Ubah</span>
+                    </button>
 
-            <button onclick="simpanDataLangsirRTDB()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black py-2 px-3 rounded-lg shadow transition flex items-center gap-1.5">
-                <i class="fa-solid fa-cloud-arrow-up"></i>
-                <span>Simpan Data Langsir</span>
-            </button>
+                    <!-- MODAL POPOVER UBAH TANGGAL LANGSIR -->
+                    <div id="modal-popover-ubah-langsir" class="hidden absolute left-0 top-10 z-[9999] w-72 bg-zinc-900 border border-orange-500/50 rounded-xl shadow-2xl p-4 text-xs text-white text-left">
+                        <div class="flex justify-between items-center mb-2 pb-2 border-b border-zinc-800">
+                            <span class="font-bold text-orange-400 flex items-center gap-1.5">
+                                <i class="fa-solid fa-calendar-days"></i> Ganti Tanggal Langsir
+                            </span>
+                            <button onclick="tutupPopoverUbahTanggalLangsir()" class="text-zinc-400 hover:text-white"><i class="fa-solid fa-xmark text-sm"></i></button>
+                        </div>
 
-            <!-- KONTAINER TOMBOL & POPOVER ARSIP LANGSIR -->
-            <div class="relative">
-                <button onclick="togglePopoverArsipLangsir(event)" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-black py-2 px-3 rounded-lg shadow transition flex items-center gap-1.5">
-                    <i class="fa-solid fa-box-archive"></i>
-                    <span>Arsip Langsir</span>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-[11px] text-zinc-400 mb-1">Pilih Tanggal Baru:</label>
+                                <input type="date" id="input-tanggal-baru-langsir" class="bg-zinc-800 border border-orange-500/30 rounded px-2.5 py-1.5 text-white text-xs w-full focus:outline-none focus:border-orange-500 mb-2">
+                            </div>
+                            <button onclick="simpanPerubahanTanggalLangsir()" class="w-full bg-orange-600 hover:bg-orange-500 text-white py-1.5 rounded font-bold transition shadow">
+                                Simpan Perubahan
+                            </button>
+                        </div>
+                    </div>
+                    <!-- AKHIR MODAL POPOVER -->
+                </div>
+            </div>
+
+            <!-- 3 Tombol Utama: Import, Simpan, Arsip -->
+            <div class="flex items-center space-x-2">
+                <input type="file" id="inputExcelLangsir" accept=".xls, .xlsx, .csv" multiple class="hidden" onchange="handleFileImportLangsir(event)">
+                
+                <button onclick="document.getElementById('inputExcelLangsir').click()" class="bg-orange-600 hover:bg-orange-700 text-white text-xs font-black py-2 px-3 rounded-lg shadow transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-file-excel"></i>
+                    <span>Import Data Langsir</span>
                 </button>
 
-                <!-- Popover Arsip Melayang di Bawah Tombol -->
-                <div id="popoverArsipLangsir" class="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-orange-200 z-50 hidden flex-col overflow-hidden">
-                    <div class="bg-gradient-to-r from-orange-500 to-amber-500 px-4 py-2.5 text-white flex justify-between items-center">
-                        <h3 class="font-black text-xs uppercase tracking-wide flex items-center gap-1.5">
-                            <i class="fa-solid fa-box-archive"></i> Riwayat Arsip Langsir
-                        </h3>
-                        <button onclick="tutupPopoverArsipLangsir()" class="text-white hover:text-red-200 font-bold text-sm">✕</button>
-                    </div>
+                <button onclick="simpanDataLangsirRTDB()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black py-2 px-3 rounded-lg shadow transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                    <span>Simpan Data Langsir</span>
+                </button>
 
-                    <!-- Filter Tanggal -->
-                    <div class="p-2.5 bg-orange-50 border-b border-orange-100">
-                        <input type="date" id="filterArsipLangsirTgl" onchange="loadArsipLangsirList()" class="w-full border border-orange-300 rounded-lg p-1.5 text-xs font-bold text-slate-800 bg-white shadow-inner">
-                    </div>
+                <!-- Arsip Langsir -->
+                <div class="relative">
+                    <button onclick="togglePopoverArsipLangsir(event)" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-black py-2 px-3 rounded-lg shadow transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-box-archive"></i>
+                        <span>Arsip Langsir</span>
+                    </button>
 
-                    <!-- Daftar List Arsip -->
-                    <div class="max-h-64 overflow-y-auto p-2.5 space-y-2 miui-custom-scroll" id="containerListArsipLangsir">
-                        <div class="text-center py-10 text-slate-400 italic text-xs">Memuat daftar arsip...</div>
+                    <!-- Popover Daftar Arsip -->
+                    <div id="popoverArsipLangsir" class="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-orange-200 z-50 hidden flex-col overflow-hidden">
+                        <div class="bg-gradient-to-r from-orange-500 to-amber-500 px-4 py-2.5 text-white flex justify-between items-center">
+                            <h3 class="font-black text-xs uppercase tracking-wide flex items-center gap-1.5">
+                                <i class="fa-solid fa-box-archive"></i> Riwayat Arsip Langsir
+                            </h3>
+                            <button onclick="tutupPopoverArsipLangsir()" class="text-white hover:text-red-200 font-bold text-sm">✕</button>
+                        </div>
+
+                        <div class="p-2.5 bg-orange-50 border-b border-orange-100">
+                            <input type="date" id="filterArsipLangsirTgl" onchange="loadArsipLangsirList()" class="w-full border border-orange-300 rounded-lg p-1.5 text-xs font-bold text-slate-800 bg-white shadow-inner">
+                        </div>
+
+                        <div class="max-h-64 overflow-y-auto p-2.5 space-y-2 miui-custom-scroll" id="containerListArsipLangsir">
+                            <div class="text-center py-10 text-slate-400 italic text-xs">Memuat daftar arsip...</div>
+                        </div>
                     </div>
                 </div>
             </div>
