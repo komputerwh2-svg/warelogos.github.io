@@ -146,7 +146,7 @@ window.renderPreviewLangsir = function() {
                 <div class="bg-gradient-to-r from-orange-500 to-amber-500 px-4 py-3 text-white flex justify-between items-center">
                     <div>
                         <h3 class="font-bold text-sm">${kodeRasa}</h3>
-                        <p class="text-[11px] text-orange-100 truncate max-w-[150px]">${group.namaRasa}</p>
+                        <p class="text-[11px] text-orange-100 max-w-[150px]">${group.namaRasa}</p>
                     </div>
 
                     <div class="flex items-center space-x-2">
@@ -233,7 +233,7 @@ window.hapusItemLangsir = function(kodeRasa, index) {
     }
 };
 
-// Simpan ke RTDB dengan format id: langsir_yyyy_mm_dd dan key: kodebarang_rak
+// Simpan ke RTDB dengan format id: langsir_yyyy_mm_dd dan key: kodebarang_rak (Termasuk NAMA_BARANG)
 window.simpanDataLangsirRTDB = function() {
     const keys = Object.keys(langsirCacheData);
     if (keys.length === 0) {
@@ -250,13 +250,17 @@ window.simpanDataLangsirRTDB = function() {
     let payloadToSave = {};
 
     keys.forEach(kodeRasa => {
-        langsirCacheData[kodeRasa].items.forEach(item => {
+        const groupData = langsirCacheData[kodeRasa];
+        const namaBarangGroup = groupData.namaRasa || kodeRasa;
+
+        groupData.items.forEach(item => {
             const cleanRak = String(item.KODE_LOKASI || 'NORAK').replace(/[\s\/\\#$\[\]\.]/g, '_');
             const nodeKey = `${item.KODE}_${cleanRak}`.toUpperCase();
 
             payloadToSave[nodeKey] = {
                 KODE_LOKASI: item.KODE_LOKASI,
                 KODE: item.KODE,
+                NAMA_BARANG: item.NAMA_BARANG || namaBarangGroup, // Menyertakan nama barang/rasa ke database
                 STOK: item.STOK,
                 EXPDATE: item.EXPDATE,
                 BARCODE: item.BARCODE,
@@ -405,16 +409,25 @@ window.pilihArsipLangsir = async function(idArsip) {
             const item = dataItems[key];
             const kodeBarang = String(item.KODE || 'PRODUK').trim().toUpperCase();
 
+            // Ambil nama barang dari berbagai kemungkinan properti agar tidak tertimpa kode
+            const namaBarangAsli = item.NAMA_BARANG || item.NAMA_RASA || item.NAMA || item.KODE || 'PRODUK';
+
             if (!tempLangsirData[kodeBarang]) {
                 tempLangsirData[kodeBarang] = {
-                    namaRasa: item.NAMA_BARANG || item.KODE || 'PRODUK',
+                    namaRasa: namaBarangAsli,
                     items: []
                 };
+            } else {
+                // Pastikan jika namaRasa sebelumnya terisi kode, diperbarui dengan nama barang asli jika ada
+                if (tempLangsirData[kodeBarang].namaRasa === kodeBarang && namaBarangAsli !== kodeBarang) {
+                    tempLangsirData[kodeBarang].namaRasa = namaBarangAsli;
+                }
             }
 
             tempLangsirData[kodeBarang].items.push({
                 KODE_LOKASI: item.KODE_LOKASI,
                 KODE: item.KODE,
+                NAMA_BARANG: namaBarangAsli, // Simpan juga di item detailnya
                 STOK: Number(item.STOK || 0),
                 EXPDATE: item.EXPDATE,
                 BARCODE: item.BARCODE,
@@ -587,7 +600,7 @@ window.cetakArsipLangsir = async function(tanggalArsip) {
 window.cetakDataLangsir = function() {
     const dataLangsir = window.currentLangsirData || langsirCacheData; 
     
-    let formattedTitleDate = "TERBARU";
+    let formattedTitleDate = "LANGSIR";
     const activeId = window.currentActiveArsipId || "";
     const parts = activeId.split('_'); 
     if (parts.length === 4) {
