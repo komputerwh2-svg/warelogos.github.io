@@ -369,8 +369,11 @@ window.loadArsipLangsirList = function() {
                                 ${itemKeys.length} RAK / ${totalKartonArsip.toLocaleString('id-ID')} Krt
                             </span>
                         </div>
-                        <div class="flex justify-end gap-1.5 pt-1 border-t border-slate-100">
+                        <div class="flex justify-between items-center pt-1 border-t border-slate-100">
                             <span class="text-[10px] text-slate-400 italic">Klik untuk muat ke preview</span>
+                            <button onclick="event.stopPropagation(); cetakArsipLangsir('${idLangsir}')" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] flex items-center gap-1 shadow-sm transition-all">
+                                <i class="fa-solid fa-print"></i> Cetak
+                            </button>
                         </div>
                     </div>
                 `;
@@ -384,64 +387,432 @@ window.loadArsipLangsirList = function() {
         });
 };
 
-// Memuat Data Arsip yang Dipilih ke Cache & Tampilkan ke Panel Kartu Preview
-window.pilihArsipLangsir = function(idLangsir) {
-    firebase.database().ref(`data_langsir/${idLangsir}`).once('value')
-        .then(snapshot => {
-            if (!snapshot.exists()) {
-                if (typeof miuiAlert === 'function') miuiAlert("Data arsip tidak ditemukan!");
-                return;
+// 1. Fungsi saat Arsip Dipilih (Load Data + Set Tanggal Asli ke Header)
+window.pilihArsipLangsir = async function(idArsip) {
+    if (!idArsip) return;
+
+    try {
+        const snapshot = await firebase.database().ref(`data_langsir/${idArsip}`).once('value');
+        if (!snapshot.exists()) {
+            if (typeof miuiAlert === 'function') miuiAlert("Data arsip tidak ditemukan!");
+            return;
+        }
+
+        const dataItems = snapshot.val();
+        let tempLangsirData = {};
+
+        Object.keys(dataItems).forEach(key => {
+            const item = dataItems[key];
+            const kodeBarang = String(item.KODE || 'PRODUK').trim().toUpperCase();
+
+            if (!tempLangsirData[kodeBarang]) {
+                tempLangsirData[kodeBarang] = {
+                    namaRasa: item.NAMA_BARANG || item.KODE || 'PRODUK',
+                    items: []
+                };
             }
 
-            const dataItems = snapshot.val();
-            langsirCacheData = {}; // Reset cache lokal
-
-            // Petakan kembali data dari node server ke struktur langsirCacheData
-            Object.keys(dataItems).forEach(key => {
-                const item = dataItems[key];
-                const kodeBarang = String(item.KODE || 'PRODUK').trim().toUpperCase();
-
-                if (!langsirCacheData[kodeBarang]) {
-                    langsirCacheData[kodeBarang] = {
-                        namaRasa: item.NAMA_BARANG || item.KODE || 'PRODUK',
-                        items: []
-                    };
-                }
-
-                langsirCacheData[kodeBarang].items.push({
-                    KODE_LOKASI: item.KODE_LOKASI,
-                    KODE: item.KODE,
-                    STOK: Number(item.STOK || 0),
-                    EXPDATE: item.EXPDATE,
-                    BARCODE: item.BARCODE,
-                    KODE_PALLET: item.KODE_PALLET
-                });
+            tempLangsirData[kodeBarang].items.push({
+                KODE_LOKASI: item.KODE_LOKASI,
+                KODE: item.KODE,
+                STOK: Number(item.STOK || 0),
+                EXPDATE: item.EXPDATE,
+                BARCODE: item.BARCODE,
+                KODE_PALLET: item.KODE_PALLET
             });
-
-            // Tutup popover arsip dan render ulang tampilan preview kartu
-            tutupPopoverArsipLangsir();
-            renderPreviewLangsir();
-
-            if (typeof miuiAlert === 'function') {
-                miuiAlert(`Berhasil memuat arsip ${idLangsir} ke panel preview!`);
-            }
-        })
-        .catch(err => {
-            console.error("Gagal mengambil arsip langsir:", err);
-            if (typeof miuiAlert === 'function') miuiAlert("Gagal memuat data arsip dari server.");
         });
+
+        // Simpan ke state global
+        window.currentLangsirData = tempLangsirData;
+        window.currentActiveArsipId = idArsip; 
+        if (typeof langsirCacheData !== 'undefined') {
+            langsirCacheData = tempLangsirData;
+        }
+
+        // Tampilkan badge tanggal aktif di header dan set teks tanggalnya
+        const badgeContainer = document.getElementById('badgeTanggalAktifContainer');
+        if (badgeContainer) {
+            badgeContainer.classList.remove('hidden');
+            badgeContainer.classList.add('flex');
+        }
+
+        const labelEl = document.getElementById('label-tanggal-langsir');
+        if (labelEl) {
+            const parts = idArsip.split('_'); // ['langsir', '2026', '10', '28']
+            if (parts.length === 4) {
+                labelEl.innerText = `${parts[3]}/${parts[2]}/${parts[1]}`;
+            } else {
+                labelEl.innerText = idArsip;
+            }
+        }
+
+        // Render data ke tampilan utama aplikasi
+        if (typeof renderLangsir === 'function') {
+            renderLangsir(tempLangsirData);
+        } else if (typeof displayLangsirData === 'function') {
+            displayLangsirData(tempLangsirData);
+        } else if (typeof renderPreviewLangsir === 'function') {
+            renderPreviewLangsir(tempLangsirData);
+        }
+
+        // Tutup popover arsip
+        const modalArsip = document.getElementById('modalArsipLangsir');
+        if (modalArsip) modalArsip.classList.add('hidden');
+        
+        const popoverArsip = document.getElementById('popoverArsipLangsir');
+        if (popoverArsip) popoverArsip.classList.add('hidden');
+
+        if (typeof miuiAlert === 'function') {
+            miuiAlert(`Arsip ${idArsip} berhasil dimuat!`);
+        }
+
+    } catch (err) {
+        console.error("Gagal memuat arsip langsir:", err);
+        if (typeof miuiAlert === 'function') miuiAlert("Gagal memuat data arsip.");
+    }
 };
 
-window.cetakArsipLangsir = function(idLangsir) {
-    firebase.database().ref(`data_langsir/${idLangsir}`).once('value')
-        .then(snapshot => {
-            if (!snapshot.exists()) {
-                if (typeof miuiAlert === 'function') miuiAlert("Data arsip tidak ditemukan!");
-                return;
+// 2. Membuka Popover Ubah Tanggal
+window.bukaPopoverUbahTanggalLangsir = function() {
+    const oldId = window.currentActiveArsipId;
+    if (!oldId) {
+        if (typeof miuiAlert === 'function') miuiAlert("Belum ada arsip langsir yang dipilih/dimuat!");
+        return;
+    }
+
+    // Set tanggal default pada input date sesuai arsip aktif saat ini
+    let defaultDateStr = new Date().toISOString().split('T')[0];
+    const parts = oldId.split('_'); // ['langsir', 'YYYY', 'MM', 'DD']
+    if (parts.length === 4) {
+        defaultDateStr = `${parts[1]}-${parts[2]}-${parts[3]}`;
+    }
+
+    const inputTgl = document.getElementById('input-tanggal-baru-langsir');
+    if (inputTgl) inputTgl.value = defaultDateStr;
+
+    const modal = document.getElementById('modal-popover-ubah-langsir');
+    if (modal) modal.classList.remove('hidden');
+};
+
+// 3. Menutup Popover Ubah Tanggal
+window.tutupPopoverUbahTanggalLangsir = function() {
+    const modal = document.getElementById('modal-popover-ubah-langsir');
+    if (modal) modal.classList.add('hidden');
+};
+
+// 4. Eksekusi Simpan Perubahan Tanggal (Memindahkan data di Firebase RTDB ke ID & Tanggal Baru)
+window.simpanPerubahanTanggalLangsir = async function() {
+    const oldId = window.currentActiveArsipId;
+    if (!oldId) {
+        if (typeof miuiAlert === 'function') miuiAlert("Belum ada arsip aktif!");
+        return;
+    }
+
+    const inputVal = document.getElementById('input-tanggal-baru-langsir')?.value;
+    if (!inputVal) {
+        if (typeof miuiAlert === 'function') miuiAlert("Silakan pilih tanggal baru terlebih dahulu.");
+        return;
+    }
+
+    const cleanDate = inputVal.trim(); // Format: YYYY-MM-DD
+    const newId = `langsir_${cleanDate.replace(/-/g, '_')}`;
+
+    if (newId === oldId) {
+        if (typeof miuiAlert === 'function') miuiAlert("Tanggal baru sama dengan tanggal arsip saat ini.");
+        return;
+    }
+
+    try {
+        const dbRef = firebase.database().ref();
+        
+        // Ambil data dari path lama di Firebase
+        const oldSnapshot = await dbRef.child(`data_langsir/${oldId}`).once('value');
+        if (!oldSnapshot.exists()) {
+            if (typeof miuiAlert === 'function') miuiAlert("Data arsip lama tidak ditemukan di database!");
+            return;
+        }
+
+        const arsipData = oldSnapshot.val();
+
+        // Simpan data ke path/tanggal baru
+        await dbRef.child(`data_langsir/${newId}`).set(arsipData);
+
+        // Hapus data dari path/tanggal lama
+        await dbRef.child(`data_langsir/${oldId}`).remove();
+
+        // Perbarui state aktif ke ID baru
+        window.currentActiveArsipId = newId;
+
+        // Update tampilan label tanggal di badge header
+        const labelEl = document.getElementById('label-tanggal-langsir');
+        if (labelEl) {
+            const dateParts = cleanDate.split('-'); // [YYYY, MM, DD]
+            if (dateParts.length === 3) {
+                labelEl.innerText = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
             }
-            window.print();
-        })
-        .catch(err => {
-            console.error("Gagal mencetak arsip:", err);
+        }
+
+        // Tutup popover
+        tutupPopoverUbahTanggalLangsir();
+
+        if (typeof miuiAlert === 'function') {
+            miuiAlert(`Tanggal arsip berhasil diubah ke ${cleanDate}!`);
+        }
+
+        // Refresh daftar arsip jika popover riwayat arsip terbuka
+        if (typeof window.loadArsipLangsirList === 'function') {
+            window.loadArsipLangsirList();
+        }
+
+    } catch (err) {
+        console.error("Gagal mengubah tanggal arsip:", err);
+        if (typeof miuiAlert === 'function') miuiAlert("Terjadi kesalahan saat mengubah tanggal arsip.");
+    }
+};
+
+// 2. Fungsi Cetak Arsip Langsung
+window.cetakArsipLangsir = async function(tanggalArsip) {
+    if (tanggalArsip) {
+        // Muat data dulu ke variabel global, lalu cetak
+        await window.pilihArsipLangsir(tanggalArsip);
+    }
+    
+    if (typeof cetakDataLangsir === 'function') {
+        cetakDataLangsir();
+    } else {
+        window.print();
+    }
+};
+
+window.cetakDataLangsir = function() {
+    const dataLangsir = window.currentLangsirData || langsirCacheData; 
+    
+    let formattedTitleDate = "TERBARU";
+    const activeId = window.currentActiveArsipId || "";
+    const parts = activeId.split('_'); 
+    if (parts.length === 4) {
+        formattedTitleDate = `${parts[3]}/${parts[2]}/${parts[1]}`;
+    } else {
+        const labelText = document.getElementById('label-tanggal-langsir')?.innerText;
+        if (labelText) formattedTitleDate = labelText;
+    }
+
+    if (!dataLangsir || Object.keys(dataLangsir).length === 0) {
+        if (typeof miuiAlert === 'function') miuiAlert("Tidak ada data langsir untuk dicetak!");
+        return;
+    }
+
+    const now = new Date();
+    const options = { weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit' };
+    const tanggalCetakStr = now.toLocaleDateString('id-ID', options);
+    const jamCetakStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    const infoWaktuCetak = `Dicetak pada: ${tanggalCetakStr}, ${jamCetakStr}`;
+
+    const printWindow = window.open('', '_blank', 'width=1000,height=800');
+    if (!printWindow) {
+        alert("Mohon izinkan pop-up (pop-up blocker) di browser Anda untuk mencetak.");
+        return;
+    }
+
+    let htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Cetak Langsir ${formattedTitleDate}</title>
+            <style>
+                @page {
+                    size: 215mm 330mm portrait;
+                    margin: 5mm 3mm;
+                }
+                body {
+                    font-family: Arial, sans-serif;
+                    background: #fff;
+                    color: #000;
+                    margin: 0;
+                    padding: 0;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
+                .page {
+                    width: 209mm;
+                    height: 320mm;
+                    max-height: 320mm;
+                    margin: 0 auto;
+                    padding: 2mm;
+                    box-sizing: border-box;
+                    page-break-after: always;
+                    break-after: page;
+                    display: flex;
+                    flex-direction: column;
+                }
+                .header-container {
+                    margin-bottom: 6px;
+                }
+                .top-info-bar {
+                    display: flex;
+                    justify-content: flex-end;
+                    font-size: 9px;
+                    color: #000;
+                    font-style: italic;
+                    margin-bottom: 1px;
+                }
+                .header-title {
+                    text-align: center;
+                    font-size: 22px;
+                    font-weight: 900;
+                    letter-spacing: 0.5px;
+                    margin-bottom: 4px;
+                }
+                .header-line {
+                    border-bottom: 2.5px solid #000;
+                    margin-top: 3px;
+                }
+                .grid-container {
+                    display: grid;
+                    grid-template-columns: repeat(4, 1fr);
+                    gap: 10px;
+                    flex: 1;
+                    align-content: start;
+                }
+                .card {
+                    /* KOTAK LUAR KARTU DIHILANGKAN (border & background transparan) */
+                    border: none;
+                    padding: 2px;
+                    background: transparent;
+                    box-sizing: border-box;
+                    display: flex;
+                    flex-direction: column;
+                }
+                .card-header {
+                    background: #fff;
+                    color: #000;
+                    border: 2px solid #000;
+                    padding: 4px 6px;
+                    font-weight: 900;
+                    border-radius: 3px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 4px;
+                    font-size: 13px; 
+                }
+                .card-items {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 2px;
+                }
+                .card-row {
+                    display: grid;
+                    grid-template-columns: 20px 1fr 18px 32px;
+                    align-items: center;
+                    background: #fff;
+                    padding: 2.5px 4px;
+                    border-radius: 2px;
+                    border: 1.2px solid #000;
+                    font-size: 12px; 
+                }
+                .row-no {
+                    color: #000;
+                    font-weight: bold;
+                    font-size: 10px;
+                    text-align: right;
+                    padding-right: 3px;
+                }
+                .row-lokasi {
+                    font-weight: bold;
+                }
+                .row-checkbox {
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                }
+                .checkbox-box {
+                    width: 9.5px;
+                    height: 9.5px;
+                    border: 1.5px solid #000;
+                    border-radius: 2px;
+                    background: #fff;
+                }
+                .row-qty {
+                    text-align: right;
+                    font-weight: normal;
+                    font-size: 12px;
+                }
+            </style>
+        </head>
+        <body>
+    `;
+
+    const entries = Object.entries(dataLangsir);
+    const kartuPerHalaman = 12; // 4 kolom x 3 baris per halaman
+
+    for (let i = 0; i < entries.length; i += kartuPerHalaman) {
+        const chunk = entries.slice(i, i + kartuPerHalaman);
+        
+        htmlContent += `
+        <div class="page">
+            <div class="header-container">
+                <div class="top-info-bar">${infoWaktuCetak}</div>
+                <div class="header-title">LANGSIR ${formattedTitleDate}</div>
+                <div class="header-line"></div>
+            </div>
+            <div class="grid-container">
+        `;
+
+        chunk.forEach(([kode, val]) => {
+            const itemsList = Array.isArray(val) ? val : (val.items || []);
+            let totalKrtRak = 0;
+            itemsList.forEach(it => {
+                totalKrtRak += Number(it.STOK || it.val || 0);
+            });
+
+            htmlContent += `
+                <div class="card">
+                    <div class="card-header">
+                        <span>${kode}</span>
+                        <span>= ${totalKrtRak}</span>
+                    </div>
+                    <div class="card-items">
+            `;
+
+            itemsList.forEach((row, index) => {
+                const lokasi = row.KODE_LOKASI || row.sub || '-';
+                const stok = row.STOK !== undefined ? row.STOK : (row.val || 0);
+                
+                htmlContent += `
+                    <div class="card-row">
+                        <span class="row-no">${index + 1}.</span>
+                        <span class="row-lokasi">${lokasi}</span>
+                        <div class="row-checkbox">
+                            <div class="checkbox-box"></div>
+                        </div>
+                        <span class="row-qty">${stok}</span>
+                    </div>
+                `;
+            });
+
+            htmlContent += `
+                    </div>
+                </div>
+            `;
         });
+
+        htmlContent += `
+            </div>
+        </div>
+        `;
+    }
+
+    htmlContent += `
+        <script>
+            window.onload = function() {
+                window.print();
+            }
+        <\/script>
+        </body>
+        </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
 };
