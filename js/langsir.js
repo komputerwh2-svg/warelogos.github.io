@@ -610,7 +610,7 @@ window.cetakDataLangsir = function() {
 
     const printWindow = window.open('', '_blank', 'width=1000,height=800');
     if (!printWindow) {
-        alert("Mohon izinkan pop-up (pop-up blocker) di browser Anda untuk mencetak.");
+        miuiAlert("Mohon izinkan pop-up (pop-up blocker) di browser Anda untuk mencetak.");
         return;
     }
 
@@ -807,6 +807,10 @@ window.cetakDataLangsir = function() {
         <script>
             window.onload = function() {
                 window.print();
+                // Menutup tab/jendela preview secara otomatis setelah dialog cetak selesai (Cetak/Batal)
+                setTimeout(function() {
+                    window.close();
+                }, 500);
             }
         <\/script>
         </body>
