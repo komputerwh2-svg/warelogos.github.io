@@ -79,7 +79,7 @@ window.handleFileImportLangsir = async function(event) {
     event.target.value = '';
 
     if (loadedCount > 0) {
-        if (typeof miuiAlert === 'function') miuiAlert(`Berhasil mengimpor ${loadedCount} berkas laporan WMS!`);
+        if (typeof miuiAlert === 'function') miuiAlert(`Berhasil mengimpor ${loadedCount} data rak WMS!`);
         renderPreviewLangsir();
     } else {
         if (typeof miuiAlert === 'function') miuiAlert("Tidak ada data valid yang berhasil dibaca.");
@@ -95,7 +95,7 @@ function readFileAsArrayBufferLangsir(file) {
     });
 }
 
-// Render Kartu Preview (Grid 3 Kolom - Sorted Qty & Expdate, MIUI Custom Scroll, Tombol Hapus per Kartu)
+// Render Kartu Preview (Grid 3 Kolom - Sorted Qty & Expdate, MIUI Custom Scroll, Tombol Hapus per Kartu & Support Badge Part)
 window.renderPreviewLangsir = function() {
     const container = document.getElementById('containerKartuLangsir');
     if (!container) return;
@@ -116,8 +116,8 @@ window.renderPreviewLangsir = function() {
     }
 
     let html = '';
-    keys.forEach(kodeRasa => {
-        const group = langsirCacheData[kodeRasa];
+    keys.forEach(groupKey => {
+        const group = langsirCacheData[groupKey];
         let items = group.items;
         if (!items || items.length === 0) return;
 
@@ -140,13 +140,25 @@ window.renderPreviewLangsir = function() {
         let totalLokasi = items.length;
         let formattedTotalKrt = totalKarton.toLocaleString('id-ID');
 
+        // Tentukan kode barang asli dan badge sesi/part jika sesi > 1
+        const sessionNum = Number(group.uploadSession || 1);
+        const kodeTampil = group.kodeBarang || groupKey.split('_S')[0];
+        
+        // Badge Part / Tambahan jika sesi unggah > 1 (Menggunakan format P_2, P_3, dst)
+        const badgePartHtml = sessionNum > 1 
+            ? `<span class="bg-amber-700 text-amber-100 text-[10px] font-black px-1.5 py-0.5 rounded shadow-xs ml-2 uppercase tracking-wide border border-amber-600">P_${sessionNum}</span>` 
+            : '';
+
         html += `
             <div class="bg-white rounded-2xl shadow-sm border border-orange-200 flex flex-col overflow-hidden">
                 <!-- Header Kartu dengan Tombol Hapus Khusus Kartu Ini -->
                 <div class="bg-gradient-to-r from-orange-500 to-amber-500 px-4 py-3 text-white flex justify-between items-center">
                     <div>
-                        <h3 class="font-bold text-sm">${kodeRasa}</h3>
-                        <p class="text-[11px] text-orange-100 max-w-[150px]">${group.namaRasa}</p>
+                        <div class="flex items-center">
+                            <h3 class="font-bold text-sm tracking-wide">${kodeTampil}</h3>
+                            ${badgePartHtml}
+                        </div>
+                        <p class="text-[11px] text-orange-100 max-w-[150px] truncate">${group.namaRasa}</p>
                     </div>
 
                     <div class="flex items-center space-x-2">
@@ -155,14 +167,14 @@ window.renderPreviewLangsir = function() {
                         </span>
 
                         <!-- Tombol Hapus Seluruh Data pada Kartu Ini -->
-                        <button onclick="hapusKartuLangsir('${kodeRasa}')" class="w-7 h-7 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center justify-center transition shadow-sm" title="Hapus seluruh data kartu ${kodeRasa} ini">
+                        <button onclick="hapusKartuLangsir('${groupKey}')" class="w-7 h-7 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center justify-center transition shadow-sm" title="Hapus seluruh data kartu ${kodeTampil} ini">
                             <i class="fa-solid fa-trash-can text-xs"></i>
                         </button>
                     </div>
                 </div>
 
-                <!-- Daftar Baris Data dengan miui-custom-scroll -->
-                <div class="p-3 flex-1 overflow-y-auto max-h-[300px] divide-y divide-slate-100 miui-custom-scroll">
+                <!-- Daftar Baris Data dengan miui-custom-scroll dan ID unik agar posisi scroll terkunci -->
+                <div id="scroll_container_${groupKey}" class="p-3 flex-1 overflow-y-auto max-h-[300px] divide-y divide-slate-100 miui-custom-scroll">
         `;
 
         items.forEach((item, index) => {
@@ -187,7 +199,7 @@ window.renderPreviewLangsir = function() {
                     </div>
                     
                     <!-- Tombol Hapus Baris Satuan -->
-                    <button onclick="hapusItemLangsir('${kodeRasa}', ${index})" class="w-8 h-8 bg-red-50 hover:bg-red-100 text-red-500 rounded-xl flex items-center justify-center transition shadow-sm flex-shrink-0" title="Hapus baris ini">
+                    <button onclick="hapusItemLangsir('${groupKey}', ${index})" class="w-8 h-8 bg-red-50 hover:bg-red-100 text-red-500 rounded-xl flex items-center justify-center transition shadow-sm flex-shrink-0" title="Hapus baris ini">
                         <i class="fa-solid fa-trash-can text-xs"></i>
                     </button>
                 </div>
@@ -225,70 +237,113 @@ window.hapusKartuLangsir = function(kodeRasa) {
 
 window.hapusItemLangsir = function(kodeRasa, index) {
     if (langsirCacheData[kodeRasa] && langsirCacheData[kodeRasa].items) {
+        // 1. Ambil posisi scroll saat ini
+        const containerKartu = document.getElementById(`scroll_container_${kodeRasa}`);
+        const currentScrollTop = containerKartu ? containerKartu.scrollTop : 0;
+
+        // 2. Hapus item dari data cache
         langsirCacheData[kodeRasa].items.splice(index, 1);
         if (langsirCacheData[kodeRasa].items.length === 0) {
             delete langsirCacheData[kodeRasa];
         }
+
+        // 3. Render ulang tampilan preview
         renderPreviewLangsir();
+
+        // 4. Langsung kembalikan posisi scroll seketika tanpa jeda (0ms / sinkronus di microtask berikutnya)
+        requestAnimationFrame(() => {
+            const restoredContainer = document.getElementById(`scroll_container_${kodeRasa}`);
+            if (restoredContainer) {
+                restoredContainer.scrollTop = currentScrollTop;
+            }
+        });
     }
 };
 
-// Simpan ke RTDB dengan format id: langsir_yyyy_mm_dd dan key: kodebarang_rak (Termasuk NAMA_BARANG)
-window.simpanDataLangsirRTDB = function() {
+// Simpan ke RTDB secara otomatis: jika tanggal hari ini sudah ada, langsung buat sesi tambahan (susulan) baru
+window.simpanDataLangsirRTDB = async function() {
     const keys = Object.keys(langsirCacheData);
     if (keys.length === 0) {
         if (typeof miuiAlert === 'function') miuiAlert("Tidak ada data langsir yang dapat disimpan!");
         return;
     }
 
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
-    const idLangsir = `langsir_${yyyy}_${mm}_${dd}`;
+    // 1. Selalu tentukan target tanggal berdasarkan tanggal hari ini (atau arsip aktif jika sedang dibuka)
+    let targetIdLangsir = window.currentActiveArsipId;
+    
+    if (!targetIdLangsir) {
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        targetIdLangsir = `langsir_${yyyy}_${mm}_${dd}`;
+    }
 
-    let payloadToSave = {};
+    try {
+        const dbRef = firebase.database().ref(`data_langsir/${targetIdLangsir}`);
+        
+        // 2. Cek apakah data di tanggal tersebut sudah ada di server
+        const snapshot = await dbRef.once('value');
+        let existingData = snapshot.exists() ? snapshot.val() : {};
 
-    keys.forEach(kodeRasa => {
-        const groupData = langsirCacheData[kodeRasa];
-        const namaBarangGroup = groupData.namaRasa || kodeRasa;
+        let payloadToSave = { ...existingData };
 
-        groupData.items.forEach(item => {
-            const cleanRak = String(item.KODE_LOKASI || 'NORAK').replace(/[\s\/\\#$\[\]\.]/g, '_');
-            const nodeKey = `${item.KODE}_${cleanRak}`.toUpperCase();
+        // 3. Deteksi otomatis sesi unggah (upload_session) berikutnya
+        let currentUploadSession = 1;
+        if (snapshot.exists()) {
+            let maxSession = 1;
+            Object.values(existingData).forEach(item => {
+                if (item.upload_session && Number(item.upload_session) > maxSession) {
+                    maxSession = Number(item.upload_session);
+                }
+            });
+            currentUploadSession = maxSession + 1; // Otomatis jadi sesi 2, 3, dst. jika tanggal sudah ada
+        }
 
-            payloadToSave[nodeKey] = {
-                KODE_LOKASI: item.KODE_LOKASI,
-                KODE: item.KODE,
-                NAMA_BARANG: item.NAMA_BARANG || namaBarangGroup, // Menyertakan nama barang/rasa ke database
-                STOK: item.STOK,
-                EXPDATE: item.EXPDATE,
-                BARCODE: item.BARCODE,
-                KODE_PALLET: item.KODE_PALLET
-            };
+        // 4. Masukkan data baru dengan penanda sesi
+        keys.forEach(kodeRasa => {
+            const groupData = langsirCacheData[kodeRasa];
+            const namaBarangGroup = groupData.namaRasa || kodeRasa;
+
+            groupData.items.forEach(item => {
+                const cleanRak = String(item.KODE_LOKASI || 'NORAK').replace(/[\s\/\\#$\[\]\.]/g, '_');
+                
+                // Gunakan suffix sesi _S1, _S2, dst. agar key tidak saling menimpa
+                const nodeKey = `${item.KODE}_${cleanRak}_S${currentUploadSession}`.toUpperCase();
+
+                payloadToSave[nodeKey] = {
+                    KODE_LOKASI: item.KODE_LOKASI,
+                    KODE: item.KODE,
+                    NAMA_BARANG: item.NAMA_BARANG || namaBarangGroup,
+                    STOK: Number(item.STOK || 0),
+                    EXPDATE: item.EXPDATE,
+                    BARCODE: item.BARCODE,
+                    KODE_PALLET: item.KODE_PALLET,
+                    upload_session: currentUploadSession // Penanda otomatis sesi unggah
+                };
+            });
         });
-    });
 
-    firebase.database().ref(`data_langsir/${idLangsir}`).set(payloadToSave)
-        .then(() => {
-            if (typeof miuiAlert === 'function') {
-                miuiAlert(`Data langsir berhasil disimpan dengan ID: ${idLangsir}!`);
-            } else {
-                alert(`Data langsir berhasil disimpan dengan ID: ${idLangsir}!`);
-            }
+        // 5. Simpan ke Firebase
+        await dbRef.set(payloadToSave);
 
-            // Kosongkan cache dan refresh/reset panel preview kartu
-            langsirCacheData = {};
-            renderPreviewLangsir();
-        })
-        .catch(err => {
-            console.error("Gagal menyimpan ke RTDB:", err);
-            if (typeof miuiAlert === 'function') {
-                miuiAlert("Gagal menyimpan data langsir ke server.");
-            } else {
-                alert("Gagal menyimpan data langsir ke server.");
-            }
-        });
+        if (typeof miuiAlert === 'function') {
+            const infoTeks = currentUploadSession > 1 ? ` (Ditambahkan sebagai Sesi/Susulan ke-${currentUploadSession})` : '';
+            miuiAlert(`Data langsir berhasil disimpan pada ${targetIdLangsir}${infoTeks}!`);
+        }
+
+        // Set arsip aktif, kosongkan cache preview, dan muat ulang tampilannya
+        window.currentActiveArsipId = targetIdLangsir;
+        langsirCacheData = {};
+        
+        if (typeof window.pilihArsipLangsir === 'function') {
+            window.pilihArsipLangsir(targetIdLangsir);
+        }
+
+    } catch (err) {
+        console.error("Gagal menyimpan ke RTDB:", err);
+        if (typeof miuiAlert === 'function') miuiAlert("Gagal menyimpan data langsir ke server.");
+    }
 };
 
 
@@ -330,12 +385,15 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// Memuat Daftar Arsip dari RTDB dengan Format Nama LANGSIR dd/mm/yyyy
+// Memuat Daftar Arsip dari RTDB dengan Format Nama LANGSIR dd/mm/yyyy & Filter Tanggal
 window.loadArsipLangsirList = function() {
     const container = document.getElementById('containerListArsipLangsir');
     if (!container) return;
 
     container.innerHTML = `<div class="text-center py-6 text-slate-400 italic text-xs">Mengambil data arsip...</div>`;
+
+    const inputFilterTgl = document.getElementById('filterArsipLangsirTgl');
+    const selectedDate = inputFilterTgl ? inputFilterTgl.value : ''; // Format: YYYY-MM-DD dari input date
 
     firebase.database().ref('data_langsir').once('value')
         .then(snapshot => {
@@ -345,7 +403,19 @@ window.loadArsipLangsirList = function() {
             }
 
             const dataArsip = snapshot.val();
-            const keys = Object.keys(dataArsip).sort().reverse(); // Urutkan terbaru
+            let keys = Object.keys(dataArsip).sort().reverse(); // Urutkan terbaru di atas
+
+            // Jika user memilih tanggal pada filter, saring kuncinya
+            if (selectedDate) {
+                // selectedDate format: "YYYY-MM-DD", ID arsip format: "langsir_YYYY_MM_DD"
+                const targetIdPart = `langsir_${selectedDate.replace(/-/g, '_')}`;
+                keys = keys.filter(id => id === targetIdPart);
+            }
+
+            if (keys.length === 0) {
+                container.innerHTML = `<div class="text-center py-10 text-slate-400 italic text-xs">Tidak ada arsip pada tanggal tersebut.</div>`;
+                return;
+            }
 
             let html = '';
             keys.forEach(idLangsir => {
@@ -391,7 +461,15 @@ window.loadArsipLangsirList = function() {
         });
 };
 
-// 1. Fungsi saat Arsip Dipilih (Load Data + Set Tanggal Asli ke Header)
+// Fungsi Opsional untuk Reset Filter Tanggal Arsip
+window.resetFilterArsipLangsir = function() {
+    const inputFilterTgl = document.getElementById('filterArsipLangsirTgl');
+    if (inputFilterTgl) {
+        inputFilterTgl.value = '';
+    }
+    window.loadArsipLangsirList();
+};
+
 window.pilihArsipLangsir = async function(idArsip) {
     if (!idArsip) return;
 
@@ -407,27 +485,30 @@ window.pilihArsipLangsir = async function(idArsip) {
 
         Object.keys(dataItems).forEach(key => {
             const item = dataItems[key];
-            const kodeBarang = String(item.KODE || 'PRODUK').trim().toUpperCase();
+            const kodeBarangBase = String(item.KODE || 'PRODUK').trim().toUpperCase();
+            
+            // Ambil nomor sesi upload (default ke 1)
+            const sessionNum = Number(item.upload_session || 1);
+            
+            // Buat key unik agar terpecah menjadi kartu terpisah jika beda sesi
+            const groupKey = sessionNum > 1 ? `${kodeBarangBase}_S${sessionNum}` : kodeBarangBase;
 
-            // Ambil nama barang dari berbagai kemungkinan properti agar tidak tertimpa kode
+            // Ambil nama barang asli (bersih tanpa teks tambahan)
             const namaBarangAsli = item.NAMA_BARANG || item.NAMA_RASA || item.NAMA || item.KODE || 'PRODUK';
 
-            if (!tempLangsirData[kodeBarang]) {
-                tempLangsirData[kodeBarang] = {
-                    namaRasa: namaBarangAsli,
+            if (!tempLangsirData[groupKey]) {
+                tempLangsirData[groupKey] = {
+                    namaRasa: namaBarangAsli,      // Tetap bersih
+                    kodeBarang: kodeBarangBase,
+                    uploadSession: sessionNum,     // Menyimpan nomor sesi (1, 2, dst.)
                     items: []
                 };
-            } else {
-                // Pastikan jika namaRasa sebelumnya terisi kode, diperbarui dengan nama barang asli jika ada
-                if (tempLangsirData[kodeBarang].namaRasa === kodeBarang && namaBarangAsli !== kodeBarang) {
-                    tempLangsirData[kodeBarang].namaRasa = namaBarangAsli;
-                }
             }
 
-            tempLangsirData[kodeBarang].items.push({
+            tempLangsirData[groupKey].items.push({
                 KODE_LOKASI: item.KODE_LOKASI,
                 KODE: item.KODE,
-                NAMA_BARANG: namaBarangAsli, // Simpan juga di item detailnya
+                NAMA_BARANG: namaBarangAsli,
                 STOK: Number(item.STOK || 0),
                 EXPDATE: item.EXPDATE,
                 BARCODE: item.BARCODE,
@@ -435,14 +516,13 @@ window.pilihArsipLangsir = async function(idArsip) {
             });
         });
 
-        // Simpan ke state global
         window.currentLangsirData = tempLangsirData;
         window.currentActiveArsipId = idArsip; 
         if (typeof langsirCacheData !== 'undefined') {
             langsirCacheData = tempLangsirData;
         }
 
-        // Tampilkan badge tanggal aktif di header dan set teks tanggalnya
+        // Header tanggal
         const badgeContainer = document.getElementById('badgeTanggalAktifContainer');
         if (badgeContainer) {
             badgeContainer.classList.remove('hidden');
@@ -451,7 +531,7 @@ window.pilihArsipLangsir = async function(idArsip) {
 
         const labelEl = document.getElementById('label-tanggal-langsir');
         if (labelEl) {
-            const parts = idArsip.split('_'); // ['langsir', '2026', '10', '28']
+            const parts = idArsip.split('_');
             if (parts.length === 4) {
                 labelEl.innerText = `${parts[3]}/${parts[2]}/${parts[1]}`;
             } else {
@@ -459,25 +539,18 @@ window.pilihArsipLangsir = async function(idArsip) {
             }
         }
 
-        // Render data ke tampilan utama aplikasi
+        // Render ke tampilan
         if (typeof renderLangsir === 'function') {
             renderLangsir(tempLangsirData);
-        } else if (typeof displayLangsirData === 'function') {
-            displayLangsirData(tempLangsirData);
         } else if (typeof renderPreviewLangsir === 'function') {
             renderPreviewLangsir(tempLangsirData);
         }
 
-        // Tutup popover arsip
         const modalArsip = document.getElementById('modalArsipLangsir');
         if (modalArsip) modalArsip.classList.add('hidden');
         
         const popoverArsip = document.getElementById('popoverArsipLangsir');
         if (popoverArsip) popoverArsip.classList.add('hidden');
-
-        if (typeof miuiAlert === 'function') {
-            miuiAlert(`Arsip ${idArsip} berhasil dimuat!`);
-        }
 
     } catch (err) {
         console.error("Gagal memuat arsip langsir:", err);
@@ -541,7 +614,7 @@ window.simpanPerubahanTanggalLangsir = async function() {
         // Ambil data dari path lama di Firebase
         const oldSnapshot = await dbRef.child(`data_langsir/${oldId}`).once('value');
         if (!oldSnapshot.exists()) {
-            if (typeof miuiAlert === 'function') miuiAlert("Data arsip lama tidak ditemukan di database!");
+            if (typeof miuiAlert === 'function') miuiAlert("Data arsip lama tidak ditemukan!");
             return;
         }
 
@@ -582,6 +655,76 @@ window.simpanPerubahanTanggalLangsir = async function() {
         if (typeof miuiAlert === 'function') miuiAlert("Terjadi kesalahan saat mengubah tanggal arsip.");
     }
 };
+
+// Fungsi untuk menghapus arsip langsir yang sedang aktif dari Firebase RTDB menggunakan miuiConfirm
+window.hapusArsipLangsirAktif = function() {
+    const oldId = window.currentActiveArsipId;
+    if (!oldId) {
+        if (typeof miuiAlert === 'function') miuiAlert("Tidak ada data arsip langsir yang sedang aktif!");
+        return;
+    }
+
+    const pesanKonfirmasi = `Apakah Anda yakin ingin menghapus permanen data langsir arsip [ ${oldId} ] ini?`;
+
+    // Cek apakah miuiConfirm tersedia, gunakan callback untuk eksekusi
+    if (typeof miuiConfirm === 'function') {
+        miuiConfirm(pesanKonfirmasi, async () => {
+            await eksekusiHapusArsip(oldId);
+        });
+    } else {
+        // Fallback jika miuiConfirm tidak ada
+        if (confirm(pesanKonfirmasi)) {
+            eksekusiHapusArsip(oldId);
+        }
+    }
+};
+
+// Fungsi helper untuk proses hapus ke Firebase & reset tampilan
+async function eksekusiHapusArsip(oldId) {
+    try {
+        const dbRef = firebase.database().ref();
+
+        // Hapus data dari path Firebase
+        await dbRef.child(`data_langsir/${oldId}`).remove();
+
+        // Tutup popover
+        tutupPopoverUbahTanggalLangsir();
+
+        // Sembunyikan kembali badge tanggal aktif di header
+        const badgeContainer = document.getElementById('badgeTanggalAktifContainer');
+        if (badgeContainer) {
+            badgeContainer.classList.remove('flex');
+            badgeContainer.classList.add('hidden');
+        }
+
+        // Reset state global & tampilan utama
+        window.currentActiveArsipId = null;
+        window.currentLangsirData = {};
+        if (typeof langsirCacheData !== 'undefined') {
+            langsirCacheData = {};
+        }
+
+        // Render ulang tampilan agar kembali ke kondisi kosong ("Belum ada data langsir diimpor")
+        if (typeof renderPreviewLangsir === 'function') {
+            renderPreviewLangsir({});
+        } else if (typeof renderLangsir === 'function') {
+            renderLangsir({});
+        }
+
+        if (typeof miuiAlert === 'function') {
+            miuiAlert(`Data arsip ${oldId} berhasil dihapus!`);
+        }
+
+        // Refresh daftar arsip di popover riwayat jika terbuka
+        if (typeof window.loadArsipLangsirList === 'function') {
+            window.loadArsipLangsirList();
+        }
+
+    } catch (err) {
+        console.error("Gagal menghapus arsip langsir:", err);
+        if (typeof miuiAlert === 'function') miuiAlert("Terjadi kesalahan saat menghapus data arsip.");
+    }
+}
 
 // 2. Fungsi Cetak Arsip Langsung
 window.cetakArsipLangsir = async function(tanggalArsip) {
@@ -688,7 +831,6 @@ window.cetakDataLangsir = function() {
                     align-content: start;
                 }
                 .card {
-                    /* KOTAK LUAR KARTU DIHILANGKAN (border & background transparan) */
                     border: none;
                     padding: 2px;
                     background: transparent;
@@ -756,7 +898,8 @@ window.cetakDataLangsir = function() {
         <body>
     `;
 
-    const entries = Object.entries(dataLangsir);
+    // Urutkan entries berdasarkan kunci agar kode barang & partnya berdampingan
+    const entries = Object.entries(dataLangsir).sort((a, b) => a[0].localeCompare(b[0]));
     const kartuPerHalaman = 12; // 4 kolom x 3 baris per halaman
 
     for (let i = 0; i < entries.length; i += kartuPerHalaman) {
@@ -772,17 +915,38 @@ window.cetakDataLangsir = function() {
             <div class="grid-container">
         `;
 
-        chunk.forEach(([kode, val]) => {
+        chunk.forEach(([key, val]) => {
             const itemsList = Array.isArray(val) ? val : (val.items || []);
+            
+            // --- URUTKAN BERDASARKAN RAK (KODE_LOKASI) ---
+            itemsList.sort((a, b) => {
+                const rakA = String(a.KODE_LOKASI || a.sub || '').trim();
+                const rakB = String(b.KODE_LOKASI || b.sub || '').trim();
+                return rakA.localeCompare(rakB, undefined, { numeric: true, sensitivity: 'base' });
+            });
+
             let totalKrtRak = 0;
             itemsList.forEach(it => {
                 totalKrtRak += Number(it.STOK || it.val || 0);
             });
 
+            // --- FORMAT LABEL KODE & PART (P_2, P_3, dst) ---
+            let displayCode = key;
+            const sessionNum = Number(val.uploadSession || 0);
+            
+            if (key.includes('_S')) {
+                const partsKey = key.split('_S');
+                const baseName = partsKey[0];
+                const sNum = partsKey[1];
+                displayCode = `${baseName} P_${sNum}`;
+            } else if (sessionNum > 1) {
+                displayCode = `${key} P_${sessionNum}`;
+            }
+
             htmlContent += `
                 <div class="card">
                     <div class="card-header">
-                        <span>${kode}</span>
+                        <span>${displayCode}</span>
                         <span>= ${totalKrtRak}</span>
                     </div>
                     <div class="card-items">
@@ -820,12 +984,11 @@ window.cetakDataLangsir = function() {
         <script>
             window.onload = function() {
                 window.print();
-                // Menutup tab/jendela preview secara otomatis setelah dialog cetak selesai (Cetak/Batal)
                 setTimeout(function() {
                     window.close();
                 }, 500);
             }
-        <\/script>
+        </script>
         </body>
         </html>
     `;
