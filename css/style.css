@@ -45,6 +45,9 @@ body {
 
 
 /* Custom Scrollbar Minimalis ala MIUI v5 */
+.miui-custom-scroll {
+    scroll-behavior: auto !important; /* Mencegah transisi/animasi scroll yang memicu kedip saat re-render */
+}
 .miui-custom-scroll::-webkit-scrollbar {
     width: 5px;
 }
