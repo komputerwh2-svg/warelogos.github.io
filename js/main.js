@@ -1860,6 +1860,68 @@ window.bukaSubPageLangsir = function() {
 };
 
 
+window.bukaSubPageRak = function() {
+    let container = document.getElementById('subpage-rak-container'); 
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'subpage-rak-container';
+        document.body.appendChild(container);
+    }
+
+    const subpage = document.getElementById('subpageRak');
+    if (subpage) {
+        subpage.classList.remove('translate-x-full');
+        if (typeof window.initRak === 'function') {
+            window.initRak();
+        }
+        return;
+    }
+
+    const basePath = window.location.pathname.includes('/warelogos.github.io') ? '/warelogos.github.io/apps/rak.html' : 'apps/rak.html';
+    const scriptPath = window.location.pathname.includes('/warelogos.github.io') ? '/warelogos.github.io/js/rak.js' : 'js/rak.js';
+
+    fetch(basePath) 
+        .then(response => {
+            if (!response.ok) throw new Error("Gagal mengambil file apps/rak.html");
+            return response.text();
+        })
+        .then(htmlContent => {
+            container.innerHTML = htmlContent;
+            
+            // Suntikkan skrip JS secara dinamis setelah HTML termuat
+            const script = document.createElement('script');
+            script.type = "module";
+            script.src = scriptPath; 
+            
+            script.onload = () => {
+                if (typeof window.initRak === 'function') {
+                    window.initRak();
+                }
+                
+                const elemenBaru = document.getElementById('subpageRak');
+                if (elemenBaru) {
+                    setTimeout(() => {
+                        elemenBaru.classList.remove('translate-x-full');
+                    }, 50);
+                }
+            };
+            document.body.appendChild(script);
+        })
+        .catch(error => {
+            console.error(error);
+            if (typeof miuiAlert === 'function') miuiAlert("Sistem Gagal Memuat Template Ceklist Rak!");
+        });
+};
+
+// Fungsi untuk menutup subpage Rak
+window.tutupSubPageRak = function() {
+    const subpage = document.getElementById('subpageRak');
+    if (subpage) {
+        subpage.classList.add('translate-x-full');
+    }
+};
+
+
 
 // ==========================================================================
 // REGISTRASI NAVIGASI UTAMA LAUNCHER SUB-PAGE SETELAN
