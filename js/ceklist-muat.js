@@ -1992,7 +1992,7 @@ window.updateRekapKelompok = function(listBarangObj, targetTotal = 0) {
 
 
 // ==========================================
-// FUNGSI UTAMA CETAK CEKLIST MUAT (DENGAN DETEKSI TUJUAN BERBEDA)
+// FUNGSI UTAMA CETAK CEKLIST MUAT (DENGAN DETEKSI ID KEMBAR & SUFFIX _2, _3, DST)
 // ==========================================
 window.cetakCeklistMuat = function() {
     console.log("--> Eksekusi cetakCeklistMuat dipanggil.");
@@ -2028,7 +2028,7 @@ window.cetakCeklistMuat = function() {
     // Opsi gabung aktif HANYA JIKA ada lebih dari 1 nama tujuan/alamat berbeda
     const canMerge = listTujuanUnik.size > 1;
 
-    const eksekusiSimpan = function(isMerged) {
+    const eksekusiSimpan = async function(isMerged) {
         console.log("--> Memproses Penyimpanan & Penggabungan Data (isMerged:", isMerged, ")...");
         const timestampNow = new Date().toISOString();
         let savedPromises = [];
@@ -2040,16 +2040,33 @@ window.cetakCeklistMuat = function() {
                         .replace(/^_+|_+\$/g, '');
         }
 
+        // Helper untuk mendapatkan ID unik dengan penambahan suffix _2, _3 jika sudah ada di database
+        async function getUniqueMuatId(baseMuatId, nodePath) {
+            let candidateId = baseMuatId;
+            let counter = 2;
+            while (true) {
+                const snapshot = await firebase.database().ref(`ceklist_muat/arsip_cetak/${nodePath}/${candidateId}`).once('value');
+                if (!snapshot.exists()) {
+                    return candidateId;
+                }
+                candidateId = `${baseMuatId}_${counter}`;
+                counter++;
+            }
+        }
+
         // 1. Olah Data DO
         const groupedDO = {};
-        keysDO.forEach((key) => {
+        for (const key of keysDO) {
             const item = cacheCeklistDO[key];
             const parts = key.split('_');
             if (parts.length >= 4) {
                 const tglPart = `${parts[0]}_${parts[1]}_${parts[2]}`;
                 const rawCust = item.meta.namacustomer;
                 const custNormalized = normalizeCustomerName(rawCust);
-                const muatId = `${tglPart}_${custNormalized}`.toUpperCase();
+                const baseMuatId = `${tglPart}_${custNormalized}`.toUpperCase();
+                
+                // Dapatkan ID unik (menambahkan _2, _3 jika nama sudah ada)
+                const muatId = await getUniqueMuatId(baseMuatId, 'ceklist_do');
 
                 if (!groupedDO[muatId]) {
                     groupedDO[muatId] = {
@@ -2087,11 +2104,11 @@ window.cetakCeklistMuat = function() {
                 }
                 groupedDO[muatId].total_muat_all += totalMuatDO;
             }
-        });
+        }
 
         // 2. Olah Data FDN
         const groupedFDN = {};
-        keysFDN.forEach((key) => {
+        for (const key of keysFDN) {
             const item = cacheCeklistFDN[key];
             const meta = item.meta || {};
             const rawTgl = meta.tgl || '';
@@ -2099,7 +2116,10 @@ window.cetakCeklistMuat = function() {
 
             const rawCust = meta.namacustomer || key;
             const custNormalized = normalizeCustomerName(rawCust);
-            const muatId = `${tglPart}_${custNormalized}`.toUpperCase();
+            const baseMuatId = `${tglPart}_${custNormalized}`.toUpperCase();
+            
+            // Dapatkan ID unik untuk FDN
+            const muatId = await getUniqueMuatId(baseMuatId, 'ceklist_fdn');
 
             if (!groupedFDN[muatId]) {
                 groupedFDN[muatId] = {
@@ -2125,7 +2145,7 @@ window.cetakCeklistMuat = function() {
                 data: itemsData
             };
             groupedFDN[muatId].total_muat_all += totalMuatFDN;
-        });
+        }
 
         // 3. Titipan
         const titipanDataObj = {};
@@ -2170,7 +2190,6 @@ window.cetakCeklistMuat = function() {
             let mainKey = '';
             let mainGroup = null;
 
-            // Tentukan Induk Utama (Prioritas DO, Jika Tidak Ada Gunakan FDN Pertama)
             if (hasDO) {
                 mainNodePath = 'ceklist_do';
                 mainKey = Object.keys(groupedDO)[0];
@@ -2183,9 +2202,8 @@ window.cetakCeklistMuat = function() {
 
             const mergedFdnObj = {};
 
-            // Gabungkan DO lain (jika ada lebih dari 1 DO beda alamat) atau FDN lain
             Object.keys(groupedDO).forEach((doMuatId) => {
-                if (hasDO && doMuatId === mainKey) return; // Lewati induk utama
+                if (hasDO && doMuatId === mainKey) return;
                 const doGroup = groupedDO[doMuatId];
                 const tujuanNama = String(doGroup.meta.namacustomer || doMuatId).toUpperCase().replace(/STOCK POINT/g, 'SP');
 
@@ -2204,7 +2222,7 @@ window.cetakCeklistMuat = function() {
             });
 
             Object.keys(groupedFDN).forEach((fdnMuatId) => {
-                if (!hasDO && fdnMuatId === mainKey) return; // Lewati induk utama jika sesama FDN
+                if (!hasDO && fdnMuatId === mainKey) return;
                 const fdnGroup = groupedFDN[fdnMuatId];
                 const tujuanNama = String(fdnGroup.meta.namacustomer || fdnMuatId).toUpperCase().replace(/STOCK POINT/g, 'SP');
 
@@ -2235,7 +2253,7 @@ window.cetakCeklistMuat = function() {
             printPayloads.push({ nodePath: mainNodePath, muatId: mainKey, payload: finalPayload });
 
         } else {
-            // PROSES TERPISAH NORMAL (TIDAK DICENTANG / TUJUAN SAMA)
+            // PROSES TERPISAH NORMAL
             Object.keys(groupedDO).forEach((muatId) => {
                 const group = groupedDO[muatId];
                 const dbRef = firebase.database().ref(`ceklist_muat/arsip_cetak/ceklist_do/${muatId}`);
