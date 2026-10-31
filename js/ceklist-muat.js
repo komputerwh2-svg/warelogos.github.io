@@ -402,6 +402,52 @@ window.previewArsipDetail = function(kategori, muatId) {
             const items = doObj.data || {};
             const jumlahItem = Object.keys(items).length;
 
+            let mainItemsRowsHtml = '';
+            let subQtyRowsHtml = '';
+            let hasSubQty = false;
+
+            Object.keys(items).forEach((kbKey) => {
+                const item = items[kbKey];
+                
+                // Render baris utama karton
+                mainItemsRowsHtml += `
+                    <tr class="border-b border-slate-100">
+                        <td class="py-1 text-[11px] font-mono font-bold text-slate-700">${item.kodebarang || kbKey}</td>
+                        <td class="py-1 text-[11px] text-center text-slate-500">${item.kodegudang || '-'}</td>
+                        <td class="py-1 text-[11px] text-right font-bold text-orange-600">${item.qty_b || 0}</td>
+                    </tr>
+                `;
+
+                // Cek apakah ada sub_qty (beceran)
+                const subQ = item.sub_qty;
+                if (subQ && (Number(subQ.ball) > 0 || Number(subQ.rtg) > 0 || Number(subQ.pcs) > 0)) {
+                    hasSubQty = true;
+                    let subParts = [];
+                    if (Number(subQ.ball) > 0) subParts.push(`${subQ.ball} ball`);
+                    if (Number(subQ.rtg) > 0) subParts.push(`${subQ.rtg} rtg`);
+                    if (Number(subQ.pcs) > 0) subParts.push(`${subQ.pcs} pcs`);
+
+                    subQtyRowsHtml += `
+                        <tr class="border-b border-slate-100">
+                            <td class="py-1 text-[11px] font-mono font-bold text-slate-700">${item.kodebarang || kbKey}</td>
+                            <td class="py-1 text-[11px] text-center text-slate-500">${item.kodegudang || 'WHNB-2'}</td>
+                            <td class="py-1 text-[11px] text-right font-bold text-slate-800">${subParts.join(' ')}</td>
+                        </tr>
+                    `;
+                }
+            });
+
+            // Gabungkan item utama, baris kosong pemisah, dan item beceran di bawah
+            let combinedTableRows = mainItemsRowsHtml;
+            if (hasSubQty) {
+                combinedTableRows += `
+                    <tr class="border-b border-slate-200">
+                        <td colspan="3" class="py-1">&nbsp;</td>
+                    </tr>
+                    ${subQtyRowsHtml}
+                `;
+            }
+
             contentHtml += `
                 <div class="border border-orange-200 rounded p-2 bg-white shadow-sm">
                     <div class="flex justify-between items-center font-bold text-orange-800 text-[11px] border-b pb-1 mb-1.5">
@@ -417,20 +463,7 @@ window.previewArsipDetail = function(kategori, muatId) {
                             </tr>
                         </thead>
                         <tbody>
-            `;
-
-            Object.keys(items).forEach((kbKey) => {
-                const item = items[kbKey];
-                contentHtml += `
-                    <tr class="border-b border-slate-100">
-                        <td class="py-1 text-[11px] font-mono font-bold text-slate-700">${item.kodebarang || kbKey}</td>
-                        <td class="py-1 text-[11px] text-center text-slate-500">${item.kodegudang || '-'}</td>
-                        <td class="py-1 text-[11px] text-right font-bold text-orange-600">${item.qty_b || 0}</td>
-                    </tr>
-                `;
-            });
-
-            contentHtml += `
+                            ${combinedTableRows}
                         </tbody>
                     </table>
                 </div>
@@ -669,6 +702,7 @@ window.cetakUlangArsip = async function(kategori, muatId) {
         // Kumpulkan semua nomor bukti unik dan item barang utama (DO / FDN)
         let listNoBukti = [];
         let allItemsArray = [];
+        let subQtyArray = []; // Wadah khusus menampung data beceran
 
         Object.keys(dataArsip).forEach(subKey => {
             if (['meta', 'titipan', 'rekap', 'total_muat_keseluruhan'].includes(subKey)) return;
@@ -682,7 +716,30 @@ window.cetakUlangArsip = async function(kategori, muatId) {
                     Object.values(docObj.data).forEach(row => {
                         row._nobuktiAsli = noBuktiAsli;
                         row._isTitipan = false;
+                        
+                        // 1. Masukkan murni data utama (karton) ke array utama
                         allItemsArray.push(row);
+
+                        // 2. Jika ada sub_qty (beceran), pisahkan ke subQtyArray
+                        const subQ = row.sub_qty;
+                        if (subQ && (Number(subQ.ball) > 0 || Number(subQ.rtg) > 0 || Number(subQ.pcs) > 0)) {
+                            let subParts = [];
+                            if (Number(subQ.ball) > 0) subParts.push(`${subQ.ball} ball`);
+                            if (Number(subQ.rtg) > 0) subParts.push(`${subQ.rtg} rtg`);
+                            if (Number(subQ.pcs) > 0) subParts.push(`${subQ.pcs} pcs`);
+
+                            let digits = String(noBuktiAsli || '').replace(/\D/g, '');
+                            let subNoBukti = digits.length >= 5 ? digits.slice(-5) : digits;
+                            let sourceTag = `<span style="font-family: Trebuchet MS; font-size: 6pt; color: #334155;">(${subNoBukti})</span>`;
+
+                            subQtyArray.push({
+                                kodebarang: row.kodebarang,
+                                qty_b: subParts.join(' '), // Pastikan qty_b terisi string beceran
+                                display_qty: subParts.join(' '),
+                                kodegudang: `${row.kodegudang || 'WHNB-2'} ${sourceTag}`,
+                                _isTitipan: true
+                            });
+                        }
                     });
                 }
             }
@@ -755,14 +812,20 @@ window.cetakUlangArsip = async function(kategori, muatId) {
             }
         });
 
-        // Gabungkan data DO/FDN Utama dengan TINGGALAN / DIY
+        // --- GABUNGKAN DATA UTAMA DENGAN Kelompok Bawah (Beceran -> Tinggalan/DIY -> Titipan Murni) ---
         let coreItemsCombined = [...allItemsArray];
-        if (tinggalanDiyArray.length > 0) {
+
+        // Gabungkan Beceran & Tinggalan/DIY terlebih dahulu jika ada
+        let subDanTinggalan = [...subQtyArray, ...tinggalanDiyArray];
+        if (subDanTinggalan.length > 0) {
+            coreItemsCombined.push({ _isEmptySpacer: true });
+            coreItemsCombined = coreItemsCombined.concat(subDanTinggalan);
+        } else if (tinggalanDiyArray.length > 0) {
             coreItemsCombined.push({ _isEmptySpacer: true });
             coreItemsCombined = coreItemsCombined.concat(tinggalanDiyArray);
         }
 
-        // --- SISIPKAN FDN GABUNGAN DI BAWAH DO (2 Baris Kosong + Header Judul FDN) ---
+        // --- SISIPKAN FDN GABUNGAN DI BAWAHNYA (JIKA ADA) ---
         if (fdnGabungArray.length > 0) {
             coreItemsCombined.push({ _isEmptySpacer: true });
             coreItemsCombined.push({ _isEmptySpacer: true });
@@ -889,14 +952,15 @@ window.cetakUlangArsip = async function(kategori, muatId) {
 
                 validItemCounter++;
 
-                // 3. Render Baris Titipan Murni (HRD & PROMOSI)
+                // Render Baris Titipan / Beceran / DIY / Tinggalan
                 if (row._isTitipan) {
+                    let qtyTampilTitipan = row.display_qty || row.qty_b || '';
                     rowsHtml += `
                         <tr style="border-bottom: 1px solid #94a3b8; font-size: 10pt;">
                             <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center; width: 30px;">${validItemCounter}</td>
                             <td style="border-right: 1px solid #000; padding: 1px 5px; font-size: 10pt; width: 45px; font-weight: bold; font-family: Trebuchet MS;">${row.kodebarang}</td>
                             <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center; width: 26px;"></td>
-                            <td style="border-right: 1px solid #000; padding: 1px 18px; text-align: center; width: 50px; font-size: 10pt; font-weight: bold; font-family: Trebuchet MS;">${row.qty_b}</td>
+                            <td style="border-right: 1px solid #000; padding: 1px 8px; text-align: center; width: 50px; font-size: 9pt; font-weight: bold; font-family: Trebuchet MS; color: #000; white-space: nowrap;">${qtyTampilTitipan}</td>
                             <td style="border-right: 1px solid #000; padding: 1px 5px; text-align: center; width: 80px; font-size: 10pt;">
                                 <span style="font-weight: bold; font-family: Trebuchet MS;">${row.kodegudang}</span>
                             </td>
@@ -1533,7 +1597,9 @@ window.parseTextFDNToCache = function(fileContent, fileName) {
 };
 
 
-// 1. Perbarui Fungsi Proses Data WHNB-2 dengan Verifikasi Metadata DO Terpisah
+// ==========================================
+// 1. Perbarui Fungsi Proses Data WHNB-2 (Dengan Tangkapan Sub Qty Ball/Rtg/Pcs)
+// ==========================================
 window.prosesDataWHNB2 = function() {
     const metaTextarea = document.getElementById('ta-bosnet-meta');
     const itemTextarea = document.getElementById('ta-bosnet-input');
@@ -1610,14 +1676,26 @@ window.prosesDataWHNB2 = function() {
         try {
             const gudang = 'WHNB-2';
             const bagianSebelumGudang = line.substring(0, line.indexOf('WHNB-2'));
+            
+            // Cari semua kecocokan pola Qty (format X/X/X/X)
             const matchesQty = bagianSebelumGudang.match(/(\d+\/\d+\/\d+\/\d+)/g);
             if (!matchesQty || matchesQty.length === 0) return;
             
-            const qtyStr = matchesQty[matchesQty.length - 1];
+            // Filter dan cari string qty yang tidak kosong/nol semua (jika ada), atau ambil yang terakhir
+            let qtyStr = matchesQty[matchesQty.length - 1];
+            for (let m of matchesQty) {
+                if (m !== "0/0/0/0" && m !== "0/0/0/00") {
+                    qtyStr = m; // Prioritaskan yang ada isinya (misal 47/2/2/0)
+                }
+            }
+
             const qtyParts = qtyStr.split('/');
             const qtyKarton = Number(qtyParts[0] || 0);
+            const qtyBall   = Number(qtyParts[1] || 0);
+            const qtyRtg    = Number(qtyParts[2] || 0);
+            const qtyPcs    = Number(qtyParts[3] || 0);
 
-            if (qtyKarton <= 0) return;
+            if (qtyKarton <= 0 && qtyBall <= 0 && qtyRtg <= 0 && qtyPcs <= 0) return;
 
             const idxNoDo = bagianSebelumGudang.indexOf(lineNoDo);
             const idxQty = bagianSebelumGudang.lastIndexOf(qtyStr);
@@ -1651,11 +1729,20 @@ window.prosesDataWHNB2 = function() {
                 cacheCeklistDO[targetCacheKey].data[kodeBarang] = {
                     kodebarang: kodeBarang,
                     kodegudang: gudang,
-                    qty_b: 0
+                    qty_b: 0,
+                    sub_qty: {
+                        ball: 0,
+                        rtg: 0,
+                        pcs: 0
+                    }
                 };
             }
 
+            // Akumulasi nilai karton dan sub_qty secara akurat
             cacheCeklistDO[targetCacheKey].data[kodeBarang].qty_b += qtyKarton;
+            cacheCeklistDO[targetCacheKey].data[kodeBarang].sub_qty.ball += qtyBall;
+            cacheCeklistDO[targetCacheKey].data[kodeBarang].sub_qty.rtg += qtyRtg;
+            cacheCeklistDO[targetCacheKey].data[kodeBarang].sub_qty.pcs += qtyPcs;
             
             let totalMuatDO = 0;
             Object.keys(cacheCeklistDO[targetCacheKey].data).forEach((kb) => {
@@ -1769,7 +1856,9 @@ function renderDaftarDOPreview() {
     container.innerHTML = html;
 }
 
-// Perbarui fungsi renderTabelItemMuatOtomatis di js/ceklist-muat.js
+// ==========================================
+// REVISI RENDER TABEL DENGAN BARIS SUB-QTY DI BAWAHNYA
+// ==========================================
 function renderTabelItemMuatOtomatis() {
     const tbody = document.getElementById('tabel-item-ceklist-body');
     const infoTotalEl = document.getElementById('info-total-muat-keseluruhan');
@@ -1780,7 +1869,6 @@ function renderTabelItemMuatOtomatis() {
     let grandTotalQty = 0;
     let grandTotalItemCount = 0;
 
-    // Array penampung seluruh item untuk dikirim ke fungsi rekap kelompok
     let semuaItemBarangAktif = [];
 
     const warnaBgList = [
@@ -1807,6 +1895,18 @@ function renderTabelItemMuatOtomatis() {
         }
     });
 
+    // Helper untuk merangkai string sub-qty (hanya ambil yang > 0)
+    function getSubQtyText(subQty) {
+        if (!subQty) return '';
+        let parts = [];
+        if (Number(subQty.ball) > 0) parts.push(`${subQty.ball} ball`);
+        if (Number(subQty.rtg) > 0) parts.push(`${subQty.rtg} rtg`);
+        if (Number(subQty.pcs) > 0) parts.push(`${subQty.pcs} pcs`);
+
+        if (parts.length === 0) return '';
+        return parts.join(' ');
+    }
+
     // Render item DO
     Object.keys(cacheCeklistDO).forEach((key) => {
         const doObj = cacheCeklistDO[key];
@@ -1821,12 +1921,12 @@ function renderTabelItemMuatOtomatis() {
             grandTotalQty += qty;
             grandTotalItemCount += 1;
 
-            // Masukkan ke array penampung rekap
             semuaItemBarangAktif.push({
                 kodebarang: row.kodebarang,
                 qty_b: qty
             });
 
+            // Baris Utama (Karton)
             html += `
                 <tr class="border-b ${warnaBg} hover:opacity-90 text-[11px] transition-colors">
                     <td class="p-1.5 border font-bold text-slate-800">${row.kodebarang}</td>
@@ -1835,6 +1935,19 @@ function renderTabelItemMuatOtomatis() {
                     <td class="p-1.5 border text-slate-600 font-mono font-semibold">${noBukti}</td>
                 </tr>
             `;
+
+            // Baris Tambahan di bawahnya khusus untuk Sub-Qty (jika ada nilai > 0)
+            const subQtyString = getSubQtyText(row.sub_qty);
+            if (subQtyString) {
+                html += `
+                    <tr class="border-b ${warnaBg} bg-amber-50/40 text-[10px] italic">
+                        <td colspan="4" class="px-3 py-1 border text-amber-900 font-medium">
+                            <span class="font-bold text-slate-700 not-italic">${row.kodebarang}</span> &nbsp;&rarr;&nbsp; 
+                            <span class="text-orange-800 font-bold">${subQtyString}</span>
+                        </td>
+                    </tr>
+                `;
+            }
         });
     });
 
@@ -1852,12 +1965,12 @@ function renderTabelItemMuatOtomatis() {
             grandTotalQty += qty;
             grandTotalItemCount += 1;
 
-            // Masukkan ke array penampung rekap
             semuaItemBarangAktif.push({
                 kodebarang: row.kodebarang,
                 qty_b: qty
             });
 
+            // Baris Utama FDN (Karton)
             html += `
                 <tr class="border-b ${warnaBg} hover:opacity-90 text-[11px] transition-colors">
                     <td class="p-1.5 border font-bold text-slate-800">${row.kodebarang}</td>
@@ -1866,6 +1979,19 @@ function renderTabelItemMuatOtomatis() {
                     <td class="p-1.5 border text-slate-600 font-mono font-semibold">${noBukti}</td>
                 </tr>
             `;
+
+            // Baris Tambahan Sub-Qty FDN di bawahnya
+            const subQtyString = getSubQtyText(row.sub_qty);
+            if (subQtyString) {
+                html += `
+                    <tr class="border-b ${warnaBg} bg-amber-50/40 text-[10px] italic">
+                        <td colspan="4" class="px-3 py-1 border text-amber-900 font-medium">
+                            <span class="font-bold text-slate-700 not-italic">${row.kodebarang}</span> &nbsp;&rarr;&nbsp; 
+                            <span class="text-orange-800 font-bold">${subQtyString}</span>
+                        </td>
+                    </tr>
+                `;
+            }
         });
     });
 
@@ -1873,7 +1999,6 @@ function renderTabelItemMuatOtomatis() {
         tbody.innerHTML = `<tr><td colspan="4" class="p-3 text-center text-slate-400 italic text-xs">Belum ada data barang...</td></tr>`;
         if (infoTotalEl) infoTotalEl.innerText = `TOTAL MUAT KESELURUHAN: 0 KRT [0 Item]`;
         
-        // Kosongkan juga rekap kelompok jika data kosong
         if (typeof updateRekapKelompok === 'function') {
             updateRekapKelompok({});
         }
@@ -1885,7 +2010,6 @@ function renderTabelItemMuatOtomatis() {
         infoTotalEl.innerText = `TOTAL MUAT KESELURUHAN: ${grandTotalQty} KRT [${grandTotalItemCount} Item]`;
     }
 
-    // Panggil fungsi rekap kelompok yang sudah kita buat sebelumnya di sini!
     if (typeof updateRekapKelompok === 'function') {
         updateRekapKelompok(semuaItemBarangAktif, grandTotalQty);
     }
@@ -1992,7 +2116,7 @@ window.updateRekapKelompok = function(listBarangObj, targetTotal = 0) {
 
 
 // ==========================================
-// FUNGSI UTAMA CETAK CEKLIST MUAT (DENGAN DETEKSI ID KEMBAR & SUFFIX _2, _3, DST)
+// FUNGSI UTAMA CETAK CEKLIST MUAT (DENGAN DUKUNGAN SUB QTY BALL/RTG/PCS & ID KEMBAR)
 // ==========================================
 window.cetakCeklistMuat = function() {
     console.log("--> Eksekusi cetakCeklistMuat dipanggil.");
@@ -2065,7 +2189,6 @@ window.cetakCeklistMuat = function() {
                 const custNormalized = normalizeCustomerName(rawCust);
                 const baseMuatId = `${tglPart}_${custNormalized}`.toUpperCase();
                 
-                // Dapatkan ID unik (menambahkan _2, _3 jika nama sudah ada)
                 const muatId = await getUniqueMuatId(baseMuatId, 'ceklist_do');
 
                 if (!groupedDO[muatId]) {
@@ -2080,17 +2203,38 @@ window.cetakCeklistMuat = function() {
 
                 const itemsData = {};
                 let totalMuatDO = 0;
+                
                 Object.keys(item.data).forEach((kb) => {
-                    itemsData[kb] = item.data[kb];
-                    const qty = Number(item.data[kb].qty_b || 0);
-                    totalMuatDO += qty;
-                    groupedDO[muatId].allItems.push({ kodebarang: kb, qty_b: qty });
+                    const rowItem = item.data[kb];
+                    const krtVal = Number(rowItem.qty_b || 0);
+
+                    // Ambil sub_qty langsung dari cache yang sudah diparsing sebelumnya
+                    const subQtyVal = rowItem.sub_qty || { ball: 0, rtg: 0, pcs: 0 };
+
+                    // Simpan objek item lengkap beserta sub_qty ke payload RTDB
+                    itemsData[kb] = {
+                        kodebarang: rowItem.kodebarang || kb,
+                        kodegudang: rowItem.kodegudang || 'WHNB-2',
+                        qty_b: krtVal,
+                        sub_qty: {
+                            ball: Number(subQtyVal.ball || 0),
+                            rtg: Number(subQtyVal.rtg || 0),
+                            pcs: Number(subQtyVal.pcs || 0)
+                        }
+                    };
+
+                    totalMuatDO += krtVal;
+                    groupedDO[muatId].allItems.push({ kodebarang: kb, qty_b: krtVal });
                 });
 
                 if (groupedDO[muatId].payloadDO[last5NoBukti]) {
                     Object.keys(itemsData).forEach((kb) => {
                         if (groupedDO[muatId].payloadDO[last5NoBukti].data[kb]) {
                             groupedDO[muatId].payloadDO[last5NoBukti].data[kb].qty_b += itemsData[kb].qty_b;
+                            // Akumulasi sub_qty jika nomor bukti sama
+                            groupedDO[muatId].payloadDO[last5NoBukti].data[kb].sub_qty.ball += itemsData[kb].sub_qty.ball;
+                            groupedDO[muatId].payloadDO[last5NoBukti].data[kb].sub_qty.rtg += itemsData[kb].sub_qty.rtg;
+                            groupedDO[muatId].payloadDO[last5NoBukti].data[kb].sub_qty.pcs += itemsData[kb].sub_qty.pcs;
                         } else {
                             groupedDO[muatId].payloadDO[last5NoBukti].data[kb] = itemsData[kb];
                         }
@@ -2118,7 +2262,6 @@ window.cetakCeklistMuat = function() {
             const custNormalized = normalizeCustomerName(rawCust);
             const baseMuatId = `${tglPart}_${custNormalized}`.toUpperCase();
             
-            // Dapatkan ID unik untuk FDN
             const muatId = await getUniqueMuatId(baseMuatId, 'ceklist_fdn');
 
             if (!groupedFDN[muatId]) {
@@ -2133,11 +2276,25 @@ window.cetakCeklistMuat = function() {
 
             const itemsData = {};
             let totalMuatFDN = 0;
+            
             Object.keys(item.data || {}).forEach((kb) => {
-                itemsData[kb] = item.data[kb];
-                const qty = Number(item.data[kb].qty_b || item.data[kb].qty_utama || 0);
-                totalMuatFDN += qty;
-                groupedFDN[muatId].allItems.push({ kodebarang: kb, qty_b: qty });
+                const rowItem = item.data[kb];
+                const krtVal = Number(rowItem.qty_b || rowItem.qty_utama || 0);
+                const subQtyVal = rowItem.sub_qty || { ball: 0, rtg: 0, pcs: 0 };
+
+                itemsData[kb] = {
+                    kodebarang: rowItem.kodebarang || kb,
+                    kodegudang: rowItem.kodegudang || 'WHNB-2',
+                    qty_b: krtVal,
+                    sub_qty: {
+                        ball: Number(subQtyVal.ball || 0),
+                        rtg: Number(subQtyVal.rtg || 0),
+                        pcs: Number(subQtyVal.pcs || 0)
+                    }
+                };
+
+                totalMuatFDN += krtVal;
+                groupedFDN[muatId].allItems.push({ kodebarang: kb, qty_b: krtVal });
             });
 
             groupedFDN[muatId].payloadFDN[last5NoBukti] = {
