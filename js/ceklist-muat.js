@@ -1499,7 +1499,7 @@ window.importFDN = function() {
     fileInput.click();
 };
 
-// 2. Parser Teks .txt FDN ke Cache Ceklist FDN
+// 2. Parser Teks .txt FDN ke Cache Ceklist FDN (Diselaraskan dengan sub_qty)
 window.parseTextFDNToCache = function(fileContent, fileName) {
     const lines = fileContent.split('\n');
     let dariGudangRaw = '', nomorDokumen = '', tanggal = '', tujuanRaw = '';
@@ -1548,14 +1548,26 @@ window.parseTextFDNToCache = function(fileContent, fileName) {
                     
                     if (kode) {
                         const qtyKrt = qtyParts[0] || 0;
+                        const valBal = qtyParts[1] || 0;
+                        const valRtg = qtyParts[2] || 0;
+                        const valPcs = qtyParts[3] || 0;
+
+                        const isWhnb2 = dariGudangRaw.includes("NON WMS") || dariGudangRaw.includes("WH-2 HO NON WMS") || dariGudangRaw.includes("WH-3");
+
                         items[kode] = {
                             kodebarang: kode,
-                            kodegudang: dariGudangRaw.includes("NON WMS") ? "WHNB-2" : "WH-2",
+                            kodegudang: isWhnb2 ? "WHNB-2" : "WH-2",
                             qty_b: qtyKrt,
-                            sub: {
-                                bal: qtyParts[1] || 0,
-                                rtg: qtyParts[2] || 0,
-                                pcs: qtyParts[3] || 0
+                            // Standarisasi sub_qty agar selaras dengan DO & modul cetak arsip
+                            sub_qty: {
+                                ball: valBal,
+                                rtg: valRtg,
+                                pcs: valPcs
+                            },
+                            sub: { // Tetap dipertahankan untuk jaga-jaga jika ada modul lain yang membaca ini
+                                bal: valBal,
+                                rtg: valRtg,
+                                pcs: valPcs
                             }
                         };
                         totalMuatDoc += qtyKrt;
