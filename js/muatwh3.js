@@ -767,6 +767,61 @@ async function prosesUbahTanggalDatabase() {
     }
 }
 
+// Fungsi eksekusi tombol HAPUS DATA
+async function prosesHapusDoDatabase() {
+    const selectDo = document.getElementById('select-revisi-nodo');
+    
+    if (!selectDo || !selectDo.value) {
+        miuiAlert("Silakan pilih Nomor DO yang ingin dihapus!");
+        return;
+    }
+
+    const nomorDoPilihan = selectDo.value; // Contoh: "47097"
+    const oldDate = currentActiveTanggalKey;    // Tanggal asal aktif
+    const tujuan = currentActiveTujuan;         // Kode tujuan (misal: "MAM")
+
+    const konfirmasi = confirm(`Apakah Anda yakin ingin menghapus DO ${nomorDoPilihan} (${tujuan}) dari tanggal ${oldDate}?`);
+    if (!konfirmasi) return;
+
+    try {
+        document.body.style.cursor = 'wait';
+
+        // Path dokumen asal dan subkoleksi DO
+        const oldDocRef = db.collection('muat_wh3').doc(oldDate).collection('datatujuan').doc(`${tujuan}_${oldDate}`);
+        const oldDoRef = oldDocRef.collection('data').doc(nomorDoPilihan);
+
+        const oldDoSnap = await oldDoRef.get();
+        if (!oldDoSnap.exists) {
+            miuiAlert("Data DO sumber tidak ditemukan! Mungkin sudah dihapus.");
+            return;
+        }
+
+        // 1. Hapus dokumen DO spesifik dari subkoleksi 'data'
+        await oldDoRef.delete();
+
+        // 2. Cek apakah dokumen induk tujuan sudah kosong dari sisa DO lain
+        const sisaDoAsal = await oldDocRef.collection('data').get();
+        if (sisaDoAsal.empty) {
+            // Jika sudah kosong, hapus juga dokumen induk foldernya
+            await oldDocRef.delete();
+        }
+
+        miuiAlert(`DO ${nomorDoPilihan} (${tujuan}) berhasil dihapus!`);
+        tutupModalUbahTanggal();
+
+        // Refresh UI tabel dan dropdown
+        if (typeof window.renderTabelGabungan === 'function') await window.renderTabelGabungan();
+        if (typeof window.updateTanggalDropdownMuatWH3 === 'function') await window.updateTanggalDropdownMuatWH3();
+        if (typeof window.muatUlangDataTabel === 'function') await window.muatUlangDataTabel();
+
+    } catch (error) {
+        console.error("Gagal menghapus DO:", error);
+        miuiAlert("Terjadi kesalahan saat menghapus data DO.");
+    } finally {
+        document.body.style.cursor = 'default';
+    }
+}
+
 // Tambahkan event listener agar teks informasi dokumen di modal ikut berubah saat tanggal baru dipilih
 document.addEventListener('DOMContentLoaded', () => {
     const inputTglRevisi = document.getElementById('input-tanggal-revisi');
@@ -859,6 +914,7 @@ window.prosesDataBosnet = function() {
     }
 };
 
+// 3. Parser Data Bosnet untuk WH-3 (Diselaraskan dengan sub_qty & alias properti)
 window.parseDataBosnet = function(rawText, targetGudang) {
     const lines = rawText.split('\n');
     let hasil = {}; 
@@ -866,10 +922,7 @@ window.parseDataBosnet = function(rawText, targetGudang) {
     lines.forEach(line => {
         if (!line.includes(targetGudang)) return; 
 
-        // PERBAIKAN REGEX:
-        // Menggunakan [A-Za-z0-9]+ agar menangkap huruf kecil maupun besar
-        // const match = line.match(/DO-HO\d+-\d+-(\d+)\s*([A-Za-z0-9]+).*?(\d+\/\d+\/\d+\/\d+)/);
-        // Tambahkan karakter strip [-] di dalam kelas karakter kode barang
+        // PERBAIKAN REGEX: Menangkap huruf, angka, dan karakter strip [-] pada kode barang
         const match = line.match(/DO-HO\d+-\d+-(\d+)\s*([A-Za-z0-9-]+).*?(\d+\/\d+\/\d+\/\d+)/);
 
         if (match) {
@@ -884,11 +937,20 @@ window.parseDataBosnet = function(rawText, targetGudang) {
                 hasil[noDO] = { tujuan: targetGudang, data: {} };
             }
             
+            const valBal = qtyParts[1] || 0;
+            const valRtg = qtyParts[2] || 0;
+            const valPcs = qtyParts[3] || 0;
+            const qtyKrt = qtyParts[0] || 0;
+
             hasil[noDO].data[kodeBarang] = {
                 gudang: targetGudang,
-                kodeBarang: kodeBarang, // Disimpan dalam bentuk kapital
-                qtyUtama: qtyParts[0],
-                qtyDetail: qtyParts.slice(1)
+                kodeBarang: kodeBarang,
+                qtyUtama: qtyKrt,
+                sub_qty: {
+                    ball: valBal,
+                    rtg: valRtg,
+                    pcs: valPcs
+                }
             };
         }
     });
@@ -1058,8 +1120,20 @@ window.simpanKeFirebase = async function(parsedData, kodeTujuan, namaLengkapTuju
         const batch = firestoreDB.batch();
         for (const noDO in parsedData) {
             if (parsedData.hasOwnProperty(noDO)) {
+                const itemDoc = parsedData[noDO];
                 const docRef = folderRef.collection("data").doc(noDO);
-                batch.set(docRef, parsedData[noDO]); 
+                
+                // Bungkus dengan struktur { meta, data } agar seragam dengan arsip DO/FDN lainnya
+                const payloadData = {
+                    meta: {
+                        nobukti: noDO,
+                        tujuan: itemDoc.tujuan || kodeClean,
+                        total_muat: Object.values(itemDoc.data || {}).reduce((sum, it) => sum + Number(it.qty_b || it.qtyUtama || 0), 0)
+                    },
+                    data: itemDoc.data || {}
+                };
+
+                batch.set(docRef, payloadData); 
             }
         }
         await batch.commit();
@@ -1123,7 +1197,6 @@ window.renderTabelGabungan = async function() {
         
         const getSortScore = (kode) => {
             let k = kode.toUpperCase();
-            // Cek khusus untuk MP agar tidak buru-buru match jika ada string lebih panjang
             for (let i = 0; i < polaUtama.length; i++) {
                 let pola = polaUtama[i];
                 if (k === pola || k.startsWith(pola + "-") || k.startsWith(pola + " ")) {
@@ -1134,7 +1207,6 @@ window.renderTabelGabungan = async function() {
                     return i + 1;
                 }
             }
-            // Fallbackincludes
             for (let i = 0; i < polaUtama.length; i++) {
                 if (k.includes(polaUtama[i])) {
                     return i + 1;
@@ -1162,7 +1234,9 @@ window.renderTabelGabungan = async function() {
         };
 
         let daftarBarangSet = new Set();
+        let daftarBeceranSet = new Set(); // Wadah khusus melacak item yang memiliki beceran
         let groupTujuan = {}; 
+        let groupTujuanBeceran = {}; // Wadah data kuantiti beceran per tujuan
         let totalNoDO = 0;
 
         for (const doc of snapshot.docs) {
@@ -1180,6 +1254,7 @@ window.renderTabelGabungan = async function() {
                     : (listNoDO[0] + "," + listNoDO.slice(1).map(id => id.slice(-2)).join(","));
                 
                 groupTujuan[namaTujuan] = { label: labelNoDO, data: {} };
+                groupTujuanBeceran[namaTujuan] = {};
             }
 
             subSnapshot.docs.forEach(doDoc => {
@@ -1188,9 +1263,27 @@ window.renderTabelGabungan = async function() {
 
                 Object.keys(dataBarang).forEach(kode => {
                     const barang = dataBarang[kode];
-                    if (barang && typeof barang === 'object' && barang.qtyUtama !== undefined) {
-                        daftarBarangSet.add(kode);
-                        groupTujuan[namaTujuan].data[kode] = (groupTujuan[namaTujuan].data[kode] || 0) + parseInt(barang.qtyUtama || 0);
+                    if (barang && typeof barang === 'object') {
+                        // 1. Tangani Data Utama (Karton)
+                        if (barang.qtyUtama !== undefined) {
+                            daftarBarangSet.add(kode);
+                            groupTujuan[namaTujuan].data[kode] = (groupTujuan[namaTujuan].data[kode] || 0) + parseInt(barang.qtyUtama || 0);
+                        }
+
+                        // 2. Tangani Data Beceran (sub_qty) jika ada nilainya > 0
+                        const subQ = barang.sub_qty;
+                        if (subQ && (Number(subQ.ball) > 0 || Number(subQ.rtg) > 0 || Number(subQ.pcs) > 0)) {
+                            let subParts = [];
+                            if (Number(subQ.ball) > 0) subParts.push(`${subQ.ball} ball`);
+                            if (Number(subQ.rtg) > 0) subParts.push(`${subQ.rtg} rtg`);
+                            if (Number(subQ.pcs) > 0) subParts.push(`${subQ.pcs} pcs`);
+                            
+                            const subString = subParts.join(' ');
+                            const subKey = `${kode} [${subString}]`; // Unik key untuk variasi beceran
+
+                            daftarBeceranSet.add(subKey);
+                            groupTujuanBeceran[namaTujuan][subKey] = subString;
+                        }
                     }
                 });
             });
@@ -1204,6 +1297,8 @@ window.renderTabelGabungan = async function() {
             return getAngkaAkhir(a) - getAngkaAkhir(b);
         });
 
+        const sortedBeceran = Array.from(daftarBeceranSet).sort();
+
         const elTotalTujuan = document.getElementById('txt-total-tujuan');
         const elTotalNodo = document.getElementById('txt-total-nodo');
         if (elTotalTujuan) elTotalTujuan.innerText = Object.keys(groupTujuan).length;
@@ -1216,8 +1311,6 @@ window.renderTabelGabungan = async function() {
         
         listTujuanKeys.forEach(tujuan => {
             row1 += `<th class="p-2 text-center border border-slate-500 text-[10px]">${groupTujuan[tujuan].label}</th>`;
-            
-            // Ubah row2 agar hanya mengirimkan '${tujuan}' saja karena tanggalnya dilacak otomatis oleh Firestore
             row2 += `<th onclick="bukaModalUbahTanggal('${tujuan}')" 
                     class="p-1 text-center text-[11px] text-blue-600 font-bold border border-slate-500 cursor-pointer hover:bg-blue-100 transition-colors" 
                     title="Klik untuk mengubah tanggal muat tujuan ${tujuan}">
@@ -1231,6 +1324,8 @@ window.renderTabelGabungan = async function() {
 
         // --- RENDER BODY ---
         tbody.innerHTML = '';
+
+        // 1. Render Barang Utama (Karton)
         sortedBarang.forEach(kode => {
             let rowTotal = 0;
             let cells = '';
@@ -1241,11 +1336,9 @@ window.renderTabelGabungan = async function() {
                 cells += `<td class="p-3 text-center border border-slate-500">${qty > 0 ? qty : ''}</td>`;
             });
 
-            // Perbaikan Pencarian Master Barang (Case-Insensitive & Trim)
             let masterInfo = null;
             if (window.cacheMasterBarang) {
                 const cleanKode = kode.trim().toUpperCase();
-                // Cari apakah key ada yang cocok secara case-insensitive
                 const foundKey = Object.keys(window.cacheMasterBarang).find(k => k.trim().toUpperCase() === cleanKode);
                 if (foundKey) {
                     masterInfo = window.cacheMasterBarang[foundKey];
@@ -1269,6 +1362,36 @@ window.renderTabelGabungan = async function() {
                 </tr>
             `;
         });
+
+        // 2. Jika ada data beceran, tambahkan baris kosong pemisah lalu render di bagian bawah
+        if (sortedBeceran.length > 0) {
+            tbody.innerHTML += `
+                <tr class="bg-slate-100 border-t-2 border-slate-400">
+                    <td colspan="${listTujuanKeys.length + 3}" class="p-1 text-center font-bold text-slate-500 text-[10px]">&nbsp;</td>
+                </tr>
+            `;
+
+            sortedBeceran.forEach(subKey => {
+                let cellsBeceran = '';
+                // Ekstrak nama kode barang asli dari subKey (misal: "MRR4A01 [2 ball]")
+                let kodeAsli = subKey.split(' [')[0];
+                let teksQtyBeceran = subKey.match(/\[(.*?)\]/)[1];
+
+                listTujuanKeys.forEach(tujuan => {
+                    const valBeceran = groupTujuanBeceran[tujuan][subKey] || '';
+                    cellsBeceran += `<td class="p-3 text-center border border-slate-500 font-bold text-orange-900 text-[11px]">${valBeceran}</td>`;
+                });
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-amber-50 bg-amber-50/30">
+                        <td class="p-3 font-black text-orange-900 border border-slate-500">${kodeAsli} <span class="text-[9px] font-normal text-slate-600"></span></td>
+                        ${cellsBeceran}
+                        <td class="p-3 font-black text-center text-slate-600 border border-slate-500">-</td>
+                        <td class="p-3 text-center border border-slate-500 text-[10px] text-slate-600 font-bold">BECERAN</td>
+                    </tr>
+                `;
+            });
+        }
 
     } catch (e) {
         console.error("Error sinkronisasi Firestore:", e);
@@ -2481,7 +2604,7 @@ window.cetakDokumenVersi1 = async function(tglMuat) {
     const theadContent = document.querySelector('table thead').innerHTML;
     const rows = document.querySelectorAll('table tbody tr');
 
-    // --- TAMBAHKAN HELPER INI DI SINI ---
+    // --- HELPER INISIAL KODE ---
     const getInisialKode = (kodeAsli) => {
         if (!window.cacheMasterBarang) return kodeAsli;
         const clean = kodeAsli.trim().toUpperCase();
@@ -2492,23 +2615,64 @@ window.cetakDokumenVersi1 = async function(tglMuat) {
         }
         return kodeAsli;
     };
-    // ------------------------------------
     
     let rowsUtamaHtml = '';
     rows.forEach(row => {
         const selTotal = row.cells[row.cells.length - 2]?.innerText.trim();
-        if (selTotal !== "" && selTotal !== "-" && !isNaN(selTotal)) {
-            // --- UBAH PROSES INI MENJADI CLONE DAN GANTI TEKS KODE MENJADI INISIAL ---
+        const isBeceranRow = row.cells[row.cells.length - 1]?.innerText.trim() === "BECERAN";
+
+        // Hanya masukkan baris utama karton ke tabel cetak (abaikan baris beceran di tabel DOM)
+        if (!isBeceranRow && selTotal !== "" && selTotal !== "-" && !isNaN(selTotal)) {
             let clonedRow = row.cloneNode(true);
             if (clonedRow.cells.length > 0) {
-                const cellKode = clonedRow.cells[0]; // Kolom KODE BARANG
+                const cellKode = clonedRow.cells[0]; 
                 const kodeLengkap = cellKode.innerText.trim();
                 cellKode.innerText = getInisialKode(kodeLengkap);
             }
             rowsUtamaHtml += `<tr>${clonedRow.innerHTML}</tr>`;
-            // ---------------------------------------------------------------------
         }
     });
+
+    // --- AMBIL DATA BECERAN LANGSUNG DARI FIRESTORE BERDASARKAN TANGGAL MUAT ---
+    let catatanBeceranList = [];
+    try {
+        const inputTglCetak = document.getElementById('select-tanggal-muat');
+        const tglMuatCetak = inputTglCetak ? inputTglCetak.value : "";
+        
+        if (tglMuatCetak) {
+            const dbCetak = firebase.firestore();
+            const snapshotTujuan = await dbCetak.collection("muat_wh3").doc(tglMuatCetak).collection("datatujuan").get();
+
+            for (const doc of snapshotTujuan.docs) {
+                const itemTujuan = doc.data();
+                const namaTujuan = itemTujuan.tujuan || doc.id;
+
+                const subSnapshot = await doc.ref.collection("data").get();
+                subSnapshot.docs.forEach(doDoc => {
+                    const rawDoc = doDoc.data();
+                    const dataBarang = rawDoc.data || rawDoc;
+
+                    Object.keys(dataBarang).forEach(kode => {
+                        const barang = dataBarang[kode];
+                        if (barang && typeof barang === 'object') {
+                            const subQ = barang.sub_qty;
+                            if (subQ && (Number(subQ.ball) > 0 || Number(subQ.rtg) > 0 || Number(subQ.pcs) > 0)) {
+                                let subParts = [];
+                                if (Number(subQ.ball) > 0) subParts.push(`${subQ.ball} ball`);
+                                if (Number(subQ.rtg) > 0) subParts.push(`${subQ.rtg} rtg`);
+                                if (Number(subQ.pcs) > 0) subParts.push(`${subQ.pcs} pcs`);
+
+                                let inisialBarang = getInisialKode(kode);
+                                catatanBeceranList.push(`• ${namaTujuan} = ${inisialBarang} [ ${subParts.join(', ')} ]`);
+                            }
+                        }
+                    });
+                });
+            }
+        }
+    } catch (e) {
+        console.error("Gagal mengambil data beceran dari Firestore untuk cetak: ", e);
+    }
 
     // AMBIL DAN PROSES DATA DARI PANEL (KIRI)
     const panelRaw = document.getElementById('panel-kebutuhan-referensi').innerText;
@@ -2546,9 +2710,8 @@ window.cetakDokumenVersi1 = async function(tglMuat) {
         }
     }
 
-    // AMBIL LANGSUNG DARI STRUKTUR DATA FIRESTORE DENGAN GARIS BAWAH DAN RAPAT SEMPURNA
+    // AMBIL RINGKASAN AMBIL BLOK DARI FIRESTORE
     let ringkasanHtml = '';
-    
     try {
         const inputTglCetak = document.getElementById('select-tanggal-muat');
         const tglMuatCetak = inputTglCetak ? inputTglCetak.value : "";
@@ -2562,24 +2725,30 @@ window.cetakDokumenVersi1 = async function(tglMuat) {
                 
                 let teksRingkasanGabungan = '';
                 dataFirestoreCetak.forEach(group => {
-                    // Menggunakan tag <u> agar ada garis bawahnya dalam format HTML
                     teksRingkasanGabungan += `<u><b>${group.blok} = ${group.total_plt} PLT</b></u>\n`;
                     if (group.detail_barang && Array.isArray(group.detail_barang)) {
                         group.detail_barang.forEach(det => {
                             teksRingkasanGabungan += `${det}\n`;
                         });
                     }
-                    teksRingkasanGabungan += '\n'; // Jarak antar blok
+                    teksRingkasanGabungan += '\n'; 
                 });
                 ringkasanHtml = teksRingkasanGabungan.trim();
             }
         }
     } catch (e) {
-        console.error("Gagal ambil data cetak Firestore: ", e);
+        console.error("Gagal ambil data ringkasan alokasi Firestore: ", e);
     }
 
     const elGrandTotal = document.getElementById('grand-total-plt');
     const grandTotalText = elGrandTotal ? elGrandTotal.innerText : '0 PLT';
+
+    let catatanBeceranHtml = '';
+    if (catatanBeceranList.length > 0) {
+        catatanBeceranList.forEach(itemCatatan => {
+            catatanBeceranHtml += `<div>${itemCatatan}</div>`;
+        });
+    }
 
     const finalHtml = `
     <html>
@@ -2588,7 +2757,7 @@ window.cetakDokumenVersi1 = async function(tglMuat) {
             @page { size: 215mm 330mm portrait; margin: 20mm 1mm 1mm 1mm; }
             body { font-family: 'Century Gothic', sans-serif; font-size: 10pt; margin: 0; padding: 0; }
             
-            table { width: 100%; border-collapse: collapse; margin-bottom: 8px; table-layout: fixed; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 6px; table-layout: fixed; }
             th, td { border: 1px solid #000; padding: 2px 3px; text-align: center; font-family: 'Century Gothic', sans-serif; font-size: 10pt; }
             
             table td:first-child {
@@ -2600,10 +2769,25 @@ window.cetakDokumenVersi1 = async function(tglMuat) {
 
             .judul-tabel { font-weight: bold; font-size: 13pt; text-align: center; margin-bottom: 6px; }
             
+            .box-catatan-beceran {
+                border: 1px solid #000;
+                padding: 5px 8px;
+                margin-bottom: 8px;
+                font-size: 10pt;
+                font-family: 'Century Gothic', sans-serif;
+                background-color: #fff;
+            }
+            .box-catatan-title {
+                font-weight: bold;
+                text-decoration: underline;
+                margin-bottom: 3px;
+                font-size: 9.5pt;
+            }
+
             .container-bawah {
                 display: flex;
                 gap: 10px;
-                margin-top: 8px;
+                margin-top: 4px;
                 align-items: flex-start;
                 width: 100%;
             }
@@ -2618,7 +2802,6 @@ window.cetakDokumenVersi1 = async function(tglMuat) {
                 min-width: 0;
             }
             
-            /* WRAPPER KHUSUS AGAR KOLOM KANAN TIDAK IKUT MELAR KE BAWAH */
             .wrapper-kanan-pas {
                 display: flex;
                 flex-direction: column;
@@ -2659,6 +2842,13 @@ window.cetakDokumenVersi1 = async function(tglMuat) {
         <div class="judul-tabel">DAFTAR MUAT WH-3 & ${judul}</div>
         <table><thead>${theadContent}</thead><tbody>${rowsUtamaHtml}</tbody></table>
         
+        ${catatanBeceranList.length > 0 ? `
+        <div class="box-catatan-beceran">
+            <div class="box-catatan-title">CATATAN MUATAN BECERAN:</div>
+            ${catatanBeceranHtml}
+        </div>
+        ` : ''}
+
         <div class="container-bawah">
             <div class="kolom-kiri">
                 <div class="section-title">SARAN ALOKASI AMBIL BLOK:</div>
@@ -2680,30 +2870,24 @@ window.cetakDokumenVersi1 = async function(tglMuat) {
     </html>`;
 
     //const win = window.open("", "_blank");
-    //win.document.write(finalHtml);
-    //win.document.close();
+	//win.document.write(finalHtml);
+	//win.document.close();
 
-    // 3. Kirim ke Print Server (Versi Dokumen v1)
+    // Kirim ke Print Server (Versi Dokumen v1)
     try {
         const now = new Date();
-        
-        // Nama Hari
         const daftarHari = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
         const hari = daftarHari[now.getDay()];
         
-        // Format tanggal dan jam
         const tgl = String(now.getDate()).padStart(2, '0');
         const bln = String(now.getMonth() + 1).padStart(2, '0');
         const thn = now.getFullYear();
-       const jam = String(now.getHours()).padStart(2, '0');
+        const jam = String(now.getHours()).padStart(2, '0');
         const menit = String(now.getMinutes()).padStart(2, '0');
         const detik = String(now.getSeconds()).padStart(2, '0');
         
-        // String untuk tampilan
         const formatWaktuLengkap = `${hari} / ${tgl}-${bln}-${thn} / ${jam}.${menit}.${detik}`;
         const judulTugas = "Cetak Dokumen v1";
-
-        // Kunci URL yang aman (tanpa spasi/titik)
         const safeKeyName = `Cetak_Dokumen_v1_${tgl}-${bln}-${thn}_${jam}-${menit}-${detik}`;
 
         await fetch(`https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs/${safeKeyName}.json`, {
