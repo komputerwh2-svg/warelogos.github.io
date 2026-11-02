@@ -443,7 +443,7 @@ function parseTanggalCustom(tglStr) {
     return 0;
 }
 
-// --- RENDER TABEL DETAIL (SLIDE 2) DENGAN KODE PALLET UTUH & BARIS TOTAL ---
+// --- RENDER TABEL DETAIL (SLIDE 2) DENGAN KODE PALLET UTUH, BARIS TOTAL & INTERAKSI KOREKSI FDN ---
 function renderTabelRecallDetail(dataArray, barcodeTarget = "") {
     const tbody = document.getElementById('tabelBodyRecallDetail'); 
     if (!tbody) return;
@@ -468,9 +468,30 @@ function renderTabelRecallDetail(dataArray, barcodeTarget = "") {
         totalInSum += valIn;
         totalOutSum += valOut;
 
+        const kodeTrans = String(item.KODE_TRANS || '').trim();
+        const isKorFdn = kodeTrans.startsWith('KOR-FDN');
+        
+        let transCellHtml = '';
+        if (isKorFdn) {
+            // Ambil argumen pendukung untuk modal koreksi
+            const tglMuatArg = item.TANGGAL || '';
+            const kodeBrgArg = item.KODEBRG || '';
+            const lokasiRakArg = typeof getCleanLokasiPalet === 'function' ? getCleanLokasiPalet(item.KODE_PALLET) : '';
+
+            transCellHtml = `
+                <span onclick="bukaModalKoreksiFdn('${kodeBrgArg}', '${tglMuatArg}', '${lokasiRakArg}')" 
+                      class="text-orange-600 hover:text-orange-800 font-black cursor-pointer underline decoration-orange-400 hover:decoration-2 transition flex items-center gap-1" 
+                      title="Klik untuk melihat rincian modal koreksi FDN">
+                    <i class="fa-solid fa-circle-info text-xs"></i> ${kodeTrans}
+                </span>
+            `;
+        } else {
+            transCellHtml = `<span class="font-bold text-slate-800">${kodeTrans || '-'}</span>`;
+        }
+
         html += `
             <tr class="hover:bg-orange-50 border-b border-slate-100 text-xs">
-                <td class="p-2.5 font-bold text-slate-800">${item.KODE_TRANS || '-'}</td>
+                <td class="p-2.5">${transCellHtml}</td>
                 <td class="p-2.5 text-center text-slate-600">${item.TANGGAL || '-'}</td>
                 <td class="p-2.5 font-mono text-emerald-700 font-bold">${kodePaletUtuh}</td>
                 <td class="p-2.5 text-center font-bold text-slate-700">${valIn}</td>
