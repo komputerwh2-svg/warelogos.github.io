@@ -659,7 +659,7 @@ window.cetakArsipRak = async function(idArsip) {
 
 
 // ==========================================
-// FUNGSI CETAK LAPORAN CEKLIST RAK (FORMAT F4 - FONT & SPACER DIPERBESAR)
+// FUNGSI CETAK LAPORAN CEKLIST RAK (DENGAN FORMAT TANGGAL PADA JUDUL)
 // ==========================================
 window.cetakDataRak = function() {
     const mode = window.currentRakMode; // 'beceran' atau 'utuhan'
@@ -668,6 +668,32 @@ window.cetakDataRak = function() {
     if (!cacheData || Object.keys(cacheData).length === 0) {
         if (typeof miuiAlert === 'function') miuiAlert("Tidak ada data Ceklist Rak untuk dicetak!");
         return;
+    }
+
+    // Ambil string tanggal dari arsip yang aktif (jika ada variabel global window.currentArsipId atau dari data)
+    // Contoh format ID arsip: 'beceran_2026-04-13' atau '04/11/2026' atau kita fallback ke tanggal hari ini
+    let tanggalArsipFormatted = "";
+    const activeId = window.currentArsipId || "";
+    
+    // Cek apakah ID mengandung pola tanggal (YYYY-MM-DD atau DD-MM-YYYY)
+    const matchDate = activeId.match(/(\d{4}[-/]\d{2}[-/]\d{2})|(\d{2}[-/]\d{2}[-/]\d{4})/);
+    if (matchDate) {
+        let rawDateStr = matchDate[0].replace(/[\/]/g, '-');
+        let parts = rawDateStr.split('-');
+        if (parts[0].length === 4) {
+            // Format YYYY-MM-DD -> DD/MM/YYYY
+            tanggalArsipFormatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+        } else {
+            // Format DD-MM-YYYY -> DD/MM/YYYY
+            tanggalArsipFormatted = `${parts[0]}/${parts[1]}/${parts[2]}`;
+        }
+    } else {
+        // Fallback jika tidak ada di ID, gunakan tanggal hari ini atau dari cache
+        const nowDefault = new Date();
+        const dd = String(nowDefault.getDate()).padStart(2, '0');
+        const mm = String(nowDefault.getMonth() + 1).padStart(2, '0');
+        const yyyy = nowDefault.getFullYear();
+        tanggalArsipFormatted = `${dd}/${mm}/${yyyy}`;
     }
 
     const now = new Date();
@@ -689,7 +715,7 @@ window.cetakDataRak = function() {
             <style>
                 @page {
                     size: 215mm 330mm portrait;
-                    margin: 5mm;
+                    margin: 7mm 10mm 5mm 10mm;
                 }
                 body {
                     font-family: Arial, sans-serif;
@@ -701,7 +727,7 @@ window.cetakDataRak = function() {
                     print-color-adjust: exact;
                 }
                 .page {
-                    width: 205mm;
+                    width: 203mm;
                     height: 320mm;
                     max-height: 320mm;
                     margin: 0 auto;
@@ -735,18 +761,19 @@ window.cetakDataRak = function() {
                     margin-top: 2px;
                 }
                 
-                /* Layout 2 Kolom Tabel Beceran */
+                /* Layout 2 Kolom Tabel Beceran: Gap 70px */
                 .beceran-table-container {
                     display: grid;
-                    grid-template-columns: repeat(2, 1fr);
-                    gap: 12px;
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                    gap: 70px; 
                     flex: 1;
                     align-content: start;
+                    padding: 0 2mm;
                 }
                 .beceran-sub-table {
                     width: 100%;
                     border-collapse: collapse;
-                    font-size: 10.5px; /* Font diperbesar sedikit agar lebih jelas */
+                    font-size: 13px;
                 }
                 .beceran-sub-table th {
                     border-top: 1.5px solid #000;
@@ -754,45 +781,45 @@ window.cetakDataRak = function() {
                     padding: 4px 5px;
                     text-align: left;
                     font-weight: bold;
-                    background: #f1f5f9;
+                    background: #f4f7f9;
                 }
                 .beceran-sub-table td {
-                    border-bottom: 1px solid #cbd5e1;
-                    padding: 3px 5px; /* Padding baris diperbesar agar tidak terlalu rapat */
+                    border-bottom: 1px solid #edeef0;
+                    padding: 2.8px 5px;
                 }
                 .td-no {
                     text-align: center;
-                    width: 22px;
+                    width: 25px;
                     font-weight: bold;
                     color: #555;
                 }
                 .td-lokasi {
                     font-weight: bold;
-                    width: 60px;
+                    width: 62px;
                 }
                 .td-kode {
                     font-weight: bold;
                 }
                 .td-checkbox {
                     text-align: center;
-                    width: 22px;
+                    width: 25px;
                 }
                 .checkbox-box {
-                    width: 9px;
-                    height: 9px;
+                    width: 10px;
+                    height: 10px;
                     border: 1px solid #000;
                     display: inline-block;
                     background: #fff;
                 }
                 .td-qty {
-                    text-align: right;
+                    text-align: center;
                     font-weight: bold;
                     width: 38px;
                 }
                 .row-spacer td {
                     border-bottom: 2.5px solid #64748b !important;
                     background: #f8fafc;
-                    height: 10px; /* Spacer diperbesar agar jeda antar rak lebih kentara */
+                    height: 10px;
                     padding: 0 !important;
                 }
 
@@ -801,39 +828,40 @@ window.cetakDataRak = function() {
                     display: grid;
                     grid-template-columns: repeat(2, 1fr);
                     grid-template-rows: repeat(2, 1fr);
-                    gap: 10px;
+                    gap: 70px; 
                     flex: 1;
+                    padding: 4px 0;
                 }
                 .card {
                     background: #fff;
                     box-sizing: border-box;
                     display: flex;
                     flex-direction: column;
-                    margin-bottom: 6px;
                 }
                 .card-header {
                     border-bottom: 1.5px solid #000;
-                    padding: 3px 4px 5px 4px;
+                    padding: 4px 6px 6px 6px;
                     font-weight: bold;
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
                     margin-bottom: 4px;
-                    font-size: 11px;
+                    font-size: 13px;
                 }
                 .card-items {
                     display: flex;
                     flex-direction: column;
                     gap: 1px;
                 }
+                /* Layout Grid 2x2 Per Lembar untuk Utuhan: Spasi dan Lebar Kolom Diperlebar */
                 .card-row {
                     display: grid;
-                    grid-template-columns: 20px 58px 1fr 20px 32px;
+                    grid-template-columns: 28px 68px 1fr 38px 25px; /* Kolom nomor dan lokasi diperlebar agar tidak mepet */
                     align-items: center;
                     background: #fff;
-                    padding: 2.5px 3px;
-                    border-bottom: 1px solid #cbd5e1;
-                    font-size: 10px;
+                    padding: 3.5px 4px; /* Padding baris ditambah agar lebih lega */
+                    border-bottom: 1px solid #929393;
+                    font-size: 13px;
                 }
             </style>
         </head>
@@ -861,7 +889,7 @@ window.cetakDataRak = function() {
             <div class="page">
                 <div class="header-container">
                     <div class="top-info-bar">${infoWaktuCetak}</div>
-                    <div class="header-title">CEKLIST RAK UTUHAN — RAK ${nomor}</div>
+                    <div class="header-title">CEKLIST RAK UTUHAN - ${tanggalArsipFormatted} - RAK ${nomor}</div>
                     <div class="header-line"></div>
                 </div>
                 <div class="grid-container-utuhan">
@@ -878,7 +906,7 @@ window.cetakDataRak = function() {
                     htmlContent += `
                         <div class="card">
                             <div class="card-header">
-                                <span>RAK ${nomor} - GRUP ${huruf}</span>
+                                <span>RAK ${nomor} — GRUP ${huruf}</span>
                                 <span>= ${totalKrtRak} Krt</span>
                             </div>
                             <div class="card-items">
@@ -887,11 +915,11 @@ window.cetakDataRak = function() {
                     itemsList.forEach((row, index) => {
                         htmlContent += `
                             <div class="card-row">
-                                <span style="font-weight:bold; text-align:right; padding-right:2px;">${index + 1}.</span>
+                                <span style="font-weight:bold; text-align:left; padding-right:2px; color:#555;">${index + 1}.</span>
                                 <span style="font-weight:bold;">${row.KODE_LOKASI}</span>
                                 <span style="font-weight:bold; color:#111;">${row.KODE_BARANG}</span>
-                                <div style="display:flex; justify-content:center;"><div style="width:8px; height:8px; border:1px solid #000;"></div></div>
-                                <span style="text-align:right; font-weight:bold;">${row.QTY}</span>
+                                <span style="text-align:center; font-weight:bold;">${row.QTY}</span>
+                                <div style="display:flex; justify-content:center;"><div style="width:10px; height:10px; border:1px solid #000; background:#fff;"></div></div>
                             </div>
                         `;
                     });
@@ -913,22 +941,43 @@ window.cetakDataRak = function() {
 
     } else {
         // ==========================================
-        // KONDISI 2: CETAK BECERAN (FONT LEBIH BESAR & SPACER LEBIH TEBAL)
+        // KONDISI 2: CETAK BECERAN (RAK UTUH TANPA TERPOTONG)
         // ==========================================
         const entries = Object.entries(cacheData).sort((a, b) => Number(a[1].nomorRak) - Number(b[1].nomorRak));
         
-        let processedRows = [];
-        let currentRak = null;
-        let counterNo = 1;
-
+        let rakGroups = [];
         entries.forEach(([key, val]) => {
-            const rakNum = val.nomorRak;
-            (val.items || []).forEach(item => {
-                if (currentRak !== null && currentRak !== rakNum) {
-                    processedRows.push({ isSpacer: true });
+            rakGroups.push({
+                rakNum: val.nomorRak,
+                items: val.items || []
+            });
+        });
+
+        let leftColumnRaks = [];
+        let rightColumnRaks = [];
+        let leftCount = 0;
+        let targetPerColumn = 55; 
+
+        rakGroups.forEach(group => {
+            const groupRows = group.items.length + (leftColumnRaks.length > 0 ? 1 : 0);
+            if (leftCount + groupRows <= targetPerColumn || leftColumnRaks.length === 0) {
+                leftColumnRaks.push(group);
+                leftCount += groupRows;
+            } else {
+                rightColumnRaks.push(group);
+            }
+        });
+
+        let leftProcessedRows = [];
+        let counterNo = 1;
+        let lastRakLeft = null;
+        leftColumnRaks.forEach(group => {
+            group.items.forEach(item => {
+                if (lastRakLeft !== null && lastRakLeft !== group.rakNum) {
+                    leftProcessedRows.push({ isSpacer: true });
                 }
-                currentRak = rakNum;
-                processedRows.push({
+                lastRakLeft = group.rakNum;
+                leftProcessedRows.push({
                     isSpacer: false,
                     no: counterNo++,
                     KODE_LOKASI: item.KODE_LOKASI,
@@ -938,16 +987,29 @@ window.cetakDataRak = function() {
             });
         });
 
-        const totalRows = processedRows.length;
-        const half = Math.ceil(totalRows / 2);
-        const leftRows = processedRows.slice(0, half);
-        const rightRows = processedRows.slice(half);
+        let rightProcessedRows = [];
+        let lastRakRight = null;
+        rightColumnRaks.forEach(group => {
+            group.items.forEach(item => {
+                if (lastRakRight !== null && lastRakRight !== group.rakNum) {
+                    rightProcessedRows.push({ isSpacer: true });
+                }
+                lastRakRight = group.rakNum;
+                rightProcessedRows.push({
+                    isSpacer: false,
+                    no: counterNo++,
+                    KODE_LOKASI: item.KODE_LOKASI,
+                    KODE_BARANG: item.KODE_BARANG,
+                    QTY: item.QTY
+                });
+            });
+        });
 
         htmlContent += `
         <div class="page">
             <div class="header-container">
                 <div class="top-info-bar">${infoWaktuCetak}</div>
-                <div class="header-title">STOK BECERAN</div>
+                <div class="header-title">STOK BECERAN - ${tanggalArsipFormatted}</div>
                 <div class="header-line"></div>
             </div>
             <div class="beceran-table-container">
@@ -957,15 +1019,15 @@ window.cetakDataRak = function() {
                             <tr>
                                 <th class="td-no">No</th>
                                 <th class="td-lokasi">Lokasi</th>
-                                <th>Kode Barang</th>
-                                <th class="td-checkbox">✓</th>
+                                <th class="td-kode">Kode Barang</th>
                                 <th class="td-qty">Qty</th>
+                                <th class="td-checkbox">✓</th>
                             </tr>
                         </thead>
                         <tbody>
         `;
 
-        leftRows.forEach((row) => {
+        leftProcessedRows.forEach((row) => {
             if (row.isSpacer) {
                 htmlContent += `<tr class="row-spacer"><td colspan="5"></td></tr>`;
             } else {
@@ -974,8 +1036,8 @@ window.cetakDataRak = function() {
                         <td class="td-no">${row.no}</td>
                         <td class="td-lokasi">${row.KODE_LOKASI}</td>
                         <td class="td-kode">${row.KODE_BARANG}</td>
-                        <td class="td-checkbox"><div class="checkbox-box"></div></td>
                         <td class="td-qty">${row.QTY}</td>
+                        <td class="td-checkbox"><div class="checkbox-box"></div></td>
                     </tr>
                 `;
             }
@@ -991,15 +1053,15 @@ window.cetakDataRak = function() {
                             <tr>
                                 <th class="td-no">No</th>
                                 <th class="td-lokasi">Lokasi</th>
-                                <th>Kode Barang</th>
-                                <th class="td-checkbox">✓</th>
+                                <th class="td-kode">Kode Barang</th>
                                 <th class="td-qty">Qty</th>
+                                <th class="td-checkbox">✓</th>
                             </tr>
                         </thead>
                         <tbody>
         `;
 
-        rightRows.forEach((row) => {
+        rightProcessedRows.forEach((row) => {
             if (row.isSpacer) {
                 htmlContent += `<tr class="row-spacer"><td colspan="5"></td></tr>`;
             } else {
@@ -1008,8 +1070,8 @@ window.cetakDataRak = function() {
                         <td class="td-no">${row.no}</td>
                         <td class="td-lokasi">${row.KODE_LOKASI}</td>
                         <td class="td-kode">${row.KODE_BARANG}</td>
-                        <td class="td-checkbox"><div class="checkbox-box"></div></td>
                         <td class="td-qty">${row.QTY}</td>
+                        <td class="td-checkbox"><div class="checkbox-box"></div></td>
                     </tr>
                 `;
             }
@@ -1040,6 +1102,7 @@ window.cetakDataRak = function() {
 };
 
 window.cetakArsipRak = async function(idArsip) {
+    window.currentArsipId = idArsip; // Simpan ID arsip yang dipilih untuk referensi tanggal
     await window.pilihArsipRak(idArsip);
     window.cetakDataRak();
 };
