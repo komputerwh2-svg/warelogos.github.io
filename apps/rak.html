@@ -78,28 +78,6 @@
 
             <!-- Tombol Aksi Kanan -->
             <div class="flex items-center space-x-2">
-                <!-- Dropdown Filter khusus Rak Utuhan -->
-                <div id="wrapperFilterRakUtuhan" class="hidden items-center gap-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1">
-                    <span class="text-[11px] font-bold text-zinc-300 flex items-center gap-1">
-                        <i class="fa-solid fa-filter text-orange-400"></i> Filter Rak:
-                    </span>
-                    <select id="selectFilterGrupRak" onchange="filterPreviewRakUtuhan(this.value)" class="bg-zinc-900 text-orange-300 font-black text-xs rounded px-2 py-1 focus:outline-none border border-zinc-700">
-                        <option value="ALL">Semua Rak (4 - 15)</option>
-                        <option value="4">Rak 4</option>
-                        <option value="5">Rak 5</option>
-                        <option value="6">Rak 6</option>
-                        <option value="7">Rak 7</option>
-                        <option value="8">Rak 8</option>
-                        <option value="9">Rak 9</option>
-                        <option value="10">Rak 10</option>
-                        <option value="11">Rak 11</option>
-                        <option value="12">Rak 12</option>
-                        <option value="13">Rak 13</option>
-                        <option value="14">Rak 14</option>
-                        <option value="15">Rak 15</option>
-                    </select>
-                </div>
-
                 <!-- Input Excel Multiple -->
                 <input type="file" id="inputExcelRak" accept=".xls, .xlsx, .csv" multiple class="hidden" onchange="handleFileImportRak(event)">
                 
