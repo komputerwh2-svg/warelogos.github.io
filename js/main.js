@@ -1923,6 +1923,77 @@ window.tutupSubPageRak = function() {
 
 
 
+// Fungsi untuk membuka subpage Aplikasi Stok Opname Mobile (StOMo)
+function bukaSubPageStomo() {
+    // 1. Tentukan kontenernya (pastikan ada <div id="subpage-stomo-container"></div> di index.html Anda)
+    const container = document.getElementById('subpage-stomo-container'); 
+    
+    if (!container) {
+        console.error("Wadah 'subpage-stomo-container' tidak ditemukan di index.html!");
+        return;
+    }
+
+    const subpage = document.getElementById('subpage-stomo');
+
+    // Jika sudah ada (sudah pernah di-fetch), langsung buka
+    if (subpage) {
+        subpage.classList.remove('translate-x-full');
+        if (typeof window.initStomoModule === 'function') {
+            window.initStomoModule();
+        }
+        return;
+    }
+
+    // 2. Fetch file HTML subpage StOMo (sesuaikan path folder jika disimpan di subfolder apps/)
+    fetch('apps/stomo.html') 
+        .then(response => {
+            if (!response.ok) throw new Error("Gagal mengambil file apps/stomo.html");
+            return response.text();
+        })
+        .then(htmlContent => {
+            container.innerHTML = htmlContent;
+
+            // 3. Suntikkan script JS-nya secara dinamis
+            const script = document.createElement('script');
+            script.src = "js/stomo.js"; // Sesuaikan path folder skrip JS Anda
+            
+            script.onload = () => {
+                // Panggil fungsi inisialisasi modul StOMo
+                if (typeof window.initStomoModule === 'function') {
+                    window.initStomoModule();
+                }
+                
+                const elemenBaru = document.getElementById('subpage-stomo');
+                if (elemenBaru) {
+                    elemenBaru.classList.remove('translate-x-full');
+                }
+            };
+            document.body.appendChild(script);
+        })
+        .catch(error => {
+            console.error(error);
+            if (typeof miuiAlert === 'function') {
+                miuiAlert("Sistem Gagal Memuat Template Aplikasi StOMo!");
+            } else {
+                alert("Sistem Gagal Memuat Template Aplikasi StOMo!");
+            }
+        });
+}
+
+// Fungsi untuk menutup subpage StOMo
+window.tutupSubPageStomo = function() {
+    const subpage = document.getElementById('subpage-stomo');
+    if (subpage) {
+        subpage.classList.add('translate-x-full');
+    }
+};
+
+// Daftarkan ke window agar bisa diakses secara global melalui atribut onclick di dasbor
+window.bukaSubPageStomo = bukaSubPageStomo;
+window.tutupSubPageStomo = tutupSubPageStomo;
+
+
+
 // ==========================================================================
 // REGISTRASI NAVIGASI UTAMA LAUNCHER SUB-PAGE SETELAN
 // ==========================================================================
