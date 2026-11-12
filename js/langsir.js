@@ -870,7 +870,7 @@ window.cetakDataLangsir = function() {
                     justify-content: space-between;
                     align-items: center;
                     margin-bottom: 4px;
-                    font-size: 13px; 
+                    font-size: 15px; 
                 }
                 .card-items {
                     display: flex;
@@ -885,12 +885,12 @@ window.cetakDataLangsir = function() {
                     padding: 2.5px 4px;
                     border-radius: 2px;
                     border: 1.2px solid #000;
-                    font-size: 12px; 
+                    font-size: 15px; 
                 }
                 .row-no {
                     color: #000;
                     font-weight: bold;
-                    font-size: 10px;
+                    font-size: 12px;
                     text-align: right;
                     padding-right: 3px;
                 }
