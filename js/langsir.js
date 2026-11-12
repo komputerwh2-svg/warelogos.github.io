@@ -194,7 +194,7 @@ window.renderPreviewLangsir = function() {
                         
                         <!-- Badge Expdate -->
                         <div class="bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-2 text-center font-medium text-slate-600 truncate shadow-2xs">
-                            ${item.EXPDATE || '-'}
+                            ${formatTampilExpdate(item.EXPDATE)}
                         </div>
                     </div>
                     
@@ -225,6 +225,27 @@ function parseTanggalCustomLangsir(tglStr) {
     const y = parseInt(parts[2], 10);
     const dateObj = new Date(y, m, d);
     return isNaN(dateObj.getTime()) ? 8640000000000 : dateObj.getTime();
+}
+
+// Helper untuk mengubah tanggal (bisa format teks biasa atau nomor serial Excel seperti 47037)
+function formatTampilExpdate(tgl) {
+    if (!tgl) return '-';
+    let tglStr = String(tgl).trim();
+
+    // Jika berupa angka serial Excel (misal: 47037)
+    if (!isNaN(tglStr) && !tglStr.includes('/') && !tglStr.includes('-')) {
+        const excelEpoch = new Date(1899, 11, 30);
+        const dateObj = new Date(excelEpoch.getTime() + (Number(tglStr) * 86400000));
+        if (!isNaN(dateObj.getTime())) {
+            let day = String(dateObj.getDate()).padStart(2, '0');
+            let month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            let year = dateObj.getFullYear();
+            return `${day}-${month}-${year}`;
+        }
+    }
+    
+    // Jika sudah format teks, kembalikan apa adanya
+    return tglStr;
 }
 
 // Fungsi Hapus Seluruh Kartu Berdasarkan Kode Rasa yang Dipilih
