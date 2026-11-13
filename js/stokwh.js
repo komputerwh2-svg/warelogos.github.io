@@ -1256,7 +1256,6 @@ async function eksekusiUploadWH3Gabungan(fileWh3, fileQa, url, isUpdate) {
         const responseLama = await fetch(url);
         const dataLama = responseLama.ok ? await responseLama.json() || {} : {};
 
-        // Mulai dengan menyalin data lama yang sudah bersih sebelumnya
         let stokAudit = JSON.parse(JSON.stringify(dataLama));
         let jumlahBarisQaTerbaca = 0;
 
@@ -1273,6 +1272,7 @@ async function eksekusiUploadWH3Gabungan(fileWh3, fileQa, url, isUpdate) {
                 const bosnet = parts[0] || 0;
                 const ball = parts[1] || 0;
                 const rtg = parts[2] || 0;
+                const pcs = parts[3] || 0;
 
                 const nama = row[2] || ""; 
                 const formattedPak = `${ball > 0 ? ball : "-"} | ${rtg > 0 ? rtg : "-"}`;
@@ -1283,10 +1283,9 @@ async function eksekusiUploadWH3Gabungan(fileWh3, fileQa, url, isUpdate) {
                 const utuhan = dataLamaItem.utuhan || 0;
                 const qa = dataLamaItem.qa || 0;
 
-                // FILTER SEPERTI VERSI LAMA: Skip jika semua komponen di baris ini benar-benar 0
-                // Tapi pastikan juga jika item lama di database sudah punya stok fisik/QA, jangan dihapus sembarangan
-                if (bosnet === 0 && ball === 0 && rtg === 0 && blok === 0 && beceran === 0 && utuhan === 0 && qa === 0) {
-                    delete stokAudit[kode]; // Bersihkan jika memang kosong melompong
+                // Jangan hapus jika ada salah satu komponen stok yang > 0 (termasuk ball, rtg, atau pcs)
+                if (bosnet === 0 && ball === 0 && rtg === 0 && pcs === 0 && blok === 0 && beceran === 0 && utuhan === 0 && qa === 0) {
+                    delete stokAudit[kode];
                     return;
                 }
 
@@ -1325,7 +1324,6 @@ async function eksekusiUploadWH3Gabungan(fileWh3, fileQa, url, isUpdate) {
                 const kode = row[1] ? String(row[1]).trim().toUpperCase() : null; 
                 if (!kode || kode === "PRODUK") return;
 
-                // Hanya ambil dari kolom kuantitas (misal index 9, atau sesuaikan kolom qty QA Anda)
                 const rawQaVal = row[9] ? String(row[9]).trim() : "0";
                 const partsQa = rawQaVal.split('/').map(p => parseInt(p) || 0);
                 const qtyVal = partsQa[0] || 0;
@@ -1341,9 +1339,9 @@ async function eksekusiUploadWH3Gabungan(fileWh3, fileQa, url, isUpdate) {
                 const beceran = dataLamaItem.beceran || 0;
                 const utuhan = dataLamaItem.utuhan || 0;
                 const bosnet = dataLamaItem.bosnet || 0;
+                const bsnBall = dataLamaItem.pak_format && dataLamaItem.pak_format !== "-" ? 1 : 0;
 
-                // Jika nilai QA dan komponen lainnya 0, hapus dari list agar bersih
-                if (qtyVal === 0 && bosnet === 0 && blok === 0 && beceran === 0 && utuhan === 0) {
+                if (qtyVal === 0 && bosnet === 0 && bsnBall === 0 && blok === 0 && beceran === 0 && utuhan === 0) {
                     delete stokAudit[kode];
                     return;
                 }
@@ -1375,7 +1373,7 @@ async function eksekusiUploadWH3Gabungan(fileWh3, fileQa, url, isUpdate) {
             });
         }
 
-        // Final safety cleanup: pastikan tidak ada data yang isinya 0 semua lolos ke database
+        // 5. Final safety cleanup yang aman untuk stok karton, pak, blok, utuhan, beceran, maupun QA
         let stokAuditBersih = {};
         Object.entries(stokAudit).forEach(([kode, item]) => {
             const bsn = parseInt(item.bosnet) || 0;
@@ -1383,13 +1381,15 @@ async function eksekusiUploadWH3Gabungan(fileWh3, fileQa, url, isUpdate) {
             const blk = parseInt(item.blok) || 0;
             const bcr = parseInt(item.beceran) || 0;
             const uth = parseInt(item.utuhan) || 0;
+            const punyaPak = item.pak_format && item.pak_format !== "-";
 
-            if (bsn > 0 || qa > 0 || blk > 0 || bcr > 0 || uth > 0) {
+            // Loloskan jika salah satu memiliki nilai stok
+            if (bsn > 0 || qa > 0 || blk > 0 || bcr > 0 || uth > 0 || punyaPak) {
                 stokAuditBersih[kode] = item;
             }
         });
 
-        // 5. Upload hasil akhir yang sudah bersih ke Firebase via PUT
+        // 6. Upload hasil akhir ke Firebase via PUT
         const response = await fetch(url, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
@@ -1400,7 +1400,7 @@ async function eksekusiUploadWH3Gabungan(fileWh3, fileQa, url, isUpdate) {
             throw new Error(`Gagal menyimpan data ke server (Status: ${response.status})`);
         }
 
-        miuiAlert(`Data WH-3 & QA berhasil disimpan! (${jumlahBarisQaTerbaca} baris QA terbaca, data kosong dibersihkan).`);
+        miuiAlert(`Data WH-3 & QA berhasil disimpan! \n(${jumlahBarisQaTerbaca} baris QA terbaca).`);
         tutupModalUploadWH3();
         resetFileInputwh3();
         isDropdownInitializedWH3 = false; 
