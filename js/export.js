@@ -972,6 +972,13 @@ window.bukaModalCetakLaporan = function() {
                                 <option value="">-- Memuat Sisa Stok --</option>
                             </select>
                         </div>
+
+                        <div>
+                            <label class="block font-bold text-slate-900 mb-1 text-[11px]">Pilih Data Ceklist Muat:</label>
+                            <select id="print-select-ceklist-export" onchange="updatePrintPreviewHTML()" class="w-full border border-slate-300 rounded p-2 text-xs bg-white text-slate-900 font-bold shadow-sm">
+                                <option value="">-- Memuat Data Ceklist --</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div class="pt-4 border-t space-y-2">
@@ -1032,6 +1039,7 @@ window.bukaModalCetakLaporan = function() {
     document.getElementById('print-tgl-selesai').value = todayStr;
 
     populateDropdownSisaStokModal(kategori);
+    populateDropdownCeklistModal(kategori);
 };
 
 window.tutupModalCetak = function() {
@@ -1080,6 +1088,44 @@ function renderDropdownOptions(snapshot, selectEl, kategori) {
     updatePrintPreviewHTML();
 }
 
+function populateDropdownCeklistModal(kategoriAktif) {
+    const selectEl = document.getElementById('print-select-ceklist-export');
+    if (!selectEl) return;
+
+    selectEl.innerHTML = '<option value="">-- Memuat Data Ceklist --</option>';
+
+    firebase.database().ref('barang_export/riwayat_ceklist').once('value').then(snapshot => {
+        let optionsHtml = '<option value="">-- Jangan Lampirkan Ceklist --</option>';
+        
+        if (snapshot.exists()) {
+            const dataRiwayat = snapshot.val();
+            let listCeklist = [];
+
+            Object.keys(dataRiwayat).forEach(id => {
+                const item = dataRiwayat[id];
+                if (item && item.tipe && item.tipe.toUpperCase() === kategoriAktif.toUpperCase()) {
+                    listCeklist.push({ id: id, ...item });
+                }
+            });
+
+            // Urutkan dari yang terbaru berdasarkan timestamp
+            listCeklist.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+            listCeklist.forEach(item => {
+                let totalKrt = (item.items || []).reduce((sum, i) => sum + Number(i.qty || 0), 0);
+                // Dirapikan dalam satu baris untuk menghindari line break error di HTML option
+                optionsHtml += `<option value="${item.id}">${item.tanggal} - ${item.buyer} (${totalKrt} KRT)</option>`;
+            });
+        }
+
+        selectEl.innerHTML = optionsHtml;
+        updatePrintPreviewHTML();
+    }).catch(err => {
+        console.error("Gagal memuat riwayat ceklist untuk modal cetak:", err);
+        selectEl.innerHTML = '<option value="">-- Gagal Memuat Data --</option>';
+    });
+}
+
 // --- FUNGSI FORMAT TANGGAL DD-MM-YYYY ---
 function formatDateIndo(dateStr) {
     if (!dateStr || !dateStr.includes("-")) return dateStr;
@@ -1090,11 +1136,15 @@ function formatDateIndo(dateStr) {
     return dateStr;
 }
 
-// --- FUNGSI UPDATE PREVIEW SECARA LIVE ---
 window.updatePrintPreviewHTML = function() {
     const tglMulai = document.getElementById('print-tgl-mulai').value;
     const tglSelesai = document.getElementById('print-tgl-selesai').value;
     const sisaStokKey = document.getElementById('print-select-sisa-stok').value;
+    
+    // --- AMBIL NILAI CEKLIST ID DARI DROPDOWN DENGAN AMAN ---
+    const ceklistSelectEl = document.getElementById('print-select-ceklist-export');
+    const ceklistId = ceklistSelectEl ? ceklistSelectEl.value : "";
+    
     const filterTipeKode = document.getElementById('print-filter-tipe-kode').value;
     const kategori = (window.selectedKategoriExport || "MEXA").toUpperCase();
     const previewPaper = document.getElementById('print-preview-paper');
@@ -1182,24 +1232,36 @@ window.updatePrintPreviewHTML = function() {
     const nodeCapital = kategori === "PUXR" ? "barang_export/SISA_PUXR" : "barang_export/SISA_MEXA";
     const nodeLower = kategori === "PUXR" ? "barang_export/sisa_puxr" : "barang_export/sisa_mexa";
 
+    // Fungsi helper untuk merender setelah data sisa stok dan ceklist didapat
+    const fetchCeklistDanRender = (sisaData) => {
+        if (ceklistId) {
+            firebase.database().ref(`barang_export/riwayat_ceklist/${ceklistId}`).once("value", snapCeklist => {
+                const ceklistData = snapCeklist.val();
+                renderPreviewHTMLContent(previewPaper, filteredMasuk, masterItems, dataInMap, dataOutMap, sisaData, ceklistData, tglMulai, tglSelesai, kategori, isCodeMatchFilter);
+            });
+        } else {
+            renderPreviewHTMLContent(previewPaper, filteredMasuk, masterItems, dataInMap, dataOutMap, sisaData, null, tglMulai, tglSelesai, kategori, isCodeMatchFilter);
+        }
+    };
+
     if (sisaStokKey) {
         firebase.database().ref(`${nodeCapital}/${sisaStokKey}`).once("value", snap => {
             let sisaData = snap.val();
             if (!sisaData) {
                 firebase.database().ref(`${nodeLower}/${sisaStokKey}`).once("value", snap2 => {
                     sisaData = snap2.val();
-                    renderPreviewHTMLContent(previewPaper, filteredMasuk, masterItems, dataInMap, dataOutMap, sisaData, tglMulai, tglSelesai, kategori, isCodeMatchFilter);
+                    fetchCeklistDanRender(sisaData);
                 });
             } else {
-                renderPreviewHTMLContent(previewPaper, filteredMasuk, masterItems, dataInMap, dataOutMap, sisaData, tglMulai, tglSelesai, kategori, isCodeMatchFilter);
+                fetchCeklistDanRender(sisaData);
             }
         });
     } else {
-        renderPreviewHTMLContent(previewPaper, filteredMasuk, masterItems, dataInMap, dataOutMap, null, tglMulai, tglSelesai, kategori, isCodeMatchFilter);
+        fetchCeklistDanRender(null);
     }
 };
 
-function renderPreviewHTMLContent(container, filteredMasuk, masterItems, dataInMap, dataOutMap, sisaData, tglMulai, tglSelesai, kategori, isCodeMatchFilter) {
+function renderPreviewHTMLContent(container, filteredMasuk, masterItems, dataInMap, dataOutMap, sisaData, ceklistData, tglMulai, tglSelesai, kategori, isCodeMatchFilter) {
     const tglMulaiFmt = formatDateIndo(tglMulai);
     const tglSelesaiFmt = formatDateIndo(tglSelesai);
     const sisaTglFmt = sisaData && sisaData.tanggal ? formatDateIndo(sisaData.tanggal) : 'Pilih Tanggal';
@@ -1254,7 +1316,7 @@ function renderPreviewHTMLContent(container, filteredMasuk, masterItems, dataInM
                 </table>
             </div>
 
-            <!-- SEBELAH KANAN: REKAP STOK (KODE, AKHIR, PLT/BEC) & SISA STOK -->
+            <!-- SEBELAH KANAN: REKAP STOK, CATATAN SISA STOK, & CATATAN MUAT CEKLIST -->
             <div style="width: 48%;">
                 <div class="section-box">REKAP STOK TERSEDIA</div>
                 <table class="preview-table">
@@ -1330,9 +1392,57 @@ function renderPreviewHTMLContent(container, filteredMasuk, masterItems, dataInM
     html += `
                     </tbody>
                 </table>
-            </div>
-        </div>
     `;
+
+    // --- TAMBAHAN TABEL CATATAN MUAT DARI CEKLIST YANG DIPILIH ---
+    if (ceklistData) {
+        const buyerName = ceklistData.buyer || '-';
+        const tujuanName = ceklistData.tujuan || '-';
+        const tglMuatCeklist = ceklistData.tanggal || '-';
+
+        html += `
+                <div class="section-box" style="margin-top: 10px;">CATATAN MUAT TGL ${tglMuatCeklist} (${buyerName} - ${tujuanName})</div>
+                <table class="preview-table">
+                    <thead>
+                        <tr>
+                            <th>Kode Barang</th>
+                            <th class="text-right">Qty Muat</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        let hasCeklistItems = false;
+        if (ceklistData.items && Array.isArray(ceklistData.items)) {
+            // Salin array items lalu urutkan secara alfanumerik berdasarkan kode barang (A-Z)
+            let sortedItems = [...ceklistData.items].sort((a, b) => {
+                let kodeA = (a.kode || '').toUpperCase();
+                let kodeB = (b.kode || '').toUpperCase();
+                return kodeA.localeCompare(kodeB, undefined, { numeric: true, sensitivity: 'base' });
+            });
+
+            sortedItems.forEach(it => {
+                if (it && it.kode && isCodeMatchFilter(it.kode)) {
+                    hasCeklistItems = true;
+                    html += `
+                        <tr>
+                            <td class="font-bold">${it.kode}</td>
+                            <td class="text-right font-bold">${Number(it.qty || 0).toLocaleString('id-ID')} Krt</td>
+                        </tr>
+                    `;
+                }
+            });
+        }
+
+        if (!hasCeklistItems) {
+            html += `<tr><td colspan="2" class="text-center italic" style="padding: 8px;">Tidak ada item ceklist yang sesuai filter</td></tr>`;
+        }
+
+        html += `
+                    </tbody>
+                </table>
+        `;
+    }
 
     container.innerHTML = html;
 }
@@ -1345,6 +1455,10 @@ window.kirimCetakKePrintJobs = async function() {
         miuiAlert("Area preview tidak ditemukan!");
         return;
     }
+
+    // Ambil ID ceklist muat yang dipilih dari dropdown (jika ada)
+    const selectCeklistEl = document.getElementById('print-select-ceklist-export');
+    const selectedCeklistId = selectCeklistEl ? selectCeklistEl.value : "";
 
     const now = new Date();
     const daftarHari = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
@@ -1407,6 +1521,7 @@ window.kirimCetakKePrintJobs = async function() {
     const safeKeyName = `Export_${kategori}_${tgl}-${String(blnIndex + 1).padStart(2, '0')}-${thn}_${jam}-${menit}-${detik}`;
 
     try {
+        // 1. Kirim laporan utama ke Print Server (Firebase)
         await fetch(`https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs/${safeKeyName}.json`, {
             method: 'PUT',
             body: JSON.stringify({ 
@@ -1418,10 +1533,514 @@ window.kirimCetakKePrintJobs = async function() {
             }),
             headers: { 'Content-Type': 'application/json' }
         });
+
+        // 2. Jika user memilih data ceklist muat pada dropdown, langsung cetak ceklistnya juga
+        if (selectedCeklistId) {
+            const snapCeklist = await firebase.database().ref(`barang_export/riwayat_ceklist/${selectedCeklistId}`).once('value');
+            const dataCeklistPilihan = snapCeklist.val();
+            
+            if (dataCeklistPilihan && typeof window.cetakCeklistExportEkspor === 'function') {
+                window.cetakCeklistExportEkspor(dataCeklistPilihan);
+            }
+        }
         
-        miuiAlert("Perintah cetak berhasil dikirim ke Print Server (Firebase)!");
+        miuiAlert("Perintah cetak berhasil dikirim ke Print Server!");
         tutupModalCetak();
     } catch (error) {
         miuiAlert("Gagal mengirim perintah cetak: " + error.message);
+    }
+};
+
+
+
+let currentTipeCeklist = 'MEXA';
+let batchItemsCeklist = [];
+let riwayatCeklistData = {};
+
+function bukaModalCeklistExport() {
+    const modal = document.getElementById('modal-ceklist-export');
+    if (!modal) {
+        console.error("Elemen #modal-ceklist-export tidak ditemukan di HTML!");
+        return;
+    }
+    modal.classList.remove('hidden');
+    
+    // Set tanggal default hari ini
+    const today = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
+    const elTgl = document.getElementById('ceklist-tgl');
+    if (elTgl) elTgl.value = today;
+    
+    muatOpsiKodeCeklist();
+    muatRiwayatCeklistFirebase();
+}
+
+function tutupModalCeklistExport() {
+    document.getElementById('modal-ceklist-export').classList.add('hidden');
+    batchItemsCeklist = [];
+    renderBatchCeklist();
+}
+
+function setTipeCeklist(tipe) {
+    currentTipeCeklist = tipe;
+    const btnMexa = document.getElementById('btn-tipe-mexa');
+    const btnPuxr = document.getElementById('btn-tipe-puxr');
+    
+    if (tipe === 'MEXA') {
+        btnMexa.className = "py-2 text-xs font-black rounded border transition shadow-sm bg-gradient-to-b from-amber-500 to-orange-600 text-white border-orange-400";
+        btnPuxr.className = "py-2 text-xs font-black rounded border transition shadow-sm bg-white text-slate-700 border-slate-400 hover:bg-slate-100";
+    } else {
+        btnPuxr.className = "py-2 text-xs font-black rounded border transition shadow-sm bg-gradient-to-b from-amber-500 to-orange-600 text-white border-orange-400";
+        btnMexa.className = "py-2 text-xs font-black rounded border transition shadow-sm bg-white text-slate-700 border-slate-400 hover:bg-slate-100";
+    }
+
+    // Perbarui isi dropdown kode setiap kali kategori diganti
+    muatOpsiKodeCeklist();
+}
+
+function muatOpsiKodeCeklist() {
+    const select = document.getElementById('ceklist-select-kode');
+    if (!select) return;
+
+    // Ambil daftar item berdasarkan kategori aktif (MEXA / PUXR) dari listKodeBarangExport
+    const listKategori = listKodeBarangExport[currentTipeCeklist] || [];
+    
+    let html = '<option value="">Pilih Kode...</option>';
+    listKategori.forEach(item => {
+        html += `<option value="${item.kode}">${item.kode}</option>`;
+    });
+
+    select.innerHTML = html;
+}
+
+function tambahItemCeklistBatch() {
+    const selectKode = document.getElementById('ceklist-select-kode');
+    const inputQty = document.getElementById('ceklist-qty');
+    
+    const kode = selectKode.value;
+    const qty = parseInt(inputQty.value) || 0;
+    
+    if (!kode) {
+        miuiAlert('Pilih kode barang terlebih dahulu!');
+        return;
+    }
+    if (qty <= 0) {
+        miuiAlert('Qty harus lebih besar dari 0!');
+        return;
+    }
+
+    // Masukkan ke urutan PALING ATAS (unshift) dengan flag isNew
+    batchItemsCeklist.unshift({ kode, qty, isNew: true });
+    renderBatchCeklist();
+    
+    // Reset dropdown kode dan kosongkan input qty
+    selectKode.value = '';
+    inputQty.value = '';
+
+    // Otomatis scroll ke bagian paling atas tabel daftar item
+    const containerTabel = document.querySelector('#tabel-batch-ceklist').closest('.overflow-y-auto');
+    if (containerTabel) containerTabel.scrollTop = 0;
+}
+
+function renderBatchCeklist() {
+    const tbody = document.getElementById('tabel-batch-ceklist');
+    if (!tbody) return;
+
+    if (batchItemsCeklist.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-slate-400 font-medium italic text-[11px]">Belum ada item ditambahkan</td></tr>`;
+        return;
+    }
+
+    let html = '';
+    batchItemsCeklist.forEach((item, index) => {
+        // Jika item baru, beri warna latar belakang sorotan kuning terang
+        let bgClass = item.isNew ? 'bg-amber-100 animate-pulse' : 'hover:bg-slate-50';
+        
+        html += `
+            <tr class="${bgClass} transition duration-500">
+                <td class="p-2 font-black text-slate-900">${item.kode}</td>
+                <td class="p-2 text-center font-mono font-extrabold text-orange-600">${item.qty} Krt</td>
+                <td class="p-2 text-center">
+                    <button onclick="hapusItemBatchCeklist(${index})" class="w-6 h-6 bg-rose-100 text-rose-600 rounded flex items-center justify-center hover:bg-rose-200 transition mx-auto">
+                        <i class="fa-solid fa-trash-can text-[10px]"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    tbody.innerHTML = html;
+
+    // Hilangkan flag isNew setelah 2 detik agar kedipan/sorotan berhenti
+    setTimeout(() => {
+        batchItemsCeklist.forEach(item => item.isNew = false);
+    }, 2000);
+}
+
+function hapusItemBatchCeklist(index) {
+    batchItemsCeklist.splice(index, 1);
+    renderBatchCeklist();
+}
+
+async function simpanCeklistExport() {
+    const buyer = document.getElementById('ceklist-buyer').value.trim();
+    const tujuan = document.getElementById('ceklist-tujuan').value.trim();
+    const tanggal = document.getElementById('ceklist-tgl').value;
+
+    if (!buyer || !tujuan) {
+        miuiAlert('Nama Buyer dan Tujuan / Alamat wajib diisi!');
+        return;
+    }
+    if (batchItemsCeklist.length === 0) {
+        miuiAlert('Tambahkan minimal 1 item barang ke batch ceklist!');
+        return;
+    }
+
+    const timestamp = Date.now();
+    
+    // Format Nama Buyer agar bersih dari spasi berlebih atau karakter khusus untuk ID
+    const cleanBuyer = buyer.replace(/[\/\-\_\.\s]+/g, '_').toUpperCase();
+    const cleanTanggal = tanggal.replace(/[\/\-\_\.]+/g, '-');
+    
+    // Buat kustom ID: TIPE_BUYER_TANGGAL_TIMESTAMP
+    const customId = `${currentTipeCeklist}_${cleanBuyer}_${cleanTanggal}_${timestamp}`;
+
+    const dataCeklist = {
+        tipe: currentTipeCeklist,
+        tanggal: tanggal,
+        buyer: buyer,
+        tujuan: tujuan,
+        items: batchItemsCeklist,
+        timestamp: timestamp
+    };
+
+    try {
+        // Simpan langsung ke node "barang_export/riwayat_ceklist/{customId}"
+        await firebase.database().ref(`barang_export/riwayat_ceklist/${customId}`).set(dataCeklist);
+
+        miuiAlert('Data Ceklist Export berhasil disimpan!');
+        document.getElementById('ceklist-buyer').value = '';
+        document.getElementById('ceklist-tujuan').value = '';
+        batchItemsCeklist = [];
+        renderBatchCeklist();
+        muatRiwayatCeklistFirebase();
+    } catch (err) {
+        console.error("Gagal menyimpan ceklist:", err);
+        miuiAlert('Gagal menyimpan data ke server.');
+    }
+}
+
+async function muatRiwayatCeklistFirebase() {
+    try {
+        const snap = await firebase.database().ref('barang_export/riwayat_ceklist').once('value');
+        riwayatCeklistData = snap.val() || {};
+        renderRiwayatCeklist();
+    } catch (err) {
+        console.error("Gagal memuat riwayat ceklist:", err);
+    }
+}
+
+function renderRiwayatCeklist() {
+    const container = document.getElementById('container-riwayat-ceklist');
+    const countBadge = document.getElementById('count-riwayat-ceklist');
+    const keyword = (document.getElementById('cari-riwayat-ceklist')?.value || '').toLowerCase();
+
+    let keys = Object.keys(riwayatCeklistData || {}).reverse();
+
+    if (keys.length === 0) {
+        if (countBadge) countBadge.innerText = '0';
+        container.innerHTML = `<div class="text-center py-10 text-slate-400 text-xs italic">Belum ada riwayat ceklist tersimpan.</div>`;
+        return;
+    }
+
+    let html = '';
+    let filteredCount = 0;
+
+    keys.forEach(id => {
+        const item = riwayatCeklistData[id];
+        if (!item) return;
+
+        const matchStr = `${item.buyer || ''} ${item.tujuan || ''} ${item.tipe || ''} ${item.tanggal || ''}`.toLowerCase();
+        if (keyword && !matchStr.includes(keyword)) return;
+
+        filteredCount++;
+        let totalKrt = (item.items || []).reduce((sum, i) => sum + Number(i.qty || 0), 0);
+        let jumlahItem = (item.items || []).length;
+
+        html += `
+            <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-xs space-y-2">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <!-- Kontainer Flex untuk Badge Tanggal dan Badge Tipe Sejajar -->
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <span class="bg-slate-100 text-slate-600 text-[9px] font-bold px-2 py-0.5 rounded border border-slate-200">${item.tanggal}</span>
+                            <span class="bg-amber-100 text-amber-700 text-[9px] font-black px-1.5 py-0.5 rounded uppercase">${item.tipe}</span>
+                        </div>
+                        <h4 class="font-black text-slate-800 text-xs mt-1.5">${item.buyer}</h4>
+                        <p class="text-[10px] text-slate-500">${item.tujuan}</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="bg-orange-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full">${totalKrt} KRT</span>
+                    </div>
+                </div>
+                <div class="flex justify-between items-center pt-2 border-t border-slate-100 text-[11px]">
+                    <span class="text-slate-500 font-medium">Item: <strong class="text-slate-700">${jumlahItem} jenis barang</strong></span>
+                    <div class="flex gap-1">
+                        <button onclick="hapusRiwayatCeklist('${id}')" class="px-2 py-1 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg text-[10px] font-bold transition">Hapus</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    if (countBadge) countBadge.innerText = filteredCount;
+
+    container.innerHTML = html || `<div class="text-center py-10 text-slate-400 text-xs italic">Data tidak ditemukan.</div>`;
+}
+
+async function hapusRiwayatCeklist(id) {
+    if (!confirm('Yakin ingin menghapus riwayat ceklist ini?')) return;
+    try {
+        await firebase.database().ref(`barang_export/riwayat_ceklist/${id}`).remove();
+        delete riwayatCeklistData[id];
+        renderRiwayatCeklist();
+    } catch (err) {
+        console.error("Gagal menghapus data:", err);
+        miuiAlert('Gagal menghapus data.');
+    }
+}
+
+
+// ==========================================
+// FUNGSI CETAK CEKLIST MUATAN EKSPOR (2 BLOK: ATAS & BAWAH DALAM 1 LEMBAR)
+// ==========================================
+window.cetakCeklistExportEkspor = function(dataCeklist) {
+    if (!dataCeklist || !dataCeklist.items || dataCeklist.items.length === 0) {
+        if (typeof miuiAlert === 'function') miuiAlert("Belum ada item barang untuk dicetak!");
+        else alert("Belum ada item barang untuk dicetak!");
+        return;
+    }
+
+    const headerTitle = "CHECKLIST MUATAN EKSPOR";
+    const nowFormatted = new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'medium' });
+    const logoUrl = "https://raw.githubusercontent.com/komputerwh2-svg/warelogos.github.io/main/uth.png";
+
+    const buyerText = dataCeklist.buyer || '-';
+    const tujuanText = dataCeklist.tujuan || '-';
+    const tanggalMuat = dataCeklist.tanggal || '-';
+    const kategoriTipe = dataCeklist.tipe || 'MEXA';
+
+    // Urutkan item berdasarkan kode secara alfanumerik (A-Z)
+    let sortedItems = [...dataCeklist.items].sort((a, b) => {
+        let kodeA = (a.kode || '').toUpperCase();
+        let kodeB = (b.kode || '').toUpperCase();
+        return kodeA.localeCompare(kodeB, undefined, { numeric: true, sensitivity: 'base' });
+    });
+
+    let rowsHtml = '';
+    let totalKrtAll = 0;
+
+    sortedItems.forEach((item, idx) => {
+        const qtyVal = Number(item.qty || 0);
+        totalKrtAll += qtyVal;
+
+        rowsHtml += `
+            <tr style="border-bottom: 1px solid #94a3b8; font-size: 8.5pt;">
+                <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center; width: 25px;">${idx + 1}</td>
+                <td style="border-right: 1px solid #000; padding: 1px 4px; font-weight: bold; font-family: Trebuchet MS;">${item.kode}</td>
+                <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center; width: 22px;"></td>
+                <td style="border-right: 1px solid #000; padding: 1px 12px; text-align: center; width: 45px; font-weight: bold; font-family: Trebuchet MS;">${qtyVal}</td>
+                <td style="border-right: 1px solid #000; padding: 1px 4px; text-align: center; width: 70px; font-family: Trebuchet MS;">WH-2</td>
+                <td style="border-right: 1px solid #000; padding: 1px 2px;"></td>
+                <td style="padding: 1px 2px; width: 45px;"></td>
+            </tr>
+        `;
+    });
+
+    // Baris penyeimbang agar tinggi tabel pas di setengah halaman (misal 14 baris)
+    const minRows = 14;
+    for (let i = sortedItems.length; i < minRows; i++) {
+        rowsHtml += `
+            <tr style="border-bottom: 1px solid #cbd5e1; font-size: 8.5pt;">
+                <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center;"> </td>
+                <td style="border-right: 1px solid #000; padding: 1px 2px;"></td>
+                <td style="border-right: 1px solid #000; padding: 1px 2px;"></td>
+                <td style="border-right: 1px solid #000; padding: 1px 2px;"></td>
+                <td style="border-right: 1px solid #000; padding: 1px 2px;"></td>
+                <td style="border-right: 1px solid #000; padding: 1px 2px;"></td>
+                <td style="padding: 1px 2px;"></td>
+            </tr>
+        `;
+    }
+
+    // Hitung rekap kelompok barang standar
+    let r = { 'DIY': 0, 'MTR/PDR': 0, 'CRR/THR': 0, 'MRR/CRR EA': 0, 'MRR EA': 0, 'MOR/MOB': 0, 'MP/LTGR/MTGR': 0, 'MJR': 0 };
+    sortedItems.forEach(item => {
+        const kelompok = typeof hitungKelompokKodeBarang === 'function' ? hitungKelompokKodeBarang(item.kode) : 'Lainnya';
+        let qty = Number(item.qty || 0);
+        const isDiyItem = (kelompok === 'DIY');
+        const rKey = isDiyItem ? 'DIY' : kelompok;
+        if (r.hasOwnProperty(rKey)) r[rKey] += qty;
+    });
+
+    // Template HTML bagian tunggal (Blok)
+    const renderSingleBlockHtml = () => `
+        <div class="ceklist-block">
+            <!-- KOP SURAT -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #000; padding-bottom: 2px; margin-bottom: 3px;">
+                <div style="width: 100px;"><img src="${logoUrl}" style="height: 22px; object-fit: contain;"></div>
+                <h2 style="font-size: 11pt; font-weight: 900; text-transform: uppercase; margin: 0; text-align: center; flex-grow: 1; letter-spacing: 0.5px;">${headerTitle} (${kategoriTipe})</h2>
+                <div style="width: 120px; text-align: right; font-size: 5pt; font-family: monospace;">print : ${nowFormatted}</div>
+            </div>
+
+            <!-- INFORMASI HEADER (BUYER & TUJUAN) -->
+            <table style="border: 1px solid #000; font-size: 8.5pt; margin-bottom: 3px; border-collapse: collapse;">
+                <tr>
+                    <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 2px 5px; width: 50%;">
+                        <span style="font-family: Century Gothic; font-weight: bold;">Tanggal Muat :</span> ${tanggalMuat}
+                    </td>
+                    <td style="border-bottom: 1px solid #000; padding: 2px 5px;">
+                        <span style="font-family: Century Gothic; font-weight: bold;">Kategori :</span> ${kategoriTipe}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="border-right: 1px solid #000; padding: 2px 5px; vertical-align: top;">
+                        <div style="font-family: Century Gothic; font-size: 7.5pt; color: #555;">NAMA BUYER :</div>
+                        <div style="font-weight: bold; font-size: 9.5pt; font-family: Trebuchet MS;">${buyerText}</div>
+                    </td>
+                    <td style="padding: 2px 5px; vertical-align: top;">
+                        <div style="font-family: Century Gothic; font-size: 7.5pt; color: #555;">TUJUAN / ALAMAT :</div>
+                        <div style="font-weight: bold; font-size: 9.5pt; font-family: Trebuchet MS;">${tujuanText}</div>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- TABEL UTAMA ITEM -->
+            <table style="border: 1px solid #000; border-collapse: collapse;">
+                <thead>
+                    <tr style="background-color: #e6e6e6; text-align: center; font-size: 9.5pt; font-family: 'Trebuchet MS';">
+                        <th style="border: 1px solid #000; padding: 2px; width: 25px;">No</th>
+                        <th style="border: 1px solid #000; padding: 2px;">Kode Rasa</th>
+                        <th style="border: 1px solid #000; padding: 2px; width: 22px;">v</th>
+                        <th style="border: 1px solid #000; padding: 2px; width: 45px;">QTY</th>
+                        <th style="border: 1px solid #000; padding: 2px; width: 70px;">Gudang</th>
+                        <th style="border: 1px solid #000; padding: 2px;">Checklist</th>
+                        <th style="border: 1px solid #000; padding: 2px; width: 45px;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHtml}
+                </tbody>
+            </table>
+
+            <!-- REKAP & TTD BAWAH -->
+            <div style="border-top: 2px solid #000; font-family: 'Trebuchet MS', Arial, sans-serif; font-size: 8.5pt; margin-top: 2px;">
+                <table style="width: 100%; border-collapse: collapse; border-bottom: 1px solid #000;">
+                    <tr>
+                        <td style="width: 220px; border-right: 1px solid #000; padding: 2px 4px; vertical-align: top;">
+                            <div style="font-weight: bold; font-size: 8.5pt;">TOTAL CHECKLIST : ${totalKrtAll} KRT</div>
+                            <div style="font-size: 7.5pt; margin-top: 2px;">Total Titipan : -</div>
+                        </td>
+                        <td style="border-right: 1px solid #000; padding: 2px 3px; font-style: italic; font-size: 6.5pt; vertical-align: top; width: 140px; line-height: 1.1;">
+                            Barang telah dimuat & diperiksa bersama, setelah meninggalkan gudang sepenuhnya tanggung jawab driver.
+                        </td>
+                        <td style="border-right: 1px solid #000; padding: 2px; text-align: center; vertical-align: top;">
+                            <div style="font-weight: bold; margin-bottom: 15px; font-size: 7.5pt;">TTD Checker</div>
+                            <span style="border-top: 1px solid #000; display: inline-block; width: 85px;"></span>
+                        </td>
+                        <td style="padding: 2px; text-align: center; vertical-align: top;">
+                            <div style="font-weight: bold; margin-bottom: 15px; font-size: 7.5pt;">TTD Driver</div>
+                            <span style="border-top: 1px solid #000; display: inline-block; width: 85px;"></span>
+                        </td>
+                    </tr>
+                </table>
+                <div style="border-bottom: 1px solid #000;">
+                    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid #000; text-align: center; font-size: 7.5pt;">
+                        <div style="border-right: 1px solid #000; padding: 1px;">DIY = ${r['DIY'] > 0 ? r['DIY'] : '-'}</div>
+                        <div style="border-right: 1px solid #000; padding: 1px;">MRR/CRR EA = ${r['MRR/CRR EA'] > 0 ? r['MRR/CRR EA'] : '-'}</div>
+                        <div style="border-right: 1px solid #000; padding: 1px;">CRR/THR = ${r['CRR/THR'] > 0 ? r['CRR/THR'] : '-'}</div>
+                        <div style="padding: 1px;">MOR/MOB = ${r['MOR/MOB'] > 0 ? r['MOR/MOB'] : '-'}</div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); text-align: center; font-size: 7.5pt;">
+                        <div style="border-right: 1px solid #000; padding: 1px;">MTR/PDR = ${r['MTR/PDR'] > 0 ? r['MTR/PDR'] : '-'}</div>
+                        <div style="border-right: 1px solid #000; padding: 1px;">MRR EA = ${r['MRR EA'] > 0 ? r['MRR EA'] : '-'}</div>
+                        <div style="border-right: 1px solid #000; padding: 1px;">MJR = ${r['MJR'] > 0 ? r['MJR'] : '-'}</div>
+                        <div style="padding: 1px;">MP/LTGR/MTGR = ${r['MP/LTGR/MTGR'] > 0 ? r['MP/LTGR/MTGR'] : '-'}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const finalHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Cetak Ceklist Ekspor - ${buyerText}</title>
+            <style>
+                @page { 
+                    size: 215mm 330mm portrait; 
+                    margin: 4mm 5mm 4mm 5mm;
+                }
+                body { 
+                    font-family: 'Trebuchet MS', Arial, sans-serif; 
+                    font-size: 8.5pt; 
+                    color: #000; 
+                    margin: 0; 
+                    padding: 0; 
+                    background: #fff; 
+                    -webkit-print-color-adjust: exact;
+                }
+                .page { 
+                    display: flex; 
+                    flex-direction: column; 
+                    justify-content: space-between; 
+                    height: 320mm; 
+                    box-sizing: border-box; 
+                }
+                .ceklist-block {
+                    height: 156mm;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-between;
+                    box-sizing: border-box;
+                    padding-bottom: 2mm;
+                }
+                /* Garis putus-putus di tengah sebagai panduan potong kertas */
+                .divider-cut {
+                    border-top: 1px dashed #94a3b8;
+                    margin: 2mm 0;
+                    text-align: center;
+                    font-size: 6pt;
+                    color: #64748b;
+                    letter-spacing: 1px;
+                }
+                table { 
+                    width: 100%; 
+                    border-collapse: collapse; 
+                }
+            </style>
+        </head>
+        <body>
+            <div class="page">
+                ${renderSingleBlockHtml()}
+                <div class="divider-cut">✂ - - - - - - - - - - - - - - - - - - - - POTONG DISINI (SETENGAH LEMBAR) - - - - - - - - - - - - - - - - - - - - ✂</div>
+                ${renderSingleBlockHtml()}
+            </div>
+            <script>
+                window.onload = function() {
+                    setTimeout(function() { window.print(); }, 300);
+                };
+                window.onafterprint = function() { window.close(); };
+            </script>
+        </body>
+        </html>
+    `;
+
+    const win = window.open("", "_blank");
+    if (win) {
+        win.document.write(finalHtml);
+        win.document.close();
+    } else {
+        if (typeof miuiAlert === 'function') miuiAlert("Pop-up diblokir oleh browser!");
+        else alert("Pop-up diblokir oleh browser!");
     }
 };
