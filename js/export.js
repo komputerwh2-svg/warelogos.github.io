@@ -1783,8 +1783,13 @@ function renderRiwayatCeklist() {
                 </div>
                 <div class="flex justify-between items-center pt-2 border-t border-slate-100 text-[11px]">
                     <span class="text-slate-500 font-medium">Item: <strong class="text-slate-700">${jumlahItem} jenis barang</strong></span>
-                    <div class="flex gap-1">
-                        <button onclick="hapusRiwayatCeklist('${id}')" class="px-2 py-1 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg text-[10px] font-bold transition">Hapus</button>
+                    <div class="flex gap-2">
+                        <button onclick="hapusRiwayatCeklist('${id}')" class="bg-rose-600 hover:bg-rose-700 text-white font-bold py-1.5 px-3 rounded text-xs">
+                            <i class="fa-solid fa-trash"></i> Hapus
+                        </button>
+                        <button onclick="testCetakCeklistLangsung()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-3 rounded text-xs">
+                            <i class="fa-solid fa-print"></i> Cetak
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1808,9 +1813,28 @@ async function hapusRiwayatCeklist(id) {
     }
 }
 
+window.testCetakCeklistLangsung = function() {
+    firebase.database().ref('barang_export/riwayat_ceklist').limitToLast(1).once('value').then(snap => {
+        const dataObj = snap.val();
+        if (!dataObj) {
+            miuiAlert("Belum ada data riwayat ceklist tersimpan di Firebase!");
+            return;
+        }
+        const firstKey = Object.keys(dataObj)[0];
+        const dataCeklist = dataObj[firstKey];
+        
+        // Panggil fungsi cetak ceklist setengah lembar
+        if (typeof window.cetakCeklistExportEkspor === 'function') {
+            window.cetakCeklistExportEkspor(dataCeklist);
+        } else {
+            miuiAlert("Fungsi cetak ceklist belum dimuat!");
+        }
+    });
+};
+
 
 // ==========================================
-// FUNGSI CETAK CEKLIST MUATAN EKSPOR (2 BLOK: ATAS & BAWAH DALAM 1 LEMBAR)
+// FUNGSI CETAK CEKLIST MUATAN EKSPOR (DENGAN KETERANGAN LENGKAP KATEGORI)
 // ==========================================
 window.cetakCeklistExportEkspor = function(dataCeklist) {
     if (!dataCeklist || !dataCeklist.items || dataCeklist.items.length === 0) {
@@ -1825,8 +1849,16 @@ window.cetakCeklistExportEkspor = function(dataCeklist) {
 
     const buyerText = dataCeklist.buyer || '-';
     const tujuanText = dataCeklist.tujuan || '-';
-    const tanggalMuat = dataCeklist.tanggal || '-';
-    const kategoriTipe = dataCeklist.tipe || 'MEXA';
+    const buyerTujuanStr = `${buyerText} - ${tujuanText}`;
+    
+    // Tentukan keterangan lengkap berdasarkan kode tipe
+    const rawTipe = (dataCeklist.tipe || 'MEXA').toUpperCase();
+    let kategoriTipeFormatted = rawTipe;
+    if (rawTipe === 'MEXA') {
+        kategoriTipeFormatted = 'MEXA (MARIMAS EXPORT)';
+    } else if (rawTipe === 'PUXR') {
+        kategoriTipeFormatted = 'PUXR (POP UP EXPORT)';
+    }
 
     // Urutkan item berdasarkan kode secara alfanumerik (A-Z)
     let sortedItems = [...dataCeklist.items].sort((a, b) => {
@@ -1843,72 +1875,118 @@ window.cetakCeklistExportEkspor = function(dataCeklist) {
         totalKrtAll += qtyVal;
 
         rowsHtml += `
-            <tr style="border-bottom: 1px solid #94a3b8; font-size: 8.5pt;">
-                <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center; width: 25px;">${idx + 1}</td>
-                <td style="border-right: 1px solid #000; padding: 1px 4px; font-weight: bold; font-family: Trebuchet MS;">${item.kode}</td>
-                <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center; width: 22px;"></td>
-                <td style="border-right: 1px solid #000; padding: 1px 12px; text-align: center; width: 45px; font-weight: bold; font-family: Trebuchet MS;">${qtyVal}</td>
-                <td style="border-right: 1px solid #000; padding: 1px 4px; text-align: center; width: 70px; font-family: Trebuchet MS;">WH-2</td>
-                <td style="border-right: 1px solid #000; padding: 1px 2px;"></td>
-                <td style="padding: 1px 2px; width: 45px;"></td>
+            <tr style="border-bottom: 1px solid #94a3b8; font-size: 8pt;">
+                <td style="border-right: 1px solid #000; padding: 1.5px 2px; text-align: center; width: 25px;">${idx + 1}</td>
+                <td style="border-right: 1px solid #000; padding: 1.5px 4px; font-weight: bold; font-family: Trebuchet MS;">${item.kode}</td>
+                <td style="border-right: 1px solid #000; padding: 1.5px 2px; text-align: center; width: 20px;"></td>
+                <td style="border-right: 1px solid #000; padding: 1.5px 8px; text-align: center; width: 45px; font-weight: bold; font-family: Trebuchet MS;">${qtyVal}</td>
+                <td style="border-right: 1px solid #000; padding: 1.5px 4px; text-align: center; width: 65px; font-family: Trebuchet MS;">WH-2</td>
+                <td style="border-right: 1px solid #000; padding: 1.5px 2px;"></td>
+                <td style="padding: 1.5px 2px; width: 45px;"></td>
             </tr>
         `;
     });
 
-    // Baris penyeimbang agar tinggi tabel pas di setengah halaman (misal 14 baris)
-    const minRows = 14;
+    // Batasi baris kosong minimal 9 baris agar tabel pas
+    const minRows = 9;
     for (let i = sortedItems.length; i < minRows; i++) {
         rowsHtml += `
-            <tr style="border-bottom: 1px solid #cbd5e1; font-size: 8.5pt;">
-                <td style="border-right: 1px solid #000; padding: 1px 2px; text-align: center;"> </td>
-                <td style="border-right: 1px solid #000; padding: 1px 2px;"></td>
-                <td style="border-right: 1px solid #000; padding: 1px 2px;"></td>
-                <td style="border-right: 1px solid #000; padding: 1px 2px;"></td>
-                <td style="border-right: 1px solid #000; padding: 1px 2px;"></td>
-                <td style="border-right: 1px solid #000; padding: 1px 2px;"></td>
-                <td style="padding: 1px 2px;"></td>
+            <tr style="border-bottom: 1px solid #cbd5e1; font-size: 8pt;">
+                <td style="border-right: 1px solid #000; padding: 1.5px 2px; text-align: center;"> </td>
+                <td style="border-right: 1px solid #000; padding: 1.5px 2px;"></td>
+                <td style="border-right: 1px solid #000; padding: 1.5px 2px;"></td>
+                <td style="border-right: 1px solid #000; padding: 1.5px 2px;"></td>
+                <td style="border-right: 1px solid #000; padding: 1.5px 2px;"></td>
+                <td style="border-right: 1px solid #000; padding: 1.5px 2px;"></td>
+                <td style="padding: 1.5px 2px;"></td>
             </tr>
         `;
     }
 
-    // Hitung rekap kelompok barang standar
-    let r = { 'DIY': 0, 'MTR/PDR': 0, 'CRR/THR': 0, 'MRR/CRR EA': 0, 'MRR EA': 0, 'MOR/MOB': 0, 'MP/LTGR/MTGR': 0, 'MJR': 0 };
-    sortedItems.forEach(item => {
-        const kelompok = typeof hitungKelompokKodeBarang === 'function' ? hitungKelompokKodeBarang(item.kode) : 'Lainnya';
-        let qty = Number(item.qty || 0);
-        const isDiyItem = (kelompok === 'DIY');
-        const rKey = isDiyItem ? 'DIY' : kelompok;
-        if (r.hasOwnProperty(rKey)) r[rKey] += qty;
-    });
-
-    // Template HTML bagian tunggal (Blok)
     const renderSingleBlockHtml = () => `
         <div class="ceklist-block">
             <!-- KOP SURAT -->
             <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #000; padding-bottom: 2px; margin-bottom: 3px;">
-                <div style="width: 100px;"><img src="${logoUrl}" style="height: 22px; object-fit: contain;"></div>
-                <h2 style="font-size: 11pt; font-weight: 900; text-transform: uppercase; margin: 0; text-align: center; flex-grow: 1; letter-spacing: 0.5px;">${headerTitle} (${kategoriTipe})</h2>
-                <div style="width: 120px; text-align: right; font-size: 5pt; font-family: monospace;">print : ${nowFormatted}</div>
+                <div style="width: 90px;"><img src="${logoUrl}" style="height: 20px; object-fit: contain;"></div>
+                <h2 style="font-size: 10pt; font-weight: 900; text-transform: uppercase; margin: 0; text-align: center; flex-grow: 1; letter-spacing: 0.5px;">${headerTitle}</h2>
+                <div style="width: 120px; text-align: right; font-size: 5pt; font-family: monospace;">print date : ${nowFormatted}</div>
             </div>
 
-            <!-- INFORMASI HEADER (BUYER & TUJUAN) -->
-            <table style="border: 1px solid #000; font-size: 8.5pt; margin-bottom: 3px; border-collapse: collapse;">
+            <!-- INFORMASI HEADER -->
+            <table style="border: 1px solid #000; font-size: 8pt; margin-bottom: 3px; border-collapse: collapse; width: 100%;">
                 <tr>
-                    <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 2px 5px; width: 50%;">
-                        <span style="font-family: Century Gothic; font-weight: bold;">Tanggal Muat :</span> ${tanggalMuat}
+                    <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 2px 4px; width: 50%;">
+                        <div style="display: flex;">
+                            <span style="width: 100px; display: inline-block; font-family: Century Gothic;">Ekspedisi & Nopol</span>
+                            <span>: </span>
+                        </div>
                     </td>
-                    <td style="border-bottom: 1px solid #000; padding: 2px 5px;">
-                        <span style="font-family: Century Gothic; font-weight: bold;">Kategori :</span> ${kategoriTipe}
+                    <td style="border-bottom: 1px solid #000; padding: 0px;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="padding: 2px 4px; border: none;">
+                                    <div style="display: flex;">
+                                        <span style="width: 80px; display: inline-block; font-family: Century Gothic;">Tanggal Muat</span>
+                                        <span>: </span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
                     </td>
                 </tr>
                 <tr>
-                    <td style="border-right: 1px solid #000; padding: 2px 5px; vertical-align: top;">
-                        <div style="font-family: Century Gothic; font-size: 7.5pt; color: #555;">NAMA BUYER :</div>
-                        <div style="font-weight: bold; font-size: 9.5pt; font-family: Trebuchet MS;">${buyerText}</div>
+                    <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 2px 4px;">
+                        <div style="display: flex;">
+                            <span style="width: 100px; display: inline-block; font-family: Century Gothic;">Nama Driver</span>
+                            <span>: </span>
+                        </div>
                     </td>
-                    <td style="padding: 2px 5px; vertical-align: top;">
-                        <div style="font-family: Century Gothic; font-size: 7.5pt; color: #555;">TUJUAN / ALAMAT :</div>
-                        <div style="font-weight: bold; font-size: 9.5pt; font-family: Trebuchet MS;">${tujuanText}</div>
+                    <td style="border-bottom: 1px solid #000; padding: 0px;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="border-right: 1px solid #000; padding: 2px 4px; width: 50%; border: none;">
+                                    <div style="display: flex;">
+                                        <span style="width: 80px; display: inline-block; font-family: Century Gothic;">Jam Muat</span>
+                                        <span>: </span>
+                                    </div>
+                                </td>
+                                <td style="padding: 2px 4px; width: 50%; border: none;">
+                                    <div style="display: flex;">
+                                        <span style="width: 80px; display: inline-block; font-family: Century Gothic;">Jam Selesai</span>
+                                        <span>: </span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <!-- KIRI: NAMA BUYER & TUJUAN -->
+                    <td style="border-right: 1px solid #000; padding: 2px 4px; vertical-align: top;">
+                        <div style="font-family: Century Gothic; font-size: 7pt; color: #555; font-weight: bold;">NAMA BUYER & TUJUAN :</div>
+                        <div style="font-weight: bold; font-size: 8.5pt; font-family: Trebuchet MS; margin-top: 1px;">${buyerTujuanStr}</div>
+                    </td>
+                    <!-- KANAN: KATEGORI DENGAN KETERANGAN LENGKAP & CHECK -->
+                    <td style="padding: 0px; vertical-align: top;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 2px 4px; width: 50%; border-top: none; border-left: none; font-family: Century Gothic; font-size: 7pt;">
+                                    Driver Check      :   Ya    Tidak
+                                </td>
+                                <td style="border-bottom: 1px solid #000; padding: 2px 4px; width: 50%; border-top: none; border-left: none; border-right: none; font-family: Century Gothic; font-size: 7pt;">
+                                    <div style="display: flex;">
+                                        <span style="width: 80px; display: inline-block;  font-family: Century Gothic;">Muat Pintu</span>
+                                        <span>: </span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="2" style="padding: 2px 4px; border: none;">
+                                    <div style="font-family: Century Gothic; font-size: 7pt; color: #555; font-weight: bold;">KODE EXPORT :</div>
+                                    <div style="font-weight: bold; font-size: 8.5pt; font-family: Trebuchet MS;">${kategoriTipeFormatted}</div>
+                                </td>
+                            </tr>
+                        </table>
                     </td>
                 </tr>
             </table>
@@ -1916,12 +1994,12 @@ window.cetakCeklistExportEkspor = function(dataCeklist) {
             <!-- TABEL UTAMA ITEM -->
             <table style="border: 1px solid #000; border-collapse: collapse;">
                 <thead>
-                    <tr style="background-color: #e6e6e6; text-align: center; font-size: 9.5pt; font-family: 'Trebuchet MS';">
+                    <tr style="background-color: #e6e6e6; text-align: center; font-size: 8.5pt; font-family: 'Trebuchet MS';">
                         <th style="border: 1px solid #000; padding: 2px; width: 25px;">No</th>
                         <th style="border: 1px solid #000; padding: 2px;">Kode Rasa</th>
-                        <th style="border: 1px solid #000; padding: 2px; width: 22px;">v</th>
+                        <th style="border: 1px solid #000; padding: 2px; width: 20px;">v</th>
                         <th style="border: 1px solid #000; padding: 2px; width: 45px;">QTY</th>
-                        <th style="border: 1px solid #000; padding: 2px; width: 70px;">Gudang</th>
+                        <th style="border: 1px solid #000; padding: 2px; width: 65px;">Gudang</th>
                         <th style="border: 1px solid #000; padding: 2px;">Checklist</th>
                         <th style="border: 1px solid #000; padding: 2px; width: 45px;">Total</th>
                     </tr>
@@ -1932,40 +2010,31 @@ window.cetakCeklistExportEkspor = function(dataCeklist) {
             </table>
 
             <!-- REKAP & TTD BAWAH -->
-            <div style="border-top: 2px solid #000; font-family: 'Trebuchet MS', Arial, sans-serif; font-size: 8.5pt; margin-top: 2px;">
-                <table style="width: 100%; border-collapse: collapse; border-bottom: 1px solid #000;">
+            <div style="border-top: 2px solid #000; border-bottom: 2px solid #000; font-family: 'Trebuchet MS', Arial, sans-serif; font-size: 8pt; margin-top: 3px;">
+                <table style="width: 100%; border-collapse: collapse;">
                     <tr>
-                        <td style="width: 220px; border-right: 1px solid #000; padding: 2px 4px; vertical-align: top;">
-                            <div style="font-weight: bold; font-size: 8.5pt;">TOTAL CHECKLIST : ${totalKrtAll} KRT</div>
-                            <div style="font-size: 7.5pt; margin-top: 2px;">Total Titipan : -</div>
+                        <td style="width: 170px; border-right: 1px solid #000; padding: 6px 4px; vertical-align: top;">
+                            <div style="font-weight: bold; font-size: 8pt;">TOTAL CHECKLIST</div>
+                            <div style="font-weight: bold; font-size: 10pt; text-decoration: underline; margin-top: 2px;">${totalKrtAll} KRT</div>
                         </td>
-                        <td style="border-right: 1px solid #000; padding: 2px 3px; font-style: italic; font-size: 6.5pt; vertical-align: top; width: 140px; line-height: 1.1;">
-                            Barang telah dimuat & diperiksa bersama, setelah meninggalkan gudang sepenuhnya tanggung jawab driver.
+                        <td style="border-right: 1px solid #000; padding: 6px 4px; font-style: italic; font-size: 6.5pt; vertical-align: top; width: 150px; line-height: 1.1;">
+                            Barang yang telah dimuat di armada dan diperiksa bersama, setelah meninggalkan gudang sepenuhnya menjadi tanggung jawab driver.
                         </td>
-                        <td style="border-right: 1px solid #000; padding: 2px; text-align: center; vertical-align: top;">
-                            <div style="font-weight: bold; margin-bottom: 15px; font-size: 7.5pt;">TTD Checker</div>
-                            <span style="border-top: 1px solid #000; display: inline-block; width: 85px;"></span>
+                        <td style="border-right: 1px solid #000; padding: 6px 2px; text-align: center; vertical-align: top;">
+                            <div style="font-weight: bold; margin-bottom: 22px; font-size: 7.5pt;">TTD Checker</div>
+                            <span style="border-top: 1px solid #000; display: inline-block; width: 75px;"></span>
                         </td>
-                        <td style="padding: 2px; text-align: center; vertical-align: top;">
-                            <div style="font-weight: bold; margin-bottom: 15px; font-size: 7.5pt;">TTD Driver</div>
-                            <span style="border-top: 1px solid #000; display: inline-block; width: 85px;"></span>
+                        <td style="padding: 6px 2px; text-align: center; vertical-align: top;">
+                            <div style="font-weight: bold; margin-bottom: 22px; font-size: 7.5pt;">TTD Driver</div>
+                            <span style="border-top: 1px solid #000; display: inline-block; width: 75px;"></span>
                         </td>
                     </tr>
                 </table>
-                <div style="border-bottom: 1px solid #000;">
-                    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid #000; text-align: center; font-size: 7.5pt;">
-                        <div style="border-right: 1px solid #000; padding: 1px;">DIY = ${r['DIY'] > 0 ? r['DIY'] : '-'}</div>
-                        <div style="border-right: 1px solid #000; padding: 1px;">MRR/CRR EA = ${r['MRR/CRR EA'] > 0 ? r['MRR/CRR EA'] : '-'}</div>
-                        <div style="border-right: 1px solid #000; padding: 1px;">CRR/THR = ${r['CRR/THR'] > 0 ? r['CRR/THR'] : '-'}</div>
-                        <div style="padding: 1px;">MOR/MOB = ${r['MOR/MOB'] > 0 ? r['MOR/MOB'] : '-'}</div>
-                    </div>
-                    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); text-align: center; font-size: 7.5pt;">
-                        <div style="border-right: 1px solid #000; padding: 1px;">MTR/PDR = ${r['MTR/PDR'] > 0 ? r['MTR/PDR'] : '-'}</div>
-                        <div style="border-right: 1px solid #000; padding: 1px;">MRR EA = ${r['MRR EA'] > 0 ? r['MRR EA'] : '-'}</div>
-                        <div style="border-right: 1px solid #000; padding: 1px;">MJR = ${r['MJR'] > 0 ? r['MJR'] : '-'}</div>
-                        <div style="padding: 1px;">MP/LTGR/MTGR = ${r['MP/LTGR/MTGR'] > 0 ? r['MP/LTGR/MTGR'] : '-'}</div>
-                    </div>
-                </div>
+            </div>
+
+            <!-- NOMOR FORM DI BAWAH TABEL -->
+            <div style="font-size: 7.5pt; font-family: Arial, sans-serif; margin-top: 2px; color: #333;">
+                <span>No. Form : 25.UM/05-02-25/01/0</span>
             </div>
         </div>
     `;
@@ -1982,7 +2051,7 @@ window.cetakCeklistExportEkspor = function(dataCeklist) {
                 }
                 body { 
                     font-family: 'Trebuchet MS', Arial, sans-serif; 
-                    font-size: 8.5pt; 
+                    font-size: 8pt; 
                     color: #000; 
                     margin: 0; 
                     padding: 0; 
@@ -1993,23 +2062,21 @@ window.cetakCeklistExportEkspor = function(dataCeklist) {
                     display: flex; 
                     flex-direction: column; 
                     justify-content: space-between; 
-                    height: 320mm; 
+                    height: 318mm; 
                     box-sizing: border-box; 
                 }
                 .ceklist-block {
-                    height: 156mm;
+                    height: 153mm;
                     display: flex;
                     flex-direction: column;
-                    justify-content: space-between;
+                    justify-content: flex-start;
                     box-sizing: border-box;
-                    padding-bottom: 2mm;
                 }
-                /* Garis putus-putus di tengah sebagai panduan potong kertas */
                 .divider-cut {
-                    border-top: 1px dashed #94a3b8;
-                    margin: 2mm 0;
+                    border-top: 1px dashed #64748b;
+                    margin: 1mm 0;
                     text-align: center;
-                    font-size: 6pt;
+                    font-size: 5pt;
                     color: #64748b;
                     letter-spacing: 1px;
                 }
@@ -2022,7 +2089,7 @@ window.cetakCeklistExportEkspor = function(dataCeklist) {
         <body>
             <div class="page">
                 ${renderSingleBlockHtml()}
-                <div class="divider-cut">✂ - - - - - - - - - - - - - - - - - - - - POTONG DISINI (SETENGAH LEMBAR) - - - - - - - - - - - - - - - - - - - - ✂</div>
+                <div class="divider-cut">✂ - - - - - - - - - - - - - - - - - - - -[ POTONG DISINI ]- - - - - - - - - - - - - - - - - - - - ✂</div>
                 ${renderSingleBlockHtml()}
             </div>
             <script>
