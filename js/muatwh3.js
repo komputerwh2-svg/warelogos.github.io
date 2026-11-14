@@ -1668,13 +1668,40 @@ window.prosesOtomatisStok = async function() {
             const qtyUtuhan = parseInt(itemStok.utuhan) || 0;
             const totalStok = qtyBeceran + qtyUtuhan;
 
-            // C. Format Rak Ambil
+            // C. Format Rak Ambil (Mencocokkan beceran_rak dan beceran_qty_teks dengan presisi)
             const detail = itemStok.detail_rak || {};
-            const formatRak = (str) => str ? str.replace(/(\d+)([A-Za-z]+)(\d+)/g, "$1 $2 $3") : "-";
-            const rakBeceran = formatRak(detail.beceran_rak || "");
-            const beceranDisplay = (rakBeceran !== "-") ? `${rakBeceran} = ${qtyBeceran}` : "";
-            const utuhanFormatted = detail.utuhan_rak ? detail.utuhan_rak.split('+').map(part => formatRak(part.trim())).join(' + ') : "";
-            const rakAmbil = `${beceranDisplay}${utuhanFormatted ? (beceranDisplay ? ' + ' : '') + utuhanFormatted : ''}`;
+            const formatRak = (str) => str ? str.replace(/(\d+)([A-Za-z]+)(\d+)/g, "$1 $2 $3").trim() : "";
+
+            let rakPartsList = [];
+
+            if (detail.beceran_rak && detail.beceran_qty_teks) {
+                // Pecah rak dan qty berdasarkan tanda '+'
+                let rakArray = detail.beceran_rak.split('+').map(r => formatRak(r));
+                let qtyArray = detail.beceran_qty_teks.split('+').map(q => q.trim());
+
+                // Gabungkan masing-masing rak dengan kuantitinya
+                for (let i = 0; i < rakArray.length; i++) {
+                    let r = rakArray[i];
+                    let q = qtyArray[i] || "";
+                    if (r && q) {
+                        rakPartsList.push(`${r} = ${q}`);
+                    } else if (r) {
+                        rakPartsList.push(r);
+                    }
+                }
+            } else if (detail.beceran_rak) {
+                rakPartsList.push(`${formatRak(detail.beceran_rak)} = ${qtyBeceran}`);
+            }
+
+            // Tangani juga jika ada utuhan_rak
+            if (detail.utuhan_rak) {
+                let utuhanArray = detail.utuhan_rak.split('+').map(u => formatRak(u.trim()));
+                utuhanArray.forEach(u => {
+                    if (u) rakPartsList.push(u);
+                });
+            }
+
+            const rakAmbil = rakPartsList.length > 0 ? rakPartsList.join(' + ') : "-";
 
             // F. PROSES AMBIL BLOK & EXP BLOK (Sama seperti sebelumnya)
             let ambilBlokArr = [];
@@ -3105,45 +3132,48 @@ window.cetakDokumenVersi2 = async function(tglMuat) {
     //    (typeof miuiAlert !== 'undefined') ? miuiAlert("Gagal membuka jendela cetak.") : alert("Gagal membuka jendela cetak.");
     //}
 
+
+
     // 3. Kirim ke Print Server (Versi Dokumen v2)
-    try {
-        const now = new Date();
-        
-        // Nama Hari
-        const daftarHari = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-        const hari = daftarHari[now.getDay()];
-        
-        // Format tanggal dan jam
-        const tgl = String(now.getDate()).padStart(2, '0');
-        const bln = String(now.getMonth() + 1).padStart(2, '0');
-        const thn = now.getFullYear();
-        const jam = String(now.getHours()).padStart(2, '0');
-        const menit = String(now.getMinutes()).padStart(2, '0');
-        const detik = String(now.getSeconds()).padStart(2, '0');
-        
-        // String untuk tampilan
-        const formatWaktuLengkap = `${hari} / ${tgl}-${bln}-${thn} / ${jam}.${menit}.${detik}`;
-        const judulTugas = "Cetak Dokumen v2";
+        try {
+            const now = new Date();
+            
+            // Nama Hari
+            const daftarHari = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+            const hari = daftarHari[now.getDay()];
+            
+            // Format tanggal dan jam
+            const tgl = String(now.getDate()).padStart(2, '0');
+            const bln = String(now.getMonth() + 1).padStart(2, '0');
+            const thn = now.getFullYear();
+            const jam = String(now.getHours()).padStart(2, '0');
+            const menit = String(now.getMinutes()).padStart(2, '0');
+            const detik = String(now.getSeconds()).padStart(2, '0');
+            
+            // String untuk tampilan
+            const formatWaktuLengkap = `${hari} / ${tgl}-${bln}-${thn} / ${jam}.${menit}.${detik}`;
+            const judulTugas = "Cetak Dokumen v2";
 
-        // Kunci URL yang aman dari karakter terlarang (menggunakan underscore/strip)
-        const safeKeyName = `Cetak_Dokumen_v2_${tgl}-${bln}-${thn}_${jam}-${menit}-${detik}`;
+            // Kunci URL yang aman dari karakter terlarang (menggunakan underscore/strip)
+            const safeKeyName = `Cetak_Dokumen_v2_${tgl}-${bln}-${thn}_${jam}-${menit}-${detik}`;
 
-        await fetch(`https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs/${safeKeyName}.json`, {
-            method: 'PUT',
-            body: JSON.stringify({ 
-                judul: judulTugas,
-                waktu_teks: formatWaktuLengkap,
-                html: finalHtml, 
-                status: 'PENDING',
-                timestamp: Date.now() 
-            }),
-            headers: { 'Content-Type': 'application/json' }
-        });
-        
-        miuiAlert("Perintah cetak dokumen v2 dikirim.");
-    } catch (e) {
-        miuiAlert("Gagal cetak: " + e.message);
-    }
+            await fetch(`https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/print_jobs/${safeKeyName}.json`, {
+                method: 'PUT',
+                body: JSON.stringify({ 
+                    judul: judulTugas,
+                    waktu_teks: formatWaktuLengkap,
+                    html: finalHtml, 
+                    status: 'PENDING',
+                    timestamp: Date.now() 
+                }),
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            miuiAlert("Perintah cetak dokumen v2 dikirim.");
+        } catch (e) {
+            miuiAlert("Gagal cetak: " + e.message);
+        }
+  
 };
 
 
