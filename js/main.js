@@ -2091,13 +2091,13 @@ window.openPktModal = async (modalId, selectId) => {
     const data = await res.json();
     const select = document.getElementById(selectId);
     
-    // Reset select dengan opsi default
     select.innerHTML = '<option value="-">- Pilih Tujuan -</option>';
     
     if (data) {
         Object.values(data).forEach(item => {
-            if(item.TUJUAN) {
-                select.innerHTML += `<option value="${item.TUJUAN}">${item.TUJUAN}</option>`;
+            // Menggunakan INISIAL sebagai value dan teks pilihan
+            if(item.INISIAL) {
+                select.innerHTML += `<option value="${item.INISIAL}">${item.INISIAL}</option>`;
             }
         });
     }
@@ -2258,12 +2258,11 @@ let masterTujuanData = [];
 let masterBarangData = [];
 
 window.openKlaimModal = async () => {
-    // 1. Fetch data tujuan (seperti sebelumnya)
+    // 1. Fetch data tujuan (Tampil lengkap)
     const res = await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/master_tujuan.json');
     const data = await res.json();
     const select = document.getElementById('tujuanKlaim');
     
-    // Simpan ke variabel global
     masterTujuanData = Object.values(data);
     
     select.innerHTML = '<option value="-">- Pilih Tujuan -</option>';
@@ -2273,15 +2272,13 @@ window.openKlaimModal = async () => {
         }
     });
 
-    // 2. Fetch data barang
+    // 2. Fetch data barang (Tampil lengkap KODE - NAMA BARANG)
     const resBarang = await fetch('https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/master_barang.json');
     const dataBarang = await resBarang.json();
 
-    // Filter hanya yang aktif dan Urutkan berdasarkan INISIAL
     masterBarangData = Object.values(dataBarang)
         .filter(item => item.IS_ACTIVE === true)
         .sort((a, b) => {
-            // Mengubah inisial menjadi string untuk memastikan perbandingan aman
             const inisialA = (a.INISIAL || "").toString().toLowerCase();
             const inisialB = (b.INISIAL || "").toString().toLowerCase();
             return inisialA.localeCompare(inisialB);
@@ -2299,12 +2296,18 @@ window.openKlaimModal = async () => {
     document.getElementById('klaimModal').classList.remove('hidden');
 };
 
-// Fungsi pengisi otomatis
+// Fungsi saat tujuan dipilih di dropdown Klaim (Hanya isi otomatis kolom Kota)
 window.isiAlamatOtomatis = () => {
-    const tujuanPilih = document.getElementById('tujuanKlaim').value;
+    const selectElement = document.getElementById('tujuanKlaim');
+    const selectedValue = selectElement.value; 
     const inputAlamat = document.getElementById('alamatKlaim');
     
-    const ditemukan = masterTujuanData.find(item => item.TUJUAN === tujuanPilih);
+    if (selectedValue === "-") {
+        inputAlamat.value = "";
+        return;
+    }
+
+    const ditemukan = masterTujuanData.find(item => item.TUJUAN === selectedValue);
     
     if (ditemukan) {
         inputAlamat.value = ditemukan.KOTA || "-";
@@ -2313,52 +2316,48 @@ window.isiAlamatOtomatis = () => {
     }
 };
 
-// Fungsi isi otomatis dan "membersihkan" tampilan
+// Fungsi isi otomatis nama barang tanpa mengubah/memotong tampilan dropdown
 window.isiBarangOtomatis = () => {
     const select = document.getElementById('kodeRasaKlaim');
     const inputNama = document.getElementById('namaBarangKlaim');
-    
     const selectedOption = select.options[select.selectedIndex];
     
     if (select.value !== "-") {
         inputNama.value = selectedOption.getAttribute('data-name');
-        
-        // TRIK: Kita ganti sementara teks option yang terpilih agar hanya menampilkan KODE
-        // Ini akan membuat dropdown terlihat hanya berisi KODE setelah dipilih
-        select.options[select.selectedIndex].text = select.value;
     } else {
         inputNama.value = "";
     }
 };
 
+// Fungsi Simpan: Di sinilah pemotongan nama depan tujuan dilakukan secara bersih
 window.simpanDataKlaim = async () => {
-    // 1. Ambil data dari form
-    const tujuan = document.getElementById('tujuanKlaim').value;
+    const tujuanLengkap = document.getElementById('tujuanKlaim').value;
+    
+    // Potong ambil nama depannya saja sebelum tanda '-' khusus untuk disimpan
+    const tujuan = tujuanLengkap !== "-" ? tujuanLengkap.split('-')[0].trim() : "-";
+    
     const kodeRasa = document.getElementById('kodeRasaKlaim').value;
     const alamat = document.getElementById('alamatKlaim').value;
     const ball = document.getElementById('qtyBall').value || "0";
     const renteng = document.getElementById('qtyRenteng').value || "0";
-    const namaBarang = document.getElementById('namaBarangKlaim').value; // Mengambil dari hidden input
+    const namaBarang = document.getElementById('namaBarangKlaim').value;
 
-    // 2. Validasi
     if (tujuan === "-" || kodeRasa === "-") {
         return miuiAlert("Mohon pilih Tujuan dan Kode Barang dengan benar!");
     }
 
-    // 3. Persiapan ID Unik: KLAIM_koderasa_tujuan_tgl_jam
     const now = new Date();
     const tgl = now.toISOString().split('T')[0].replace(/-/g, '');
     const timeId = now.getHours().toString().padStart(2, '0') + 
                    now.getMinutes().toString().padStart(2, '0') + 
                    now.getSeconds().toString().padStart(2, '0');
     
-    // Format tujuan untuk ID (hapus spasi agar rapi)
     const tujuanFormatted = tujuan.replace(/\s+/g, '_').toUpperCase();
     const uniqueId = `KLAIM_${kodeRasa}_${tujuanFormatted}_${tgl}_${timeId}`;
 
     const data = {
         jenis: "KLAIM",
-        tujuan: tujuan,
+        tujuan: tujuan, // Berisi nama depan yang bersih (misal: BERKAT BUDI BERSAMA)
         alamat: alamat,
         kodeBarang: kodeRasa,
         namaBarang: namaBarang,
@@ -2367,7 +2366,6 @@ window.simpanDataKlaim = async () => {
         timestamp: now.getTime()
     };
 
-    // 4. Simpan ke Firebase
     try {
         await fetch(`https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app/label_history/${uniqueId}.json`, {
             method: 'PUT',
@@ -2377,7 +2375,7 @@ window.simpanDataKlaim = async () => {
         
         miuiAlert("Data Klaim Tersimpan!");
         
-        // Reset form
+        // Reset form setelah simpan
         document.getElementById('tujuanKlaim').value = "-";
         document.getElementById('alamatKlaim').value = "";
         document.getElementById('kodeRasaKlaim').value = "-";
