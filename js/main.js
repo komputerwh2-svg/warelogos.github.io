@@ -2422,12 +2422,12 @@ window.cetakKlaimHariIni = async () => {
 
             pagesHtml += `
             <div style="border: 2px solid #000; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; height: 75mm; width: 200mm; padding: 5px;">
-                <div style="font-size: 45pt; font-family: Edo; line-height: 1;">${item.tujuan.toUpperCase()}</div>
-                <div style="font-size: 35pt; font-family: Edo; line-height: 1;">${item.alamat.toUpperCase()}</div>
+                <div style="font-size: 35pt; font-family: Edo; line-height: 1;">${item.tujuan.toUpperCase()}</div>
+                <div style="font-size: 45pt; font-family: Edo; line-height: 1;">${item.alamat.toUpperCase()}</div>
                 <div style="border-top: 2px dashed #000; width: 95%; margin: 8px 0;"></div>
                 <div style="font-size: 45pt; font-family: Edo; line-height: 1;">${item.kodeBarang} . ${qtyStr}</div>
                 <div style="border-top: 1px double #000; width: 95%; margin: 8px 0;"></div>
-                <div style="font-size: 30pt; font-family: Edo; line-height: 1;">${item.namaBarang.toUpperCase()}</div>
+                <div style="font-size: 28pt; font-family: Edo; line-height: 1;">${item.namaBarang.toUpperCase()}</div>
             </div>`;
         });
         
