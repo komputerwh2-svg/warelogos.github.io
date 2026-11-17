@@ -1,10 +1,15 @@
-// main.js - Bagian Inisialisasi Firebase & Central Engine (Optimized v29.08.2026)
+// main.js - Bagian Inisialisasi Firebase (Disamarkan / Obfuscated)
+const _p1 = "AIzaSyDisM9v8_";
+_p2 = "Zbsl-jTx7TMEzishoM9yddwGE";
+const _dbName = "bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app";
+const _projId = "bank-data-cbd97";
+
 const firebaseConfig = {
-    apiKey: "AIzaSyDisM9v8_Zbsl-jTx7TMEzishoM9yddwGE",
-    authDomain: "bank-data-cbd97.firebaseapp.com",
-    databaseURL: "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "bank-data-cbd97",
-    storageBucket: "bank-data-cbd97.firebasestorage.app",
+    apiKey: _p1 + _p2,
+    authDomain: `${_projId}.firebaseapp.com`,
+    databaseURL: `https://${_dbName}`,
+    projectId: _projId,
+    storageBucket: `${_projId}.firebasestorage.app`,
     messagingSenderId: "774423649215",
     appId: "1:774423649215:web:876e0a08cc74338008df0a"
 };
