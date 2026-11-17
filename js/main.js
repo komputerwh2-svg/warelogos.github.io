@@ -1,6 +1,6 @@
 // main.js - Bagian Inisialisasi Firebase (Disamarkan / Obfuscated)
 const _p1 = "AIzaSyDisM9v8_";
-_p2 = "Zbsl-jTx7TMEzishoM9yddwGE";
+const _p2 = "Zbsl-jTx7TMEzishoM9yddwGE";
 const _dbName = "bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app";
 const _projId = "bank-data-cbd97";
 
