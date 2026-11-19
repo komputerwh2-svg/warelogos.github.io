@@ -561,51 +561,35 @@ function renderListKlaimTemp() {
     `).join('');
 }
 
-// Kompres + Grayscale & Auto-Kontras untuk hasil cetak HP LaserJet yang tajam
-function prosesGambarKlaim(file, applyLaserjetMode = true, maxWidth = 1100, quality = 0.75) {
+// Kompres gambar berwarna berkualitas tinggi agar tetap jernih & hemat ukuran untuk RTDB
+function prosesGambarKlaim(file, applyLaserjetMode = false, maxWidth = 1440, quality = 0.83) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (ev) => {
             const img = new Image();
             img.onload = () => {
                 const scale = img.width > maxWidth ? maxWidth / img.width : 1;
+                const targetW = Math.max(1, Math.round(img.width * scale));
+                const targetH = Math.max(1, Math.round(img.height * scale));
+
                 const canvas = document.createElement('canvas');
-                canvas.width = Math.round(img.width * scale);
-                canvas.height = Math.round(img.height * scale);
+                canvas.width = targetW;
+                canvas.height = targetH;
+
                 const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(img, 0, 0, targetW, targetH);
 
-                if (applyLaserjetMode) {
-                    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    const px = imgData.data;
-
-                    // Hitung rata-rata luminansi untuk koreksi gelap/terang otomatis ringan
-                    let sumLum = 0;
-                    const totalPx = px.length / 4;
-                    for (let i = 0; i < px.length; i += 4) {
-                        const lum = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
-                        sumLum += lum;
-                    }
-                    const avgLum = totalPx > 0 ? sumLum / totalPx : 128;
-                    const brightnessShift = avgLum < 95 ? (115 - avgLum) * 0.75 : (avgLum > 180 ? (160 - avgLum) * 0.55 : 0);
-                    const contrast = 1.22;
-                    const factor = (259 * (contrast * 100 + 255)) / (255 * (259 - contrast * 100));
-
-                    for (let i = 0; i < px.length; i += 4) {
-                        let gray = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2] + brightnessShift;
-                        gray = factor * (gray - 128) + 128;
-                        gray = Math.max(0, Math.min(255, gray));
-                        px[i] = gray;
-                        px[i + 1] = gray;
-                        px[i + 2] = gray;
-                    }
-                    ctx.putImageData(imgData, 0, 0);
-                }
+                // Tetap pertahankan warna asli di aplikasi; grayscale diterapkan saat cetak
+                const mimeType = file && file.type === 'image/png' && !applyLaserjetMode
+                    ? 'image/jpeg'
+                    : 'image/jpeg';
 
                 resolve({
-                    nama: file.name || 'surat-klaim.jpg',
-                    grayscale: applyLaserjetMode,
-                    src: canvas.toDataURL('image/jpeg', quality)
+                    nama: file && file.name ? file.name : 'bukti-klaim.jpg',
+                    grayscale: false,
+                    src: canvas.toDataURL(mimeType, quality)
                 });
             };
             img.onerror = reject;
@@ -707,6 +691,7 @@ function renderViewerFotoAktif(statusText = '') {
     const isCctvSlide = isSlideObj && currentFoto.tipe === 'CCTV';
     const imgSrc = isSlideObj ? currentFoto.src : currentFoto;
     const imgNama = isSlideObj && currentFoto.nama ? currentFoto.nama : `Foto ${viewerFotoIndex + 1}`;
+    const slideFilterCss = isCctvSlide && currentFoto.filterCss ? currentFoto.filterCss : '';
 
     if (btnHapusFoto) {
         if (!isCctvSlide) btnHapusFoto.classList.remove('hidden');
@@ -722,6 +707,9 @@ function renderViewerFotoAktif(statusText = '') {
     img.draggable = false;
     img.className = 'w-full h-full object-contain bg-black select-none transition-transform duration-150';
     terapkanTransformGambar(img);
+    if (slideFilterCss) {
+        img.style.filter = slideFilterCss;
+    }
     slideWrap.appendChild(img);
 
     if (isCctvSlide) {
@@ -729,7 +717,8 @@ function renderViewerFotoAktif(statusText = '') {
             const zoomBox = document.createElement('div');
             zoomBox.className = 'w-24 h-20 sm:w-28 sm:h-24 bg-black border-2 border-white shadow-lg overflow-hidden pointer-events-none';
             zoomBox.style.cssText = `position:absolute; z-index:3; ${getPosCss(currentFoto.zoomPos || 'right-bottom')}`;
-            zoomBox.innerHTML = `<img src="${currentFoto.zoomCropSrc}" alt="Zoom Beceran" class="w-full h-full object-contain">`;
+            const zoomFilterAttr = slideFilterCss ? ` style="filter: ${slideFilterCss};"` : '';
+            zoomBox.innerHTML = `<img src="${currentFoto.zoomCropSrc}" alt="Zoom Beceran" class="w-full h-full object-contain"${zoomFilterAttr}>`;
             slideWrap.appendChild(zoomBox);
         }
 
@@ -1012,13 +1001,14 @@ function bangunDaftarSlideViewerKlaim(item) {
                 nama: `CCTV ${kodeLap} - ${fc.palet || `Foto ${fIdx + 1}`}`,
                 src: fc.src,
                 zoomCropSrc: fc.zoomCropSrc || '',
+                filterCss: getFotoFilterCss(fc, false),
                 notePos: fc.notePos || (hasZoom ? 'left-bottom' : 'right-bottom'),
                 zoomPos: fc.zoomPos || 'right-bottom',
                 catatan: {
                     tujuan: tujuanLap,
                     meta: baris2,
                     ekspedisi: ekspedisiLap,
-                    palet: fc.palet || `PALET KE-${fIdx + 1}`,
+                    palet: fc.palet || `PALET KE-${fIdx + 1}: `,
                     rumus: fc.rumus || '',
                     tambahan: fc.catatanTambahan || ''
                 }
@@ -1300,7 +1290,7 @@ window.bukaModalLaporanCctv = function(klaimId, kodeDipilih = '') {
             ? existingLap.fotos.map((f, idx) => ({
                 nama: f.nama || `CCTV-${idx + 1}.jpg`,
                 src: f.src,
-                palet: f.palet || `PALET KE-${idx + 1}`,
+                palet: f.palet || `PALET KE-${idx + 1}: `,
                 rumus: f.rumus || '',
                 catatanTambahan: f.catatanTambahan || '',
                 zoomCropSrc: f.zoomCropSrc || '',
@@ -1345,12 +1335,6 @@ window.bukaModalLaporanCctv = function(klaimId, kodeDipilih = '') {
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
                         <div>
-                            <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">Kode Barang</label>
-                            <select id="cctv-select-kode" onchange="gantiKodeLaporanCctv(this.value)" class="w-full p-2 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white uppercase">
-                                ${opsiKodeHtml}
-                            </select>
-                        </div>
-                        <div>
                             <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">No. DO / DN</label>
                             <input type="text" id="cctv-no-do" value="${escapeHtmlCctv(cctvEditorState.noDo)}" oninput="cctvEditorState.noDo = this.value.toUpperCase()" class="w-full p-2 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white uppercase">
                         </div>
@@ -1359,12 +1343,18 @@ window.bukaModalLaporanCctv = function(klaimId, kodeDipilih = '') {
                             <input type="text" id="cctv-tujuan" value="${escapeHtmlCctv(cctvEditorState.tujuan)}" oninput="cctvEditorState.tujuan = this.value.toUpperCase()" class="w-full p-2 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white uppercase">
                         </div>
                         <div>
-                            <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">Total DO</label>
-                            <input type="text" id="cctv-total-do" value="${escapeHtmlCctv(cctvEditorState.totalDo)}" oninput="cctvEditorState.totalDo = this.value.toUpperCase()" placeholder="Misal: 500 KARTON" class="w-full p-2 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white uppercase">
-                        </div>
-                        <div>
                             <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">Ekspedisi & Nopol</label>
                             <input type="text" id="cctv-ekspedisi-nopol" value="${escapeHtmlCctv(cctvEditorState.ekspedisiNopol)}" oninput="cctvEditorState.ekspedisiNopol = this.value.toUpperCase()" placeholder="SINAR INDAH - BE 8807 AUD" class="w-full p-2 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white uppercase">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">Kode Barang</label>
+                            <select id="cctv-select-kode" onchange="gantiKodeLaporanCctv(this.value)" class="w-full p-2 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white uppercase">
+                                ${opsiKodeHtml}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">Total DO</label>
+                            <input type="text" id="cctv-total-do" value="${escapeHtmlCctv(cctvEditorState.totalDo)}" oninput="cctvEditorState.totalDo = this.value.toUpperCase()" placeholder="Misal: 500 KARTON" class="w-full p-2 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white uppercase">
                         </div>
                     </div>
                 </div>
@@ -1395,7 +1385,7 @@ window.bukaModalLaporanCctv = function(klaimId, kodeDipilih = '') {
                         <i class="fa-solid fa-save mr-1"></i> Simpan Laporan CCTV
                     </button>
                     <button type="button" onclick="simpanLaporanCctvKeRtdb(true)" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-[11px] uppercase shadow">
-                        <i class="fa-solid fa-print mr-1"></i> Simpan & Cetak F4
+                        <i class="fa-solid fa-print mr-1"></i> Cetak Laporan Klaim
                     </button>
                 </div>
             </div>
@@ -1419,21 +1409,51 @@ window.gantiKodeLaporanCctv = function(kodeBaru) {
         : {};
     const existingLap = lapRoot[kodeBaru] || {};
 
+    // Ambil ekspedisi & nopol dari simpanan pertama (atau nilai aktif saat ini jika belum tersimpan)
+    let ekspedisiPertama = '';
+    const keysLap = Object.keys(lapRoot);
+    for (const k of keysLap) {
+        if (k === kodeBaru) continue;
+        const valExp = (lapRoot[k] && lapRoot[k].ekspedisi_nopol || '').trim();
+        if (valExp) {
+            ekspedisiPertama = valExp;
+            break;
+        }
+    }
+    if (!ekspedisiPertama) {
+        for (const k of keysLap) {
+            const valExp = (lapRoot[k] && lapRoot[k].ekspedisi_nopol || '').trim();
+            if (valExp) {
+                ekspedisiPertama = valExp;
+                break;
+            }
+        }
+    }
+    if (!ekspedisiPertama && (cctvEditorState.ekspedisiNopol || '').trim()) {
+        ekspedisiPertama = cctvEditorState.ekspedisiNopol.trim();
+    }
+
     cctvEditorState.kodeAktif = kodeBaru;
     cctvEditorState.tujuan = existingLap.tujuan || klaim.tujuan || '';
     cctvEditorState.noDo = existingLap.no_do || klaim.no_dn || '';
     cctvEditorState.totalDo = existingLap.total_do || '';
-    cctvEditorState.ekspedisiNopol = existingLap.ekspedisi_nopol || '';
+    cctvEditorState.ekspedisiNopol = existingLap.ekspedisi_nopol || ekspedisiPertama || '';
     cctvEditorState.fotos = Array.isArray(existingLap.fotos)
         ? existingLap.fotos.map((f, idx) => ({
             nama: f.nama || `CCTV-${idx + 1}.jpg`,
             src: f.src,
-            palet: f.palet || `PALET KE-${idx + 1}`,
+            palet: f.palet || `PALET KE-${idx + 1}: `,
             rumus: f.rumus || '',
             catatanTambahan: f.catatanTambahan || '',
             zoomCropSrc: f.zoomCropSrc || '',
             notePos: f.notePos || (f.zoomCropSrc ? 'left-bottom' : 'right-bottom'),
-            zoomPos: f.zoomPos || 'right-bottom'
+            zoomPos: f.zoomPos || 'right-bottom',
+            filter: f.filter && typeof f.filter === 'object'
+                ? {
+                    brightness: Number(f.filter.brightness) || 0,
+                    contrast: Number(f.filter.contrast) || 1
+                }
+                : { brightness: 0, contrast: 1 }
         }))
         : [];
 
@@ -1463,7 +1483,7 @@ window.handleTambahFotoCctvModal = async function(event) {
             cctvEditorState.fotos.push({
                 nama: item.nama,
                 src: item.src,
-                palet: `PALET KE-${startIdx + i + 1}`,
+                palet: `PALET KE-${startIdx + i + 1}: `,
                 rumus: '',
                 catatanTambahan: '',
                 zoomCropSrc: '',
@@ -1671,6 +1691,48 @@ window.simpanHasilCropZoomBeceran = function() {
     renderDaftarFotoCctvModal();
 };
 
+function getFotoFilterCss(foto, forPrint = false) {
+    const f = foto && typeof foto.filter === 'object' && foto.filter !== null ? foto.filter : {};
+    const bright = 1 + (Number(f.brightness) || 0) / 100;
+    const contrast = Number(f.contrast) || 1;
+    const grayPart = forPrint ? ' grayscale(1)' : '';
+    return `brightness(${bright.toFixed(2)}) contrast(${contrast.toFixed(2)})${grayPart}`;
+}
+
+window.updateFilterFotoCctv = function(index, key, val) {
+    const foto = cctvEditorState.fotos[index];
+    if (!foto) return;
+    if (!foto.filter || typeof foto.filter !== 'object') {
+        foto.filter = { brightness: 0, contrast: 1 };
+    }
+
+    if (key === 'brightness') {
+        foto.filter.brightness = parseInt(val, 10) || 0;
+    } else if (key === 'contrast') {
+        foto.filter.contrast = parseFloat(val) || 1;
+    }
+
+    const brightVal = Number(foto.filter.brightness) || 0;
+    const contrastVal = Number(foto.filter.contrast) || 1;
+    const filterCss = getFotoFilterCss(foto, false);
+
+    const imgEl = document.getElementById(`cctv-img-preview-${index}`);
+    if (imgEl) imgEl.style.filter = filterCss;
+
+    const brightLabel = document.getElementById(`cctv-val-brightness-${index}`);
+    if (brightLabel) brightLabel.textContent = brightVal > 0 ? `+${brightVal}` : `${brightVal}`;
+
+    const contrastLabel = document.getElementById(`cctv-val-contrast-${index}`);
+    if (contrastLabel) contrastLabel.textContent = `${contrastVal.toFixed(2)}x`;
+};
+
+window.resetFilterFotoCctv = function(index) {
+    const foto = cctvEditorState.fotos[index];
+    if (!foto) return;
+    foto.filter = { brightness: 0, contrast: 1 };
+    renderDaftarFotoCctvModal();
+};
+
 function renderDaftarFotoCctvModal() {
     const container = document.getElementById('cctv-daftar-foto-container');
     if (!container) return;
@@ -1689,10 +1751,17 @@ function renderDaftarFotoCctvModal() {
         const notePos = foto.notePos || (hasZoom ? 'left-bottom' : 'right-bottom');
         const zoomPos = foto.zoomPos || 'right-bottom';
 
+        const filterObj = foto.filter && typeof foto.filter === 'object'
+            ? foto.filter
+            : { brightness: 0, contrast: 1 };
+        const brightVal = Number(filterObj.brightness) || 0;
+        const contrastVal = Number(filterObj.contrast) || 1;
+        const filterCss = getFotoFilterCss(foto, false);
+
         return `
             <div class="bg-white border border-orange-200 rounded-xl p-3 flex flex-col justify-between space-y-2.5 shadow-sm">
                 <div class="relative h-44 bg-slate-900 rounded-lg overflow-hidden flex items-center justify-center">
-                    <img src="${foto.src}" alt="${escapeHtmlCctv(foto.nama)}" class="w-full h-full object-contain">
+                    <img id="cctv-img-preview-${idx}" src="${foto.src}" alt="${escapeHtmlCctv(foto.nama)}" style="filter: ${filterCss};" class="w-full h-full object-contain transition-[filter] duration-75">
                     <span class="bg-black/75 text-white text-[10px] font-black px-2 py-0.5 rounded" style="position:absolute; top:6px; left:6px;">#${idx + 1}</span>
                     ${hasZoom ? `
                         <div class="w-24 h-20 bg-black border-2 border-amber-400 rounded overflow-hidden shadow-lg" style="position:absolute; ${getPosCss(zoomPos)}">
@@ -1715,6 +1784,33 @@ function renderDaftarFotoCctvModal() {
                 <div>
                     <label class="text-[9px] font-black text-slate-500 uppercase block">Catatan Tambahan / Total (Bisa Diedit Bebas)</label>
                     <input type="text" value="${escapeHtmlCctv(foto.catatanTambahan)}" oninput="cctvEditorState.fotos[${idx}].catatanTambahan = this.value" placeholder="Misal: TOTAL: ( 77 x 6 = 462 + 38 = 500 Karton )" class="w-full p-1.5 text-[11px] font-semibold text-slate-800 border border-slate-300 rounded-lg">
+                </div>
+
+                <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 space-y-1.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] font-black text-slate-700">
+                            Terang & Kontras Foto #${idx + 1} (Grayscale Saat Cetak)
+                        </span>
+                        <button type="button" onclick="resetFilterFotoCctv(${idx})" class="text-[9px] font-bold text-slate-500 hover:text-orange-600 underline">
+                            Reset
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <div class="flex justify-between text-[9px] font-bold text-slate-500">
+                                <span>Terang</span>
+                                <span id="cctv-val-brightness-${idx}">${brightVal > 0 ? '+' + brightVal : brightVal}</span>
+                            </div>
+                            <input type="range" min="-45" max="45" step="1" value="${brightVal}" oninput="updateFilterFotoCctv(${idx}, 'brightness', this.value)" class="w-full accent-orange-600 cursor-pointer">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-[9px] font-bold text-slate-500">
+                                <span>Kontras</span>
+                                <span id="cctv-val-contrast-${idx}">${contrastVal.toFixed(2)}x</span>
+                            </div>
+                            <input type="range" min="0.7" max="1.6" step="0.05" value="${contrastVal}" oninput="updateFilterFotoCctv(${idx}, 'contrast', this.value)" class="w-full accent-orange-600 cursor-pointer">
+                        </div>
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-2">
@@ -1845,17 +1941,18 @@ window.cetakLaporanBuktiCctv = function(klaimId, kodeDipilih = '') {
 
     const pagesHtml = chunks.map((chunk) => {
         const slotHtml = chunk.map((f, idx) => {
-            const paletText = escapeHtmlCctv(f.palet || `PALET KE-${idx + 1}`);
+            const paletText = escapeHtmlCctv(f.palet || `PALET KE-${idx + 1}: `);
             const rumusText = escapeHtmlCctv(f.rumus || '');
             const tambahanText = escapeHtmlCctv(f.catatanTambahan || '');
             const hasZoom = !!f.zoomCropSrc;
             const notePos = f.notePos || (hasZoom ? 'left-bottom' : 'right-bottom');
             const zoomPos = f.zoomPos || 'right-bottom';
+            const fotoFilterCetak = getFotoFilterCss(f, true);
 
             return `
                 <div class="foto-slot">
                     <div class="foto-frame">
-                        <img class="main-img" src="${f.src}" alt="${paletText}">
+                        <img class="main-img" src="${f.src}" alt="${paletText}" style="filter: ${fotoFilterCetak};">
 
                         <div class="note-box" style="${getPosCss(notePos)}">
                             <div class="note-tujuan">${tujuanCetak}</div>
@@ -1868,7 +1965,7 @@ window.cetakLaporanBuktiCctv = function(klaimId, kodeDipilih = '') {
 
                         ${hasZoom ? `
                             <div class="zoom-inset" style="${getPosCss(zoomPos)}">
-                                <img src="${f.zoomCropSrc}" alt="Zoom Beceran">
+                                <img src="${f.zoomCropSrc}" alt="Zoom Beceran" style="filter: ${fotoFilterCetak};">
                             </div>
                         ` : ''}
                     </div>
