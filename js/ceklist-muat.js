@@ -734,7 +734,8 @@ window.cetakUlangArsip = async function(kategori, muatId) {
 
                             subQtyArray.push({
                                 kodebarang: row.kodebarang,
-                                qty_b: subParts.join(' '), // Pastikan qty_b terisi string beceran
+                                qty_b: subParts.join(' '), // Tetap teks beceran untuk tampilan di tabel
+                                calc_qty: 1, // Terdeteksi beceran: digenapkan menjadi 1 KRT
                                 display_qty: subParts.join(' '),
                                 kodegudang: `${row.kodegudang || 'WHNB-2'} ${sourceTag}`,
                                 _isTitipan: true
@@ -1041,7 +1042,10 @@ window.cetakUlangArsip = async function(kategori, muatId) {
             let totalSemuaItem = 0;
             coreItemsCombined.forEach(item => {
                 if (!item._isEmptySpacer && !item._isHeaderTitle) {
-                    totalSemuaItem += Number(item.qty_b || item.qty_utama || 0);
+                    const nilaiQty = item.calc_qty !== undefined
+                        ? Number(item.calc_qty)
+                        : Number(item.qty_b || item.qty_utama || 0);
+                    totalSemuaItem += (Number.isNaN(nilaiQty) ? 0 : nilaiQty);
                 }
             });
 
