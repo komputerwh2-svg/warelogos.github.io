@@ -745,17 +745,29 @@ window.cetakUlangArsip = async function(kategori, muatId) {
             }
         });
 
-        // --- SORTING DATA DO/FDN UTAMA: WHNB-2 ditaruh paling akhir ---
-        allItemsArray.sort((a, b) => {
-            const gudangA = String(a.kodegudang || '').toUpperCase();
-            const gudangB = String(b.kodegudang || '').toUpperCase();
-            const isWhnb2A = gudangA.includes('WHNB-2');
-            const isWhnb2B = gudangB.includes('WHNB-2');
-            
-            if (isWhnb2A && !isWhnb2B) return 1;
-            if (!isWhnb2A && isWhnb2B) return -1;
-            return 0;
-        });
+        // --- SORTING DATA DO/FDN UTAMA ---
+        // Urutkan berdasarkan Kode Rasa (kodebarang) untuk tujuan yang sama,
+        // dan tetap taruh WHNB-2 di paling akhir.
+        // Jika ada FDN_GABUNGAN (gabungan beda tujuan), urutan utama tidak diacak/diurut campur.
+        const hasFdnGabunganArsip = !!(dataArsip.titipan && dataArsip.titipan.FDN_GABUNGAN && Object.keys(dataArsip.titipan.FDN_GABUNGAN).length > 0);
+
+        if (!hasFdnGabunganArsip) {
+            allItemsArray.sort((a, b) => {
+                const gudangA = String(a.kodegudang || '').toUpperCase();
+                const gudangB = String(b.kodegudang || '').toUpperCase();
+                const isWhnb2A = gudangA.includes('WHNB-2');
+                const isWhnb2B = gudangB.includes('WHNB-2');
+
+                // 1. WHNB-2 selalu di paling akhir
+                if (isWhnb2A && !isWhnb2B) return 1;
+                if (!isWhnb2A && isWhnb2B) return -1;
+
+                // 2. Di dalam kelompok gudang yang sama (tujuan sama), urutkan berdasarkan Kode Rasa
+                const kodeA = String(a.kodebarang || '').toUpperCase().trim();
+                const kodeB = String(b.kodebarang || '').toUpperCase().trim();
+                return kodeA.localeCompare(kodeB, undefined, { numeric: true, sensitivity: 'base' });
+            });
+        }
 
         const titipanObj = dataArsip.titipan || {};
 
