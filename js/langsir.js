@@ -26,12 +26,112 @@ window.tutupSubPageLangsir = function() {
     }
 };
 
-// Fungsi Membaca File Excel (Satuan atau Multiple)
+// Helper: ambil nomor part dari item/groupKey (default 1)
+function ekstrakNomorPartLangsir(valObj, groupKey = '') {
+    const direct = Number(valObj?.uploadSession || valObj?.upload_session || 0);
+    if (direct > 0) return direct;
+
+    const matchP = String(groupKey).match(/_P(\d+)$/i);
+    if (matchP) return Number(matchP[1]);
+
+    const matchS = String(groupKey).match(/_S(\d+)$/i);
+    if (matchS) return Number(matchS[1]);
+
+    return 1;
+}
+
+// Helper: tentukan target ID arsip (arsip aktif atau tanggal hari ini)
+function getTargetIdLangsirAktif() {
+    if (window.currentActiveArsipId) return window.currentActiveArsipId;
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    return `langsir_${yyyy}_${mm}_${dd}`;
+}
+
+// Helper: hitung nomor Part berikutnya (P_1 untuk awal, P_2 untuk import/susulan berikutnya, dst.)
+async function tentukanPartBerikutnyaLangsir(targetIdLangsir) {
+    let maxPart = 0;
+
+    // Cek part yang sudah ada di layar / cache saat ini
+    Object.entries(langsirCacheData || {}).forEach(([gKey, grp]) => {
+        const p = ekstrakNomorPartLangsir(grp, gKey);
+        if (p > maxPart) maxPart = p;
+    });
+
+    // Cek part yang sudah tersimpan di RTDB pada tanggal target
+    if (targetIdLangsir && typeof firebase !== 'undefined' && firebase.database) {
+        try {
+            const snap = await firebase.database().ref(`data_langsir/${targetIdLangsir}`).once('value');
+            if (snap.exists()) {
+                if (maxPart < 1) maxPart = 1;
+                const val = snap.val() || {};
+                Object.values(val).forEach(it => {
+                    const p = Number(it?.upload_session || 1);
+                    if (p > maxPart) maxPart = p;
+                });
+            }
+        } catch (e) {
+            console.warn('Gagal memeriksa part arsip di RTDB:', e);
+        }
+    }
+
+    return maxPart > 0 ? maxPart + 1 : 1;
+}
+
+// Fungsi Membaca File Excel (Satuan atau Multiple) - Langkah 1: Pisah per Part (P_1, P_2, dst.)
 window.handleFileImportLangsir = async function(event) {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
+    let maxPart = 0;
+
+    // 1. Cek part tertinggi yang sudah ada di cache/layar saat ini
+    Object.keys(langsirCacheData || {}).forEach(key => {
+        const grp = langsirCacheData[key];
+        const matchP = String(key).match(/_P(\d+)$/i);
+        const matchS = String(key).match(/_S(\d+)$/i);
+        const partDiGrp = Number(grp?.uploadSession || grp?.upload_session || 0);
+        const partDiKey = matchP ? Number(matchP[1]) : (matchS ? Number(matchS[1]) : 0);
+        const p = Math.max(partDiGrp, partDiKey);
+        if (p > maxPart) maxPart = p;
+    });
+
+    // Jika di cache sudah ada kartu (misal hasil buka arsip P_1), minimal mulai dari part 1
+    if (Object.keys(langsirCacheData || {}).length > 0 && maxPart < 1) {
+        maxPart = 1;
+    }
+
+    // 2. Cek part tertinggi yang sudah tersimpan di RTDB untuk tanggal aktif / hari ini
+    let targetIdLangsir = window.currentActiveArsipId;
+    if (!targetIdLangsir) {
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        targetIdLangsir = `langsir_${yyyy}_${mm}_${dd}`;
+    }
+
+    if (typeof firebase !== 'undefined' && firebase.database && targetIdLangsir) {
+        try {
+            const snap = await firebase.database().ref(`data_langsir/${targetIdLangsir}`).once('value');
+            if (snap.exists()) {
+                if (maxPart < 1) maxPart = 1;
+                const val = snap.val() || {};
+                Object.values(val).forEach(it => {
+                    const p = Number(it?.upload_session || 1);
+                    if (p > maxPart) maxPart = p;
+                });
+            }
+        } catch (err) {
+            console.warn('Gagal cek part di RTDB:', err);
+        }
+    }
+
+    const partBaru = maxPart + 1;
     let loadedCount = 0;
+    let adaItemValid = false;
 
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
@@ -52,21 +152,29 @@ window.handleFileImportLangsir = async function(event) {
                 const kodePallet = String(row.KODE_PALLET || '').trim();
 
                 if (!kodeBarang) return;
+                adaItemValid = true;
 
-                if (!langsirCacheData[kodeBarang]) {
-                    langsirCacheData[kodeBarang] = {
+                // Pakai kunci unik per kode & part agar tidak menimpa data lama
+                const groupKey = `${kodeBarang}_P${partBaru}`;
+
+                if (!langsirCacheData[groupKey]) {
+                    langsirCacheData[groupKey] = {
+                        kodeBarang: kodeBarang,
                         namaRasa: namaRasa,
+                        uploadSession: partBaru,
                         items: []
                     };
                 }
 
-                langsirCacheData[kodeBarang].items.push({
+                langsirCacheData[groupKey].items.push({
                     KODE_LOKASI: kodeLokasi,
                     KODE: kodeBarang,
+                    NAMA_BARANG: namaRasa,
                     STOK: stok,
                     EXPDATE: expdate,
                     BARCODE: barcode,
-                    KODE_PALLET: kodePallet
+                    KODE_PALLET: kodePallet,
+                    upload_session: partBaru
                 });
             });
 
@@ -78,8 +186,10 @@ window.handleFileImportLangsir = async function(event) {
 
     event.target.value = '';
 
-    if (loadedCount > 0) {
-        if (typeof miuiAlert === 'function') miuiAlert(`Berhasil mengimpor ${loadedCount} data rak WMS!`);
+    if (loadedCount > 0 && adaItemValid) {
+        if (typeof miuiAlert === 'function') {
+            miuiAlert(`Berhasil mengimpor ${loadedCount} data rak WMS sebagai Part ${partBaru} (P_${partBaru})!`);
+        }
         renderPreviewLangsir();
     } else {
         if (typeof miuiAlert === 'function') miuiAlert("Tidak ada data valid yang berhasil dibaca.");
@@ -95,7 +205,7 @@ function readFileAsArrayBufferLangsir(file) {
     });
 }
 
-// Render Kartu Preview (Grid 3 Kolom - Sorted Qty & Expdate, MIUI Custom Scroll, Tombol Hapus per Kartu & Support Badge Part)
+// Render Kartu Preview (Grid 3 Kolom - Sorted Qty & Expdate, MIUI Custom Scroll, Tombol Hapus per Kartu & Support Badge Part P_1, P_2, dst.)
 window.renderPreviewLangsir = function() {
     const container = document.getElementById('containerKartuLangsir');
     if (!container) return;
@@ -140,14 +250,19 @@ window.renderPreviewLangsir = function() {
         let totalLokasi = items.length;
         let formattedTotalKrt = totalKarton.toLocaleString('id-ID');
 
-        // Tentukan kode barang asli dan badge sesi/part jika sesi > 1
-        const sessionNum = Number(group.uploadSession || 1);
-        const kodeTampil = group.kodeBarang || groupKey.split('_S')[0];
-        
-        // Badge Part / Tambahan jika sesi unggah > 1 (Menggunakan format P_2, P_3, dst)
-        const badgePartHtml = sessionNum > 1 
-            ? `<span class="bg-amber-700 text-amber-100 text-[10px] font-black px-1.5 py-0.5 rounded shadow-xs ml-2 uppercase tracking-wide border border-amber-600">P_${sessionNum}</span>` 
-            : '';
+        // Tentukan nomor part/sesi berdasarkan uploadSession / upload_session atau suffix _P1 / _S1 (default: 1 -> P_1)
+        const matchKey = String(groupKey).match(/_(?:P|S)(\d+)$/i);
+        const rawSession = Number(
+            group.uploadSession ??
+            group.upload_session ??
+            items[0]?.upload_session ??
+            items[0]?.uploadSession ??
+            (matchKey ? matchKey[1] : 1)
+        );
+        const sessionNum = rawSession > 0 ? rawSession : 1;
+
+        const kodeTampil = group.kodeBarang || String(groupKey).replace(/_(?:P|S)\d+$/i, '');
+        const badgePartHtml = `<span class="bg-amber-700 text-amber-100 text-[10px] font-black px-1.5 py-0.5 rounded shadow-xs ml-2 uppercase tracking-wide border border-amber-600">P_${sessionNum}</span>`;
 
         html += `
             <div class="bg-white rounded-2xl shadow-sm border border-orange-200 flex flex-col overflow-hidden">
@@ -167,7 +282,7 @@ window.renderPreviewLangsir = function() {
                         </span>
 
                         <!-- Tombol Hapus Seluruh Data pada Kartu Ini -->
-                        <button onclick="hapusKartuLangsir('${groupKey}')" class="w-7 h-7 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center justify-center transition shadow-sm" title="Hapus seluruh data kartu ${kodeTampil} ini">
+                        <button onclick="hapusKartuLangsir('${groupKey}')" class="w-7 h-7 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center justify-center transition shadow-sm" title="Hapus seluruh data kartu ${kodeTampil} P_${sessionNum} ini">
                             <i class="fa-solid fa-trash-can text-xs"></i>
                         </button>
                     </div>
@@ -281,7 +396,27 @@ window.hapusItemLangsir = function(kodeRasa, index) {
     }
 };
 
-// Simpan ke RTDB secara otomatis: jika tanggal hari ini sudah ada, langsung buat sesi tambahan (susulan) baru
+window.setModeTombolSimpanLangsir = function(isUpdateMode = false) {
+    window.isModeUpdateLangsir = Boolean(isUpdateMode);
+
+    // Cari tombol hijau "SIMPAN DATA" / "UPDATE DATA" di header subpageLangsir
+    const subpage = document.getElementById('subpageLangsir') || document;
+    const btn = subpage.querySelector('button[onclick*="simpanDataLangsirRTDB"]');
+    if (!btn) return;
+
+    if (isUpdateMode) {
+        btn.innerHTML = `<i class="fa-solid fa-rotate"></i> <span>UPDATE DATA</span>`;
+        btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700', 'bg-green-600', 'hover:bg-green-700');
+        btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+        btn.title = "Simpan data lanjutan (P_2 / upload_session 2 dst.) ke arsip yang sedang dibuka";
+    } else {
+        btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> <span>SIMPAN DATA</span>`;
+        btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+        btn.classList.add('bg-emerald-600', 'hover:bg-emerald-700');
+        btn.title = "Simpan data langsir baru (upload_session 1)";
+    }
+};
+
 window.simpanDataLangsirRTDB = async function() {
     const keys = Object.keys(langsirCacheData);
     if (keys.length === 0) {
@@ -289,9 +424,10 @@ window.simpanDataLangsirRTDB = async function() {
         return;
     }
 
-    // 1. Selalu tentukan target tanggal berdasarkan tanggal hari ini (atau arsip aktif jika sedang dibuka)
+    const isUpdateMode = Boolean(window.isModeUpdateLangsir && window.currentActiveArsipId);
+
+    // Tentukan target ID arsip
     let targetIdLangsir = window.currentActiveArsipId;
-    
     if (!targetIdLangsir) {
         const now = new Date();
         const yyyy = now.getFullYear();
@@ -302,68 +438,145 @@ window.simpanDataLangsirRTDB = async function() {
 
     try {
         const dbRef = firebase.database().ref(`data_langsir/${targetIdLangsir}`);
-        
-        // 2. Cek apakah data di tanggal tersebut sudah ada di server
         const snapshot = await dbRef.once('value');
-        let existingData = snapshot.exists() ? snapshot.val() : {};
+        const sudahAdaDiDb = snapshot.exists();
+        const existingData = sudahAdaDiDb ? snapshot.val() : {};
 
-        let payloadToSave = { ...existingData };
-
-        // 3. Deteksi otomatis sesi unggah (upload_session) berikutnya
-        let currentUploadSession = 1;
-        if (snapshot.exists()) {
-            let maxSession = 1;
-            Object.values(existingData).forEach(item => {
-                if (item.upload_session && Number(item.upload_session) > maxSession) {
-                    maxSession = Number(item.upload_session);
+        // Mode SIMPAN DATA (awal / upload_session: 1)
+        if (!isUpdateMode) {
+            if (sudahAdaDiDb) {
+                if (typeof miuiAlert === 'function') {
+                    miuiAlert(`Arsip ${targetIdLangsir} sudah ada. Buka dari Arsip Langsir untuk menambah data lanjutan (UPDATE DATA).`);
                 }
+                return;
+            }
+
+            const payloadAwal = {};
+            keys.forEach((groupKey, gIdx) => {
+                const groupData = langsirCacheData[groupKey];
+                if (!groupData || !Array.isArray(groupData.items)) return;
+
+                const namaBarangGroup = groupData.namaRasa || groupData.kodeBarang || groupKey;
+
+                groupData.items.forEach((item, idx) => {
+                    const kodeBrg = String(item.KODE || groupData.kodeBarang || 'PRODUK').trim().toUpperCase();
+                    const cleanRak = String(item.KODE_LOKASI || 'NORAK')
+                        .trim()
+                        .replace(/[\s\/\\#$\[\]\.]/g, '_')
+                        .toUpperCase();
+
+                    const nodeKey = `${kodeBrg}_${cleanRak}_S1_${gIdx}_${idx}`;
+                    payloadAwal[nodeKey] = {
+                        KODE_LOKASI: item.KODE_LOKASI,
+                        KODE: kodeBrg,
+                        NAMA_BARANG: item.NAMA_BARANG || namaBarangGroup,
+                        STOK: Number(item.STOK || 0),
+                        EXPDATE: item.EXPDATE,
+                        BARCODE: item.BARCODE,
+                        KODE_PALLET: item.KODE_PALLET,
+                        upload_session: 1
+                    };
+                });
             });
-            currentUploadSession = maxSession + 1; // Otomatis jadi sesi 2, 3, dst. jika tanggal sudah ada
+
+            await dbRef.set(payloadAwal);
+
+            if (typeof miuiAlert === 'function') {
+                miuiAlert(`Data pertama (upload_session: 1 / P_1) berhasil disimpan pada ${targetIdLangsir}!`);
+            }
+
+            window.currentActiveArsipId = targetIdLangsir;
+            langsirCacheData = {};
+            window.setModeTombolSimpanLangsir(true);
+
+            if (typeof window.pilihArsipLangsir === 'function') {
+                await window.pilihArsipLangsir(targetIdLangsir);
+            }
+            return;
         }
 
-        // 4. Masukkan data baru dengan penanda sesi
-        keys.forEach(kodeRasa => {
-            const groupData = langsirCacheData[kodeRasa];
-            const namaBarangGroup = groupData.namaRasa || kodeRasa;
+        // Mode UPDATE DATA (setelah load riwayat: hanya simpan data lanjutan P_2 / upload_session 2 dst.)
+        let maxSessionDiDb = 1;
+        Object.values(existingData).forEach(item => {
+            const s = Number(item?.upload_session || 1);
+            if (s > maxSessionDiDb) maxSessionDiDb = s;
+        });
 
-            groupData.items.forEach(item => {
-                const cleanRak = String(item.KODE_LOKASI || 'NORAK').replace(/[\s\/\\#$\[\]\.]/g, '_');
-                
-                // Gunakan suffix sesi _S1, _S2, dst. agar key tidak saling menimpa
-                const nodeKey = `${item.KODE}_${cleanRak}_S${currentUploadSession}`.toUpperCase();
+        let payloadUpdate = { ...existingData };
+        let jumlahLanjutanDisimpan = 0;
+        let partLanjutanTertinggi = maxSessionDiDb;
 
-                payloadToSave[nodeKey] = {
+        keys.forEach((groupKey, gIdx) => {
+            const groupData = langsirCacheData[groupKey];
+            if (!groupData || !Array.isArray(groupData.items) || groupData.items.length === 0) return;
+
+            const matchKey = String(groupKey).match(/_(?:P|S)(\d+)$/i);
+            let partNum = Number(
+                groupData.uploadSession ??
+                groupData.upload_session ??
+                groupData.items[0]?.upload_session ??
+                (matchKey ? matchKey[1] : 0)
+            );
+
+            // Jika belum ada nomor part eksplisit, tetapkan sebagai sesi lanjutan berikutnya (minimal 2 / P_2)
+            if (!partNum || partNum <= 0) {
+                partNum = maxSessionDiDb + 1;
+            }
+
+            // Lewati data yang sudah ada di DB (upload_session <= maxSessionDiDb) agar tidak diduplikasi
+            if (partNum <= maxSessionDiDb) {
+                return;
+            }
+
+            if (partNum > partLanjutanTertinggi) {
+                partLanjutanTertinggi = partNum;
+            }
+
+            const namaBarangGroup = groupData.namaRasa || groupData.kodeBarang || groupKey;
+
+            groupData.items.forEach((item, idx) => {
+                const kodeBrg = String(item.KODE || groupData.kodeBarang || 'PRODUK').trim().toUpperCase();
+                const cleanRak = String(item.KODE_LOKASI || 'NORAK')
+                    .trim()
+                    .replace(/[\s\/\\#$\[\]\.]/g, '_')
+                    .toUpperCase();
+
+                const nodeKey = `${kodeBrg}_${cleanRak}_S${partNum}_${gIdx}_${idx}`;
+                payloadUpdate[nodeKey] = {
                     KODE_LOKASI: item.KODE_LOKASI,
-                    KODE: item.KODE,
+                    KODE: kodeBrg,
                     NAMA_BARANG: item.NAMA_BARANG || namaBarangGroup,
                     STOK: Number(item.STOK || 0),
                     EXPDATE: item.EXPDATE,
                     BARCODE: item.BARCODE,
                     KODE_PALLET: item.KODE_PALLET,
-                    upload_session: currentUploadSession // Penanda otomatis sesi unggah
+                    upload_session: partNum
                 };
+                jumlahLanjutanDisimpan++;
             });
         });
 
-        // 5. Simpan ke Firebase
-        await dbRef.set(payloadToSave);
-
-        if (typeof miuiAlert === 'function') {
-            const infoTeks = currentUploadSession > 1 ? ` (Ditambahkan sebagai Sesi/Susulan ke-${currentUploadSession})` : '';
-            miuiAlert(`Data langsir berhasil disimpan pada ${targetIdLangsir}${infoTeks}!`);
+        if (jumlahLanjutanDisimpan === 0) {
+            if (typeof miuiAlert === 'function') {
+                miuiAlert("Tidak ada data lanjutan baru (P_2 dst.) untuk di-update.");
+            }
+            return;
         }
 
-        // Set arsip aktif, kosongkan cache preview, dan muat ulang tampilannya
-        window.currentActiveArsipId = targetIdLangsir;
+        await dbRef.set(payloadUpdate);
+
+        if (typeof miuiAlert === 'function') {
+            miuiAlert(`Data lanjutan (upload_session: ${partLanjutanTertinggi} / P_${partLanjutanTertinggi}) berhasil di-update pada ${targetIdLangsir}!`);
+        }
+
         langsirCacheData = {};
-        
         if (typeof window.pilihArsipLangsir === 'function') {
-            window.pilihArsipLangsir(targetIdLangsir);
+            await window.pilihArsipLangsir(targetIdLangsir);
         }
 
     } catch (err) {
-        console.error("Gagal menyimpan ke RTDB:", err);
-        if (typeof miuiAlert === 'function') miuiAlert("Gagal menyimpan data langsir ke server.");
+        console.error("Gagal menyimpan/update ke RTDB:", err);
+        if (typeof miuiAlert === 'function') miuiAlert("Gagal menyimpan atau meng-update data langsir ke server.");
     }
 };
 
@@ -378,11 +591,10 @@ window.togglePopoverArsipLangsir = function(event) {
         popover.classList.remove('hidden');
         popover.classList.add('flex');
 
-        // Set default tanggal hari ini
-        const today = new Date().toISOString().split('T')[0];
+        // Kosongkan filter tanggal saat pertama kali dibuka agar seluruh riwayat arsip langsung terlihat
         const dateInput = document.getElementById('filterArsipLangsirTgl');
-        if (dateInput && !dateInput.value) {
-            dateInput.value = today;
+        if (dateInput) {
+            dateInput.value = '';
         }
         loadArsipLangsirList();
     } else {
@@ -507,40 +719,47 @@ window.pilihArsipLangsir = async function(idArsip) {
         Object.keys(dataItems).forEach(key => {
             const item = dataItems[key];
             const kodeBarangBase = String(item.KODE || 'PRODUK').trim().toUpperCase();
-            
-            // Ambil nomor sesi upload (default ke 1)
-            const sessionNum = Number(item.upload_session || 1);
-            
-            // Buat key unik agar terpecah menjadi kartu terpisah jika beda sesi
-            const groupKey = sessionNum > 1 ? `${kodeBarangBase}_S${sessionNum}` : kodeBarangBase;
+
+            // Ambil nomor sesi/part dari item (default ke 1 -> P_1)
+            const rawSession = Number(item.upload_session || 1);
+            const sessionNum = rawSession > 0 ? rawSession : 1;
+
+            // Kunci grup per kode & part (P_1, P_2, dst.) agar kartu tidak saling menimpa
+            const groupKey = `${kodeBarangBase}_P${sessionNum}`;
 
             // Ambil nama barang asli (bersih tanpa teks tambahan)
             const namaBarangAsli = item.NAMA_BARANG || item.NAMA_RASA || item.NAMA || item.KODE || 'PRODUK';
 
             if (!tempLangsirData[groupKey]) {
                 tempLangsirData[groupKey] = {
-                    namaRasa: namaBarangAsli,      // Tetap bersih
+                    namaRasa: namaBarangAsli,
                     kodeBarang: kodeBarangBase,
-                    uploadSession: sessionNum,     // Menyimpan nomor sesi (1, 2, dst.)
+                    uploadSession: sessionNum,
                     items: []
                 };
             }
 
             tempLangsirData[groupKey].items.push({
                 KODE_LOKASI: item.KODE_LOKASI,
-                KODE: item.KODE,
+                KODE: kodeBarangBase,
                 NAMA_BARANG: namaBarangAsli,
                 STOK: Number(item.STOK || 0),
                 EXPDATE: item.EXPDATE,
                 BARCODE: item.BARCODE,
-                KODE_PALLET: item.KODE_PALLET
+                KODE_PALLET: item.KODE_PALLET,
+                upload_session: sessionNum
             });
         });
 
         window.currentLangsirData = tempLangsirData;
-        window.currentActiveArsipId = idArsip; 
+        window.currentActiveArsipId = idArsip;
         if (typeof langsirCacheData !== 'undefined') {
             langsirCacheData = tempLangsirData;
+        }
+
+        // Ubah tombol simpan menjadi UPDATE DATA karena arsip sudah dimuat dari riwayat
+        if (typeof window.setModeTombolSimpanLangsir === 'function') {
+            window.setModeTombolSimpanLangsir(true);
         }
 
         // Header tanggal
@@ -569,13 +788,209 @@ window.pilihArsipLangsir = async function(idArsip) {
 
         const modalArsip = document.getElementById('modalArsipLangsir');
         if (modalArsip) modalArsip.classList.add('hidden');
-        
+
         const popoverArsip = document.getElementById('popoverArsipLangsir');
-        if (popoverArsip) popoverArsip.classList.add('hidden');
+        if (popoverArsip) {
+            popoverArsip.classList.remove('flex');
+            popoverArsip.classList.add('hidden');
+        }
 
     } catch (err) {
         console.error("Gagal memuat arsip langsir:", err);
         if (typeof miuiAlert === 'function') miuiAlert("Gagal memuat data arsip.");
+    }
+};
+
+
+// Stack riwayat penghapusan untuk fitur Batal Hapus (Undo)
+let riwayatHapusKartuLangsir = []; // Menyimpan snapshot kartu { groupKey, groupData }
+let riwayatHapusRakLangsir = [];   // Menyimpan snapshot rak { groupKey, index, item, groupMeta }
+
+function updateBadgeBatalHapusLangsir() {
+    const jmlKartu = riwayatHapusKartuLangsir.length;
+    const jmlRak = riwayatHapusRakLangsir.length;
+    const total = jmlKartu + jmlRak;
+
+    const badgeTotal = document.getElementById('badgeCountBatalHapusLangsir');
+    if (badgeTotal) {
+        badgeTotal.innerText = String(total);
+        if (total > 0) {
+            badgeTotal.classList.remove('hidden');
+        } else {
+            badgeTotal.classList.add('hidden');
+        }
+    }
+
+    const elCountKartu = document.getElementById('countUndoKartuLangsir');
+    if (elCountKartu) elCountKartu.innerText = String(jmlKartu);
+
+    const elCountRak = document.getElementById('countUndoRakLangsir');
+    if (elCountRak) elCountRak.innerText = String(jmlRak);
+
+    const btnKartu = document.getElementById('btnUndoKartuLangsir');
+    if (btnKartu) btnKartu.disabled = jmlKartu === 0;
+
+    const btnRak = document.getElementById('btnUndoRakLangsir');
+    if (btnRak) btnRak.disabled = jmlRak === 0;
+}
+
+window.togglePopoverBatalHapusLangsir = function(event) {
+    if (event) event.stopPropagation();
+    const popover = document.getElementById('popoverBatalHapusLangsir');
+    if (!popover) return;
+
+    updateBadgeBatalHapusLangsir();
+
+    if (popover.classList.contains('hidden')) {
+        popover.classList.remove('hidden');
+        popover.classList.add('flex');
+    } else {
+        tutupPopoverBatalHapusLangsir();
+    }
+};
+
+window.tutupPopoverBatalHapusLangsir = function() {
+    const popover = document.getElementById('popoverBatalHapusLangsir');
+    if (popover) {
+        popover.classList.remove('flex');
+        popover.classList.add('hidden');
+    }
+};
+
+document.addEventListener('click', function(e) {
+    const popover = document.getElementById('popoverBatalHapusLangsir');
+    if (popover && !popover.contains(e.target) && !e.target.closest('#btnBatalHapusLangsir')) {
+        tutupPopoverBatalHapusLangsir();
+    }
+});
+
+// Fungsi Hapus Seluruh Kartu Berdasarkan GroupKey / Kode Barang (tercatat untuk Batal Hapus Kode Barang)
+window.hapusKartuLangsir = function(groupKey) {
+    if (langsirCacheData[groupKey]) {
+        const snapshotGroup = {
+            ...langsirCacheData[groupKey],
+            items: Array.isArray(langsirCacheData[groupKey].items)
+                ? langsirCacheData[groupKey].items.map(it => ({ ...it }))
+                : []
+        };
+
+        riwayatHapusKartuLangsir.push({
+            groupKey: groupKey,
+            groupData: snapshotGroup
+        });
+
+        delete langsirCacheData[groupKey];
+        updateBadgeBatalHapusLangsir();
+        renderPreviewLangsir();
+    }
+};
+
+// Fungsi Hapus Baris Rak Satuan (tercatat untuk Batal Hapus Rak)
+window.hapusItemLangsir = function(groupKey, index) {
+    if (langsirCacheData[groupKey] && Array.isArray(langsirCacheData[groupKey].items)) {
+        const containerKartu = document.getElementById(`scroll_container_${groupKey}`);
+        const currentScrollTop = containerKartu ? containerKartu.scrollTop : 0;
+
+        const removedItem = langsirCacheData[groupKey].items[index];
+        if (!removedItem) return;
+
+        const groupMeta = {
+            kodeBarang: langsirCacheData[groupKey].kodeBarang,
+            namaRasa: langsirCacheData[groupKey].namaRasa,
+            uploadSession: langsirCacheData[groupKey].uploadSession
+        };
+
+        riwayatHapusRakLangsir.push({
+            groupKey: groupKey,
+            index: index,
+            item: { ...removedItem },
+            groupMeta: groupMeta
+        });
+
+        langsirCacheData[groupKey].items.splice(index, 1);
+        if (langsirCacheData[groupKey].items.length === 0) {
+            delete langsirCacheData[groupKey];
+        }
+
+        updateBadgeBatalHapusLangsir();
+        renderPreviewLangsir();
+
+        requestAnimationFrame(() => {
+            const restoredContainer = document.getElementById(`scroll_container_${groupKey}`);
+            if (restoredContainer) {
+                restoredContainer.scrollTop = currentScrollTop;
+            }
+        });
+    }
+};
+
+// Mengembalikan seluruh data Kode Barang yang terakhir dihapus
+window.batalHapusKodeBarangLangsir = function() {
+    if (riwayatHapusKartuLangsir.length === 0) {
+        if (typeof miuiAlert === 'function') miuiAlert("Tidak ada riwayat hapus kode barang untuk dibatalkan.");
+        tutupPopoverBatalHapusLangsir();
+        return;
+    }
+
+    const lastRemoved = riwayatHapusKartuLangsir.pop();
+    const { groupKey, groupData } = lastRemoved;
+
+    if (!langsirCacheData[groupKey]) {
+        langsirCacheData[groupKey] = {
+            ...groupData,
+            items: Array.isArray(groupData.items) ? groupData.items.map(it => ({ ...it })) : []
+        };
+    } else {
+        const existingItems = langsirCacheData[groupKey].items || [];
+        const restoredItems = Array.isArray(groupData.items) ? groupData.items : [];
+        langsirCacheData[groupKey].items = [...existingItems, ...restoredItems];
+    }
+
+    tutupPopoverBatalHapusLangsir();
+    updateBadgeBatalHapusLangsir();
+    renderPreviewLangsir();
+
+    if (typeof miuiAlert === 'function') {
+        const kodeLabel = groupData.kodeBarang || groupKey;
+        miuiAlert(`Batal hapus berhasil: data kode barang ${kodeLabel} dikembalikan.`);
+    }
+};
+
+// Mengembalikan baris Rak yang terakhir dihapus
+window.batalHapusRakLangsir = function() {
+    if (riwayatHapusRakLangsir.length === 0) {
+        if (typeof miuiAlert === 'function') miuiAlert("Tidak ada riwayat hapus rak untuk dibatalkan.");
+        tutupPopoverBatalHapusLangsir();
+        return;
+    }
+
+    const lastRemovedRak = riwayatHapusRakLangsir.pop();
+    const { groupKey, index, item, groupMeta } = lastRemovedRak;
+
+    if (!langsirCacheData[groupKey]) {
+        const matchKey = String(groupKey).match(/_(?:P|S)(\d+)$/i);
+        const fallbackKode = groupMeta?.kodeBarang || String(groupKey).replace(/_(?:P|S)\d+$/i, '');
+        const fallbackSession = groupMeta?.uploadSession || (matchKey ? Number(matchKey[1]) : 1);
+
+        langsirCacheData[groupKey] = {
+            kodeBarang: fallbackKode,
+            namaRasa: groupMeta?.namaRasa || item.NAMA_BARANG || fallbackKode,
+            uploadSession: fallbackSession,
+            items: []
+        };
+    }
+
+    const targetItems = langsirCacheData[groupKey].items;
+    const insertPos = Math.max(0, Math.min(Number(index ?? targetItems.length), targetItems.length));
+    targetItems.splice(insertPos, 0, { ...item });
+
+    tutupPopoverBatalHapusLangsir();
+    updateBadgeBatalHapusLangsir();
+    renderPreviewLangsir();
+
+    if (typeof miuiAlert === 'function') {
+        const rakLabel = item.KODE_LOKASI || '-';
+        miuiAlert(`Batal hapus berhasil: rak ${rakLabel} (${item.STOK || 0} Krt) dikembalikan.`);
     }
 };
 
