@@ -618,7 +618,7 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// Memuat Daftar Arsip dari RTDB dengan Format Nama LANGSIR dd/mm/yyyy & Filter Tanggal
+// Memuat Daftar Arsip dari RTDB dengan Format Nama LANGSIR dd/mm/yyyy, Info Sesi & Filter Tanggal
 window.loadArsipLangsirList = function() {
     const container = document.getElementById('containerListArsipLangsir');
     if (!container) return;
@@ -640,7 +640,6 @@ window.loadArsipLangsirList = function() {
 
             // Jika user memilih tanggal pada filter, saring kuncinya
             if (selectedDate) {
-                // selectedDate format: "YYYY-MM-DD", ID arsip format: "langsir_YYYY_MM_DD"
                 const targetIdPart = `langsir_${selectedDate.replace(/-/g, '_')}`;
                 keys = keys.filter(id => id === targetIdPart);
             }
@@ -653,32 +652,45 @@ window.loadArsipLangsirList = function() {
             let html = '';
             keys.forEach(idLangsir => {
                 let formattedTitle = idLangsir;
-                const parts = idLangsir.split('_'); // ['langsir', '2026', '10', '26']
+                const parts = idLangsir.split('_'); // ['langsir', '2026', '11', '20']
                 if (parts.length === 4) {
                     formattedTitle = `LANGSIR ${parts[3]}/${parts[2]}/${parts[1]}`;
                 }
 
-                const itemsObj = dataArsip[idLangsir];
+                const itemsObj = dataArsip[idLangsir] || {};
                 const itemKeys = Object.keys(itemsObj);
-                
+
                 let totalKartonArsip = 0;
+                const sessionSet = new Set();
+
                 itemKeys.forEach(k => {
-                    totalKartonArsip += Number(itemsObj[k].STOK || 0);
+                    const row = itemsObj[k] || {};
+                    totalKartonArsip += Number(row.STOK || 0);
+                    const s = Number(row.upload_session || 1) || 1;
+                    sessionSet.add(s);
                 });
+
+                const sortedSessions = Array.from(sessionSet).sort((a, b) => a - b);
+                const badgeSesiHtml = sortedSessions.length > 1
+                    ? `<span class="bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-black px-1.5 py-0.5 rounded">${sortedSessions.length} SESI (${sortedSessions.map(n => `P_${n}`).join(', ')})</span>`
+                    : `<span class="bg-slate-100 text-slate-600 text-[9px] font-bold px-1.5 py-0.5 rounded">P_${sortedSessions[0] || 1}</span>`;
 
                 html += `
                     <div onclick="pilihArsipLangsir('${idLangsir}')" class="bg-white border border-orange-200 rounded-xl p-2.5 shadow-xs hover:shadow-md hover:border-orange-400 cursor-pointer transition flex flex-col space-y-1.5 group">
-                        <div class="flex justify-between items-center">
+                        <div class="flex justify-between items-center gap-1.5">
                             <span class="font-black text-slate-800 text-[11px] uppercase flex items-center gap-1.5 group-hover:text-orange-600 transition">
                                 <i class="fa-solid fa-file-lines text-orange-500"></i> ${formattedTitle}
                             </span>
-                            <span class="bg-orange-100 text-orange-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            <span class="bg-orange-100 text-orange-700 text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap">
                                 ${itemKeys.length} RAK / ${totalKartonArsip.toLocaleString('id-ID')} Krt
                             </span>
                         </div>
-                        <div class="flex justify-between items-center pt-1 border-t border-slate-100">
-                            <span class="text-[10px] text-slate-400 italic">Klik untuk muat ke preview</span>
-                            <button onclick="event.stopPropagation(); cetakArsipLangsir('${idLangsir}')" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] flex items-center gap-1 shadow-sm transition-all">
+                        <div class="flex justify-between items-center pt-1 border-t border-slate-100 gap-2">
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                ${badgeSesiHtml}
+                                <span class="text-[10px] text-slate-400 italic">Klik untuk muat</span>
+                            </div>
+                            <button onclick="event.stopPropagation(); cetakArsipLangsir('${idLangsir}', this)" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold flex items-center gap-1 shadow-sm transition-all shrink-0">
                                 <i class="fa-solid fa-print"></i> Cetak
                             </button>
                         </div>
@@ -802,13 +814,84 @@ window.pilihArsipLangsir = async function(idArsip) {
 };
 
 
-// Stack riwayat penghapusan untuk fitur Batal Hapus (Undo)
-let riwayatHapusKartuLangsir = []; // Menyimpan snapshot kartu { groupKey, groupData }
-let riwayatHapusRakLangsir = [];   // Menyimpan snapshot rak { groupKey, index, item, groupMeta }
+// Stack riwayat penghapusan untuk fitur Batal Hapus (Undo) & Hapus Permanen RTDB
+let riwayatHapusKartuLangsir = [];    // Menyimpan snapshot kartu { groupKey, groupData }
+let riwayatHapusRakLangsir = [];      // Menyimpan snapshot rak { groupKey, index, item, groupMeta }
+let pendingHapusKodeRtdbLangsir = [];  // Antrean hapus permanen kode barang (beserta list rak-nya)
+let pendingHapusRakRtdbLangsir = [];   // Antrean hapus permanen rak satuan
+
+function getPartDariGroupLangsir(groupKey, groupData, itemObj = null) {
+    const matchKey = String(groupKey || '').match(/_(?:P|S)(\d+)$/i);
+    const p = Number(
+        itemObj?.upload_session ??
+        itemObj?.uploadSession ??
+        groupData?.uploadSession ??
+        groupData?.upload_session ??
+        (matchKey ? matchKey[1] : 1)
+    );
+    return p > 0 ? p : 1;
+}
+
+function mapItemUntukHapusRtdb(groupKey, groupData, it) {
+    const kodeBrg = String(groupData?.kodeBarang || groupKey || '')
+        .replace(/_(?:P|S)\d+$/i, '')
+        .trim()
+        .toUpperCase();
+
+    return {
+        groupKey,
+        kodeBarang: String(it?.KODE || kodeBrg).trim().toUpperCase(),
+        kodeLokasi: String(it?.KODE_LOKASI || '').trim(),
+        stok: Number(it?.STOK || 0),
+        expdate: String(it?.EXPDATE || '').trim(),
+        partNum: getPartDariGroupLangsir(groupKey, groupData, it)
+    };
+}
+
+function catatPendingHapusKodeRtdb(groupKey, groupData) {
+    const kodeBrg = String(groupData?.kodeBarang || groupKey || '')
+        .replace(/_(?:P|S)\d+$/i, '')
+        .trim()
+        .toUpperCase();
+    const partNum = getPartDariGroupLangsir(groupKey, groupData);
+    const items = (groupData?.items || []).map(it => mapItemUntukHapusRtdb(groupKey, groupData, it));
+
+    pendingHapusKodeRtdbLangsir.push({
+        groupKey,
+        kodeBarang: kodeBrg,
+        partNum,
+        items
+    });
+}
+
+function catatPendingHapusRakRtdb(groupKey, groupData, item) {
+    pendingHapusRakRtdbLangsir.push(mapItemUntukHapusRtdb(groupKey, groupData, item));
+}
+
+function batalkanPendingHapusKodeRtdb(groupKey) {
+    const idx = pendingHapusKodeRtdbLangsir.findIndex(p => p.groupKey === groupKey);
+    if (idx !== -1) {
+        pendingHapusKodeRtdbLangsir.splice(idx, 1);
+    }
+}
+
+function batalkanPendingHapusRakRtdb(groupKey, itemCocok) {
+    const idx = pendingHapusRakRtdbLangsir.findIndex(p =>
+        p.groupKey === groupKey &&
+        String(p.kodeLokasi) === String(itemCocok?.KODE_LOKASI || '').trim() &&
+        Number(p.stok) === Number(itemCocok?.STOK || 0) &&
+        String(p.expdate) === String(itemCocok?.EXPDATE || '').trim()
+    );
+    if (idx !== -1) {
+        pendingHapusRakRtdbLangsir.splice(idx, 1);
+    }
+}
 
 function updateBadgeBatalHapusLangsir() {
     const jmlKartu = riwayatHapusKartuLangsir.length;
     const jmlRak = riwayatHapusRakLangsir.length;
+    const jmlPermKode = pendingHapusKodeRtdbLangsir.length;
+    const jmlPermRak = pendingHapusRakRtdbLangsir.length;
     const total = jmlKartu + jmlRak;
 
     const badgeTotal = document.getElementById('badgeCountBatalHapusLangsir');
@@ -827,11 +910,23 @@ function updateBadgeBatalHapusLangsir() {
     const elCountRak = document.getElementById('countUndoRakLangsir');
     if (elCountRak) elCountRak.innerText = String(jmlRak);
 
+    const elCountPermKode = document.getElementById('countHapusPermanenKodeLangsir');
+    if (elCountPermKode) elCountPermKode.innerText = String(jmlPermKode);
+
+    const elCountPermRak = document.getElementById('countHapusPermanenRakLangsir');
+    if (elCountPermRak) elCountPermRak.innerText = String(jmlPermRak);
+
     const btnKartu = document.getElementById('btnUndoKartuLangsir');
     if (btnKartu) btnKartu.disabled = jmlKartu === 0;
 
     const btnRak = document.getElementById('btnUndoRakLangsir');
     if (btnRak) btnRak.disabled = jmlRak === 0;
+
+    const btnPermKode = document.getElementById('btnHapusPermanenKodeLangsir');
+    if (btnPermKode) btnPermKode.disabled = jmlPermKode === 0;
+
+    const btnPermRak = document.getElementById('btnHapusPermanenRakLangsir');
+    if (btnPermRak) btnPermRak.disabled = jmlPermRak === 0;
 }
 
 window.togglePopoverBatalHapusLangsir = function(event) {
@@ -864,7 +959,7 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// Fungsi Hapus Seluruh Kartu Berdasarkan GroupKey / Kode Barang (tercatat untuk Batal Hapus Kode Barang)
+// Fungsi Hapus Seluruh Kartu Berdasarkan GroupKey / Kode Barang
 window.hapusKartuLangsir = function(groupKey) {
     if (langsirCacheData[groupKey]) {
         const snapshotGroup = {
@@ -879,13 +974,15 @@ window.hapusKartuLangsir = function(groupKey) {
             groupData: snapshotGroup
         });
 
+        catatPendingHapusKodeRtdb(groupKey, snapshotGroup);
+
         delete langsirCacheData[groupKey];
         updateBadgeBatalHapusLangsir();
         renderPreviewLangsir();
     }
 };
 
-// Fungsi Hapus Baris Rak Satuan (tercatat untuk Batal Hapus Rak)
+// Fungsi Hapus Baris Rak Satuan
 window.hapusItemLangsir = function(groupKey, index) {
     if (langsirCacheData[groupKey] && Array.isArray(langsirCacheData[groupKey].items)) {
         const containerKartu = document.getElementById(`scroll_container_${groupKey}`);
@@ -906,6 +1003,8 @@ window.hapusItemLangsir = function(groupKey, index) {
             item: { ...removedItem },
             groupMeta: groupMeta
         });
+
+        catatPendingHapusRakRtdb(groupKey, langsirCacheData[groupKey], removedItem);
 
         langsirCacheData[groupKey].items.splice(index, 1);
         if (langsirCacheData[groupKey].items.length === 0) {
@@ -946,6 +1045,8 @@ window.batalHapusKodeBarangLangsir = function() {
         langsirCacheData[groupKey].items = [...existingItems, ...restoredItems];
     }
 
+    batalkanPendingHapusKodeRtdb(groupKey);
+
     tutupPopoverBatalHapusLangsir();
     updateBadgeBatalHapusLangsir();
     renderPreviewLangsir();
@@ -984,6 +1085,8 @@ window.batalHapusRakLangsir = function() {
     const insertPos = Math.max(0, Math.min(Number(index ?? targetItems.length), targetItems.length));
     targetItems.splice(insertPos, 0, { ...item });
 
+    batalkanPendingHapusRakRtdb(groupKey, item);
+
     tutupPopoverBatalHapusLangsir();
     updateBadgeBatalHapusLangsir();
     renderPreviewLangsir();
@@ -991,6 +1094,153 @@ window.batalHapusRakLangsir = function() {
     if (typeof miuiAlert === 'function') {
         const rakLabel = item.KODE_LOKASI || '-';
         miuiAlert(`Batal hapus berhasil: rak ${rakLabel} (${item.STOK || 0} Krt) dikembalikan.`);
+    }
+};
+
+// Hapus permanen Kode Barang dari Firebase RTDB
+window.hapusPermanenKodeLangsir = function() {
+    if (pendingHapusKodeRtdbLangsir.length === 0) {
+        if (typeof miuiAlert === 'function') miuiAlert("Tidak ada kode barang yang dihapus untuk dihapus permanen.");
+        tutupPopoverBatalHapusLangsir();
+        return;
+    }
+
+    const idArsip = window.currentActiveArsipId;
+    if (!idArsip) {
+        if (typeof miuiAlert === 'function') miuiAlert("Belum ada arsip aktif di RTDB untuk menghapus permanen kode.");
+        tutupPopoverBatalHapusLangsir();
+        return;
+    }
+
+    const jmlKode = pendingHapusKodeRtdbLangsir.length;
+    const pesan = `Hapus permanen ${jmlKode} kode barang dari arsip [ ${idArsip} ] di Firebase RTDB?`;
+
+    const jalankanHapusKode = async () => {
+        try {
+            const dbRef = firebase.database().ref(`data_langsir/${idArsip}`);
+            const snap = await dbRef.once('value');
+
+            if (snap.exists()) {
+                const nextDbData = { ...(snap.val() || {}) };
+
+                Object.keys(nextDbData).forEach(dbKey => {
+                    const dbItem = nextDbData[dbKey];
+                    if (!dbItem) return;
+
+                    const dbKode = String(dbItem.KODE || '').trim().toUpperCase();
+                    const dbPart = Number(dbItem.upload_session || 1);
+
+                    const cocokKode = pendingHapusKodeRtdbLangsir.some(p =>
+                        p.kodeBarang === dbKode && p.partNum === dbPart
+                    );
+
+                    if (cocokKode) {
+                        delete nextDbData[dbKey];
+                    }
+                });
+
+                await dbRef.set(nextDbData);
+            }
+
+            pendingHapusKodeRtdbLangsir = [];
+            riwayatHapusKartuLangsir = [];
+            updateBadgeBatalHapusLangsir();
+            tutupPopoverBatalHapusLangsir();
+
+            if (typeof miuiAlert === 'function') {
+                miuiAlert(`Berhasil menghapus permanen ${jmlKode} kode barang dari RTDB (${idArsip})!`);
+            }
+
+            if (typeof window.pilihArsipLangsir === 'function') {
+                await window.pilihArsipLangsir(idArsip);
+            }
+        } catch (err) {
+            console.error("Gagal hapus permanen kode di RTDB:", err);
+            if (typeof miuiAlert === 'function') miuiAlert("Gagal menghapus permanen kode barang di RTDB.");
+        }
+    };
+
+    if (typeof miuiConfirm === 'function') {
+        miuiConfirm(pesan, jalankanHapusKode);
+    } else if (confirm(pesan)) {
+        jalankanHapusKode();
+    }
+};
+
+// Hapus permanen Rak satuan dari Firebase RTDB
+window.hapusPermanenRakLangsir = function() {
+    if (pendingHapusRakRtdbLangsir.length === 0) {
+        if (typeof miuiAlert === 'function') miuiAlert("Tidak ada rak yang dihapus untuk dihapus permanen.");
+        tutupPopoverBatalHapusLangsir();
+        return;
+    }
+
+    const idArsip = window.currentActiveArsipId;
+    if (!idArsip) {
+        if (typeof miuiAlert === 'function') miuiAlert("Belum ada arsip aktif di RTDB untuk menghapus permanen rak.");
+        tutupPopoverBatalHapusLangsir();
+        return;
+    }
+
+    const jmlRak = pendingHapusRakRtdbLangsir.length;
+    const pesan = `Hapus permanen ${jmlRak} data rak dari arsip [ ${idArsip} ] di Firebase RTDB?`;
+
+    const jalankanHapusRak = async () => {
+        try {
+            const dbRef = firebase.database().ref(`data_langsir/${idArsip}`);
+            const snap = await dbRef.once('value');
+
+            if (snap.exists()) {
+                const nextDbData = { ...(snap.val() || {}) };
+
+                Object.keys(nextDbData).forEach(dbKey => {
+                    const dbItem = nextDbData[dbKey];
+                    if (!dbItem) return;
+
+                    const dbKode = String(dbItem.KODE || '').trim().toUpperCase();
+                    const dbLokasi = String(dbItem.KODE_LOKASI || '').trim();
+                    const dbStok = Number(dbItem.STOK || 0);
+                    const dbExp = String(dbItem.EXPDATE || '').trim();
+                    const dbPart = Number(dbItem.upload_session || 1);
+
+                    const cocokRak = pendingHapusRakRtdbLangsir.some(p =>
+                        p.kodeBarang === dbKode &&
+                        p.partNum === dbPart &&
+                        p.kodeLokasi === dbLokasi &&
+                        p.stok === dbStok &&
+                        p.expdate === dbExp
+                    );
+
+                    if (cocokRak) {
+                        delete nextDbData[dbKey];
+                    }
+                });
+
+                await dbRef.set(nextDbData);
+            }
+
+            pendingHapusRakRtdbLangsir = [];
+            riwayatHapusRakLangsir = [];
+            updateBadgeBatalHapusLangsir();
+            tutupPopoverBatalHapusLangsir();
+
+            if (typeof miuiAlert === 'function') {
+                miuiAlert(`Berhasil menghapus permanen ${jmlRak} data rak dari RTDB (${idArsip})!`);
+            }
+
+            if (typeof window.pilihArsipLangsir === 'function') {
+                await window.pilihArsipLangsir(idArsip);
+            }
+        } catch (err) {
+            console.error("Gagal hapus permanen rak di RTDB:", err);
+            if (typeof miuiAlert === 'function') miuiAlert("Gagal menghapus permanen data rak di RTDB.");
+        }
+    };
+
+    if (typeof miuiConfirm === 'function') {
+        miuiConfirm(pesan, jalankanHapusRak);
+    } else if (confirm(pesan)) {
+        jalankanHapusRak();
     }
 };
 
@@ -1162,32 +1412,252 @@ async function eksekusiHapusArsip(oldId) {
     }
 }
 
-// 2. Fungsi Cetak Arsip Langsung
-window.cetakArsipLangsir = async function(tanggalArsip) {
-    if (tanggalArsip) {
-        // Muat data dulu ke variabel global, lalu cetak
-        await window.pilihArsipLangsir(tanggalArsip);
+let pendingCetakArsipLangsir = {
+    tanggalArsip: null,
+    dataLangsir: null,
+    sessions: []
+};
+
+function ekstrakNomorSesiItemLangsir(key, val) {
+    if (val && typeof val === 'object' && !Array.isArray(val)) {
+        if (val.uploadSession) return Number(val.uploadSession) || 1;
+        if (val.upload_session) return Number(val.upload_session) || 1;
+        if (Array.isArray(val.items) && val.items.length > 0) {
+            const first = val.items[0];
+            if (first.uploadSession) return Number(first.uploadSession) || 1;
+            if (first.upload_session) return Number(first.upload_session) || 1;
+        }
     }
-    
+    const matchKey = String(key || '').match(/_(?:S|P)(\d+)$/i);
+    if (matchKey) return Number(matchKey[1]) || 1;
+    return 1;
+}
+
+window.tutupPopoverPilihSesiCetakLangsir = function() {
+    const pop = document.getElementById('popoverPilihSesiCetakLangsir');
+    if (pop) {
+        pop.classList.remove('flex');
+        pop.classList.add('hidden');
+    }
+};
+
+function tampilkanPopoverSesiDiTombol(btnRect, idArsip, sessions) {
+    const pop = document.getElementById('popoverPilihSesiCetakLangsir');
+    if (!pop) return;
+
+    const labelEl = document.getElementById('labelArsipSesiCetak');
+    if (labelEl) {
+        const parts = String(idArsip || '').split('_');
+        labelEl.innerText = parts.length === 4 ? `LANGSIR ${parts[3]}/${parts[2]}/${parts[1]}` : idArsip;
+    }
+
+    const listEl = document.getElementById('listSesiCetakLangsir');
+    if (listEl) {
+        listEl.innerHTML = sessions.map(s => `
+            <div onclick="pilihSesiDanCetakLangsir(${s.session})" class="bg-white border border-orange-200 rounded-xl p-2.5 shadow-xs hover:shadow-md hover:border-orange-400 cursor-pointer transition flex flex-col space-y-1.5 group">
+                <div class="flex justify-between items-center gap-1.5">
+                    <span class="font-black text-slate-800 text-[11px] uppercase flex items-center gap-1.5 group-hover:text-orange-600 transition">
+                        <span class="bg-orange-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded">P_${s.session}</span>
+                        <span>SESI KE-${s.session}</span>
+                    </span>
+                    <span class="bg-orange-100 text-orange-700 text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap">
+                        ${s.totalRak.toLocaleString('id-ID')} RAK / ${s.totalQty.toLocaleString('id-ID')} Krt
+                    </span>
+                </div>
+                <div class="flex justify-between items-center pt-1 border-t border-slate-100">
+                    <span class="text-[10px] text-slate-400 italic">${s.totalKartu} Kartu Kode</span>
+                    <span class="px-2 py-0.5 bg-emerald-600 group-hover:bg-emerald-700 text-white rounded text-[10px] font-bold flex items-center gap-1 shadow-xs transition">
+                        <i class="fa-solid fa-print"></i> Cetak Sesi ${s.session}
+                    </span>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    pop.classList.remove('hidden');
+    pop.classList.add('flex');
+
+    // <-- LETAKKAN BLOK PENEMPATAN POSISINYA DI SINI -->
+    if (btnRect) {
+        const popWidth = pop.offsetWidth || 320;
+        const popHeight = pop.offsetHeight || 240;
+        const gap = 8;
+
+        // Tombol Cetak ada di sisi kanan; letakkan popover di sebelah kirinya agar tidak menabrak tepi kanan layar
+        let left = btnRect.left - popWidth - gap;
+        let top = btnRect.top - 10;
+
+        // Jika ruang di sebelah kiri tidak cukup, letakkan rata kanan di bawah tombol
+        if (left < 8) {
+            left = btnRect.right - popWidth;
+            top = btnRect.bottom + gap;
+        }
+        if (left < 8) left = 8;
+        if (left + popWidth > window.innerWidth - 8) {
+            left = window.innerWidth - popWidth - 8;
+        }
+
+        // Jaga agar tidak keluar batas atas / bawah layar
+        if (top + popHeight > window.innerHeight - 8) {
+            top = window.innerHeight - popHeight - 8;
+        }
+        if (top < 8) top = 8;
+
+        pop.style.left = `${Math.round(left)}px`;
+        pop.style.top = `${Math.round(top)}px`;
+        pop.style.right = 'auto';
+    }
+}
+
+window.pilihSesiDanCetakLangsir = function(sessionFilter) {
+    const { tanggalArsip, dataLangsir } = pendingCetakArsipLangsir || {};
+    tutupPopoverPilihSesiCetakLangsir();
+    if (dataLangsir) {
+        window.currentLangsirData = dataLangsir;
+    }
+    if (tanggalArsip) {
+        window.currentActiveArsipId = tanggalArsip;
+    }
     if (typeof cetakDataLangsir === 'function') {
-        cetakDataLangsir();
+        cetakDataLangsir(sessionFilter);
     } else {
         window.print();
     }
 };
 
-window.cetakDataLangsir = function() {
-    const dataLangsir = window.currentLangsirData || langsirCacheData; 
-    
+// 2. Fungsi Cetak Arsip (Deteksi Sesi: 1 sesi langsung cetak, >1 sesi munculkan popover di tombol Cetak)
+window.cetakArsipLangsir = async function(tanggalArsip, triggerEl = null) {
+    const btnEl =
+        (triggerEl && triggerEl.nodeType === 1 ? triggerEl : null) ||
+        (triggerEl && triggerEl.currentTarget ? triggerEl.currentTarget : null) ||
+        (triggerEl && triggerEl.target && triggerEl.target.closest ? triggerEl.target.closest('button') : null) ||
+        document.querySelector(`#containerListArsipLangsir button[onclick*="${tanggalArsip}"]`);
+
+    const btnRect = btnEl ? btnEl.getBoundingClientRect() : null;
+
+    if (!tanggalArsip) return;
+
+    try {
+        // Ambil langsung dari RTDB tanpa memanggil pilihArsipLangsir() agar #popoverArsipLangsir tidak ikut tertutup
+        const snap = await firebase.database().ref(`data_langsir/${tanggalArsip}`).once('value');
+        if (!snap.exists()) {
+            if (typeof miuiAlert === 'function') miuiAlert("Data arsip untuk dicetak tidak ditemukan!");
+            return;
+        }
+
+        const rawDbObj = snap.val() || {};
+        const sessionMap = new Map();
+        const tempLangsirData = {};
+
+        Object.entries(rawDbObj).forEach(([dbKey, item]) => {
+            if (!item) return;
+            const kodeBarangBase = String(item.KODE || 'PRODUK').trim().toUpperCase();
+            const rawSession = Number(item.upload_session || 1);
+            const sessionNum = rawSession > 0 ? rawSession : 1;
+            const groupKey = `${kodeBarangBase}_P${sessionNum}`;
+            const namaBarangAsli = item.NAMA_BARANG || item.NAMA_RASA || item.NAMA || kodeBarangBase;
+            const stokVal = Number(item.STOK || 0);
+
+            if (!tempLangsirData[groupKey]) {
+                tempLangsirData[groupKey] = {
+                    namaRasa: namaBarangAsli,
+                    kodeBarang: kodeBarangBase,
+                    uploadSession: sessionNum,
+                    items: []
+                };
+            }
+
+            tempLangsirData[groupKey].items.push({
+                KODE_LOKASI: item.KODE_LOKASI,
+                KODE: kodeBarangBase,
+                NAMA_BARANG: namaBarangAsli,
+                STOK: stokVal,
+                EXPDATE: item.EXPDATE,
+                BARCODE: item.BARCODE,
+                KODE_PALLET: item.KODE_PALLET,
+                upload_session: sessionNum
+            });
+
+            if (!sessionMap.has(sessionNum)) {
+                sessionMap.set(sessionNum, {
+                    session: sessionNum,
+                    totalKartu: 0,
+                    totalRak: 0,
+                    totalQty: 0
+                });
+            }
+            const info = sessionMap.get(sessionNum);
+            info.totalRak += 1;
+            info.totalQty += stokVal;
+        });
+
+        sessionMap.forEach((info, sNum) => {
+            let jmlKartu = 0;
+            Object.values(tempLangsirData).forEach(grp => {
+                if (Number(grp.uploadSession || 1) === sNum) jmlKartu += 1;
+            });
+            info.totalKartu = jmlKartu;
+        });
+
+        // Simpan data cetak sementara tanpa merusak preview layar yang sedang aktif
+        window._cetakTempLangsirData = tempLangsirData;
+        window._cetakTempArsipId = tanggalArsip;
+
+        const sessions = Array.from(sessionMap.values()).sort((a, b) => a.session - b.session);
+
+        if (sessions.length <= 1) {
+            const singleSession = sessions.length === 1 ? sessions[0].session : 'ALL';
+            window.currentLangsirData = tempLangsirData;
+            window.currentActiveArsipId = tanggalArsip;
+            if (typeof cetakDataLangsir === 'function') {
+                cetakDataLangsir(singleSession);
+            } else {
+                window.print();
+            }
+            return;
+        }
+
+        pendingCetakArsipLangsir = {
+            tanggalArsip,
+            dataLangsir: tempLangsirData,
+            sessions
+        };
+        tampilkanPopoverSesiDiTombol(btnRect, tanggalArsip, sessions);
+    } catch (err) {
+        console.error("Gagal menyiapkan cetak arsip:", err);
+        if (typeof miuiAlert === 'function') miuiAlert("Gagal memuat data cetak arsip.");
+    }
+};
+
+window.cetakDataLangsir = function(sessionFilter = 'ALL') {
+    const rawDataLangsir = window.currentLangsirData || langsirCacheData;
+
+    // Saring data sesuai sesi yang dipilih ('ALL' atau nomor sesi tertentu)
+    const filteredEntriesObj = Object.fromEntries(
+        Object.entries(rawDataLangsir || {}).filter(([key, val]) => {
+            if (sessionFilter === 'ALL') return true;
+            return ekstrakNomorSesiItemLangsir(key, val) === Number(sessionFilter);
+        })
+    );
+
+    const dataLangsir = Object.keys(filteredEntriesObj).length > 0 || sessionFilter !== 'ALL'
+        ? filteredEntriesObj
+        : rawDataLangsir;
+
     let formattedTitleDate = "LANGSIR";
     const activeId = window.currentActiveArsipId || "";
-    const parts = activeId.split('_'); 
+    const parts = activeId.split('_');
     if (parts.length === 4) {
         formattedTitleDate = `${parts[3]}/${parts[2]}/${parts[1]}`;
     } else {
         const labelText = document.getElementById('label-tanggal-langsir')?.innerText;
         if (labelText) formattedTitleDate = labelText;
     }
+
+    const partNum = Number(sessionFilter);
+    const hasPart = sessionFilter !== 'ALL' && !Number.isNaN(partNum) && partNum > 0;
+    const labelPartHtml = hasPart ? `<span class="header-part">(Part ${partNum})</span>` : '';
+    const titlePlainPart = hasPart ? ` (Part ${partNum})` : '';
 
     if (!dataLangsir || Object.keys(dataLangsir).length === 0) {
         if (typeof miuiAlert === 'function') miuiAlert("Tidak ada data langsir untuk dicetak!");
@@ -1210,7 +1680,7 @@ window.cetakDataLangsir = function() {
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Cetak Langsir ${formattedTitleDate}</title>
+            <title>Cetak Langsir ${formattedTitleDate}${titlePlainPart}</title>
             <style>
                 @page {
                     size: 215mm 330mm portrait;
@@ -1255,6 +1725,11 @@ window.cetakDataLangsir = function() {
                     letter-spacing: 0.5px;
                     margin-bottom: 4px;
                 }
+                .header-part {
+                    font-size: 14px;
+                    font-weight: 700;
+                    margin-left: 4px;
+                }
                 .header-line {
                     border-bottom: 2.5px solid #000;
                     margin-top: 3px;
@@ -1285,7 +1760,7 @@ window.cetakDataLangsir = function() {
                     justify-content: space-between;
                     align-items: center;
                     margin-bottom: 4px;
-                    font-size: 15px; 
+                    font-size: 15px;
                 }
                 .card-items {
                     display: flex;
@@ -1300,7 +1775,7 @@ window.cetakDataLangsir = function() {
                     padding: 2.5px 4px;
                     border-radius: 2px;
                     border: 1.2px solid #000;
-                    font-size: 15px; 
+                    font-size: 15px;
                 }
                 .row-no {
                     color: #000;
@@ -1334,18 +1809,17 @@ window.cetakDataLangsir = function() {
         <body>
     `;
 
-    // Urutkan entries berdasarkan kunci agar kode barang & partnya berdampingan
     const entries = Object.entries(dataLangsir).sort((a, b) => a[0].localeCompare(b[0]));
-    const kartuPerHalaman = 12; // 4 kolom x 3 baris per halaman
+    const kartuPerHalaman = 12;
 
     for (let i = 0; i < entries.length; i += kartuPerHalaman) {
         const chunk = entries.slice(i, i + kartuPerHalaman);
-        
+
         htmlContent += `
         <div class="page">
             <div class="header-container">
                 <div class="top-info-bar">${infoWaktuCetak}</div>
-                <div class="header-title">LANGSIR ${formattedTitleDate}</div>
+                <div class="header-title">LANGSIR ${formattedTitleDate}${labelPartHtml}</div>
                 <div class="header-line"></div>
             </div>
             <div class="grid-container">
@@ -1353,8 +1827,7 @@ window.cetakDataLangsir = function() {
 
         chunk.forEach(([key, val]) => {
             const itemsList = Array.isArray(val) ? val : (val.items || []);
-            
-            // --- URUTKAN BERDASARKAN RAK (KODE_LOKASI) ---
+
             itemsList.sort((a, b) => {
                 const rakA = String(a.KODE_LOKASI || a.sub || '').trim();
                 const rakB = String(b.KODE_LOKASI || b.sub || '').trim();
@@ -1366,18 +1839,15 @@ window.cetakDataLangsir = function() {
                 totalKrtRak += Number(it.STOK || it.val || 0);
             });
 
-            // --- FORMAT LABEL KODE & PART (P_2, P_3, dst) ---
-            let displayCode = key;
-            const sessionNum = Number(val.uploadSession || 0);
-            
-            if (key.includes('_S')) {
-                const partsKey = key.split('_S');
-                const baseName = partsKey[0];
-                const sNum = partsKey[1];
-                displayCode = `${baseName} P_${sNum}`;
-            } else if (sessionNum > 1) {
-                displayCode = `${key} P_${sessionNum}`;
-            }
+            // --- FORMAT LABEL KODE ASLI (TANPA TAMBAHAN P_1 / P_2 / _S...) ---
+            let rawCode = (val && typeof val === 'object' && !Array.isArray(val) && val.kodeBarang)
+                ? String(val.kodeBarang)
+                : String(key || '');
+
+            let displayCode = rawCode
+                .replace(/(?:_S|_P|\s+P_)\d+$/i, '')
+                .trim()
+                .toUpperCase();
 
             htmlContent += `
                 <div class="card">
@@ -1391,7 +1861,7 @@ window.cetakDataLangsir = function() {
             itemsList.forEach((row, index) => {
                 const lokasi = row.KODE_LOKASI || row.sub || '-';
                 const stok = row.STOK !== undefined ? row.STOK : (row.val || 0);
-                
+
                 htmlContent += `
                     <div class="card-row">
                         <span class="row-no">${index + 1}.</span>
