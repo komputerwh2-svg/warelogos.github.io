@@ -178,7 +178,39 @@
 
                 <!-- Panel Bawah: Riwayat Trobel -->
                 <div class="bg-white p-5 rounded-2xl shadow-sm border border-orange-500">
-                    <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider mb-3">Riwayat DO Trobel</h3>
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 mb-3">
+                        <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider">Riwayat DO Trobel</h3>
+
+                        <div class="flex flex-wrap items-center gap-2">
+                            <div class="relative">
+                                <input
+                                    type="date"
+                                    id="filter-trobel-tgl"
+                                    onchange="renderTabelRiwayatTrobelTersaring()"
+                                    title="Cari berdasarkan Tanggal DO"
+                                    class="px-2.5 py-1.5 text-[11px] font-bold text-slate-800 border border-orange-300 rounded-lg bg-white focus:outline-none focus:border-orange-500"
+                                >
+                            </div>
+
+                            <div class="relative">
+                                <input
+                                    type="text"
+                                    id="filter-trobel-cari"
+                                    oninput="renderTabelRiwayatTrobelTersaring()"
+                                    placeholder="Cari Tujuan atau No. DN/DO..."
+                                    class="w-52 sm:w-60 px-2.5 py-1.5 text-[11px] font-bold text-slate-800 border border-orange-300 rounded-lg bg-white uppercase placeholder:normal-case placeholder:font-normal focus:outline-none focus:border-orange-500"
+                                >
+                            </div>
+
+                            <button
+                                type="button"
+                                onclick="resetFilterRiwayatTrobel()"
+                                class="px-2.5 py-1.5 text-[10px] font-black text-slate-600 hover:text-orange-600 bg-slate-100 hover:bg-orange-50 border border-slate-200 rounded-lg transition"
+                            >
+                                Reset
+                            </button>
+                        </div>
+                    </div>
                     <div class="overflow-x-auto max-h-[450px] overflow-y-auto miui-custom-scroll">
                         <table class="w-full text-left border-collapse text-[11px]">
                             <thead>
@@ -347,7 +379,39 @@
 
                 <!-- Panel Bawah: Riwayat Klaim -->
                 <div class="bg-white p-5 rounded-2xl shadow-sm border border-orange-500">
-                    <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider mb-3">Riwayat Klaim</h3>
+                   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 mb-3">
+                        <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider">Riwayat Klaim</h3>
+
+                        <div class="flex flex-wrap items-center gap-2">
+                            <div class="relative">
+                                <input
+                                    type="date"
+                                    id="filter-klaim-tgl"
+                                    onchange="renderTabelRiwayatKlaimTersaring()"
+                                    title="Cari berdasarkan Tanggal DO"
+                                    class="px-2.5 py-1.5 text-[11px] font-bold text-slate-800 border border-orange-300 rounded-lg bg-white focus:outline-none focus:border-orange-500"
+                                >
+                            </div>
+
+                            <div class="relative">
+                                <input
+                                    type="text"
+                                    id="filter-klaim-cari"
+                                    oninput="renderTabelRiwayatKlaimTersaring()"
+                                    placeholder="Cari No. DO/DN atau Tujuan..."
+                                    class="w-52 sm:w-60 px-2.5 py-1.5 text-[11px] font-bold text-slate-800 border border-orange-300 rounded-lg bg-white uppercase placeholder:normal-case placeholder:font-normal focus:outline-none focus:border-orange-500"
+                                >
+                            </div>
+
+                            <button
+                                type="button"
+                                onclick="resetFilterRiwayatKlaim()"
+                                class="px-2.5 py-1.5 text-[10px] font-black text-slate-600 hover:text-orange-600 bg-slate-100 hover:bg-orange-50 border border-slate-200 rounded-lg transition"
+                            >
+                                Reset
+                            </button>
+                        </div>
+                    </div>
                     <div class="overflow-x-auto max-h-[450px] overflow-y-auto miui-custom-scroll">
                         <table class="w-full text-left border-collapse text-[11px]">
                             <thead>
