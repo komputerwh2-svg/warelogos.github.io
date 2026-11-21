@@ -59,13 +59,37 @@ function getPembagiKrtPaket(jenisPaket) {
     return 1;
 }
 
+//Helper Format Rincian Konversi
+function formatRincianKonversiPaket(jenisPaket, qty) {
+    const jenis = String(jenisPaket || '').trim().toUpperCase();
+    const totalQty = Number(qty) || 0;
+    if (!jenis || totalQty <= 0) return '';
+
+    const kapasitasKrt = (jenis === 'PR-PKT59') ? 3 : 6;
+    const krt = Math.floor(totalQty / kapasitasKrt);
+    const sisaPkt = totalQty % kapasitasKrt;
+
+    const bagian = [];
+    if (krt > 0) bagian.push(`${krt} KRT`);
+    if (sisaPkt > 0) bagian.push(`${sisaPkt} PKT`);
+
+    const infoKonversi = bagian.length ? ` ( ${bagian.join(' + ')} )` : '';
+    return `${jenis} = ${totalQty} PKT${infoKonversi}`;
+}
+
 function formatRincianPaketWatermark(jenisPaket, qtyPkt) {
     const kode = String(jenisPaket || '').trim().toUpperCase();
     const qty = Math.max(0, parseInt(qtyPkt, 10) || 0);
     const pembagi = getPembagiKrtPaket(kode);
     const krt = Math.floor(qty / pembagi);
     const sisaPkt = qty % pembagi;
-    return `${kode} = ${qty} PKT ( ${krt} KRT + ${sisaPkt} PKT )`;
+
+    const bagian = [];
+    if (krt > 0) bagian.push(`${krt} KRT`);
+    if (sisaPkt > 0) bagian.push(`${sisaPkt} PKT`);
+
+    const rincian = bagian.length ? ` ( ${bagian.join(' + ')} )` : '';
+    return `${kode} = ${qty} PKT${rincian}`;
 }
 
 function tampilkanToastPaket(pesan, tipe = 'info') {
@@ -157,20 +181,32 @@ function renderDaftarItemPaketSementara() {
         return;
     }
 
-    container.innerHTML = daftarItemPaketSementara.map((item, idx) => `
+    container.innerHTML = daftarItemPaketSementara.map((item, idx) => {
+        const kode = String(item.jenis_paket || '').trim().toUpperCase();
+        const qty = Math.max(0, parseInt(item.qty, 10) || 0);
+        const pembagi = getPembagiKrtPaket(kode);
+        const krt = Math.floor(qty / pembagi);
+        const sisaPkt = qty % pembagi;
+
+        const bagian = [];
+        if (krt > 0) bagian.push(`${krt} KRT`);
+        if (sisaPkt > 0) bagian.push(`${sisaPkt} PKT`);
+        const teksKonversi = bagian.length ? `(${bagian.join(' + ')})` : '';
+
+        return `
         <div class="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-orange-50 border border-orange-200">
             <div class="min-w-0">
-                <span class="font-black text-orange-700 text-[11px]">${escapeHTMLPaket(item.jenis_paket)}</span>
-                <span class="text-slate-700 font-bold text-[11px] ml-1.5">= ${item.qty} PKT</span>
-                <span class="text-slate-500 font-semibold text-[10px] ml-1">(${Math.floor(item.qty / getPembagiKrtPaket(item.jenis_paket))} KRT + ${item.qty % getPembagiKrtPaket(item.jenis_paket)} PKT)</span>
+                <span class="font-black text-orange-700 text-[11px]">${escapeHTMLPaket(kode)}</span>
+                <span class="text-slate-700 font-bold text-[11px] ml-1.5">= ${qty} PKT</span>
+                ${teksKonversi ? `<span class="text-slate-500 font-semibold text-[10px] ml-1">${teksKonversi}</span>` : ''}
             </div>
             <button type="button" onclick="hapusItemPaketSementara(${idx})"
                 class="w-6 h-6 rounded bg-rose-100 hover:bg-rose-200 text-rose-700 flex items-center justify-center shrink-0 transition"
                 title="Hapus item">
                 <i class="fa-solid fa-xmark text-xs"></i>
             </button>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
 }
 
 function tambahItemPaketKeList() {
@@ -1091,7 +1127,186 @@ window.initPaketPajang = function () {
 };
 
 // =========================================================
-// 7. EKSPOR FUNGSI KE GLOBAL WINDOW
+// 7. CETAK LABEL F4 PORTRAIT & ANTREAN PRINT_JOBS
+// =========================================================
+const RTDB_BASE_URL_PAKET = 'https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app';
+
+function getSisaPktDariItem(jenisPaket, qty) {
+    const jenis = String(jenisPaket || '').trim().toUpperCase();
+    const totalQty = Number(qty) || 0;
+    if (totalQty <= 0) return 0;
+
+    // Jika sudah ada helper konversi KRT + sisa PKT di js/paket.js, pakai itu
+    if (typeof hitungKonversiPaket === 'function') {
+        const res = hitungKonversiPaket(jenis, totalQty);
+        if (res && typeof res.sisaPkt === 'number') {
+            return res.sisaPkt;
+        }
+    }
+
+    // Fallback kapasitas standar: PR-PKT40 & PR-PKT82 = 6 PKT/KRT; PR-PKT59 = 3 PKT/KRT
+    const kapasitasKrt = (jenis === 'PR-PKT59') ? 3 : 6;
+    return totalQty % kapasitasKrt;
+}
+
+function buatHtmlHalamanLabelPaket(daftarLabel) {
+    let pagesHtml = '';
+    const itemsPerPage = 4;
+
+    for (let i = 0; i < daftarLabel.length; i += itemsPerPage) {
+        const chunk = daftarLabel.slice(i, i + itemsPerPage);
+
+        pagesHtml += `
+        <div class="page" style="page-break-after: always; width: 210mm; height: 330mm; padding: 5mm 2mm; box-sizing: border-box; display: grid; grid-template-rows: repeat(4, 1fr); gap: 59px;">`;
+
+        chunk.forEach((lbl) => {
+            const tujuanTeks = escapeHTMLPaket((lbl.tujuan || '').toUpperCase());
+            const jenisTeks = escapeHTMLPaket((lbl.jenis_paket || '').toUpperCase());
+            const sisaAngka = Number(lbl.sisa_pkt) || 0;
+
+            pagesHtml += `
+            <div style="border: 2px solid #000; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; height: 70mm; width: 200mm;">
+                <div style="font-size: 57pt; font-family: Edo; line-height: 1;">${tujuanTeks}</div>
+                <div style="border-top: 2px dashed #000; width: 95%; margin: 12px 0;"></div>
+                <div style="font-size: 49pt; font-family: Edo; line-height: 1;">${jenisTeks} . ${sisaAngka} . PAKET</div>
+            </div>`;
+        });
+
+        pagesHtml += `</div>`;
+    }
+
+    return pagesHtml;
+}
+
+function pecahRecordKeDaftarLabel(records, filterJenis = '') {
+    const hasil = [];
+    const targetJenis = (filterJenis || '').trim().toUpperCase();
+
+    (records || []).forEach((rec) => {
+        const tujuan = (rec.tujuan || '').trim().toUpperCase();
+        const items = Array.isArray(rec.items) ? rec.items : [];
+
+        items.forEach((it) => {
+            const jenis = (it.jenis_paket || '').trim().toUpperCase();
+            if (targetJenis && jenis !== targetJenis) return;
+
+            // Hanya ambil jika ada sisa pembagi KRT (+ PKT > 0)
+            const sisaPkt = getSisaPktDariItem(jenis, it.qty);
+            if (sisaPkt <= 0) return;
+
+            hasil.push({
+                tujuan: tujuan,
+                no_do: (rec.no_do || '').trim().toUpperCase(),
+                jenis_paket: jenis,
+                qty_asal: Number(it.qty) || 0,
+                sisa_pkt: sisaPkt
+            });
+        });
+    });
+
+    return hasil;
+}
+
+async function kirimTugasCetakKePrintJobs(daftarLabel, kodeLabelTugas) {
+    if (!Array.isArray(daftarLabel) || daftarLabel.length === 0) {
+        tampilkanToastPaket('Tidak ada sisa (+ PKT) untuk dicetak labelnya.', 'info');
+        return;
+    }
+
+    if (typeof window.showCetakProgress === 'function') {
+        window.showCetakProgress(`Mengirim Dokumen Cetak Label ${kodeLabelTugas}...`);
+    }
+
+    const pagesHtml = buatHtmlHalamanLabelPaket(daftarLabel);
+    const now = new Date();
+
+    const daftarHari = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const hari = daftarHari[now.getDay()];
+
+    const tgl = String(now.getDate()).padStart(2, '0');
+    const bln = String(now.getMonth() + 1).padStart(2, '0');
+    const thn = now.getFullYear();
+    const tanggalStr = `${tgl}-${bln}-${thn}`;
+
+    const jam = String(now.getHours()).padStart(2, '0');
+    const menit = String(now.getMinutes()).padStart(2, '0');
+    const detik = String(now.getSeconds()).padStart(2, '0');
+    const waktuStr = `${jam}.${menit}.${detik}`;
+
+    const formatWaktuLengkap = `${hari} / ${tanggalStr} / ${waktuStr}`;
+    const judulTugas = `Cetak ${kodeLabelTugas} (${daftarLabel.length} Label)`;
+
+    const safeKode = String(kodeLabelTugas || 'SISA_PKT')
+        .replace(/[^A-Za-z0-9_-]+/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '');
+
+    const safeKeyName = `Cetak_${safeKode}_${daftarLabel.length}_Label_${tgl}-${bln}-${thn}_${jam}-${menit}-${detik}`;
+
+    try {
+        const resp = await fetch(`${RTDB_BASE_URL_PAKET}/print_jobs/${encodeURIComponent(safeKeyName)}.json`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                judul: judulTugas,
+                waktu_teks: formatWaktuLengkap,
+                html: pagesHtml,
+                status: 'PENDING',
+                timestamp: Date.now()
+            }),
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!resp.ok) {
+            throw new Error(`HTTP ${resp.status}`);
+        }
+
+        tampilkanToastPaket(`Proses Mencetak ${daftarLabel.length} Label Sisa PKT (${kodeLabelTugas}).`, 'success');
+    } catch (e) {
+        tampilkanToastPaket(`Gagal mengirim perintah cetak label: ${e.message}`, 'error');
+    }
+}
+
+async function cetakLabelPerTujuanPaket(recordId) {
+    if (!Array.isArray(window.__riwayatPaketHariIniCache)) {
+        await muatRiwayatPaketHariIni();
+    }
+
+    const rec = (window.__riwayatPaketHariIniCache || []).find((item) => item.id === recordId);
+    if (!rec) {
+        tampilkanToastPaket('Data tujuan tidak ditemukan.', 'error');
+        return;
+    }
+
+    const daftarLabel = pecahRecordKeDaftarLabel([rec]);
+    if (!daftarLabel.length) {
+        tampilkanToastPaket(`Tujuan ${rec.tujuan || ''} tidak memiliki sisa (+ PKT) untuk dicetak.`, 'info');
+        return;
+    }
+
+    const kodeTugas = `${rec.tujuan || 'TUJUAN'}_SISA_PKT`;
+    await kirimTugasCetakKePrintJobs(daftarLabel, kodeTugas);
+}
+
+async function cetakLabelHariIniPaket(filterJenis = '') {
+    if (!Array.isArray(window.__riwayatPaketHariIniCache)) {
+        await muatRiwayatPaketHariIni();
+    }
+
+    const records = window.__riwayatPaketHariIniCache || [];
+    const daftarLabel = pecahRecordKeDaftarLabel(records, filterJenis);
+
+    if (!daftarLabel.length) {
+        const infoJenis = filterJenis ? ` ${filterJenis}` : '';
+        tampilkanToastPaket(`Tidak ada sisa (+ PKT)${infoJenis} untuk dicetak hari ini.`, 'info');
+        return;
+    }
+
+    const kodeTugas = filterJenis ? `${filterJenis.toUpperCase()}_SISA_PKT` : 'SISA_PKT_PAJANG';
+    await kirimTugasCetakKePrintJobs(daftarLabel, kodeTugas);
+}
+
+// =========================================================
+// 8. EKSPOR FUNGSI KE GLOBAL WINDOW
 // =========================================================
 window.tambahItemPaketKeList = tambahItemPaketKeList;
 window.hapusItemPaketSementara = hapusItemPaketSementara;
@@ -1112,3 +1327,5 @@ window.jepretFotoWatermarkPaket = jepretFotoWatermarkPaket;
 window.handleFotoFileWatermarkPaket = handleFotoFileWatermarkPaket;
 window.resetModeKameraPaket = resetModeKameraPaket;
 window.simpanHasilFotoWatermarkPaket = simpanHasilFotoWatermarkPaket;
+window.cetakLabelPerTujuanPaket = cetakLabelPerTujuanPaket;
+window.cetakLabelHariIniPaket = cetakLabelHariIniPaket;
