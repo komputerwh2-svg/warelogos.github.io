@@ -1,64 +1,57 @@
 <div id="subpage-paket" class="fixed inset-0 bg-[#f4f4f4] z-[60] translate-x-full transition-transform duration-300 ease-in-out flex flex-col font-sans select-none overflow-hidden">
 
     <!-- Header -->
-    <div class="w-full h-auto min-h-[60px] flex items-center justify-between px-3 shadow-md relative z-10"
+    <div class="w-full h-auto min-h-[60px] flex items-center justify-between gap-2 px-3 shadow-md relative z-10"
         style="background: linear-gradient(to bottom, #3c3c3c, #2a2a2a); border-bottom: 1px solid #1a1a1a;">
 
         <!-- Bagian Kiri: Tombol Kembali & Judul -->
-        <div class="flex flex-wrap items-center gap-3 py-2 px-2">
+        <div class="flex items-center gap-2.5 sm:gap-3 py-2 min-w-0">
             <button type="button" onclick="tutupSubPagePaketPajang()"
-                class="miui-btn-back flex items-center justify-center gap-1 px-3 py-1.5 rounded text-xs font-bold text-orange-400 shadow-inner">
+                class="miui-btn-back flex items-center justify-center gap-1 px-2.5 sm:px-3 py-1.5 rounded text-xs font-bold text-orange-400 shadow-inner shrink-0 whitespace-nowrap">
                 <i class="fa-solid fa-chevron-left text-sm"></i>
                 <span>Kembali</span>
             </button>
 
-            <div class="h-7 w-[1px] bg-white/10 mx-1"></div>
+            <div class="h-7 w-[1px] bg-white/10 shrink-0"></div>
 
-            <div class="flex flex-wrap items-baseline gap-2">
-                <h1 class="text-white font-bold text-[14px] tracking-wide drop-shadow-md">
+            <div class="flex items-baseline gap-2 min-w-0">
+                <h1 class="text-white font-bold text-[13px] sm:text-[14px] tracking-wide drop-shadow-md truncate">
                     Paket Pajang
                 </h1>
-                <span id="label-tanggal-hari-ini" class="text-orange-400 font-mono font-bold text-[11px] tracking-wide"></span>
+                <span id="label-tanggal-hari-ini" class="hidden sm:inline text-orange-400 font-mono font-bold text-[11px] tracking-wide whitespace-nowrap"></span>
             </div>
         </div>
 
-        <!-- Bagian Kanan: Status Koneksi -->
-        <div class="flex items-center gap-2 pr-2">
-            <span id="status-koneksi-paket"
-                class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-black/35 text-orange-300 border border-orange-500/40 shadow-inner">
-                ONLINE
-            </span>
+        <!-- Bagian Kanan: Tombol Kamera (Menggantikan Badge ONLINE) -->
+        <div class="flex items-center shrink-0">
+            <button type="button" id="btn-buka-kamera-paket" onclick="bukaKameraWatermarkPaket()"
+                class="px-3 py-1.5 rounded-lg text-[11px] font-black uppercase text-white bg-orange-600 hover:bg-orange-700 active:scale-95 border border-orange-400/50 transition flex items-center gap-1.5 shadow whitespace-nowrap">
+                <i class="fa-solid fa-camera"></i>
+                <span>Kamera</span>
+            </button>
         </div>
     </div>
 
-    <!-- Main Content Area (Responsif PC & HP) -->
+    <!-- Main Content Area (Responsif PC Samping Kanan & HP Modal Depan) -->
     <div class="flex-1 overflow-y-auto p-3 sm:p-5 bg-[#f4f4f4] miui-custom-scroll">
-        <div class="max-w-3xl mx-auto space-y-4">
+        <div id="paket-main-grid" class="max-w-3xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-4 items-start transition-all duration-300">
 
             <!-- KARTU FORM INPUT PAKET PAJANG -->
-            <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-orange-500 space-y-4">
+            <div id="paket-form-kolom" class="lg:col-span-12 bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-orange-500 space-y-4 transition-all duration-300">
 
-                <!-- Header Form Input + Tombol Kamera & Riwayat di Pojok Kanan Atas -->
-                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-orange-100 pb-3">
-                    <h3 class="text-xs sm:text-sm font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
-                        <i class="fa-solid fa-box-open text-orange-600"></i>
-                        <span>Form Input Paket Pajang</span>
+                <!-- Header Form Input + Tombol Riwayat Tetap di Pojok Kanan Atas -->
+                <div class="flex items-center justify-between gap-2 border-b border-orange-100 pb-3">
+                    <h3 class="text-xs sm:text-sm font-black text-slate-700 uppercase tracking-wider flex items-center gap-2 min-w-0">
+                        <i class="fa-solid fa-box-open text-orange-600 shrink-0"></i>
+                        <span class="truncate">Form Input Paket Pajang</span>
                     </h3>
 
-                    <div class="flex items-center gap-1.5 shrink-0">
-                        <button type="button" id="btn-buka-kamera-paket" onclick="bukaKameraWatermarkPaket()"
-                            class="px-3 py-1.5 rounded-lg text-[11px] font-black uppercase text-white bg-orange-600 hover:bg-orange-700 border border-orange-600 transition flex items-center gap-1.5 shadow-sm">
-                            <i class="fa-solid fa-camera"></i>
-                            <span>Kamera</span>
-                        </button>
-
-                        <button type="button" id="btn-toggle-riwayat-paket" onclick="togglePanelRiwayatPaket()"
-                            class="px-3 py-1.5 rounded-lg text-[11px] font-black uppercase text-orange-700 hover:text-white bg-orange-50 hover:bg-orange-600 border border-orange-300 transition flex items-center gap-1.5 shadow-sm">
-                            <i class="fa-solid fa-clock-rotate-left"></i>
-                            <span>Riwayat</span>
-                            <span id="badge-jumlah-riwayat-paket" class="px-1.5 py-0.2 rounded bg-orange-200/80 text-orange-900 text-[10px] font-mono">0</span>
-                        </button>
-                    </div>
+                    <button type="button" id="btn-toggle-riwayat-paket" onclick="togglePanelRiwayatPaket()"
+                        class="px-2.5 sm:px-3 py-1.5 rounded-lg text-[10px] sm:text-[11px] font-black uppercase text-orange-700 hover:text-white bg-orange-50 hover:bg-orange-600 border border-orange-300 transition flex items-center gap-1.5 shadow-sm shrink-0 whitespace-nowrap">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                        <span>Riwayat</span>
+                        <span id="badge-jumlah-riwayat-paket" class="px-1.5 py-0.5 rounded bg-orange-200/80 text-orange-900 text-[10px] font-mono leading-none">0</span>
+                    </button>
                 </div>
 
                 <!-- Identitas Tujuan: No DO & Tujuan -->
@@ -80,7 +73,8 @@
                             <label for="paket-tujuan" class="text-[10px] font-black text-slate-500 uppercase block mb-1">
                                 Tujuan
                             </label>
-                            <input id="paket-tujuan" type="text" list="list-tujuan-paket" placeholder="Pilih atau ketik tujuan..."
+                            <input id="paket-tujuan" type="text" list="list-tujuan-paket" autocomplete="off"
+                                placeholder="Pilih dari daftar atau ketik tujuan..."
                                 class="w-full p-2.5 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white uppercase placeholder:normal-case placeholder:font-normal placeholder:text-slate-400 focus:outline-none focus:border-orange-500">
                             <datalist id="list-tujuan-paket"></datalist>
                         </div>
@@ -120,7 +114,6 @@
                         </div>
                     </div>
 
-                    <!-- Daftar Item Sementara yang Sudah Ditambahkan -->
                     <div>
                         <div class="text-[10px] font-black text-slate-600 uppercase mb-1.5">
                             Daftar Item Tujuan Ini:
@@ -150,36 +143,39 @@
                 </div>
             </div>
 
-            <!-- PANEL RIWAYAT (TERSEMBUNYI DEFAULT, DIBUKA LEWAT TOMBOL RIWAYAT) -->
-            <div id="panel-riwayat-paket" class="hidden bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-orange-500 space-y-3">
-                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-orange-100 pb-2.5">
-                    <div>
-                        <h3 class="text-xs sm:text-sm font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
-                            <i class="fa-solid fa-list-check text-orange-600"></i>
-                            <span>Riwayat Tujuan Paket Pajang</span>
-                        </h3>
-                        <p id="paket-ringkasan" class="text-[11px] font-bold text-slate-500 mt-0.5">
-                            Total tujuan: 0 | Total QTY: 0
-                        </p>
+            <!-- PANEL RIWAYAT: DEFAULT TERSEMBUNYI; DI HP JADI MODAL DEPAN, DI PC JADI KOLOM KANAN -->
+            <div id="panel-riwayat-paket"
+                class="hidden fixed inset-0 z-[65] bg-slate-950/75 backdrop-blur-[2px] p-3 flex items-center justify-center lg:static lg:inset-auto lg:z-auto lg:bg-transparent lg:backdrop-blur-none lg:p-0">
+                <div class="w-full max-w-lg lg:max-w-none max-h-[88vh] lg:max-h-[calc(100vh-110px)] bg-white p-4 sm:p-5 rounded-2xl shadow-2xl lg:shadow-sm border border-orange-500 flex flex-col space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-orange-100 pb-2.5 shrink-0">
+                        <div>
+                            <h3 class="text-xs sm:text-sm font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                                <i class="fa-solid fa-list-check text-orange-600"></i>
+                                <span>Riwayat Paket</span>
+                            </h3>
+                            <p id="paket-ringkasan" class="text-[11px] font-bold text-slate-500 mt-0.5">
+                                Total tujuan: 0 | Total QTY: 0 PKT
+                            </p>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="muatRiwayatPaketHariIni()"
+                                class="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase text-slate-700 hover:text-orange-600 bg-orange-50 hover:bg-orange-100 border border-orange-300 transition flex items-center gap-1">
+                                <i class="fa-solid fa-rotate-right"></i>
+                                <span>Refresh</span>
+                            </button>
+                            <button type="button" onclick="togglePanelRiwayatPaket(false)"
+                                class="px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition">
+                                Tutup
+                            </button>
+                        </div>
                     </div>
 
-                    <div class="flex items-center gap-2">
-                        <button type="button" onclick="muatRiwayatPaketHariIni()"
-                            class="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase text-slate-700 hover:text-orange-600 bg-orange-50 hover:bg-orange-100 border border-orange-300 transition flex items-center gap-1">
-                            <i class="fa-solid fa-rotate-right"></i>
-                            <span>Refresh</span>
-                        </button>
-                        <button type="button" onclick="togglePanelRiwayatPaket(false)"
-                            class="px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition">
-                            Tutup
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Daftar Data Tujuan + Tombol Cetak di Tiap Baris -->
-                <div id="paket-riwayat-list" class="space-y-2.5 max-h-[420px] overflow-y-auto pr-1 miui-custom-scroll">
-                    <div class="text-center py-8 text-xs font-bold text-slate-400 bg-slate-50 rounded-xl border border-dashed border-orange-200">
-                        Belum ada data tersimpan.
+                    <!-- Daftar Data Tujuan + Tombol Cetak di Tiap Baris -->
+                    <div id="paket-riwayat-list" class="space-y-2.5 overflow-y-auto pr-1 flex-1 miui-custom-scroll">
+                        <div class="text-center py-8 text-xs font-bold text-slate-400 bg-slate-50 rounded-xl border border-dashed border-orange-200">
+                            Belum ada data tersimpan.
+                        </div>
                     </div>
                 </div>
             </div>
@@ -187,9 +183,9 @@
         </div>
     </div>
 
-    <!-- MODAL KAMERA WATERMARK (ALUR TIMEMARK) -->
-    <div id="modal-kamera-paket" class="fixed inset-0 z-[65] hidden bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5">
-        <div class="w-full max-w-2xl bg-white rounded-2xl border border-orange-500 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+    <!-- MODAL KAMERA WATERMARK (ALUR TIMEMARK + LOGO MARIFOOD) -->
+    <div id="modal-kamera-paket" class="fixed inset-0 z-[70] hidden bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-2.5 sm:p-5">
+        <div class="w-full max-w-2xl bg-white rounded-2xl border border-orange-500 shadow-2xl overflow-hidden flex flex-col max-h-[94vh]">
 
             <!-- Header Modal -->
             <div class="px-4 py-3 bg-[#2f2f2f] text-white flex items-center justify-between border-b border-black/30 shrink-0">
@@ -204,37 +200,74 @@
             </div>
 
             <!-- Isi Modal -->
-            <div class="p-4 overflow-y-auto space-y-3 miui-custom-scroll">
+            <div class="p-3.5 sm:p-4 overflow-y-auto space-y-3 miui-custom-scroll">
 
-                <!-- Preview Kamera / Hasil Foto + Overlay Watermark -->
+                <!-- Preview Kamera / Hasil Foto + Overlay Watermark Gaya Timemark -->
                 <div class="relative w-full aspect-[4/3] sm:aspect-video bg-slate-900 rounded-xl overflow-hidden border border-orange-300 flex items-center justify-center">
                     <video id="paket-camera-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
                     <canvas id="paket-watermark-canvas" class="hidden w-full h-full object-contain bg-slate-950"></canvas>
 
-                    <!-- Overlay Watermark Preview (Gaya Timemark) -->
+                    <!-- Overlay Watermark Preview (Gaya Timemark + Logo MariFood) -->
                     <div id="paket-watermark-overlay"
-                        class="pointer-events-none absolute left-3 bottom-3 max-w-[85%] bg-black/65 backdrop-blur-[2px] text-white rounded-lg p-2.5 border-l-4 border-amber-400 shadow-lg text-left space-y-1">
-                        <div class="text-[11px] font-black tracking-wide text-amber-300 leading-tight">
-                            Dokumentasi • Paket Pajang
+                        class="pointer-events-none absolute left-2.5 bottom-2.5 max-w-[88%] bg-[#1e2229]/80 backdrop-blur-[2px] text-white rounded-md p-2 sm:p-2.5 shadow-xl text-left border border-white/10">
+
+                        <!-- Baris Atas: Badge Logo MariFood + Judul Dokumentasi / Paket Pajang -->
+                        <div class="flex items-center gap-2">
+                            <div class="bg-[#ececec] rounded px-1.5 py-1 flex flex-col items-center justify-center shrink-0 shadow-sm">
+                                <svg viewBox="0 0 140 58" class="h-6 sm:h-7 w-auto" aria-label="MariFood">
+                                    <!-- Matahari Oranye & Kuning -->
+                                    <path d="M 52 24 A 18 18 0 0 1 88 24 Z" fill="#f58220"/>
+                                    <path d="M 47 24 A 23 23 0 0 1 93 24" fill="none" stroke="#ffd200" stroke-width="3.2" stroke-linecap="round"/>
+                                    <!-- Gelombang Daun Hijau -->
+                                    <path d="M 40 28 C 56 18, 86 16, 104 25 C 88 23, 68 25, 52 33 Z" fill="#8dc63f"/>
+                                    <path d="M 42 29 C 62 21, 88 22, 103 27 C 86 35, 62 36, 44 31 Z" fill="#009444"/>
+                                    <!-- Teks MariFood -->
+                                    <text x="6" y="52" font-family="Poppins, Arial, sans-serif" font-weight="800" font-size="22" fill="#009444">Mari</text>
+                                    <text x="56" y="52" font-family="Poppins, Arial, sans-serif" font-weight="800" font-size="22" fill="#f58220">food</text>
+                                </svg>
+                            </div>
+
+                            <div class="leading-tight">
+                                <div class="text-xs sm:text-sm font-black text-[#f6d34a] tracking-wide">
+                                    Dokumentasi
+                                </div>
+                                <div class="text-xs sm:text-sm font-extrabold text-white tracking-wide">
+                                    Paket Pajang
+                                </div>
+                            </div>
                         </div>
-                        <div class="flex items-baseline gap-2">
-                            <span id="wm-jam-preview" class="text-lg font-black font-mono leading-none text-white">00:00</span>
-                            <span id="wm-tanggal-preview" class="text-[10px] font-semibold text-slate-200 leading-tight"></span>
+
+                        <!-- Pemisah Aksen Kuning-Hijau -->
+                        <div class="my-1.5 h-[2px] w-full bg-gradient-to-r from-[#ffd200] via-[#8dc63f] to-transparent rounded-full"></div>
+
+                        <!-- Baris Waktu: Jam Besar di Kiri + Hari/Tanggal di Kanan -->
+                        <div class="flex items-center gap-2.5 leading-none mb-1.5">
+                            <span id="wm-jam-preview" class="text-2xl sm:text-3xl font-black font-mono tracking-tight text-[#d9e021]">
+                                00:00
+                            </span>
+                            <div class="text-[10px] sm:text-[11px] font-bold text-slate-100 leading-tight">
+                                <div id="wm-hari-preview">-</div>
+                                <div id="wm-tanggal-preview" class="font-mono">-</div>
+                            </div>
                         </div>
-                        <div id="wm-info-preview" class="text-[10px] font-bold text-slate-100 whitespace-pre-line leading-snug border-t border-white/15 pt-1"></div>
+
+                        <!-- Baris Info / Data Tersimpan Terpilih -->
+                        <div id="wm-info-preview" class="text-[10px] sm:text-[11px] font-semibold text-white whitespace-pre-line leading-snug"></div>
                     </div>
                 </div>
 
-                <!-- Input Catatan Watermark Cepat -->
+                <!-- Pilihan Data Tersimpan (Dropdown) + Tombol Pilih Foto -->
                 <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end bg-slate-50 p-3 rounded-xl border border-orange-200">
                     <div class="sm:col-span-9">
-                        <label for="paket-wm-catatan" class="text-[10px] font-black text-slate-500 uppercase block mb-1">
-                            Catatan / Tujuan & Rincian Paket di Foto
+                        <label for="paket-wm-select-data" class="text-[10px] font-black text-slate-500 uppercase block mb-1">
+                            Pilih Data Tersimpan untuk Watermark
                         </label>
-                        <input id="paket-wm-catatan" type="text" oninput="updatePreviewWatermarkPaket()"
-                            placeholder="Otomatis terisi dari No DO, Tujuan & item..."
+                        <select id="paket-wm-select-data" onchange="handlePilihDataWatermarkPaket(this.value)"
                             class="w-full p-2 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white focus:outline-none focus:border-orange-500">
+                            <option value="">-- Memuat data tersimpan hari ini... --</option>
+                        </select>
                     </div>
+
                     <div class="sm:col-span-3">
                         <label class="w-full p-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 text-[11px] font-black uppercase text-center cursor-pointer block transition">
                             <i class="fa-solid fa-image mr-1"></i> Pilih Foto
@@ -244,7 +277,7 @@
                 </div>
 
                 <!-- Tombol Aksi Kamera -->
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-0.5">
                     <button type="button" id="btn-jepret-watermark" onclick="jepretFotoWatermarkPaket()"
                         class="py-2.5 px-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-black uppercase shadow transition flex items-center justify-center gap-1.5">
                         <i class="fa-solid fa-circle-dot"></i>
