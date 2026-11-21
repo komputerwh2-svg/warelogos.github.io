@@ -183,120 +183,194 @@
         </div>
     </div>
 
-    <!-- MODAL KAMERA WATERMARK (ALUR TIMEMARK + LOGO MARIFOOD) -->
-    <div id="modal-kamera-paket" class="fixed inset-0 z-[70] hidden bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-2.5 sm:p-5">
-        <div class="w-full max-w-2xl bg-white rounded-2xl border border-orange-500 shadow-2xl overflow-hidden flex flex-col max-h-[94vh]">
+    <!-- MODAL KAMERA WATERMARK (LAYOUT ALA TIMEMARK) -->
+    <div id="modal-kamera-paket" class="fixed inset-0 z-[70] hidden bg-black/95 flex flex-col justify-between select-none overflow-hidden">
 
-            <!-- Header Modal -->
-            <div class="px-4 py-3 bg-[#2f2f2f] text-white flex items-center justify-between border-b border-black/30 shrink-0">
-                <div class="flex items-center gap-2">
-                    <i class="fa-solid fa-camera text-orange-400"></i>
-                    <span class="text-xs sm:text-sm font-black uppercase tracking-wider">Kamera Watermark Paket Pajang</span>
-                </div>
-                <button type="button" onclick="tutupKameraWatermarkPaket()"
-                    class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold text-orange-300 transition">
-                    Tutup
-                </button>
+        <!-- Bar Atas Kamera (Kompak & Jelas) -->
+        <div class="h-12 px-3 bg-white/95 text-slate-800 flex items-center justify-between border-b border-slate-200 shrink-0 z-20">
+            <button type="button" onclick="tutupKameraWatermarkPaket()"
+                class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-black text-slate-700 flex items-center gap-1 transition">
+                <i class="fa-solid fa-xmark"></i>
+                <span>Tutup</span>
+            </button>
+
+            <div class="px-3 py-0.5 rounded-full border border-emerald-500/40 bg-emerald-50 text-emerald-700 text-[11px] font-bold flex items-center gap-1.5">
+                <i class="fa-solid fa-shield-check text-emerald-600"></i>
+                <span>Watermark Paket Pajang</span>
             </div>
 
-            <!-- Isi Modal -->
-            <div class="p-3.5 sm:p-4 overflow-y-auto space-y-3 miui-custom-scroll">
+            <button type="button" onclick="togglePanelEditCatatanWatermark()"
+                class="px-2.5 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-black flex items-center gap-1 transition">
+                <i class="fa-solid fa-pen-to-square"></i>
+                <span>Edit</span>
+            </button>
+        </div>
 
-                <!-- Preview Kamera / Hasil Foto + Overlay Watermark Gaya Timemark -->
-                <div class="relative w-full aspect-[4/3] sm:aspect-video bg-slate-900 rounded-xl overflow-hidden border border-orange-300 flex items-center justify-center">
-                    <video id="paket-camera-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
-                    <canvas id="paket-watermark-canvas" class="hidden w-full h-full object-contain bg-slate-950"></canvas>
+        <!-- Area Viewfinder Kamera / Canvas Hasil Foto -->
+        <div class="relative flex-1 w-full bg-black overflow-hidden flex items-center justify-center">
+            <video id="paket-camera-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
+            <canvas id="paket-watermark-canvas" class="hidden w-full h-full object-contain bg-black"></canvas>
 
-                    <!-- Overlay Watermark Preview (Gaya Timemark + Logo MariFood) -->
-                    <div id="paket-watermark-overlay"
-                        class="pointer-events-none absolute left-2.5 bottom-2.5 max-w-[88%] bg-[#1e2229]/80 backdrop-blur-[2px] text-white rounded-md p-2 sm:p-2.5 shadow-xl text-left border border-white/10">
+            <!-- Grid Kamera 3x3 Tipis (Khas Aplikasi Kamera) -->
+            <div id="paket-camera-grid" class="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-3">
+                <div class="border-r border-b border-white/15"></div>
+                <div class="border-r border-b border-white/15"></div>
+                <div class="border-b border-white/15"></div>
+                <div class="border-r border-b border-white/15"></div>
+                <div class="border-r border-b border-white/15"></div>
+                <div class="border-b border-white/15"></div>
+                <div class="border-r border-white/15"></div>
+                <div class="border-r border-b border-white/15"></div>
+                <div></div>
+            </div>
 
-                        <!-- Baris Atas: Badge Logo MariFood + Judul Dokumentasi / Paket Pajang -->
-                        <div class="flex items-center gap-2">
-                            <div class="bg-[#ececec] rounded px-1.5 py-1 flex flex-col items-center justify-center shrink-0 shadow-sm">
-                                <svg viewBox="0 0 140 58" class="h-6 sm:h-7 w-auto" aria-label="MariFood">
-                                    <!-- Matahari Oranye & Kuning -->
-                                    <path d="M 52 24 A 18 18 0 0 1 88 24 Z" fill="#f58220"/>
-                                    <path d="M 47 24 A 23 23 0 0 1 93 24" fill="none" stroke="#ffd200" stroke-width="3.2" stroke-linecap="round"/>
-                                    <!-- Gelombang Daun Hijau -->
-                                    <path d="M 40 28 C 56 18, 86 16, 104 25 C 88 23, 68 25, 52 33 Z" fill="#8dc63f"/>
-                                    <path d="M 42 29 C 62 21, 88 22, 103 27 C 86 35, 62 36, 44 31 Z" fill="#009444"/>
-                                    <!-- Teks MariFood -->
-                                    <text x="6" y="52" font-family="Poppins, Arial, sans-serif" font-weight="800" font-size="22" fill="#009444">Mari</text>
-                                    <text x="56" y="52" font-family="Poppins, Arial, sans-serif" font-weight="800" font-size="22" fill="#f58220">food</text>
-                                </svg>
-                            </div>
+            <!-- Tombol Edit Mengambang di Sisi Kanan Viewfinder (Ala Timemark) -->
+            <button type="button" onclick="togglePanelEditCatatanWatermark()" title="Pilih / Edit Catatan Watermark"
+                class="z-20 absolute right-3 bottom-28 w-10 h-10 rounded-xl bg-black/55 hover:bg-black/75 border border-white/30 text-white flex items-center justify-center shadow-lg transition">
+                <i class="fa-solid fa-pen-to-square text-sm"></i>
+            </button>
 
-                            <div class="leading-tight">
-                                <div class="text-xs sm:text-sm font-black text-[#f6d34a] tracking-wide">
-                                    Dokumentasi
-                                </div>
-                                <div class="text-xs sm:text-sm font-extrabold text-white tracking-wide">
-                                    Paket Pajang
-                                </div>
-                            </div>
+            <!-- Overlay Watermark Preview di Kiri Bawah Viewfinder -->
+            <div id="paket-watermark-overlay"
+                class="pointer-events-none z-10 absolute left-2.5 bottom-3 max-w-[78%] sm:max-w-[62%] bg-[#1e2229]/80 backdrop-blur-[2px] text-white rounded-md p-2 sm:p-2.5 shadow-xl text-left border border-white/10">
+
+                <!-- Baris Atas: Logo MariFood + Dokumentasi / Paket Pajang -->
+                <div class="flex items-center gap-2">
+                    <div class="bg-[#ececec] rounded px-1.5 py-1 flex flex-col items-center justify-center shrink-0 shadow-sm">
+                        <svg viewBox="0 0 140 58" class="h-6 sm:h-7 w-auto" aria-label="MariFood">
+                            <path d="M 52 24 A 18 18 0 0 1 88 24 Z" fill="#f58220"/>
+                            <path d="M 47 24 A 23 23 0 0 1 93 24" fill="none" stroke="#ffd200" stroke-width="3.2" stroke-linecap="round"/>
+                            <path d="M 40 28 C 56 18, 86 16, 104 25 C 88 23, 68 25, 52 33 Z" fill="#8dc63f"/>
+                            <path d="M 42 29 C 62 21, 88 22, 103 27 C 86 35, 62 36, 44 31 Z" fill="#009444"/>
+                            <text x="6" y="52" font-family="Poppins, Arial, sans-serif" font-weight="800" font-size="22" fill="#009444">Mari</text>
+                            <text x="56" y="52" font-family="Poppins, Arial, sans-serif" font-weight="800" font-size="22" fill="#f58220">food</text>
+                        </svg>
+                    </div>
+
+                    <div class="leading-tight">
+                        <div class="text-xs sm:text-sm font-black text-[#f6d34a] tracking-wide">
+                            Dokumentasi
                         </div>
-
-                        <!-- Pemisah Aksen Kuning-Hijau -->
-                        <div class="my-1.5 h-[2px] w-full bg-gradient-to-r from-[#ffd200] via-[#8dc63f] to-transparent rounded-full"></div>
-
-                        <!-- Baris Waktu: Jam Besar di Kiri + Hari/Tanggal di Kanan -->
-                        <div class="flex items-center gap-2.5 leading-none mb-1.5">
-                            <span id="wm-jam-preview" class="text-2xl sm:text-3xl font-black font-mono tracking-tight text-[#d9e021]">
-                                00:00
-                            </span>
-                            <div class="text-[10px] sm:text-[11px] font-bold text-slate-100 leading-tight">
-                                <div id="wm-hari-preview">-</div>
-                                <div id="wm-tanggal-preview" class="font-mono">-</div>
-                            </div>
+                        <div class="text-xs sm:text-sm font-extrabold text-white tracking-wide">
+                            Paket Pajang
                         </div>
-
-                        <!-- Baris Info / Data Tersimpan Terpilih -->
-                        <div id="wm-info-preview" class="text-[10px] sm:text-[11px] font-semibold text-white whitespace-pre-line leading-snug"></div>
                     </div>
                 </div>
 
-                <!-- Pilihan Data Tersimpan (Dropdown) + Tombol Pilih Foto -->
-                <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end bg-slate-50 p-3 rounded-xl border border-orange-200">
-                    <div class="sm:col-span-9">
-                        <label for="paket-wm-select-data" class="text-[10px] font-black text-slate-500 uppercase block mb-1">
-                            Pilih Data Tersimpan untuk Watermark
-                        </label>
-                        <select id="paket-wm-select-data" onchange="handlePilihDataWatermarkPaket(this.value)"
-                            class="w-full p-2 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white focus:outline-none focus:border-orange-500">
-                            <option value="">-- Memuat data tersimpan hari ini... --</option>
-                        </select>
-                    </div>
+                <!-- Garis Aksen Kuning-Hijau -->
+                <div class="my-1.5 h-[2px] w-full bg-gradient-to-r from-[#ffd200] via-[#8dc63f] to-transparent rounded-full"></div>
 
-                    <div class="sm:col-span-3">
-                        <label class="w-full p-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 text-[11px] font-black uppercase text-center cursor-pointer block transition">
-                            <i class="fa-solid fa-image mr-1"></i> Pilih Foto
-                            <input type="file" id="paket-wm-file-input" accept="image/*" capture="environment" class="hidden" onchange="handleFotoFileWatermarkPaket(event)">
-                        </label>
+                <!-- Jam Besar + Hari & Tanggal -->
+                <div class="flex items-center gap-2.5 leading-none mb-1.5">
+                    <span id="wm-jam-preview" class="text-2xl sm:text-3xl font-black font-mono tracking-tight text-[#d9e021]">
+                        00:00
+                    </span>
+                    <div class="text-[10px] sm:text-[11px] font-bold text-slate-100 leading-tight">
+                        <div id="wm-hari-preview">-</div>
+                        <div id="wm-tanggal-preview" class="font-mono">-</div>
                     </div>
                 </div>
 
-                <!-- Tombol Aksi Kamera -->
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-0.5">
-                    <button type="button" id="btn-jepret-watermark" onclick="jepretFotoWatermarkPaket()"
-                        class="py-2.5 px-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-black uppercase shadow transition flex items-center justify-center gap-1.5">
-                        <i class="fa-solid fa-circle-dot"></i>
-                        <span>Ambil Foto</span>
+                <!-- Info Tujuan, DO & Konversi Paket -->
+                <div id="wm-info-preview" class="text-[10px] sm:text-[11px] font-semibold text-white whitespace-pre-line leading-snug"></div>
+            </div>
+
+            <!-- Popover Pilihan Data Tersimpan (Muncul Saat Tombol Edit Diklik) -->
+            <div id="panel-edit-watermark-paket"
+                class="hidden z-30 absolute inset-x-3 bottom-3 sm:left-auto sm:right-3 sm:w-96 bg-white text-slate-800 rounded-2xl shadow-2xl border border-orange-500 p-3.5 space-y-2.5">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span class="text-xs font-black uppercase text-slate-700 flex items-center gap-1.5">
+                        <i class="fa-solid fa-sliders text-orange-600"></i>
+                        <span>Pilih Data Catatan Watermark</span>
+                    </span>
+                    <button type="button" onclick="togglePanelEditCatatanWatermark(false)"
+                        class="px-2.5 py-1 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-[10px] font-black uppercase">
+                        Selesai
+                    </button>
+                </div>
+
+                <div>
+                    <label for="paket-wm-select-data" class="text-[10px] font-black text-slate-500 uppercase block mb-1">
+                        Data Tersimpan Hari Ini
+                    </label>
+                    <select id="paket-wm-select-data" onchange="handlePilihDataWatermarkPaket(this.value)"
+                        class="w-full p-2 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-slate-50 focus:outline-none focus:border-orange-500">
+                        <option value="">-- Memuat data tersimpan hari ini... --</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bar Kontrol Bawah Khas Kamera: Riwayat Foto (Kiri Bawah) | Shutter Bulat (Tengah) | Pilih Foto / Simpan -->
+        <div class="bg-white px-4 py-3 border-t border-slate-200 shrink-0 z-20">
+            <div class="max-w-xl mx-auto flex items-center justify-between gap-3">
+
+                <!-- Kiri Bawah: Riwayat Hasil Foto (Thumbnail + Jumlah) -->
+                <button type="button" id="btn-riwayat-foto-paket" onclick="bukaRiwayatFotoWatermarkPaket()"
+                    class="flex flex-col items-center gap-1 group w-16 shrink-0">
+                    <div class="relative w-12 h-12 rounded-xl bg-slate-100 border-2 border-slate-300 group-hover:border-orange-500 overflow-hidden flex items-center justify-center shadow-sm transition">
+                        <img id="wm-thumb-riwayat" src="" alt="Riwayat" class="hidden w-full h-full object-cover">
+                        <i id="wm-icon-riwayat-kosong" class="fa-solid fa-images text-slate-400 text-base"></i>
+                        <span id="wm-badge-count-foto"
+                            class="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full bg-orange-600 text-white text-[9px] font-black font-mono leading-none">0</span>
+                    </div>
+                    <span class="text-[10px] font-bold text-slate-600 group-hover:text-orange-600 leading-none">Riwayat Foto</span>
+                </button>
+
+                <!-- Tengah: Tombol Shutter Khas Aplikasi Kamera -->
+                <div class="flex items-center justify-center gap-3">
+                    <button type="button" id="btn-jepret-watermark" onclick="jepretFotoWatermarkPaket()" title="Ambil Foto"
+                        class="w-16 h-16 rounded-full border-4 border-slate-800 bg-white hover:bg-orange-50 active:scale-90 flex items-center justify-center shadow-lg transition">
+                        <span class="w-12 h-12 rounded-full bg-orange-600 hover:bg-orange-700 flex items-center justify-center text-white">
+                            <i class="fa-solid fa-camera text-lg"></i>
+                        </span>
                     </button>
 
                     <button type="button" id="btn-ulang-kamera-paket" onclick="resetModeKameraPaket()"
-                        class="hidden py-2.5 px-3 rounded-xl bg-slate-700 hover:bg-slate-800 text-white text-xs font-black uppercase shadow transition flex items-center justify-center gap-1.5">
+                        class="hidden px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-[11px] font-black uppercase shadow transition flex items-center gap-1.5">
                         <i class="fa-solid fa-camera-rotate"></i>
                         <span>Foto Ulang</span>
                     </button>
 
                     <button type="button" id="btn-simpan-foto-watermark" onclick="simpanHasilFotoWatermarkPaket()" disabled
-                        class="sm:col-span-2 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-xs font-black uppercase shadow transition flex items-center justify-center gap-1.5">
+                        class="hidden px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-[11px] font-black uppercase shadow transition flex items-center gap-1.5">
                         <i class="fa-solid fa-download"></i>
-                        <span>Simpan Foto Watermark</span>
+                        <span>Simpan</span>
                     </button>
                 </div>
 
+                <!-- Kanan: Pilih Foto dari Galeri / Perangkat -->
+                <label class="flex flex-col items-center gap-1 cursor-pointer group w-16 shrink-0">
+                    <div class="w-12 h-12 rounded-xl bg-slate-100 border border-slate-300 group-hover:border-orange-500 flex items-center justify-center text-slate-700 group-hover:text-orange-600 shadow-sm transition">
+                        <i class="fa-solid fa-photo-film text-lg"></i>
+                    </div>
+                    <span class="text-[10px] font-bold text-slate-600 group-hover:text-orange-600 leading-none">Foto Lokal</span>
+                    <input type="file" id="paket-wm-file-input" accept="image/*" capture="environment" class="hidden" onchange="handleFotoFileWatermarkPaket(event)">
+                </label>
+
+            </div>
+        </div>
+
+        <!-- Drawer / Modal Riwayat Hasil Foto Watermark Hari Ini -->
+        <div id="modal-riwayat-foto-paket"
+            class="hidden fixed inset-0 z-[75] bg-black/80 backdrop-blur-xs flex items-end sm:items-center justify-center p-2 sm:p-4">
+            <div class="w-full max-w-lg bg-white text-slate-800 rounded-2xl border border-orange-500 shadow-2xl overflow-hidden flex flex-col max-h-[82vh]">
+                <div class="px-4 py-3 bg-[#2f2f2f] text-white flex items-center justify-between shrink-0">
+                    <span class="text-xs font-black uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-images text-orange-400"></i>
+                        <span>Riwayat Hasil Foto Hari Ini</span>
+                    </span>
+                    <button type="button" onclick="tutupRiwayatFotoWatermarkPaket()"
+                        class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold text-orange-300">
+                        Tutup
+                    </button>
+                </div>
+
+                <div id="daftar-riwayat-foto-paket" class="p-3.5 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-2.5 miui-custom-scroll">
+                    <div class="col-span-full text-center py-8 text-xs font-bold text-slate-400">
+                        Belum ada foto watermark yang diambil.
+                    </div>
+                </div>
             </div>
         </div>
     </div>
