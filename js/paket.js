@@ -823,7 +823,7 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
 
     if (!canvas) return;
 
-    const maxDim = 1920;
+    const maxDim = 1600;
     let w = lebarAsli || 1280;
     let h = tinggiAsli || 720;
     if (w > maxDim || h > maxDim) {
@@ -842,29 +842,30 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
 
     const logoImg = await buatImageLogoMariFood();
 
-    const minSide = Math.min(w, h);
-    const scale = Math.max(1.0, minSide / 640);
-
-    const pad = Math.round(16 * scale);
-    const margin = Math.round(22 * scale);
     const { jam, hari, tanggal, hariTanggal } = getInfoWaktuWatermarkSekarang();
-
     const selectedId = selectEl?.value || '';
     const rec = window.__opsiWatermarkPaketMap?.[selectedId] || null;
     const teksInfo = rec ? formatInfoWatermarkDariRecord(rec) : '';
     const barisInfo = teksInfo ? teksInfo.split('\n') : [];
 
-    // Kotak logo proporsional (120:100 -> 6:5) agar tidak gepeng
-    const logoH = Math.round(50 * scale);
-    const logoW = Math.round(logoH * 1.2);
-    const judulGap = Math.round(12 * scale);
+    // Samakan skala proporsional dengan preview (sekitar 42% lebar sisi terpendek agar pas & tidak kebesaran)
+    const acuanLebar = Math.min(w, h);
+    const scale = Math.max(0.72, acuanLebar / 920);
 
-    const fontJudul = `900 ${Math.round(20 * scale)}px Arial, sans-serif`;
-    const fontSubjudul = `800 ${Math.round(20 * scale)}px Arial, sans-serif`;
-    const fontChevron = `900 ${Math.round(10 * scale)}px monospace`;
-    const fontJam = `900 ${Math.round(42 * scale)}px monospace`;
-    const fontTgl = `700 ${Math.round(16 * scale)}px Arial, sans-serif`;
-    const fontDetail = `700 ${Math.round(17 * scale)}px Arial, sans-serif`;
+    const pad = Math.round(12 * scale);
+    const margin = Math.round(14 * scale);
+
+    // Kotak logo proporsional (120:100 -> 6:5) agar tidak gepeng
+    const logoH = Math.round(38 * scale);
+    const logoW = Math.round(logoH * 1.2);
+    const judulGap = Math.round(9 * scale);
+
+    const fontJudul = `900 ${Math.round(14 * scale)}px Arial, sans-serif`;
+    const fontSubjudul = `800 ${Math.round(14 * scale)}px Arial, sans-serif`;
+    const fontChevron = `900 ${Math.round(8 * scale)}px monospace`;
+    const fontJam = `900 ${Math.round(28 * scale)}px monospace`;
+    const fontTgl = `700 ${Math.round(11 * scale)}px Arial, sans-serif`;
+    const fontDetail = `700 ${Math.round(12 * scale)}px Arial, sans-serif`;
 
     ctx.font = fontJudul;
     const wJudul = ctx.measureText('Dokumentasi').width;
@@ -879,82 +880,83 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
         if (mw > maxDetailWidth) maxDetailWidth = mw;
     });
 
-    const contentWidth = Math.max(headerFixedW, maxDetailWidth, Math.round(230 * scale));
-    const boxWidth = Math.min(w - margin * 2, contentWidth + pad * 2);
+    const maxAllowedBoxW = Math.round(w * 0.62);
+    const contentWidth = Math.max(headerFixedW, maxDetailWidth, Math.round(170 * scale));
+    const boxWidth = Math.min(maxAllowedBoxW - margin * 2, contentWidth + pad * 2);
 
-    const topBlockH = Math.max(logoH, Math.round(50 * scale));
-    const dividerBlockH = Math.round(22 * scale);
-    const timeBlockH = Math.round(48 * scale);
-    const lineH = Math.round(25 * scale);
-    const detailBlockH = barisInfo.length ? (Math.round(8 * scale) + barisInfo.length * lineH) : 0;
+    const topBlockH = Math.max(logoH, Math.round(36 * scale));
+    const dividerBlockH = Math.round(16 * scale);
+    const timeBlockH = Math.round(34 * scale);
+    const lineH = Math.round(17 * scale);
+    const detailBlockH = barisInfo.length ? (Math.round(6 * scale) + barisInfo.length * lineH) : 0;
     const boxHeight = pad * 2 + topBlockH + dividerBlockH + timeBlockH + detailBlockH;
 
     const boxX = margin;
     const boxY = h - margin - boxHeight;
 
     // Panel gelap semi-transparan gaya Timemark
-    ctx.fillStyle = 'rgba(26, 30, 36, 0.78)';
+    ctx.fillStyle = 'rgba(34, 38, 46, 0.78)';
     ctx.beginPath();
-    ctx.roundRect(boxX, boxY, boxWidth, boxHeight, Math.round(10 * scale));
+    ctx.roundRect(boxX, boxY, boxWidth, boxHeight, Math.round(8 * scale));
     ctx.fill();
 
     const innerX = boxX + pad;
     let curY = boxY + pad;
 
-    // Logo MariFood di kiri atas
+    // Logo MariFood di kiri atas (ukuran tetap, tidak ikut melebar)
     if (logoImg) {
         ctx.drawImage(logoImg, innerX, curY, logoW, logoH);
     }
 
-    // Judul "Dokumentasi" & "Paket Pajang" sejajar di kanan logo
+    // Judul "Dokumentasi" & "Paket Pajang" sejajar di kanan logo (ukuran tetap)
     const titleX = innerX + logoW + judulGap;
     ctx.font = fontJudul;
     ctx.fillStyle = '#a3e635';
-    ctx.fillText('Dokumentasi', titleX, curY + Math.round(19 * scale));
+    ctx.fillText('Dokumentasi', titleX, curY + Math.round(14 * scale));
 
     ctx.font = fontSubjudul;
     ctx.fillStyle = '#ffffff';
-    ctx.fillText('Paket Pajang', titleX, curY + Math.round(43 * scale));
+    ctx.fillText('Paket Pajang', titleX, curY + Math.round(31 * scale));
 
     // Garis pemisah hijau stabilo + chevron kecil
-    curY += topBlockH + Math.round(8 * scale);
+    curY += topBlockH + Math.round(6 * scale);
     ctx.strokeStyle = '#a3e635';
-    ctx.lineWidth = Math.max(3, Math.round(3 * scale));
+    ctx.lineWidth = Math.max(2, Math.round(2.2 * scale));
     ctx.beginPath();
     ctx.moveTo(innerX, curY);
     ctx.lineTo(boxX + boxWidth - pad, curY);
     ctx.stroke();
 
     ctx.font = fontChevron;
-    ctx.fillStyle = 'rgba(163, 230, 53, 0.92)';
-    const chevronStr = '>'.repeat(Math.max(14, Math.floor((boxWidth - pad * 2) / (6.5 * scale))));
-    ctx.fillText(chevronStr, innerX, curY + Math.round(10 * scale), boxWidth - pad * 2);
+    ctx.fillStyle = 'rgba(163, 230, 53, 0.90)';
+    const chevronStr = '>'.repeat(Math.max(12, Math.floor((boxWidth - pad * 2) / (5 * scale))));
+    ctx.fillText(chevronStr, innerX, curY + Math.round(8 * scale), boxWidth - pad * 2);
 
     // Jam hijau stabilo + Hari & Tanggal
-    curY += Math.round(48 * scale);
+    curY += Math.round(34 * scale);
     ctx.font = fontJam;
     ctx.fillStyle = '#a3e635';
     ctx.fillText(jam, innerX, curY);
 
     const jamW = ctx.measureText(jam).width;
-    const dateX = innerX + jamW + Math.round(14 * scale);
+    const dateX = innerX + jamW + Math.round(10 * scale);
     ctx.font = fontTgl;
     ctx.fillStyle = '#f8fafc';
-    ctx.fillText(hari, dateX, curY - Math.round(21 * scale));
+    ctx.fillText(hari, dateX, curY - Math.round(15 * scale));
     ctx.fillText(tanggal, dateX, curY - Math.round(2 * scale));
 
     // Rincian Tujuan, No DO & Konversi Paket (KRT + PKT)
     if (barisInfo.length) {
-        curY += Math.round(10 * scale);
+        curY += Math.round(8 * scale);
         ctx.font = fontDetail;
         ctx.fillStyle = '#ffffff';
         barisInfo.forEach((line) => {
             curY += lineH;
-            ctx.fillText(line, innerX, curY);
+            ctx.fillText(line, innerX, curY, boxWidth - pad * 2);
         });
     }
 
-    dataUrlFotoWatermarkAktif = canvas.toDataURL('image/jpeg', 0.95);
+    dataUrlFotoWatermarkAktif = canvas.toDataURL('image/jpeg', 0.92);
 
     cacheFotoWatermarkHariIni.unshift({
         dataUrl: dataUrlFotoWatermarkAktif,
