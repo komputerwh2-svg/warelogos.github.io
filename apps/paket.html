@@ -1,0 +1,275 @@
+<div id="subpage-paket" class="fixed inset-0 bg-[#f4f4f4] z-[60] translate-x-full transition-transform duration-300 ease-in-out flex flex-col font-sans select-none overflow-hidden">
+
+    <!-- Header -->
+    <div class="w-full h-auto min-h-[60px] flex items-center justify-between px-3 shadow-md relative z-10"
+        style="background: linear-gradient(to bottom, #3c3c3c, #2a2a2a); border-bottom: 1px solid #1a1a1a;">
+
+        <!-- Bagian Kiri: Tombol Kembali & Judul -->
+        <div class="flex flex-wrap items-center gap-3 py-2 px-2">
+            <button type="button" onclick="tutupSubPagePaketPajang()"
+                class="miui-btn-back flex items-center justify-center gap-1 px-3 py-1.5 rounded text-xs font-bold text-orange-400 shadow-inner">
+                <i class="fa-solid fa-chevron-left text-sm"></i>
+                <span>Kembali</span>
+            </button>
+
+            <div class="h-7 w-[1px] bg-white/10 mx-1"></div>
+
+            <div class="flex flex-wrap items-baseline gap-2">
+                <h1 class="text-white font-bold text-[14px] tracking-wide drop-shadow-md">
+                    Paket Pajang
+                </h1>
+                <span id="label-tanggal-hari-ini" class="text-orange-400 font-mono font-bold text-[11px] tracking-wide"></span>
+            </div>
+        </div>
+
+        <!-- Bagian Kanan: Status Koneksi -->
+        <div class="flex items-center gap-2 pr-2">
+            <span id="status-koneksi-paket"
+                class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-black/35 text-orange-300 border border-orange-500/40 shadow-inner">
+                ONLINE
+            </span>
+        </div>
+    </div>
+
+    <!-- Main Content Area (Responsif PC & HP) -->
+    <div class="flex-1 overflow-y-auto p-3 sm:p-5 bg-[#f4f4f4] miui-custom-scroll">
+        <div class="max-w-3xl mx-auto space-y-4">
+
+            <!-- KARTU FORM INPUT PAKET PAJANG -->
+            <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-orange-500 space-y-4">
+
+                <!-- Header Form Input + Tombol Kamera & Riwayat di Pojok Kanan Atas -->
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-orange-100 pb-3">
+                    <h3 class="text-xs sm:text-sm font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-box-open text-orange-600"></i>
+                        <span>Form Input Paket Pajang</span>
+                    </h3>
+
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <button type="button" id="btn-buka-kamera-paket" onclick="bukaKameraWatermarkPaket()"
+                            class="px-3 py-1.5 rounded-lg text-[11px] font-black uppercase text-white bg-orange-600 hover:bg-orange-700 border border-orange-600 transition flex items-center gap-1.5 shadow-sm">
+                            <i class="fa-solid fa-camera"></i>
+                            <span>Kamera</span>
+                        </button>
+
+                        <button type="button" id="btn-toggle-riwayat-paket" onclick="togglePanelRiwayatPaket()"
+                            class="px-3 py-1.5 rounded-lg text-[11px] font-black uppercase text-orange-700 hover:text-white bg-orange-50 hover:bg-orange-600 border border-orange-300 transition flex items-center gap-1.5 shadow-sm">
+                            <i class="fa-solid fa-clock-rotate-left"></i>
+                            <span>Riwayat</span>
+                            <span id="badge-jumlah-riwayat-paket" class="px-1.5 py-0.2 rounded bg-orange-200/80 text-orange-900 text-[10px] font-mono">0</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Identitas Tujuan: No DO & Tujuan -->
+                <div class="bg-slate-50 p-3.5 sm:p-4 rounded-xl border border-orange-200 space-y-3">
+                    <h4 class="text-[10px] font-black text-orange-600 uppercase tracking-wider">
+                        1. Identitas Tujuan
+                    </h4>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label for="paket-no-do" class="text-[10px] font-black text-slate-500 uppercase block mb-1">
+                                No DO
+                            </label>
+                            <input id="paket-no-do" type="text" placeholder="Contoh: 77237 / DO-HO001-..."
+                                class="w-full p-2.5 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white uppercase placeholder:normal-case placeholder:font-normal placeholder:text-slate-400 focus:outline-none focus:border-orange-500">
+                        </div>
+
+                        <div>
+                            <label for="paket-tujuan" class="text-[10px] font-black text-slate-500 uppercase block mb-1">
+                                Tujuan
+                            </label>
+                            <input id="paket-tujuan" type="text" list="list-tujuan-paket" placeholder="Pilih atau ketik tujuan..."
+                                class="w-full p-2.5 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white uppercase placeholder:normal-case placeholder:font-normal placeholder:text-slate-400 focus:outline-none focus:border-orange-500">
+                            <datalist id="list-tujuan-paket"></datalist>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input Multi-Item: Jenis Paket & QTY -->
+                <div class="bg-orange-50/60 p-3.5 sm:p-4 rounded-xl border border-orange-200 space-y-3">
+                    <div class="flex items-center justify-between gap-2">
+                        <h4 class="text-[10px] font-black text-orange-600 uppercase tracking-wider">
+                            2. Item Paket (Bisa Lebih dari 1 Jenis Paket)
+                        </h4>
+                        <span class="text-[10px] font-bold text-slate-500">
+                            Klik <strong class="text-orange-700">Tambah Item</strong> bila ada paket lain
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+                        <div class="sm:col-span-7">
+                            <label for="paket-jenis" class="text-[10px] font-black text-slate-500 uppercase block mb-1">
+                                Jenis Paket
+                            </label>
+                            <select id="paket-jenis"
+                                class="w-full p-2.5 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white focus:outline-none focus:border-orange-500">
+                                <option value="PR-PKT40">PR-PKT40 (Paket 40)</option>
+                                <option value="PR-PKT59">PR-PKT59 (Paket 59)</option>
+                                <option value="PR-PKT82">PR-PKT82 (Paket 82)</option>
+                            </select>
+                        </div>
+
+                        <div class="sm:col-span-5">
+                            <label for="paket-qty" class="text-[10px] font-black text-slate-500 uppercase block mb-1">
+                                QTY
+                            </label>
+                            <input id="paket-qty" type="number" min="1" step="1" inputmode="numeric" placeholder="Jumlah QTY..."
+                                class="w-full p-2.5 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white placeholder:font-normal placeholder:text-slate-400 focus:outline-none focus:border-orange-500">
+                        </div>
+                    </div>
+
+                    <!-- Daftar Item Sementara yang Sudah Ditambahkan -->
+                    <div>
+                        <div class="text-[10px] font-black text-slate-600 uppercase mb-1.5">
+                            Daftar Item Tujuan Ini:
+                        </div>
+                        <div id="container-item-paket"
+                            class="min-h-[54px] max-h-40 overflow-y-auto space-y-1.5 bg-white p-2.5 rounded-lg border border-orange-200 text-xs miui-custom-scroll">
+                            <div class="text-slate-400 italic text-[11px] text-center py-1.5">
+                                Belum ada item ditambahkan (bisa klik Tambah Item atau langsung Simpan Data jika 1 item)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2 Tombol Utama: Tambah Item & Simpan Data -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    <button type="button" id="btn-tambah-item-paket" onclick="tambahItemPaketKeList()"
+                        class="w-full bg-amber-500 hover:bg-amber-600 active:scale-[0.99] text-slate-950 py-2.5 px-4 rounded-xl font-black text-xs uppercase shadow transition flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Tambah Item</span>
+                    </button>
+
+                    <button type="button" id="btn-simpan-paket" onclick="simpanDataPaketPajang()"
+                        class="w-full bg-orange-600 hover:bg-orange-700 active:scale-[0.99] disabled:opacity-50 text-white py-2.5 px-4 rounded-xl font-black text-xs uppercase shadow transition flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span>Simpan Data</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- PANEL RIWAYAT (TERSEMBUNYI DEFAULT, DIBUKA LEWAT TOMBOL RIWAYAT) -->
+            <div id="panel-riwayat-paket" class="hidden bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-orange-500 space-y-3">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-orange-100 pb-2.5">
+                    <div>
+                        <h3 class="text-xs sm:text-sm font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                            <i class="fa-solid fa-list-check text-orange-600"></i>
+                            <span>Riwayat Tujuan Paket Pajang</span>
+                        </h3>
+                        <p id="paket-ringkasan" class="text-[11px] font-bold text-slate-500 mt-0.5">
+                            Total tujuan: 0 | Total QTY: 0
+                        </p>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="muatRiwayatPaketHariIni()"
+                            class="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase text-slate-700 hover:text-orange-600 bg-orange-50 hover:bg-orange-100 border border-orange-300 transition flex items-center gap-1">
+                            <i class="fa-solid fa-rotate-right"></i>
+                            <span>Refresh</span>
+                        </button>
+                        <button type="button" onclick="togglePanelRiwayatPaket(false)"
+                            class="px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition">
+                            Tutup
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Daftar Data Tujuan + Tombol Cetak di Tiap Baris -->
+                <div id="paket-riwayat-list" class="space-y-2.5 max-h-[420px] overflow-y-auto pr-1 miui-custom-scroll">
+                    <div class="text-center py-8 text-xs font-bold text-slate-400 bg-slate-50 rounded-xl border border-dashed border-orange-200">
+                        Belum ada data tersimpan.
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- MODAL KAMERA WATERMARK (ALUR TIMEMARK) -->
+    <div id="modal-kamera-paket" class="fixed inset-0 z-[65] hidden bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5">
+        <div class="w-full max-w-2xl bg-white rounded-2xl border border-orange-500 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+
+            <!-- Header Modal -->
+            <div class="px-4 py-3 bg-[#2f2f2f] text-white flex items-center justify-between border-b border-black/30 shrink-0">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-camera text-orange-400"></i>
+                    <span class="text-xs sm:text-sm font-black uppercase tracking-wider">Kamera Watermark Paket Pajang</span>
+                </div>
+                <button type="button" onclick="tutupKameraWatermarkPaket()"
+                    class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold text-orange-300 transition">
+                    Tutup
+                </button>
+            </div>
+
+            <!-- Isi Modal -->
+            <div class="p-4 overflow-y-auto space-y-3 miui-custom-scroll">
+
+                <!-- Preview Kamera / Hasil Foto + Overlay Watermark -->
+                <div class="relative w-full aspect-[4/3] sm:aspect-video bg-slate-900 rounded-xl overflow-hidden border border-orange-300 flex items-center justify-center">
+                    <video id="paket-camera-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
+                    <canvas id="paket-watermark-canvas" class="hidden w-full h-full object-contain bg-slate-950"></canvas>
+
+                    <!-- Overlay Watermark Preview (Gaya Timemark) -->
+                    <div id="paket-watermark-overlay"
+                        class="pointer-events-none absolute left-3 bottom-3 max-w-[85%] bg-black/65 backdrop-blur-[2px] text-white rounded-lg p-2.5 border-l-4 border-amber-400 shadow-lg text-left space-y-1">
+                        <div class="text-[11px] font-black tracking-wide text-amber-300 leading-tight">
+                            Dokumentasi • Paket Pajang
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                            <span id="wm-jam-preview" class="text-lg font-black font-mono leading-none text-white">00:00</span>
+                            <span id="wm-tanggal-preview" class="text-[10px] font-semibold text-slate-200 leading-tight"></span>
+                        </div>
+                        <div id="wm-info-preview" class="text-[10px] font-bold text-slate-100 whitespace-pre-line leading-snug border-t border-white/15 pt-1"></div>
+                    </div>
+                </div>
+
+                <!-- Input Catatan Watermark Cepat -->
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end bg-slate-50 p-3 rounded-xl border border-orange-200">
+                    <div class="sm:col-span-9">
+                        <label for="paket-wm-catatan" class="text-[10px] font-black text-slate-500 uppercase block mb-1">
+                            Catatan / Tujuan & Rincian Paket di Foto
+                        </label>
+                        <input id="paket-wm-catatan" type="text" oninput="updatePreviewWatermarkPaket()"
+                            placeholder="Otomatis terisi dari No DO, Tujuan & item..."
+                            class="w-full p-2 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-white focus:outline-none focus:border-orange-500">
+                    </div>
+                    <div class="sm:col-span-3">
+                        <label class="w-full p-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 text-[11px] font-black uppercase text-center cursor-pointer block transition">
+                            <i class="fa-solid fa-image mr-1"></i> Pilih Foto
+                            <input type="file" id="paket-wm-file-input" accept="image/*" capture="environment" class="hidden" onchange="handleFotoFileWatermarkPaket(event)">
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Tombol Aksi Kamera -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                    <button type="button" id="btn-jepret-watermark" onclick="jepretFotoWatermarkPaket()"
+                        class="py-2.5 px-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-black uppercase shadow transition flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-circle-dot"></i>
+                        <span>Ambil Foto</span>
+                    </button>
+
+                    <button type="button" id="btn-ulang-kamera-paket" onclick="resetModeKameraPaket()"
+                        class="hidden py-2.5 px-3 rounded-xl bg-slate-700 hover:bg-slate-800 text-white text-xs font-black uppercase shadow transition flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-camera-rotate"></i>
+                        <span>Foto Ulang</span>
+                    </button>
+
+                    <button type="button" id="btn-simpan-foto-watermark" onclick="simpanHasilFotoWatermarkPaket()" disabled
+                        class="sm:col-span-2 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-xs font-black uppercase shadow transition flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-download"></i>
+                        <span>Simpan Foto Watermark</span>
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifikasi Ringan -->
+    <div id="paket-toast"
+        class="fixed bottom-5 right-5 z-[70] hidden px-4 py-2.5 rounded-xl bg-slate-900 border border-orange-500 text-xs font-bold text-white shadow-2xl">
+    </div>
+</div>
