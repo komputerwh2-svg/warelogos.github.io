@@ -219,32 +219,30 @@
                 <i class="fa-solid fa-pen-to-square text-sm"></i>
             </button>
 
-            <!-- Overlay Watermark Preview di Kiri Bawah Viewfinder -->
+            <!-- Overlay Watermark Preview di Kiri Bawah Viewfinder (Selaras dengan Canvas) -->
             <div id="paket-watermark-overlay"
-                class="pointer-events-none z-10 absolute left-2.5 bottom-3 max-w-[82%] sm:max-w-[65%] bg-[#22262e]/78 backdrop-blur-[2px] text-white rounded-[8px] p-2.5 sm:p-3 shadow-xl text-left border border-white/10">
+                class="pointer-events-none z-10 absolute left-3 bottom-3 max-w-[68%] sm:max-w-[56%] bg-[#22262e]/72 backdrop-blur-[1.5px] text-white rounded-[10px] p-3 shadow-xl text-left border border-white/10">
 
-                <!-- Baris Atas: Kotak Logo MariFood + Dokumentasi / Paket Pajang -->
-                <div class="flex items-center gap-2.5">
-                    <div class="bg-[#ececec] rounded-[6px] w-14 h-12 sm:w-16 sm:h-14 px-1 flex items-center justify-center shrink-0 shadow-sm">
-                        <svg viewBox="0 0 120 100" class="w-full h-full block" aria-label="MariFood">
-                            <!-- Matahari Oranye & Busur Kuning -->
+                <!-- Baris Atas: Kotak Logo MariFood (6:5) + Dokumentasi / Paket Pajang -->
+                <div class="inline-flex items-center gap-2.5 max-w-full">
+                    <div class="bg-[#ececec] rounded-[8px] w-14 h-[47px] sm:w-16 sm:h-[53px] p-0.5 flex items-center justify-center shrink-0 shadow-sm">
+                        <svg viewBox="0 0 120 100" class="w-full h-full block shrink-0" aria-label="MariFood">
+                            <rect width="120" height="100" rx="10" fill="#ececec"/>
                             <path d="M 42 36 A 18 18 0 0 1 78 36 Z" fill="#f58220"/>
                             <path d="M 37 36 A 23 23 0 0 1 83 36" fill="none" stroke="#ffd200" stroke-width="3.5" stroke-linecap="round"/>
-                            <!-- Daun / Gelombang Hijau -->
                             <path d="M 28 42 C 46 28, 76 26, 96 37 C 78 35, 56 38, 38 48 Z" fill="#a3e635"/>
                             <path d="M 30 43 C 52 32, 78 34, 95 40 C 76 50, 50 51, 32 45 Z" fill="#009444"/>
-                            <!-- Teks MariFood Proporsional -->
-                            <text x="60" y="74" text-anchor="middle" font-family="Poppins, Arial, sans-serif" font-weight="800" font-size="23" letter-spacing="-0.5">
+                            <text x="60" y="74" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800" font-size="23" letter-spacing="-0.5">
                                 <tspan fill="#009444">Mari</tspan><tspan fill="#f58220">food</tspan>
                             </text>
                         </svg>
                     </div>
 
                     <div class="leading-[1.15] shrink-0">
-                        <div class="text-sm sm:text-base font-black text-[#a3e635] tracking-wide whitespace-nowrap">
+                        <div class="text-sm sm:text-base font-black text-[#a3e635] tracking-tight whitespace-nowrap">
                             Dokumentasi
                         </div>
-                        <div class="text-sm sm:text-base font-extrabold text-white tracking-wide whitespace-nowrap">
+                        <div class="text-sm sm:text-base font-extrabold text-white tracking-tight whitespace-nowrap">
                             Paket Pajang
                         </div>
                     </div>
@@ -253,24 +251,24 @@
                 <!-- Garis Hijau Stabilo + Baris Chevron Kecil -->
                 <div class="mt-2 mb-1.5">
                     <div class="h-[2.5px] w-full bg-[#a3e635] rounded-full"></div>
-                    <div class="text-[8px] sm:text-[9px] font-mono font-black tracking-[0.22em] text-[#a3e635]/90 overflow-hidden whitespace-nowrap leading-none mt-0.5">
-                        >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+                    <div class="text-[8px] sm:text-[9px] font-mono font-black tracking-[0.2em] text-[#a3e635]/90 overflow-hidden whitespace-nowrap leading-none mt-1">
+                        >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
                     </div>
                 </div>
 
                 <!-- Jam Hijau Stabilo + Hari & Tanggal -->
                 <div class="flex items-center gap-2.5 leading-none mb-2">
-                    <span id="wm-jam-preview" class="text-2xl sm:text-3xl font-black font-mono tracking-tight text-[#a3e635] shrink-0">
+                    <span id="wm-jam-preview" class="text-2xl sm:text-[30px] font-black font-mono tracking-tight text-[#a3e635] shrink-0">
                         00:00
                     </span>
-                    <div class="text-[10px] sm:text-xs font-bold text-slate-100 leading-tight shrink-0">
+                    <div class="text-[10px] sm:text-xs font-bold text-[#f8fafc] leading-tight shrink-0">
                         <div id="wm-hari-preview">-</div>
                         <div id="wm-tanggal-preview" class="font-mono">-</div>
                     </div>
                 </div>
 
                 <!-- Info Tujuan, DO & Konversi Paket -->
-                <div id="wm-info-preview" class="text-[11px] sm:text-xs font-bold text-white whitespace-pre-line leading-snug"></div>
+                <div id="wm-info-preview" class="text-[11px] sm:text-xs font-bold text-white whitespace-pre-line leading-[1.35]"></div>
             </div>
 
             <!-- Popover Pilihan Data Tersimpan (Muncul Saat Tombol Edit Diklik) -->
