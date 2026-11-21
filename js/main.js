@@ -1633,6 +1633,78 @@ window.bukaSubPageDoTrobel = bukaSubPageDoTrobel;
 window.tutupSubPageDoTrobel = tutupSubPageDoTrobel;
 
 
+// Fungsi untuk membuka subpage Paket Pajang
+function bukaSubPagePaketPajang() {
+    const container = document.getElementById('subpage-paket-container');
+
+    if (!container) {
+        console.error("Wadah 'subpage-paket-container' tidak ditemukan di index.html!");
+        return;
+    }
+
+    const subpage = document.getElementById('subpage-paket');
+
+    // Jika sudah ada (sudah pernah di-fetch), langsung buka
+    if (subpage) {
+        subpage.classList.remove('translate-x-full');
+        if (typeof window.initPaketPajang === 'function') {
+            window.initPaketPajang();
+        }
+        return;
+    }
+
+    const basePath = window.location.pathname.includes('/warelogos.github.io')
+        ? '/warelogos.github.io/apps/paket.html'
+        : 'apps/paket.html';
+    const scriptPath = window.location.pathname.includes('/warelogos.github.io')
+        ? '/warelogos.github.io/js/paket.js'
+        : 'js/paket.js';
+
+    fetch(basePath)
+        .then(response => {
+            if (!response.ok) throw new Error("Gagal mengambil file apps/paket.html");
+            return response.text();
+        })
+        .then(htmlContent => {
+            container.innerHTML = htmlContent;
+
+            const script = document.createElement('script');
+            script.src = scriptPath;
+
+            script.onload = () => {
+                if (typeof window.initPaketPajang === 'function') {
+                    window.initPaketPajang();
+                }
+
+                const elemenBaru = document.getElementById('subpage-paket');
+                if (elemenBaru) {
+                    setTimeout(() => {
+                        elemenBaru.classList.remove('translate-x-full');
+                    }, 50);
+                }
+            };
+            document.body.appendChild(script);
+        })
+        .catch(error => {
+            console.error(error);
+            if (typeof miuiAlert === 'function') {
+                miuiAlert("Sistem Gagal Memuat Template Paket Pajang!");
+            }
+        });
+}
+
+// Fungsi untuk menutup subpage Paket Pajang
+window.tutupSubPagePaketPajang = function() {
+    const subpage = document.getElementById('subpage-paket');
+    if (subpage) {
+        subpage.classList.add('translate-x-full');
+    }
+};
+
+window.bukaSubPagePaketPajang = bukaSubPagePaketPajang;
+window.tutupSubPagePaketPajang = tutupSubPagePaketPajang;
+
+
 
 // Fungsi untuk membuka subpage Barang Export
 function bukaSubPageExport() {
