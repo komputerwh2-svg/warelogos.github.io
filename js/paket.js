@@ -795,14 +795,17 @@ function updatePreviewWatermarkPaket() {
 function buatImageLogoMariFood() {
     return new Promise((resolve) => {
         const svgMarkup = `
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 58" width="280" height="116">
-                <rect width="140" height="58" rx="6" fill="#ececec"/>
-                <path d="M 52 24 A 18 18 0 0 1 88 24 Z" fill="#f58220"/>
-                <path d="M 47 24 A 23 23 0 0 1 93 24" fill="none" stroke="#ffd200" stroke-width="3.2" stroke-linecap="round"/>
-                <path d="M 40 28 C 56 18, 86 16, 104 25 C 88 23, 68 25, 52 33 Z" fill="#8dc63f"/>
-                <path d="M 42 29 C 62 21, 88 22, 103 27 C 86 35, 62 36, 44 31 Z" fill="#009444"/>
-                <text x="6" y="52" font-family="Poppins, Arial, sans-serif" font-weight="800" font-size="22" fill="#009444">Mari</text>
-                <text x="56" y="52" font-family="Poppins, Arial, sans-serif" font-weight="800" font-size="22" fill="#f58220">food</text>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 76" width="360" height="152">
+                <rect width="180" height="76" rx="8" fill="#efefef"/>
+                <!-- Matahari Oranye & Kuning -->
+                <path d="M 68 32 A 22 22 0 0 1 112 32 Z" fill="#f58220"/>
+                <path d="M 62 32 A 28 28 0 0 1 118 32" fill="none" stroke="#ffd200" stroke-width="4" stroke-linecap="round"/>
+                <!-- Gelombang Daun Hijau Stabilo & Hijau Tua -->
+                <path d="M 52 38 C 72 25, 110 23, 132 34 C 112 31, 88 34, 68 44 Z" fill="#a3e635"/>
+                <path d="M 54 39 C 78 29, 112 30, 131 36 C 110 46, 80 47, 56 41 Z" fill="#009444"/>
+                <!-- Teks MariFood -->
+                <text x="10" y="68" font-family="Poppins, Arial, sans-serif" font-weight="800" font-size="28" fill="#009444">Mari</text>
+                <text x="74" y="68" font-family="Poppins, Arial, sans-serif" font-weight="800" font-size="28" fill="#f58220">food</text>
             </svg>
         `.trim();
 
@@ -839,7 +842,10 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
 
     const logoImg = await buatImageLogoMariFood();
 
-    const scale = Math.max(0.75, w / 900);
+    // Skala berbasis sisi terpendek agar proporsi tetap natural di potret maupun lanskap
+    const minSide = Math.min(w, h);
+    const scale = Math.max(0.85, minSide / 720);
+
     const pad = Math.round(14 * scale);
     const margin = Math.round(18 * scale);
     const { jam, hari, tanggal, hariTanggal } = getInfoWaktuWatermarkSekarang();
@@ -849,86 +855,98 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
     const teksInfo = rec ? formatInfoWatermarkDariRecord(rec) : '';
     const barisInfo = teksInfo ? teksInfo.split('\n') : [];
 
-    const logoW = Math.round(86 * scale);
-    const logoH = Math.round(36 * scale);
-    const fontJudul = `900 ${Math.round(15 * scale)}px Poppins, sans-serif`;
-    const fontSubjudul = `800 ${Math.round(15 * scale)}px Poppins, sans-serif`;
-    const fontJam = `900 ${Math.round(36 * scale)}px monospace`;
+    // Ukuran tetap untuk logo & judul agar tidak ikut melebar mengikuti isi detail
+    const logoH = Math.round(42 * scale);
+    const logoW = Math.round(logoH * (180 / 76));
+    const judulGap = Math.round(10 * scale);
+
+    const fontJudul = `900 ${Math.round(17 * scale)}px Poppins, sans-serif`;
+    const fontSubjudul = `800 ${Math.round(17 * scale)}px Poppins, sans-serif`;
+    const fontJam = `900 ${Math.round(38 * scale)}px monospace`;
     const fontTgl = `700 ${Math.round(14 * scale)}px Poppins, sans-serif`;
     const fontDetail = `700 ${Math.round(15 * scale)}px Poppins, sans-serif`;
 
+    ctx.font = fontJudul;
+    const wJudul = ctx.measureText('Dokumentasi').width;
+    ctx.font = fontSubjudul;
+    const wSubjudul = ctx.measureText('Paket Pajang').width;
+    const headerTextW = Math.max(wJudul, wSubjudul);
+    const headerFixedW = logoW + judulGap + headerTextW;
+
     ctx.font = fontDetail;
-    let maxTextWidth = Math.round(280 * scale);
+    let maxDetailWidth = 0;
     barisInfo.forEach((line) => {
         const mw = ctx.measureText(line).width;
-        if (mw > maxTextWidth) maxTextWidth = mw;
+        if (mw > maxDetailWidth) maxDetailWidth = mw;
     });
 
-    const headerMinW = logoW + Math.round(155 * scale);
-    const boxWidth = Math.min(w - margin * 2, Math.max(headerMinW, maxTextWidth) + pad * 2);
+    const contentWidth = Math.max(headerFixedW, maxDetailWidth, Math.round(210 * scale));
+    const boxWidth = Math.min(w - margin * 2, contentWidth + pad * 2);
 
-    const topBlockH = Math.max(logoH, Math.round(38 * scale));
-    const dividerH = Math.round(12 * scale);
-    const timeBlockH = Math.round(42 * scale);
-    const lineH = Math.round(21 * scale);
-    const detailBlockH = barisInfo.length ? (barisInfo.length * lineH + Math.round(8 * scale)) : 0;
-    const boxHeight = pad * 2 + topBlockH + dividerH + timeBlockH + detailBlockH;
+    const topBlockH = Math.max(logoH, Math.round(44 * scale));
+    const dividerGap = Math.round(12 * scale);
+    const timeBlockH = Math.round(44 * scale);
+    const lineH = Math.round(22 * scale);
+    const detailBlockH = barisInfo.length ? (Math.round(8 * scale) + barisInfo.length * lineH) : 0;
+    const boxHeight = pad * 2 + topBlockH + dividerGap + timeBlockH + detailBlockH;
 
     const boxX = margin;
     const boxY = h - margin - boxHeight;
 
-    ctx.fillStyle = 'rgba(30, 34, 41, 0.80)';
+    // Panel latar gelap semi-transparan gaya Timemark
+    ctx.fillStyle = 'rgba(26, 30, 36, 0.36)';
     ctx.beginPath();
-    ctx.roundRect(boxX, boxY, boxWidth, boxHeight, Math.round(8 * scale));
+    ctx.roundRect(boxX, boxY, boxWidth, boxHeight, Math.round(10 * scale));
     ctx.fill();
 
     const innerX = boxX + pad;
     let curY = boxY + pad;
 
+    // Logo MariFood di kiri atas (lebar & tinggi tetap)
     if (logoImg) {
         ctx.drawImage(logoImg, innerX, curY, logoW, logoH);
     }
 
-    const titleX = innerX + logoW + Math.round(10 * scale);
+    // Judul "Dokumentasi" & "Paket Pajang" di sebelah kanan logo (lebar tetap)
+    const titleX = innerX + logoW + judulGap;
     ctx.font = fontJudul;
-    ctx.fillStyle = '#f6d34a';
-    ctx.fillText('Dokumentasi', titleX, curY + Math.round(14 * scale));
+    ctx.fillStyle = '#a3e635';
+    ctx.fillText('Dokumentasi', titleX, curY + Math.round(16 * scale));
 
     ctx.font = fontSubjudul;
     ctx.fillStyle = '#ffffff';
-    ctx.fillText('Paket Pajang', titleX, curY + Math.round(32 * scale));
+    ctx.fillText('Paket Pajang', titleX, curY + Math.round(37 * scale));
 
+    // Garis pemisah hijau stabilo
     curY += topBlockH + Math.round(6 * scale);
-    const gradLine = ctx.createLinearGradient(innerX, curY, boxX + boxWidth - pad, curY);
-    gradLine.addColorStop(0, '#ffd200');
-    gradLine.addColorStop(0.55, '#8dc63f');
-    gradLine.addColorStop(1, 'rgba(141, 198, 63, 0)');
-    ctx.strokeStyle = gradLine;
-    ctx.lineWidth = Math.max(2, Math.round(2.5 * scale));
+    ctx.strokeStyle = '#a3e635';
+    ctx.lineWidth = Math.max(2.5, Math.round(2.5 * scale));
     ctx.beginPath();
     ctx.moveTo(innerX, curY);
     ctx.lineTo(boxX + boxWidth - pad, curY);
     ctx.stroke();
 
-    curY += Math.round(34 * scale);
+    // Jam hijau stabilo + Hari & Tanggal
+    curY += Math.round(38 * scale);
     ctx.font = fontJam;
-    ctx.fillStyle = '#d9e021';
+    ctx.fillStyle = '#a3e635';
     ctx.fillText(jam, innerX, curY);
 
     const jamW = ctx.measureText(jam).width;
     const dateX = innerX + jamW + Math.round(12 * scale);
     ctx.font = fontTgl;
-    ctx.fillStyle = '#f1f5f9';
-    ctx.fillText(hari, dateX, curY - Math.round(17 * scale));
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillText(hari, dateX, curY - Math.round(18 * scale));
     ctx.fillText(tanggal, dateX, curY - Math.round(1 * scale));
 
+    // Rincian Tujuan, No DO & Konversi Paket (KRT + PKT)
     if (barisInfo.length) {
-        curY += Math.round(14 * scale);
+        curY += Math.round(10 * scale);
         ctx.font = fontDetail;
         ctx.fillStyle = '#ffffff';
         barisInfo.forEach((line) => {
             curY += lineH;
-            ctx.fillText(line, innerX, curY, boxWidth - pad * 2);
+            ctx.fillText(line, innerX, curY);
         });
     }
 
