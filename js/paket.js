@@ -575,7 +575,6 @@ async function isiDropdownDataWatermarkPaket(pilihIdOtomatis = '') {
     const selectEl = document.getElementById('paket-wm-select-data');
     if (!selectEl) return;
 
-    // Pastikan riwayat hari ini termuat bila belum ada di cache
     if (!Array.isArray(window.__riwayatPaketHariIniCache)) {
         await muatRiwayatPaketHariIni();
     }
@@ -631,6 +630,86 @@ function handlePilihDataWatermarkPaket() {
     updatePreviewWatermarkPaket();
 }
 
+function togglePanelEditCatatanWatermark(paksaState) {
+    const panel = document.getElementById('panel-edit-watermark-paket');
+    if (!panel) return;
+
+    const akanBuka = typeof paksaState === 'boolean'
+        ? paksaState
+        : panel.classList.contains('hidden');
+
+    if (akanBuka) {
+        panel.classList.remove('hidden');
+    } else {
+        panel.classList.add('hidden');
+    }
+}
+
+function updateBadgeRiwayatFotoPaket() {
+    const thumbEl = document.getElementById('wm-thumb-riwayat');
+    const iconKosongEl = document.getElementById('wm-icon-riwayat-kosong');
+    const badgeEl = document.getElementById('wm-badge-count-foto');
+
+    const jumlah = cacheFotoWatermarkHariIni.length;
+    if (badgeEl) badgeEl.textContent = jumlah;
+
+    if (jumlah > 0 && cacheFotoWatermarkHariIni[0]?.dataUrl) {
+        if (thumbEl) {
+            thumbEl.src = cacheFotoWatermarkHariIni[0].dataUrl;
+            thumbEl.classList.remove('hidden');
+        }
+        if (iconKosongEl) iconKosongEl.classList.add('hidden');
+    } else {
+        if (thumbEl) {
+            thumbEl.src = '';
+            thumbEl.classList.add('hidden');
+        }
+        if (iconKosongEl) iconKosongEl.classList.remove('hidden');
+    }
+}
+
+function bukaRiwayatFotoWatermarkPaket() {
+    const modal = document.getElementById('modal-riwayat-foto-paket');
+    const wadah = document.getElementById('daftar-riwayat-foto-paket');
+    if (!modal || !wadah) return;
+
+    modal.classList.remove('hidden');
+
+    if (!cacheFotoWatermarkHariIni.length) {
+        wadah.innerHTML = `
+            <div class="col-span-full text-center py-8 text-xs font-bold text-slate-400">
+                Belum ada foto watermark yang diambil.
+            </div>`;
+        return;
+    }
+
+    wadah.innerHTML = cacheFotoWatermarkHariIni.map((item, idx) => `
+        <div class="rounded-xl border border-orange-200 bg-slate-50 overflow-hidden flex flex-col shadow-xs">
+            <img src="${item.dataUrl}" alt="Foto ${idx + 1}" class="w-full h-28 object-cover bg-slate-900">
+            <div class="p-2 space-y-1.5 flex-1 flex flex-col justify-between">
+                <div class="text-[10px] font-mono font-bold text-slate-500 truncate">${escapeHTMLPaket(item.waktu || '')}</div>
+                <div class="text-[10px] font-bold text-slate-700 line-clamp-2 leading-tight">${escapeHTMLPaket(item.caption || 'Paket Pajang')}</div>
+                <button type="button" onclick="unduhUlangFotoCache(${idx})"
+                    class="w-full py-1 px-2 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-[10px] font-black uppercase transition">
+                    Simpan / Share
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function tutupRiwayatFotoWatermarkPaket() {
+    const modal = document.getElementById('modal-riwayat-foto-paket');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function unduhUlangFotoCache(index) {
+    const item = cacheFotoWatermarkHariIni[index];
+    if (!item?.dataUrl) return;
+    dataUrlFotoWatermarkAktif = item.dataUrl;
+    await simpanHasilFotoWatermarkPaket();
+}
+
 function pakaiDataKeKameraPaket(recordId) {
     bukaKameraWatermarkPaket(recordId || '');
 }
@@ -640,6 +719,9 @@ async function bukaKameraWatermarkPaket(pilihIdOtomatis = '') {
     if (!modal) return;
 
     modal.classList.remove('hidden');
+    togglePanelEditCatatanWatermark(false);
+    tutupRiwayatFotoWatermarkPaket();
+    updateBadgeRiwayatFotoPaket();
     resetModeKameraPaket();
 
     await isiDropdownDataWatermarkPaket(pilihIdOtomatis);
@@ -654,6 +736,8 @@ function tutupKameraWatermarkPaket() {
     const modal = document.getElementById('modal-kamera-paket');
     if (modal) modal.classList.add('hidden');
 
+    togglePanelEditCatatanWatermark(false);
+    tutupRiwayatFotoWatermarkPaket();
     clearInterval(timerWatermarkPaket);
     hentikanStreamKameraPaket();
 }
@@ -677,8 +761,8 @@ async function mulaiStreamKameraPaket() {
         videoEl.srcObject = streamKameraPaket;
         videoEl.classList.remove('hidden');
     } catch (err) {
-        console.warn('Kamera langsung tidak tersedia, gunakan tombol Pilih Foto:', err);
-        tampilkanToastPaket('Kamera tidak tersedia, gunakan tombol Pilih Foto.', 'info');
+        console.warn('Kamera langsung tidak tersedia, gunakan tombol Foto Lokal:', err);
+        tampilkanToastPaket('Kamera tidak tersedia, gunakan tombol Foto Lokal.', 'info');
     }
 }
 
@@ -733,6 +817,7 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
     const canvas = document.getElementById('paket-watermark-canvas');
     const videoEl = document.getElementById('paket-camera-video');
     const overlayEl = document.getElementById('paket-watermark-overlay');
+    const gridEl = document.getElementById('paket-camera-grid');
     const selectEl = document.getElementById('paket-wm-select-data');
 
     if (!canvas) return;
@@ -792,7 +877,6 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
     const boxX = margin;
     const boxY = h - margin - boxHeight;
 
-    // Panel latar gelap semi-transparan gaya Timemark
     ctx.fillStyle = 'rgba(30, 34, 41, 0.80)';
     ctx.beginPath();
     ctx.roundRect(boxX, boxY, boxWidth, boxHeight, Math.round(8 * scale));
@@ -801,12 +885,10 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
     const innerX = boxX + pad;
     let curY = boxY + pad;
 
-    // Logo MariFood di kiri atas panel
     if (logoImg) {
         ctx.drawImage(logoImg, innerX, curY, logoW, logoH);
     }
 
-    // Judul "Dokumentasi" & "Paket Pajang" di sebelah kanan logo
     const titleX = innerX + logoW + Math.round(10 * scale);
     ctx.font = fontJudul;
     ctx.fillStyle = '#f6d34a';
@@ -816,7 +898,6 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
     ctx.fillStyle = '#ffffff';
     ctx.fillText('Paket Pajang', titleX, curY + Math.round(32 * scale));
 
-    // Garis aksen kuning-hijau
     curY += topBlockH + Math.round(6 * scale);
     const gradLine = ctx.createLinearGradient(innerX, curY, boxX + boxWidth - pad, curY);
     gradLine.addColorStop(0, '#ffd200');
@@ -829,7 +910,6 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
     ctx.lineTo(boxX + boxWidth - pad, curY);
     ctx.stroke();
 
-    // Jam besar + Hari & Tanggal
     curY += Math.round(34 * scale);
     ctx.font = fontJam;
     ctx.fillStyle = '#d9e021';
@@ -842,7 +922,6 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
     ctx.fillText(hari, dateX, curY - Math.round(17 * scale));
     ctx.fillText(tanggal, dateX, curY - Math.round(1 * scale));
 
-    // Rincian Tujuan, No DO & Paket (KRT + PKT)
     if (barisInfo.length) {
         curY += Math.round(14 * scale);
         ctx.font = fontDetail;
@@ -863,22 +942,27 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
     if (cacheFotoWatermarkHariIni.length > 8) {
         cacheFotoWatermarkHariIni.pop();
     }
+    updateBadgeRiwayatFotoPaket();
 
     if (videoEl) videoEl.classList.add('hidden');
     if (overlayEl) overlayEl.classList.add('hidden');
+    if (gridEl) gridEl.classList.add('hidden');
     canvas.classList.remove('hidden');
 
     document.getElementById('btn-jepret-watermark')?.classList.add('hidden');
     document.getElementById('btn-ulang-kamera-paket')?.classList.remove('hidden');
 
     const btnSimpanFoto = document.getElementById('btn-simpan-foto-watermark');
-    if (btnSimpanFoto) btnSimpanFoto.disabled = false;
+    if (btnSimpanFoto) {
+        btnSimpanFoto.classList.remove('hidden');
+        btnSimpanFoto.disabled = false;
+    }
 }
 
 function jepretFotoWatermarkPaket() {
     const videoEl = document.getElementById('paket-camera-video');
     if (!videoEl || !videoEl.videoWidth) {
-        tampilkanToastPaket('Kamera belum siap. Gunakan tombol Pilih Foto jika kamera tidak aktif.', 'error');
+        tampilkanToastPaket('Kamera belum siap. Gunakan tombol Foto Lokal jika kamera tidak aktif.', 'error');
         return;
     }
     gambarWatermarkKeCanvas(videoEl, videoEl.videoWidth, videoEl.videoHeight);
@@ -906,16 +990,21 @@ function resetModeKameraPaket() {
     const videoEl = document.getElementById('paket-camera-video');
     const canvas = document.getElementById('paket-watermark-canvas');
     const overlayEl = document.getElementById('paket-watermark-overlay');
+    const gridEl = document.getElementById('paket-camera-grid');
 
     if (canvas) canvas.classList.add('hidden');
     if (videoEl) videoEl.classList.remove('hidden');
     if (overlayEl) overlayEl.classList.remove('hidden');
+    if (gridEl) gridEl.classList.remove('hidden');
 
     document.getElementById('btn-jepret-watermark')?.classList.remove('hidden');
     document.getElementById('btn-ulang-kamera-paket')?.classList.add('hidden');
 
     const btnSimpanFoto = document.getElementById('btn-simpan-foto-watermark');
-    if (btnSimpanFoto) btnSimpanFoto.disabled = true;
+    if (btnSimpanFoto) {
+        btnSimpanFoto.classList.add('hidden');
+        btnSimpanFoto.disabled = true;
+    }
 }
 
 async function simpanHasilFotoWatermarkPaket() {
@@ -982,7 +1071,9 @@ window.initPaketPajang = function () {
     }
 };
 
-// Daftarkan fungsi ke global window agar bisa dipanggil dari atribut onclick di HTML
+// =========================================================
+// 7. EKSPOR FUNGSI KE GLOBAL WINDOW
+// =========================================================
 window.tambahItemPaketKeList = tambahItemPaketKeList;
 window.hapusItemPaketSementara = hapusItemPaketSementara;
 window.simpanDataPaketPajang = simpanDataPaketPajang;
@@ -993,6 +1084,11 @@ window.hapusRiwayatPaket = hapusRiwayatPaket;
 window.pakaiDataKeKameraPaket = pakaiDataKeKameraPaket;
 window.bukaKameraWatermarkPaket = bukaKameraWatermarkPaket;
 window.tutupKameraWatermarkPaket = tutupKameraWatermarkPaket;
+window.handlePilihDataWatermarkPaket = handlePilihDataWatermarkPaket;
+window.togglePanelEditCatatanWatermark = togglePanelEditCatatanWatermark;
+window.bukaRiwayatFotoWatermarkPaket = bukaRiwayatFotoWatermarkPaket;
+window.tutupRiwayatFotoWatermarkPaket = tutupRiwayatFotoWatermarkPaket;
+window.unduhUlangFotoCache = unduhUlangFotoCache;
 window.jepretFotoWatermarkPaket = jepretFotoWatermarkPaket;
 window.handleFotoFileWatermarkPaket = handleFotoFileWatermarkPaket;
 window.resetModeKameraPaket = resetModeKameraPaket;
