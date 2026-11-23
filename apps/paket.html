@@ -428,15 +428,29 @@
         <div id="modal-riwayat-foto-paket"
             class="hidden fixed inset-0 z-[75] bg-black/80 backdrop-blur-xs flex items-end sm:items-center justify-center p-2 sm:p-4">
             <div class="w-full max-w-lg bg-white text-slate-800 rounded-2xl border border-orange-500 shadow-2xl overflow-hidden flex flex-col max-h-[82vh]">
-                <div class="px-4 py-3 bg-[#2f2f2f] text-white flex items-center justify-between shrink-0">
-                    <span class="text-xs font-black uppercase tracking-wider flex items-center gap-2">
+                <div class="px-4 py-3 bg-[#2f2f2f] text-white flex items-center justify-between gap-2 shrink-0">
+                    <span class="text-xs font-black uppercase tracking-wider flex items-center gap-2 truncate">
                         <i class="fa-solid fa-images text-orange-400"></i>
                         <span>Riwayat Hasil Foto Hari Ini</span>
                     </span>
-                    <button type="button" onclick="tutupRiwayatFotoWatermarkPaket()"
-                        class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold text-orange-300">
-                        Tutup
-                    </button>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <button type="button" onclick="refreshRiwayatFotoWatermarkPaket()"
+                            class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-bold text-amber-300 flex items-center gap-1 transition"
+                            title="Muat ulang riwayat foto">
+                            <i class="fa-solid fa-rotate-right text-[10px]"></i>
+                            <span>Refresh</span>
+                        </button>
+                        <button type="button" onclick="hapusSemuaRiwayatFotoWatermarkPaket()"
+                            class="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/35 text-[11px] font-bold text-rose-200 flex items-center gap-1 transition"
+                            title="Kosongkan riwayat foto">
+                            <i class="fa-solid fa-trash-can text-[10px]"></i>
+                            <span>Hapus</span>
+                        </button>
+                        <button type="button" onclick="tutupRiwayatFotoWatermarkPaket()"
+                            class="text-white hover:text-red-400 font-bold text-lg">
+                            ✕
+                        </button>
+                    </div>
                 </div>
 
                 <div id="daftar-riwayat-foto-paket" class="p-3.5 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-2.5 miui-custom-scroll">
