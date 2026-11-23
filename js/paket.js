@@ -1619,7 +1619,69 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
     document.getElementById('btn-ulang-kamera-paket')?.classList.add('hidden');
     document.getElementById('btn-simpan-foto-watermark')?.classList.add('hidden');
 
-    notifPaket('Foto watermark langsung tersimpan ke perangkat.');
+    // notifPaket('Foto watermark langsung tersimpan ke perangkat.');
+}
+
+let audioCtxKameraPaket = null;
+
+function bunyiJepretKameraPaket() {
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+
+        if (!audioCtxKameraPaket) {
+            audioCtxKameraPaket = new AudioCtx();
+        }
+        if (audioCtxKameraPaket.state === 'suspended') {
+            audioCtxKameraPaket.resume();
+        }
+
+        const now = audioCtxKameraPaket.currentTime;
+
+        // 1. Noise burst singkat untuk karakter suara rana/shutter kamera
+        const durasi = 0.065;
+        const jumlahSample = Math.max(1, Math.floor(audioCtxKameraPaket.sampleRate * durasi));
+        const buffer = audioCtxKameraPaket.createBuffer(1, jumlahSample, audioCtxKameraPaket.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < jumlahSample; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (jumlahSample * 0.28));
+        }
+
+        const noise = audioCtxKameraPaket.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = audioCtxKameraPaket.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1800, now);
+        filter.Q.setValueAtTime(1.4, now);
+
+        const gainNoise = audioCtxKameraPaket.createGain();
+        gainNoise.gain.setValueAtTime(0.45, now);
+        gainNoise.gain.exponentialRampToValueAtTime(0.001, now + durasi);
+
+        noise.connect(filter);
+        filter.connect(gainNoise);
+        gainNoise.connect(audioCtxKameraPaket.destination);
+        noise.start(now);
+        noise.stop(now + durasi);
+
+        // 2. Klik pendek di akhir agar terasa seperti mekanis shutter
+        const osc = audioCtxKameraPaket.createOscillator();
+        const gainClick = audioCtxKameraPaket.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(950, now + 0.015);
+        osc.frequency.exponentialRampToValueAtTime(260, now + 0.06);
+
+        gainClick.gain.setValueAtTime(0.18, now + 0.015);
+        gainClick.gain.exponentialRampToValueAtTime(0.001, now + 0.065);
+
+        osc.connect(gainClick);
+        gainClick.connect(audioCtxKameraPaket.destination);
+        osc.start(now + 0.015);
+        osc.stop(now + 0.07);
+    } catch (err) {
+        console.warn('Suara jepret kamera dilewati:', err);
+    }
 }
 
 function jepretFotoWatermarkPaket() {
@@ -1627,6 +1689,7 @@ function jepretFotoWatermarkPaket() {
     if (!videoEl || !videoEl.videoWidth) {
         return notifPaket('Kamera belum siap. Gunakan tombol Foto Lokal jika kamera tidak aktif.');
     }
+    bunyiJepretKameraPaket();
     gambarWatermarkKeCanvas(videoEl, videoEl.videoWidth, videoEl.videoHeight);
 }
 
