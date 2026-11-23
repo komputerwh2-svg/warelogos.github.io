@@ -385,6 +385,52 @@ window.simpanKredensialAdminRTDB = function() {
     });
 };
 
+function blokirAutofillNonAdmin(root = document) {
+    const scope = root && typeof root.querySelectorAll === 'function' ? root : document;
+    const fields = scope.querySelectorAll('input, textarea, select');
+
+    fields.forEach((el) => {
+        const isInsideAdminModal = Boolean(el.closest('#modal-admin-lock'));
+        const isAdminCredential = isInsideAdminModal && (el.id === 'admin-user' || el.id === 'admin-pass');
+
+        // Izinkan autofill kredensial HANYA pada #admin-user dan #admin-pass di dalam #modal-admin-lock
+        if (isAdminCredential) {
+            if (el.id === 'admin-user') el.setAttribute('autocomplete', 'username');
+            if (el.id === 'admin-pass') el.setAttribute('autocomplete', 'current-password');
+            return;
+        }
+
+        const typeAttr = String(el.getAttribute('type') || '').toLowerCase();
+        if (typeAttr === 'checkbox' || typeAttr === 'radio' || typeAttr === 'file' || typeAttr === 'hidden') {
+            return;
+        }
+
+        // Untuk semua input di luar modal admin, cegah autofill & pengelola sandi
+        el.setAttribute('autocomplete', 'new-password'); // lebih kuat meredam password manager dibanding "off" di beberapa browser
+        el.setAttribute('autocorrect', 'off');
+        el.setAttribute('autocapitalize', 'off');
+        el.setAttribute('spellcheck', 'false');
+        el.setAttribute('data-form-type', 'other');
+        el.setAttribute('data-lpignore', 'true');
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    blokirAutofillNonAdmin(document);
+
+    if (typeof MutationObserver === 'function' && document.body) {
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((m) => {
+                m.addedNodes.forEach((node) => {
+                    if (node && node.nodeType === 1) {
+                        blokirAutofillNonAdmin(node);
+                    }
+                });
+            });
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+    }
+});
 
 // Konfigurasi Keamanan Aplikasi yang Dikunci
 const APP_CONFIG = {
@@ -416,6 +462,16 @@ function requestAksesAplikasi(appId) {
             if (modal) {
                 modal.classList.remove('hidden');
                 modal.classList.add('flex');
+                if (typeof blokirAutofillNonAdmin === 'function') {
+                    blokirAutofillNonAdmin(modal);
+                }
+                const userEl = document.getElementById('admin-user');
+                const passEl = document.getElementById('admin-pass');
+                if (userEl && !userEl.value.trim()) {
+                    userEl.focus();
+                } else if (passEl) {
+                    passEl.focus();
+                }
             }
         }
     } else {
