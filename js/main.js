@@ -305,6 +305,178 @@ async function fetchWeather() {
 fetchWeather();
 setInterval(fetchWeather, 15 * 60 * 1000);
 
+
+
+// === MODUL SPEED TEST MANDIRI (TANPA LAYANAN Pihak Ketiga) ===
+let sedangTesSpeed = false;
+
+function bukaModalSpeedTest() {
+    const modal = document.getElementById('modal-speed-test');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+}
+
+function tutupModalSpeedTest() {
+    const modal = document.getElementById('modal-speed-test');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+}
+
+function bukaLayananSpeedTest(url) {
+    window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+function setSpeedUiProgress(persen, tahap, angkaTeks, satuanTeks, statusTeks) {
+    const bar = document.getElementById('speedtest-progress-bar');
+    const tahapEl = document.getElementById('speedtest-tahap-label');
+    const angkaEl = document.getElementById('speedtest-angka-utama');
+    const satuanEl = document.getElementById('speedtest-satuan-utama');
+    const detailEl = document.getElementById('speedtest-detail-status');
+
+    if (bar) bar.style.width = `${Math.max(0, Math.min(100, persen))}%`;
+    if (tahapEl && tahap !== undefined) tahapEl.textContent = tahap;
+    if (angkaEl && angkaTeks !== undefined) angkaEl.textContent = angkaTeks;
+    if (satuanEl && satuanTeks !== undefined) satuanEl.textContent = satuanTeks;
+    if (detailEl && statusTeks !== undefined) detailEl.textContent = statusTeks;
+}
+
+async function ukurPingMandiri(jumlahPercobaan = 4) {
+    const hasilMs = [];
+    for (let i = 0; i < jumlahPercobaan; i++) {
+        const url = `https://speed.cloudflare.com/__down?bytes=1&_r=${Date.now()}_${i}`;
+        const mulai = performance.now();
+        const res = await fetch(url, { cache: 'no-store' });
+        await res.arrayBuffer();
+        const durasi = performance.now() - mulai;
+        hasilMs.push(durasi);
+    }
+    const rataRata = hasilMs.reduce((a, b) => a + b, 0) / hasilMs.length;
+    return Math.round(rataRata);
+}
+
+async function ukurDownloadMandiri() {
+    // Uji bertahap (5 MB lalu 12 MB) agar koneksi cepat maupun sedang terukur stabil
+    const ukuranList = [5 * 1024 * 1024, 12 * 1024 * 1024];
+    let totalBytes = 0;
+    let totalDetik = 0;
+
+    for (let idx = 0; idx < ukuranList.length; idx++) {
+        const bytesTarget = ukuranList[idx];
+        const url = `https://speed.cloudflare.com/__down?bytes=${bytesTarget}&_r=${Date.now()}_${idx}`;
+        const mulai = performance.now();
+        const res = await fetch(url, { cache: 'no-store' });
+        const buf = await res.arrayBuffer();
+        const durasiDetik = (performance.now() - mulai) / 1000;
+
+        if (durasiDetik > 0) {
+            totalBytes += buf.byteLength;
+            totalDetik += durasiDetik;
+            const mbpsSementara = ((buf.byteLength * 8) / (durasiDetik * 1e6)).toFixed(1);
+            setSpeedUiProgress(
+                idx === 0 ? 45 : 68,
+                'Menguji Download',
+                mbpsSementara,
+                'Mbps',
+                `Mengunduh paket uji (${Math.round(bytesTarget / (1024 * 1024))} MB)...`
+            );
+        }
+    }
+
+    if (totalDetik <= 0) return 0;
+    return Number(((totalBytes * 8) / (totalDetik * 1e6)).toFixed(1));
+}
+
+async function ukurUploadMandiri() {
+    const ukuranBytes = 3 * 1024 * 1024; // 3 MB payload acak
+    const payload = new Uint8Array(ukuranBytes);
+    for (let i = 0; i < payload.length; i += 4096) {
+        payload[i] = (i * 131) & 255;
+    }
+
+    setSpeedUiProgress(78, 'Menguji Upload', '...', 'Mbps', 'Mengirim paket data uji ke server...');
+
+    const mulai = performance.now();
+    const res = await fetch(`https://speed.cloudflare.com/__up?_r=${Date.now()}`, {
+        method: 'POST',
+        body: payload,
+        cache: 'no-store'
+    });
+    await res.text();
+    const durasiDetik = (performance.now() - mulai) / 1000;
+
+    if (durasiDetik <= 0) return 0;
+    return Number(((ukuranBytes * 8) / (durasiDetik * 1e6)).toFixed(1));
+}
+
+async function jalankanTesSpeedMandiri() {
+    if (sedangTesSpeed) return;
+    sedangTesSpeed = true;
+
+    const btn = document.getElementById('btn-mulai-speedtest');
+    const pingEl = document.getElementById('speedtest-ping');
+    const dlEl = document.getElementById('speedtest-download');
+    const ulEl = document.getElementById('speedtest-upload');
+
+    if (btn) {
+        btn.disabled = true;
+        btn.classList.add('opacity-60', 'cursor-not-allowed');
+    }
+    if (pingEl) pingEl.textContent = '...';
+    if (dlEl) dlEl.textContent = '...';
+    if (ulEl) ulEl.textContent = '...';
+
+    try {
+        // 1. Ping
+        setSpeedUiProgress(15, 'Menguji Ping', '...', 'ms', 'Mengukur latensi jaringan...');
+        const pingMs = await ukurPingMandiri(4);
+        if (pingEl) pingEl.textContent = `${pingMs} ms`;
+        setSpeedUiProgress(25, 'Ping Selesai', String(pingMs), 'ms', `Latensi terukur ${pingMs} ms`);
+
+        // 2. Download
+        setSpeedUiProgress(35, 'Menguji Download', '0.0', 'Mbps', 'Memulai uji kecepatan unduh...');
+        const dlMbps = await ukurDownloadMandiri();
+        if (dlEl) dlEl.textContent = `${dlMbps} Mbps`;
+        setSpeedUiProgress(70, 'Download Selesai', String(dlMbps), 'Mbps', `Kecepatan download ${dlMbps} Mbps`);
+
+        // 3. Upload
+        const ulMbps = await ukurUploadMandiri();
+        if (ulEl) ulEl.textContent = `${ulMbps} Mbps`;
+
+        setSpeedUiProgress(
+            100,
+            'Pengujian Selesai',
+            String(dlMbps),
+            'Mbps (DL)',
+            `Ping ${pingMs} ms • Download ${dlMbps} Mbps • Upload ${ulMbps} Mbps`
+        );
+    } catch (err) {
+        console.warn('Tes speed mandiri terkendala:', err);
+        setSpeedUiProgress(
+            0,
+            'Gagal Mengukur',
+            '0.0',
+            'Mbps',
+            'Koneksi terputus atau diblokir jaringan/firewall. Coba lagi atau buka Speed.is.'
+        );
+    } finally {
+        sedangTesSpeed = false;
+        if (btn) {
+            btn.disabled = false;
+            btn.classList.remove('opacity-60', 'cursor-not-allowed');
+            btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i><span>Ulangi Tes</span>';
+        }
+    }
+}
+
+window.bukaModalSpeedTest = bukaModalSpeedTest;
+window.tutupModalSpeedTest = tutupModalSpeedTest;
+window.bukaLayananSpeedTest = bukaLayananSpeedTest;
+window.jalankanTesSpeedMandiri = jalankanTesSpeedMandiri;
+
 // =========================================================================
 // 4. NAVIGATION TO SUB-PAGE CONFIGURATION MODAL
 // =========================================================================
