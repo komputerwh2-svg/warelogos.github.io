@@ -164,16 +164,29 @@
                                 <i class="fa-solid fa-rotate-right"></i>
                                 <span>Refresh</span>
                             </button>
-                            <button type="button" onclick="cetakLabelHariIniPaket()"
-                                class="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase text-white bg-orange-600 hover:bg-orange-700 transition flex items-center gap-1">
-                                <i class="fa-solid fa-print"></i>
-                                <span>Cetak Semua</span>
-                            </button>
                             <button type="button" onclick="togglePanelRiwayatPaket(false)"
-                                class="px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition">
+                                class="px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase text-rose-500 hover:text-rose-800 bg-rose-100 hover:bg-rose-200 border border-rose-200 transition">
                                 Tutup
                             </button>
                         </div>
+                    </div>
+
+                    <!-- Bar Filter: Hari Ini / Semua Data / Tanggal Tertentu -->
+                    <div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-orange-100 shrink-0">
+                        <div class="inline-flex rounded-lg bg-orange-50 p-0.5 border border-orange-200">
+                            <button type="button" id="btn-filter-riwayat-hari" onclick="setModeRiwayatPaket('hari')"
+                                class="px-2.5 py-1 rounded-md text-[10px] font-black uppercase bg-orange-600 text-white transition">
+                                Hari Ini
+                            </button>
+                            <button type="button" id="btn-filter-riwayat-semua" onclick="setModeRiwayatPaket('semua')"
+                                class="px-2.5 py-1 rounded-md text-[10px] font-black uppercase text-slate-600 hover:text-orange-600 transition">
+                                Semua Data
+                            </button>
+                        </div>
+
+                        <input type="date" id="filter-tanggal-riwayat-paket" onchange="handleGantiTanggalRiwayatPaket(this.value)"
+                            class="px-2 py-1 text-[10px] font-bold text-slate-700 border border-orange-200 rounded-lg bg-orange-50/40 focus:outline-none focus:border-orange-500"
+                            title="Filter tanggal tertentu">
                     </div>
 
                     <!-- Daftar Data Tujuan + Tombol Cetak di Tiap Baris -->
@@ -198,6 +211,50 @@
                 <span>Dokumentasi Paket Pajang</span>
             </div>
             <button type="button" onclick="tutupKameraWatermarkPaket()" class="text-black hover:text-red-400 font-bold text-lg">✕</button>
+        </div>
+
+        <!-- Badge Watermark Pojok Kanan Atas: [icon.png] Warehouse Logistik -->
+        <div id="wm-top-right-preview"
+            class="pointer-events-none absolute top-14 right-3 z-20 flex items-center gap-1.5 select-none">
+            <img src="./icon.png" alt="Warehouse Logistik"
+                onerror="if(!this.dataset.fb){this.dataset.fb='1';this.src='https://komputerwh2-svg.github.io/warelogos.github.io/icon.png';}else{this.style.display='none';}"
+                class="w-5 h-5 rounded object-contain bg-white/85 p-0.5 shadow-sm shrink-0">
+            <span class="text-xs sm:text-sm font-black tracking-tight text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.85)]">
+                Warehouse Logistik
+            </span>
+        </div>
+
+        <!-- Teks Vertikal Sisi Kanan: Dokumentasi Terverifikasi -->
+        <div id="wm-right-vertical-preview"
+            class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 z-20 select-none">
+            <div style="writing-mode: vertical-rl;"
+                class="text-[10px] font-bold tracking-wider text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+                Dokumentasi Terverifikasi
+            </div>
+        </div>
+
+        <!-- Kontrol Flash & Zoom di Sisi Kanan Area Kamera -->
+        <div class="absolute right-3 top-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-2">
+            <button type="button" id="btn-toggle-flash-paket" onclick="toggleFlashKameraPaket()"
+                class="w-10 h-10 rounded-full bg-slate-900/75 hover:bg-slate-800 text-amber-300 border border-white/20 shadow-lg flex items-center justify-center transition"
+                title="Flash / Lampu Kamera">
+                <i id="icon-flash-paket" class="fa-solid fa-bolt-slash text-sm"></i>
+            </button>
+
+            <div class="bg-slate-900/75 border border-white/20 rounded-2xl p-1 flex flex-col items-center gap-1 shadow-lg">
+                <button type="button" id="btn-zoom-2" onclick="setZoomKameraPaket(2)"
+                    class="w-9 h-9 rounded-full text-[10px] font-black text-white hover:bg-white/15 transition">
+                    2
+                </button>
+                <button type="button" id="btn-zoom-1" onclick="setZoomKameraPaket(1.0)"
+                    class="w-9 h-9 rounded-full text-[10px] font-black bg-amber-400 text-slate-950 transition">
+                    1.0x
+                </button>
+                <button type="button" id="btn-zoom-06" onclick="setZoomKameraPaket(0.6)"
+                    class="w-9 h-9 rounded-full text-[10px] font-black text-white hover:bg-white/15 transition">
+                    0.6
+                </button>
+            </div>
         </div>
 
         <!-- Area Viewfinder Kamera / Canvas Hasil Foto -->
@@ -290,13 +347,27 @@
                     </button>
                 </div>
 
+                <div class="space-y-1">
+                    <div class="flex items-center justify-between gap-2">
+                        <label for="paket-wm-tanggal" class="text-[10px] font-black text-slate-500 uppercase">
+                            Tanggal Data Muatan
+                        </label>
+                        <button type="button" onclick="resetTanggalWatermarkSemua()"
+                            class="text-[10px] font-black uppercase text-orange-600 hover:text-orange-700">
+                            Semua Tanggal
+                        </button>
+                    </div>
+                    <input type="date" id="paket-wm-tanggal" onchange="handleGantiTanggalWatermarkPaket(this.value)"
+                        class="w-full px-2.5 py-1.5 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-slate-50 focus:outline-none focus:border-orange-500">
+                </div>
+
                 <div>
                     <label for="paket-wm-select-data" class="text-[10px] font-black text-slate-500 uppercase block mb-1">
-                        Data Tersimpan Hari Ini
+                        Data Tersimpan (Riwayat Paket)
                     </label>
                     <select id="paket-wm-select-data" onchange="handlePilihDataWatermarkPaket(this.value)"
                         class="w-full p-2 text-xs font-bold text-slate-800 border border-orange-300 rounded-lg bg-slate-50 focus:outline-none focus:border-orange-500">
-                        <option value="">-- Memuat data tersimpan hari ini... --</option>
+                        <option value="">-- Memuat data tersimpan... --</option>
                     </select>
                 </div>
             </div>
