@@ -253,11 +253,81 @@
             <button onclick="handleMigrasiClick(event)" class="w-12 h-12 rounded-xl bg-slate-950/60 text-slate-200 border border-white/10 flex items-center justify-center text-xl active:scale-90 transition-all hover:bg-slate-900/80 shadow-md">
                 <i class="fa-solid fa-arrows-rotate"></i>
             </button>
+            <button type="button" onclick="bukaModalSpeedTest()" title="Tes Speed Internet" aria-label="Tes Speed Internet"
+                class="w-12 h-12 rounded-xl bg-slate-950/60 text-amber-400 border border-white/10 flex items-center justify-center text-xl active:scale-90 transition-all hover:bg-slate-900/80 shadow-md">
+                <i class="fa-solid fa-gauge-high"></i>
+            </button>
             <div class="miui-dock-line"></div>
             <button onclick="bukaSetelan()" class="w-12 h-12 rounded-xl bg-slate-950/40 text-slate-400 border border-white/5 flex items-center justify-center text-xl active:scale-90 transition-all hover:bg-slate-900/60 shadow-md">
                 <i class="fa-solid fa-sliders"></i>
             </button>
         </nav>
+    </div>
+
+    <div id="modal-speed-test" class="hidden fixed inset-0 z-[9999] bg-black/55 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="w-full max-w-md bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+            <!-- Header Gaya Modal Pinjam Palet -->
+            <div class="px-4 py-3 bg-[#232730] text-white flex items-center justify-between">
+                <div class="flex items-center gap-2 text-xs font-black uppercase tracking-wider">
+                    <i class="fa-solid fa-gauge-high text-orange-500"></i>
+                    <span>TES KECEPATAN INTERNET</span>
+                </div>
+                <button type="button" onclick="tutupModalSpeedTest()" class="text-white hover:text-red-400 font-bold text-lg">
+                    ✕
+                </button>
+            </div>
+
+            <!-- Body -->
+            <div class="p-4 space-y-3.5">
+                <!-- Panel Status & Angka Utama -->
+                <div class="rounded-xl border border-slate-300 bg-slate-50/70 p-3.5 text-center space-y-1">
+                    <div id="speedtest-tahap-label" class="text-[10px] font-black uppercase tracking-wider text-orange-600">
+                        SIAP MENGUJI KONEKSI
+                    </div>
+                    <div class="flex items-baseline justify-center gap-1.5 py-0.5">
+                        <span id="speedtest-angka-utama" class="text-4xl font-black tabular-nums text-slate-800">0.0</span>
+                        <span id="speedtest-satuan-utama" class="text-xs font-bold uppercase text-slate-500">Mbps</span>
+                    </div>
+                    <div class="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+                        <div id="speedtest-progress-bar" class="h-full w-0 bg-orange-500 transition-all duration-200"></div>
+                    </div>
+                    <div id="speedtest-detail-status" class="text-[11px] font-medium text-slate-600 pt-1">
+                        Tekan Mulai Tes untuk mengukur Ping, Download &amp; Upload.
+                    </div>
+                </div>
+
+                <!-- 3 Kotak Metrik -->
+                <div class="grid grid-cols-3 gap-2 text-center">
+                    <div class="rounded-xl border border-slate-300 bg-white p-2.5">
+                        <div class="text-[10px] font-black uppercase text-orange-600">PING</div>
+                        <div id="speedtest-ping" class="text-sm font-black tabular-nums text-slate-800 mt-0.5">- ms</div>
+                    </div>
+                    <div class="rounded-xl border border-slate-300 bg-white p-2.5">
+                        <div class="text-[10px] font-black uppercase text-orange-600">DOWNLOAD</div>
+                        <div id="speedtest-download" class="text-sm font-black tabular-nums text-slate-800 mt-0.5">- Mbps</div>
+                    </div>
+                    <div class="rounded-xl border border-slate-300 bg-white p-2.5">
+                        <div class="text-[10px] font-black uppercase text-orange-600">UPLOAD</div>
+                        <div id="speedtest-upload" class="text-sm font-black tabular-nums text-slate-800 mt-0.5">- Mbps</div>
+                    </div>
+                </div>
+
+                <!-- Tombol Aksi (Oranye Utama & Netral Sekunder) -->
+                <div class="pt-1 flex items-center gap-2.5">
+                    <button type="button" id="btn-mulai-speedtest" onclick="jalankanTesSpeedMandiri()"
+                        class="flex-1 py-2.5 px-4 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-xs flex items-center justify-center gap-2 transition active:scale-[0.99]">
+                        <i class="fa-solid fa-play"></i>
+                        <span>Mulai Tes</span>
+                    </button>
+                    <button type="button" onclick="bukaLayananSpeedTest('https://speed.is/')"
+                        title="Buka Speed.is di tab baru"
+                        class="py-2.5 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition">
+                        <span>Speed.is</span>
+                        <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Modal Progress Cetak Universal (Gaya MIUI V5) -->
