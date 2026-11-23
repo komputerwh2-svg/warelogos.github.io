@@ -460,6 +460,44 @@
                 </div>
             </div>
         </div>
+
+        <!-- Modal Pratinjau Hasil Foto Saat Salah Satu Item Riwayat Dipilih -->
+        <div id="modal-preview-foto-riwayat"
+            class="hidden fixed inset-0 z-[80] bg-black/90 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5">
+            <div class="w-full max-w-2xl bg-[#1f232b] text-white rounded-2xl border border-orange-500 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                <div class="px-4 py-3 bg-[#2a2f3a] flex items-center justify-between gap-2 border-b border-white/10 shrink-0">
+                    <div class="min-w-0">
+                        <div class="text-xs font-black uppercase tracking-wider text-orange-400">
+                            Pratinjau Hasil Foto
+                        </div>
+                        <div id="preview-riwayat-waktu" class="text-[11px] font-mono text-slate-300 truncate"></div>
+                    </div>
+                    <button type="button" onclick="tutupPreviewFotoRiwayat()"
+                        class="text-white hover:text-red-400 font-bold text-lg">
+                        ✕
+                    </button>
+                </div>
+
+                <div class="flex-1 overflow-auto p-3 sm:p-4 flex flex-col items-center justify-center bg-black/60 gap-3">
+                    <img id="preview-riwayat-img" src="" alt="Pratinjau Foto Riwayat"
+                        class="max-w-full max-h-[62vh] object-contain rounded-xl border border-white/15 shadow-lg bg-black">
+                    <div id="preview-riwayat-caption"
+                        class="w-full max-w-xl text-xs font-bold text-slate-200 bg-white/5 border border-white/10 rounded-xl px-3 py-2 whitespace-pre-line"></div>
+                </div>
+
+                <div class="px-4 py-3 bg-[#2a2f3a] border-t border-white/10 flex items-center justify-end gap-2 shrink-0">
+                    <button type="button" id="btn-simpan-dari-preview-riwayat"
+                        class="px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-black uppercase flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-download"></i>
+                        <span>Simpan / Share</span>
+                    </button>
+                    <button type="button" onclick="tutupPreviewFotoRiwayat()"
+                        class="px-3.5 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-xs font-black uppercase transition">
+                        Kembali
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Toast Notifikasi Ringan -->
