@@ -15,8 +15,15 @@ const ISI_KRT_PER_PAKET = {
 };
 
 // =========================================================
-// 1. HELPER TANGGAL, FORMAT & KONVERSI KRT + PKT
+// 1. HELPER TANGGAL, FORMAT, KONVERSI & NOTIFIKASI MIUI ALERT
 // =========================================================
+function notifPaket(pesan) {
+    if (typeof window.miuiAlert === 'function') {
+        return window.miuiAlert(pesan);
+    }
+    alert(pesan);
+}
+
 function getTanggalHariIniISO() {
     const now = new Date();
     const y = now.getFullYear();
@@ -59,7 +66,7 @@ function getPembagiKrtPaket(jenisPaket) {
     return 1;
 }
 
-//Helper Format Rincian Konversi
+// Helper Format Rincian Konversi
 function formatRincianKonversiPaket(jenisPaket, qty) {
     const jenis = String(jenisPaket || '').trim().toUpperCase();
     const totalQty = Number(qty) || 0;
@@ -90,27 +97,6 @@ function formatRincianPaketWatermark(jenisPaket, qtyPkt) {
 
     const rincian = bagian.length ? ` ( ${bagian.join(' + ')} )` : '';
     return `${kode} = ${qty} PKT${rincian}`;
-}
-
-function tampilkanToastPaket(pesan, tipe = 'info') {
-    const toast = document.getElementById('paket-toast');
-    if (!toast) return;
-
-    toast.textContent = pesan;
-    toast.className = 'fixed bottom-5 right-5 z-[80] px-4 py-2.5 rounded-xl border text-xs font-bold shadow-2xl transition-all';
-
-    if (tipe === 'success') {
-        toast.classList.add('bg-emerald-950', 'border-emerald-500', 'text-emerald-200');
-    } else if (tipe === 'error') {
-        toast.classList.add('bg-rose-950', 'border-rose-500', 'text-rose-200');
-    } else {
-        toast.classList.add('bg-slate-900', 'border-orange-500', 'text-white');
-    }
-
-    clearTimeout(window.__paketToastTimer);
-    window.__paketToastTimer = setTimeout(() => {
-        toast.classList.add('hidden');
-    }, 3000);
 }
 
 // =========================================================
@@ -217,16 +203,14 @@ function tambahItemPaketKeList() {
     const qty = parseInt(qtyEl?.value || '0', 10);
 
     if (!jenisPaket) {
-        tampilkanToastPaket('Pilih jenis paket terlebih dahulu.', 'error');
-        return;
+        return notifPaket('Pilih jenis paket terlebih dahulu.');
     }
     if (!Number.isFinite(qty) || qty <= 0) {
-        tampilkanToastPaket('Masukkan QTY (PKT) lebih dari 0.', 'error');
+        notifPaket('Masukkan QTY (PKT) lebih dari 0.');
         qtyEl?.focus();
         return;
     }
 
-    // Jika jenis paket yang sama sudah ada di list sementara, akumulasikan QTY-nya
     const existingIdx = daftarItemPaketSementara.findIndex((it) => it.jenis_paket === jenisPaket);
     if (existingIdx >= 0) {
         daftarItemPaketSementara[existingIdx].qty += qty;
@@ -240,7 +224,7 @@ function tambahItemPaketKeList() {
     if (qtyEl) qtyEl.value = '';
     qtyEl?.focus();
     renderDaftarItemPaketSementara();
-    tampilkanToastPaket(`${jenisPaket} (${qty} PKT) ditambahkan ke daftar.`, 'success');
+    notifPaket(`${jenisPaket} (${qty} PKT) ditambahkan ke daftar.`);
 }
 
 function hapusItemPaketSementara(index) {
@@ -259,12 +243,11 @@ async function simpanDataPaketPajang() {
     const tujuan = (tujuanEl?.value || '').trim().toUpperCase();
 
     if (!tujuan) {
-        tampilkanToastPaket('Tujuan wajib diisi atau dipilih.', 'error');
+        notifPaket('Tujuan wajib diisi atau dipilih.');
         tujuanEl?.focus();
         return;
     }
 
-    // Siapkan daftar item final (gabungan daftar sementara + input aktif bila diisi)
     const itemsFinal = daftarItemPaketSementara.map((it) => ({ ...it }));
     const jenisAktif = (jenisEl?.value || '').trim().toUpperCase();
     const qtyAktif = parseInt(qtyEl?.value || '0', 10);
@@ -279,7 +262,7 @@ async function simpanDataPaketPajang() {
     }
 
     if (!itemsFinal.length) {
-        tampilkanToastPaket('Isi QTY paket atau klik Tambah Item terlebih dahulu.', 'error');
+        notifPaket('Isi QTY paket atau klik Tambah Item terlebih dahulu.');
         qtyEl?.focus();
         return;
     }
@@ -316,7 +299,6 @@ async function simpanDataPaketPajang() {
             throw new Error('Firebase Realtime Database belum terinisialisasi.');
         }
 
-        // Reset form setelah berhasil simpan
         daftarItemPaketSementara = [];
         renderDaftarItemPaketSementara();
         if (noDoEl) noDoEl.value = '';
@@ -324,18 +306,18 @@ async function simpanDataPaketPajang() {
         if (qtyEl) qtyEl.value = '';
         noDoEl?.focus();
 
-        tampilkanToastPaket(`Data tujuan ${tujuan} berhasil disimpan.`, 'success');
+        notifPaket(`Data tujuan ${tujuan} berhasil disimpan.`);
         await muatRiwayatPaketHariIni();
     } catch (err) {
         console.error('Gagal menyimpan ke RTDB data_paket:', err);
-        tampilkanToastPaket('Gagal menyimpan data ke Realtime Database.', 'error');
+        notifPaket(`Gagal menyimpan data ke Realtime Database: ${err.message}`);
     } finally {
         if (btnSimpan) btnSimpan.disabled = false;
     }
 }
 
 // =========================================================
-// 4. PANEL RIWAYAT & TOMBOL CETAK PER BARIS TUJUAN
+// 4. PANEL RIWAYAT & TOMBOL CETAK PER BARIS / PER TANGGAL
 // =========================================================
 function togglePanelRiwayatPaket(paksaState) {
     const panel = document.getElementById('panel-riwayat-paket');
@@ -375,6 +357,199 @@ function togglePanelRiwayatPaket(paksaState) {
     }
 }
 
+let modeRiwayatPaketAktif = 'hari'; // 'hari' | 'semua' | 'tanggal'
+let tanggalFilterRiwayatPaket = '';
+
+function updateTampilanTombolModeRiwayat() {
+    const btnHari = document.getElementById('btn-filter-riwayat-hari');
+    const btnSemua = document.getElementById('btn-filter-riwayat-semua');
+    if (!btnHari || !btnSemua) return;
+
+    if (modeRiwayatPaketAktif === 'semua') {
+        btnSemua.className = 'px-2.5 py-1 rounded-md text-[10px] font-black uppercase bg-orange-600 text-white transition';
+        btnHari.className = 'px-2.5 py-1 rounded-md text-[10px] font-black uppercase text-slate-600 hover:text-orange-600 transition';
+    } else {
+        btnHari.className = 'px-2.5 py-1 rounded-md text-[10px] font-black uppercase bg-orange-600 text-white transition';
+        btnSemua.className = 'px-2.5 py-1 rounded-md text-[10px] font-black uppercase text-slate-600 hover:text-orange-600 transition';
+    }
+}
+
+async function setModeRiwayatPaket(mode) {
+    modeRiwayatPaketAktif = mode === 'semua' ? 'semua' : 'hari';
+    if (modeRiwayatPaketAktif === 'hari') {
+        tanggalFilterRiwayatPaket = '';
+        const inpTgl = document.getElementById('filter-tanggal-riwayat-paket');
+        if (inpTgl) inpTgl.value = '';
+    }
+    updateTampilanTombolModeRiwayat();
+    await muatRiwayatPaketHariIni();
+}
+
+async function handleGantiTanggalRiwayatPaket(val) {
+    tanggalFilterRiwayatPaket = (val || '').trim();
+    modeRiwayatPaketAktif = tanggalFilterRiwayatPaket ? 'tanggal' : 'hari';
+    updateTampilanTombolModeRiwayat();
+    await muatRiwayatPaketHariIni();
+}
+
+function ekstrakTanggalDariKeyAtauData(key, data) {
+    const matchKey = String(key || '').match(/^(\d{4})_(\d{2})_(\d{2})_/);
+    if (matchKey) {
+        return {
+            iso: `${matchKey[1]}-${matchKey[2]}-${matchKey[3]}`,
+            underscore: `${matchKey[1]}_${matchKey[2]}_${matchKey[3]}`
+        };
+    }
+    if (data && data.timestamp) {
+        const dt = new Date(Number(data.timestamp));
+        if (!Number.isNaN(dt.getTime())) {
+            const y = dt.getFullYear();
+            const m = String(dt.getMonth() + 1).padStart(2, '0');
+            const d = String(dt.getDate()).padStart(2, '0');
+            return {
+                iso: `${y}-${m}-${d}`,
+                underscore: `${y}_${m}_${d}`
+            };
+        }
+    }
+    return { iso: '', underscore: '' };
+}
+
+function formatLabelTanggalBajuPaket(tglISO) {
+    if (!tglISO) return 'TANPA TANGGAL';
+    const parts = String(tglISO).split('-');
+    if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return tglISO;
+}
+
+function sinkronkanDropdownWatermarkPaket(semuaRecords) {
+    const selectWm = document.getElementById('paket-wm-select-data');
+    if (!selectWm) return;
+
+    const prevSelected = selectWm.value;
+    window.__opsiWatermarkPaketMap = {};
+
+    if (!Array.isArray(semuaRecords) || !semuaRecords.length) {
+        selectWm.innerHTML = `<option value="">-- Belum ada data tersimpan --</option>`;
+        return;
+    }
+
+    selectWm.innerHTML = semuaRecords.map((rec) => {
+        window.__opsiWatermarkPaketMap[rec.id] = rec;
+        const tglLabel = rec._tglISO ? `[${formatLabelTanggalBajuPaket(rec._tglISO)}] ` : '';
+        const doLabel = rec.no_do ? ` (DO: ${rec.no_do})` : '';
+        return `<option value="${escapeHTMLPaket(rec.id)}">${escapeHTMLPaket(tglLabel + (rec.tujuan || '-') + doLabel)}</option>`;
+    }).join('');
+
+    const masihAda = semuaRecords.some((r) => r.id === prevSelected);
+    selectWm.value = masihAda ? prevSelected : semuaRecords[0].id;
+
+    if (typeof handlePilihDataWatermarkPaket === 'function') {
+        handlePilihDataWatermarkPaket(selectWm.value);
+    }
+}
+
+function renderKartuItemRiwayatPaket(rec) {
+    const items = Array.isArray(rec.items) ? rec.items : [];
+    const jamStr = rec.timestamp
+        ? new Date(rec.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+        : '';
+
+    const badgeItemsHtml = items.map((it) => `
+        <span class="inline-flex items-center px-2 py-0.5 rounded bg-orange-100 text-orange-800 border border-orange-200 text-[10px] font-black">
+            ${escapeHTMLPaket(it.jenis_paket)}: ${Number(it.qty) || 0} PKT
+        </span>
+    `).join(' ');
+
+    return `
+        <div class="p-3 rounded-xl bg-slate-50 border border-orange-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div class="min-w-0 space-y-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xs font-black text-slate-800 uppercase">${escapeHTMLPaket(rec.tujuan)}</span>
+                    ${rec.no_do ? `<span class="px-2 py-0.5 rounded bg-slate-200 text-slate-700 font-mono text-[10px] font-bold">DO: ${escapeHTMLPaket(rec.no_do)}</span>` : ''}
+                    ${jamStr ? `<span class="text-[10px] font-mono text-slate-400">${escapeHTMLPaket(jamStr)}</span>` : ''}
+                </div>
+                <div class="flex flex-wrap gap-1">
+                    ${badgeItemsHtml}
+                </div>
+            </div>
+
+            <div class="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+                <button type="button" onclick="pakaiDataKeKameraPaket('${escapeHTMLPaket(rec.id)}')"
+                    class="px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-[10px] font-black uppercase shadow-sm transition flex items-center gap-1"
+                    title="Gunakan data ini untuk watermark kamera">
+                    <i class="fa-solid fa-camera"></i>
+                    <span>Foto</span>
+                </button>
+
+                <button type="button" onclick="cetakLabelPerTujuanPaket('${escapeHTMLPaket(rec.id)}')"
+                    class="px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-[10px] font-black uppercase shadow-sm transition flex items-center gap-1"
+                    title="Cetak label sisa PKT untuk tujuan ini">
+                    <i class="fa-solid fa-print"></i>
+                    <span>Cetak</span>
+                </button>
+
+                <button type="button" onclick="hapusRiwayatPaket('${escapeHTMLPaket(rec.id)}')"
+                    class="w-7 h-7 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 flex items-center justify-center transition"
+                    title="Hapus data">
+                    <i class="fa-solid fa-trash-can text-[11px]"></i>
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function renderRiwayatDikelompokkanPerTanggal(listEl, records) {
+    if (!listEl) return;
+
+    const mapKelompok = new Map();
+    records.forEach((rec) => {
+        const keyTgl = rec._tglISO || 'tanpa-tanggal';
+        if (!mapKelompok.has(keyTgl)) {
+            mapKelompok.set(keyTgl, []);
+        }
+        mapKelompok.get(keyTgl).push(rec);
+    });
+
+    const tanggalTerurut = Array.from(mapKelompok.keys()).sort((a, b) => b.localeCompare(a));
+
+    listEl.innerHTML = tanggalTerurut.map((tglKey) => {
+        const groupRecs = mapKelompok.get(tglKey) || [];
+        const labelBaju = formatLabelTanggalBajuPaket(tglKey === 'tanpa-tanggal' ? '' : tglKey);
+        const totalQtyKelompok = groupRecs.reduce((s, r) => s + (Number(r.total_qty) || 0), 0);
+        const cardsHtml = groupRecs.map((rec) => renderKartuItemRiwayatPaket(rec)).join('');
+
+        return `
+            <section class="rounded-xl border border-orange-200 bg-orange-50/35 p-2.5 space-y-2">
+                <div class="flex items-center justify-between gap-2 pb-1.5 border-b border-orange-200/80">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-slate-800 text-white text-[10px] font-black tracking-wider uppercase shadow-sm">
+                            <i class="fa-solid fa-calendar-day text-orange-400"></i>
+                            <span>${escapeHTMLPaket(labelBaju)}</span>
+                        </span>
+                        <span class="text-[10px] font-bold text-slate-500">
+                            ${groupRecs.length} tujuan • ${totalQtyKelompok} PKT
+                        </span>
+                    </div>
+
+                    <button type="button" onclick="cetakLabelPerTanggalPaket('${escapeHTMLPaket(tglKey)}')"
+                        class="px-2.5 py-1 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-[10px] font-black uppercase shadow-sm transition flex items-center gap-1 shrink-0"
+                        title="Cetak semua label sisa PKT pada tanggal ${escapeHTMLPaket(labelBaju)}">
+                        <i class="fa-solid fa-print"></i>
+                        <span>Cetak Semua</span>
+                    </button>
+                </div>
+
+                <div class="space-y-2">
+                    ${cardsHtml}
+                </div>
+            </section>
+        `;
+    }).join('');
+}
+
 async function muatRiwayatPaketHariIni() {
     const listEl = document.getElementById('paket-riwayat-list');
     const ringkasanEl = document.getElementById('paket-ringkasan');
@@ -382,96 +557,66 @@ async function muatRiwayatPaketHariIni() {
 
     const tglISO = getTanggalHariIniISO();
     const prefixHariIni = `${getTanggalUnderscore()}_`;
-    const records = [];
+    const targetISO = modeRiwayatPaketAktif === 'tanggal' ? tanggalFilterRiwayatPaket : tglISO;
+
+    const semuaRecords = [];
 
     try {
         if (typeof firebase !== 'undefined' && firebase.apps?.length && typeof firebase.database === 'function') {
-            const snap = await firebase.database()
-                .ref('data_paket')
-                .orderByKey()
-                .startAt(prefixHariIni)
-                .endAt(`${prefixHariIni}\uf8ff`)
-                .once('value');
-
+            const snap = await firebase.database().ref('data_paket').once('value');
             const val = snap.val();
             if (val && typeof val === 'object') {
                 Object.entries(val).forEach(([key, data]) => {
                     if (data && typeof data === 'object') {
-                        records.push({ id: key, ...data });
+                        const infoTgl = ekstrakTanggalDariKeyAtauData(key, data);
+                        semuaRecords.push({
+                            id: key,
+                            _tglISO: infoTgl.iso,
+                            ...data
+                        });
                     }
                 });
             }
         }
 
-        // Urutkan terbaru di atas
-        records.sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
-        window.__riwayatPaketHariIniCache = records;
+        semuaRecords.sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+        window.__semuaRiwayatPaketCache = semuaRecords;
+        sinkronkanDropdownWatermarkPaket(semuaRecords);
 
-        const totalQtySemua = records.reduce((sum, r) => sum + (Number(r.total_qty) || 0), 0);
-        if (badgeEl) badgeEl.textContent = records.length;
+        const jumlahHariIni = semuaRecords.filter(
+            (r) => r._tglISO === tglISO || String(r.id || '').startsWith(prefixHariIni)
+        ).length;
+
+        let recordsTampil = semuaRecords;
+        if (modeRiwayatPaketAktif === 'hari' || modeRiwayatPaketAktif === 'tanggal') {
+            recordsTampil = semuaRecords.filter((r) => r._tglISO === targetISO);
+        }
+
+        window.__riwayatPaketHariIniCache = recordsTampil;
+
+        const totalQtyTampil = recordsTampil.reduce((sum, r) => sum + (Number(r.total_qty) || 0), 0);
+        if (badgeEl) badgeEl.textContent = jumlahHariIni;
         if (ringkasanEl) {
-            ringkasanEl.textContent = `Total tujuan: ${records.length} | Total QTY: ${totalQtySemua} PKT`;
+            const labelPeriode = modeRiwayatPaketAktif === 'semua'
+                ? 'Semua Tanggal'
+                : `Tanggal ${targetISO}`;
+            ringkasanEl.textContent = `${labelPeriode} • Total tujuan: ${recordsTampil.length} | Total QTY: ${totalQtyTampil} PKT`;
         }
 
         if (!listEl) return;
 
-        if (!records.length) {
+        if (!recordsTampil.length) {
+            const pesanKosong = modeRiwayatPaketAktif === 'semua'
+                ? 'Belum ada data tersimpan di riwayat.'
+                : `Belum ada data tersimpan pada tanggal ${targetISO}.`;
             listEl.innerHTML = `
                 <div class="text-center py-8 text-xs font-bold text-slate-400 bg-slate-50 rounded-xl border border-dashed border-orange-200">
-                    Belum ada data tersimpan pada tanggal ${tglISO}.
+                    ${escapeHTMLPaket(pesanKosong)}
                 </div>`;
             return;
         }
 
-        listEl.innerHTML = records.map((rec) => {
-            const items = Array.isArray(rec.items) ? rec.items : [];
-            const jamStr = rec.timestamp
-                ? new Date(rec.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
-                : '';
-
-            const badgeItemsHtml = items.map((it) => `
-                <span class="inline-flex items-center px-2 py-0.5 rounded bg-orange-100 text-orange-800 border border-orange-200 text-[10px] font-black">
-                    ${escapeHTMLPaket(it.jenis_paket)}: ${Number(it.qty) || 0} PKT
-                </span>
-            `).join(' ');
-
-            return `
-                <div class="p-3 rounded-xl bg-slate-50 border border-orange-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                    <div class="min-w-0 space-y-1">
-                        <div class="flex items-center gap-2 flex-wrap">
-                            <span class="text-xs font-black text-slate-800 uppercase">${escapeHTMLPaket(rec.tujuan)}</span>
-                            ${rec.no_do ? `<span class="px-2 py-0.5 rounded bg-slate-200 text-slate-700 font-mono text-[10px] font-bold">DO: ${escapeHTMLPaket(rec.no_do)}</span>` : ''}
-                            ${jamStr ? `<span class="text-[10px] font-mono text-slate-400">${jamStr}</span>` : ''}
-                        </div>
-                        <div class="flex flex-wrap gap-1">
-                            ${badgeItemsHtml}
-                        </div>
-                    </div>
-
-                    <div class="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
-                        <button type="button" onclick="pakaiDataKeKameraPaket('${escapeHTMLPaket(rec.id)}')"
-                            class="px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-[10px] font-black uppercase shadow-sm transition flex items-center gap-1"
-                            title="Gunakan data ini untuk watermark kamera">
-                            <i class="fa-solid fa-camera"></i>
-                            <span>Foto</span>
-                        </button>
-
-                        <button type="button" onclick="cetakLabelPerTujuanPaket('${escapeHTMLPaket(rec.id)}')"
-                            class="px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-[10px] font-black uppercase shadow-sm transition flex items-center gap-1"
-                            title="Cetak label untuk tujuan ini">
-                            <i class="fa-solid fa-print"></i>
-                            <span>Cetak</span>
-                        </button>
-
-                        <button type="button" onclick="hapusRiwayatPaket('${escapeHTMLPaket(rec.id)}')"
-                            class="w-7 h-7 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 flex items-center justify-center transition"
-                            title="Hapus data">
-                            <i class="fa-solid fa-trash-can text-[11px]"></i>
-                        </button>
-                    </div>
-                </div>
-            `;
-        }).join('');
+        renderRiwayatDikelompokkanPerTanggal(listEl, recordsTampil);
     } catch (err) {
         console.error('Gagal memuat riwayat data_paket:', err);
         if (listEl) {
@@ -483,50 +628,45 @@ async function muatRiwayatPaketHariIni() {
     }
 }
 
-async function cetakLabelPerTujuanPaket(recordId) {
-    const records = Array.isArray(window.__riwayatPaketHariIniCache) ? window.__riwayatPaketHariIniCache : [];
-    const target = records.find((r) => r.id === recordId);
+async function cetakLabelPerTanggalPaket(tglKey) {
+    let semuaRecords = Array.isArray(window.__semuaRiwayatPaketCache)
+        ? window.__semuaRiwayatPaketCache
+        : null;
 
-    if (!target) {
-        tampilkanToastPaket('Data tujuan tidak ditemukan.', 'error');
-        return;
+    if (!semuaRecords) {
+        await muatRiwayatPaketHariIni();
+        semuaRecords = window.__semuaRiwayatPaketCache || [];
     }
 
-    try {
-        const jobPayload = {
-            modul: 'PAKET_PAJANG',
-            paket_id: target.id,
-            tanggal: target.tanggal || getTanggalHariIniISO(),
-            no_do: target.no_do || '',
-            tujuan: target.tujuan || '',
-            items: Array.isArray(target.items) ? target.items : [],
-            total_qty: Number(target.total_qty) || 0,
-            status: 'PENDING',
-            timestamp: Date.now()
-        };
+    const recordsTanggal = semuaRecords.filter((rec) => (rec._tglISO || 'tanpa-tanggal') === tglKey);
+    const daftarLabel = pecahRecordKeDaftarLabel(recordsTanggal);
+    const labelTgl = formatLabelTanggalBajuPaket(tglKey === 'tanpa-tanggal' ? '' : tglKey);
 
-        // Kirim ke print_jobs (Firestore jika aktif, dan tandai status di RTDB)
-        if (typeof db !== 'undefined' && db) {
-            await db.collection('print_jobs').add({
-                ...jobPayload,
-                created_at: firebase.firestore.FieldValue.serverTimestamp()
-            });
-        } else if (typeof firebase !== 'undefined' && firebase.apps?.length && typeof firebase.database === 'function') {
-            await firebase.database().ref(`print_jobs/${target.id}_${Date.now()}`).set(jobPayload);
-        }
-
-        if (typeof firebase !== 'undefined' && firebase.apps?.length && typeof firebase.database === 'function') {
-            await firebase.database().ref(`data_paket/${target.id}`).update({
-                status_cetak: 'TERKIRIM_CETAK',
-                last_print_at: Date.now()
-            });
-        }
-
-        tampilkanToastPaket(`Antrean cetak ${target.tujuan} berhasil dikirim.`, 'success');
-    } catch (err) {
-        console.error('Gagal mengirim antrean cetak tujuan:', err);
-        tampilkanToastPaket('Gagal mengirim antrean cetak.', 'error');
+    if (!daftarLabel.length) {
+        return notifPaket(`Tidak ada sisa (+ PKT) untuk dicetak pada tanggal ${labelTgl}.`);
     }
+
+    const kodeTugas = `SISA_PKT_${labelTgl.replace(/\//g, '-')}`;
+    await kirimTugasCetakKePrintJobs(daftarLabel, kodeTugas);
+}
+
+function getInfoBeceranItemPaket(jenisPaket, qtyPkt) {
+    const kode = String(jenisPaket || '').trim().toUpperCase();
+    const qty = Math.max(0, parseInt(qtyPkt, 10) || 0);
+    const pembagi = (typeof getPembagiKrtPaket === 'function')
+        ? getPembagiKrtPaket(kode)
+        : (kode === 'PR-PKT59' ? 3 : 6);
+
+    const krt = Math.floor(qty / pembagi);
+    const sisaPkt = qty % pembagi;
+
+    return {
+        jenis_paket: kode,
+        qty_awal: qty,
+        pembagi: pembagi,
+        krt: krt,
+        sisa_pkt: sisaPkt
+    };
 }
 
 async function hapusRiwayatPaket(recordId) {
@@ -537,11 +677,11 @@ async function hapusRiwayatPaket(recordId) {
         if (typeof firebase !== 'undefined' && firebase.apps?.length && typeof firebase.database === 'function') {
             await firebase.database().ref(`data_paket/${recordId}`).remove();
         }
-        tampilkanToastPaket('Data berhasil dihapus.', 'info');
+        notifPaket('Data berhasil dihapus.');
         await muatRiwayatPaketHariIni();
     } catch (err) {
         console.error('Gagal menghapus data_paket:', err);
-        tampilkanToastPaket('Gagal menghapus data.', 'error');
+        notifPaket('Gagal menghapus data.');
     }
 }
 
@@ -607,22 +747,81 @@ function susunOpsiDraftFormJikaAda() {
     };
 }
 
-async function isiDropdownDataWatermarkPaket(pilihIdOtomatis = '') {
-    const selectEl = document.getElementById('paket-wm-select-data');
-    if (!selectEl) return;
+let tanggalFilterWatermarkPaket = ''; // '' = tampilkan semua tanggal, 'YYYY-MM-DD' = filter tanggal tertentu
 
-    if (!Array.isArray(window.__riwayatPaketHariIniCache)) {
-        await muatRiwayatPaketHariIni();
+async function ambilSemuaRecordPaketUntukKamera() {
+    if (Array.isArray(window.__semuaRiwayatPaketCache) && window.__semuaRiwayatPaketCache.length) {
+        return window.__semuaRiwayatPaketCache;
     }
 
-    const records = Array.isArray(window.__riwayatPaketHariIniCache)
-        ? window.__riwayatPaketHariIniCache
-        : [];
+    const hasil = [];
+    if (typeof firebase !== 'undefined' && firebase.apps?.length && typeof firebase.database === 'function') {
+        const snap = await firebase.database().ref('data_paket').once('value');
+        const val = snap.val();
+        if (val && typeof val === 'object') {
+            Object.entries(val).forEach(([key, data]) => {
+                if (data && typeof data === 'object') {
+                    const infoTgl = ekstrakTanggalDariKeyAtauData(key, data);
+                    hasil.push({
+                        id: key,
+                        _tglISO: infoTgl.iso,
+                        ...data
+                    });
+                }
+            });
+        }
+    }
+
+    hasil.sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+    window.__semuaRiwayatPaketCache = hasil;
+    return hasil;
+}
+
+async function handleGantiTanggalWatermarkPaket(tglVal) {
+    tanggalFilterWatermarkPaket = (tglVal || '').trim();
+    await isiDropdownDataWatermarkPaket();
+}
+
+async function resetTanggalWatermarkSemua() {
+    tanggalFilterWatermarkPaket = '';
+    const inpTgl = document.getElementById('paket-wm-tanggal');
+    if (inpTgl) inpTgl.value = '';
+    await isiDropdownDataWatermarkPaket();
+}
+
+async function isiDropdownDataWatermarkPaket(pilihIdOtomatis = '') {
+    const selectEl = document.getElementById('paket-wm-select-data');
+    const inpTgl = document.getElementById('paket-wm-tanggal');
+    if (!selectEl) return;
+
+    let semuaRecords = [];
+    try {
+        semuaRecords = await ambilSemuaRecordPaketUntukKamera();
+    } catch (err) {
+        console.warn('Gagal memuat data paket untuk kamera:', err);
+        semuaRecords = Array.isArray(window.__semuaRiwayatPaketCache) ? window.__semuaRiwayatPaketCache : [];
+    }
+
+    // Jika dipanggil dengan recordId spesifik (misal klik tombol FOTO pada baris riwayat), arahkan tanggalnya ke record tersebut bila ada
+    if (pilihIdOtomatis && pilihIdOtomatis !== '__DRAFT_FORM__') {
+        const recDipilih = semuaRecords.find((r) => r.id === pilihIdOtomatis);
+        if (recDipilih && recDipilih._tglISO) {
+            tanggalFilterWatermarkPaket = recDipilih._tglISO;
+        }
+    }
+
+    if (inpTgl && inpTgl.value !== tanggalFilterWatermarkPaket) {
+        inpTgl.value = tanggalFilterWatermarkPaket;
+    }
+
+    const recordsTersaring = tanggalFilterWatermarkPaket
+        ? semuaRecords.filter((rec) => rec._tglISO === tanggalFilterWatermarkPaket)
+        : semuaRecords;
 
     const draft = susunOpsiDraftFormJikaAda();
     const opsiList = [];
 
-    if (draft) {
+    if (draft && !tanggalFilterWatermarkPaket) {
         opsiList.push({
             value: '__DRAFT_FORM__',
             label: `[Draft Form] ${draft.tujuan}${draft.no_do ? ` (DO:${draft.no_do})` : ''}`,
@@ -630,11 +829,14 @@ async function isiDropdownDataWatermarkPaket(pilihIdOtomatis = '') {
         });
     }
 
-    records.forEach((rec) => {
+    recordsTersaring.forEach((rec) => {
         const totalQty = Number(rec.total_qty) || 0;
+        const tglPrefix = !tanggalFilterWatermarkPaket && rec._tglISO
+            ? `[${formatLabelTanggalBajuPaket(rec._tglISO)}] `
+            : '';
         opsiList.push({
             value: rec.id,
-            label: `${rec.tujuan || 'TUJUAN'}${rec.no_do ? ` • DO:${rec.no_do}` : ''} (${totalQty} PKT)`,
+            label: `${tglPrefix}${rec.tujuan || 'TUJUAN'}${rec.no_do ? ` • DO:${rec.no_do}` : ''} (${totalQty} PKT)`,
             record: rec
         });
     });
@@ -645,7 +847,10 @@ async function isiDropdownDataWatermarkPaket(pilihIdOtomatis = '') {
     });
 
     if (!opsiList.length) {
-        selectEl.innerHTML = `<option value="">-- Belum ada data tersimpan hari ini --</option>`;
+        const ketKosong = tanggalFilterWatermarkPaket
+            ? `-- Tidak ada data pada tanggal ${formatLabelTanggalBajuPaket(tanggalFilterWatermarkPaket)} --`
+            : '-- Belum ada data tersimpan --';
+        selectEl.innerHTML = `<option value="">${escapeHTMLPaket(ketKosong)}</option>`;
         updatePreviewWatermarkPaket();
         return;
     }
@@ -798,7 +1003,7 @@ async function mulaiStreamKameraPaket() {
         videoEl.classList.remove('hidden');
     } catch (err) {
         console.warn('Kamera langsung tidak tersedia, gunakan tombol Foto Lokal:', err);
-        tampilkanToastPaket('Kamera tidak tersedia, gunakan tombol Foto Lokal.', 'info');
+        notifPaket('Kamera tidak tersedia, gunakan tombol Foto Lokal.');
     }
 }
 
@@ -828,6 +1033,26 @@ function updatePreviewWatermarkPaket() {
     }
 }
 
+function buatImageIconWarehouse() {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        let sudahFallback = false;
+
+        img.onload = () => resolve(img);
+        img.onerror = () => {
+            if (!sudahFallback) {
+                sudahFallback = true;
+                img.src = 'https://komputerwh2-svg.github.io/warelogos.github.io/icon.png';
+            } else {
+                resolve(null);
+            }
+        };
+
+        img.src = './icon.png';
+    });
+}
+
 function buatImageLogoMariFood() {
     return new Promise((resolve) => {
         const svgMarkup = `
@@ -854,20 +1079,16 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
     const canvas = document.getElementById('paket-watermark-canvas');
     const videoEl = document.getElementById('paket-camera-video');
     const overlayEl = document.getElementById('paket-watermark-overlay');
+    const topRightEl = document.getElementById('wm-top-right-preview');
+    const rightVertEl = document.getElementById('wm-right-vertical-preview');
     const gridEl = document.getElementById('paket-camera-grid');
     const selectEl = document.getElementById('paket-wm-select-data');
 
     if (!canvas) return;
 
-    // Ukuran foto standar kamera potret (maksimal 1200px, rasio tetap terjaga)
-    const maxDim = 1200;
-    let w = lebarAsli || 900;
-    let h = tinggiAsli || 1200;
-    if (w > maxDim || h > maxDim) {
-        const ratio = Math.min(maxDim / w, maxDim / h);
-        w = Math.round(w * ratio);
-        h = Math.round(h * ratio);
-    }
+    // Gunakan resolusi asli media tanpa dikompresi/diperkecil
+    const w = Math.max(1, Math.round(lebarAsli || 900));
+    const h = Math.max(1, Math.round(tinggiAsli || 1200));
 
     canvas.width = w;
     canvas.height = h;
@@ -875,9 +1096,21 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
-    ctx.drawImage(sumberMedia, 0, 0, w, h);
+    if (sumberMedia === videoEl && typeof levelZoomKameraAktif === 'number' && Math.abs(levelZoomKameraAktif - 1.0) > 0.01) {
+        const effectiveZoom = Math.max(0.6, Math.min(2.5, levelZoomKameraAktif));
+        const cropW = w / effectiveZoom;
+        const cropH = h / effectiveZoom;
+        const sx = Math.max(0, (w - cropW) / 2);
+        const sy = Math.max(0, (h - cropH) / 2);
+        ctx.drawImage(sumberMedia, sx, sy, cropW, cropH, 0, 0, w, h);
+    } else {
+        ctx.drawImage(sumberMedia, 0, 0, w, h);
+    }
 
-    const logoImg = await buatImageLogoMariFood();
+    const [logoImg, iconWhImg] = await Promise.all([
+        buatImageLogoMariFood(),
+        buatImageIconWarehouse()
+    ]);
 
     const { jam, hari, tanggal, hariTanggal } = getInfoWaktuWatermarkSekarang();
     const selectedId = selectEl?.value || '';
@@ -885,13 +1118,11 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
     const teksInfo = rec ? formatInfoWatermarkDariRecord(rec) : '';
     const barisInfo = teksInfo ? teksInfo.split('\n') : [];
 
-    // Skala acuan 900px agar proporsi identik dengan hasil foto contoh (3:4)
     const scale = Math.max(0.75, w / 900);
 
     const pad = Math.round(16 * scale);
     const margin = Math.round(16 * scale);
 
-    // Logo MariFood kotak proporsional (120:100 -> 6:5), tidak gepeng
     const logoH = Math.round(52 * scale);
     const logoW = Math.round(logoH * 1.2);
     const judulGap = Math.round(12 * scale);
@@ -903,7 +1134,6 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
     const fontTgl = `700 ${Math.round(16 * scale)}px Arial, sans-serif`;
     const fontDetail = `700 ${Math.round(17 * scale)}px Arial, sans-serif`;
 
-    // Lebar kotak watermark sekitar 56% lebar foto (pas seperti contoh)
     const maxBoxW = Math.round(w * 0.56);
 
     ctx.font = fontDetail;
@@ -925,7 +1155,6 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
     const boxX = margin;
     const boxY = h - margin - boxHeight;
 
-    // Panel latar gelap semi-transparan khas Timemark
     ctx.fillStyle = 'rgba(34, 38, 46, 0.72)';
     ctx.beginPath();
     ctx.roundRect(boxX, boxY, boxWidth, boxHeight, Math.round(10 * scale));
@@ -934,12 +1163,10 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
     const innerX = boxX + pad;
     let curY = boxY + pad;
 
-    // Logo MariFood di kiri atas
     if (logoImg) {
         ctx.drawImage(logoImg, innerX, curY, logoW, logoH);
     }
 
-    // Judul "Dokumentasi" & "Paket Pajang" (ukuran tetap, tidak ikut melebar)
     const titleX = innerX + logoW + judulGap;
     ctx.font = fontJudul;
     ctx.fillStyle = '#a3e635';
@@ -949,7 +1176,6 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
     ctx.fillStyle = '#ffffff';
     ctx.fillText('Paket Pajang', titleX, curY + Math.round(45 * scale));
 
-    // Garis pemisah hijau stabilo + chevron kecil
     curY += topBlockH + Math.round(8 * scale);
     ctx.strokeStyle = '#a3e635';
     ctx.lineWidth = Math.max(2.5, Math.round(3 * scale));
@@ -963,7 +1189,6 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
     const chevronStr = '>'.repeat(Math.max(16, Math.floor((boxWidth - pad * 2) / (6.5 * scale))));
     ctx.fillText(chevronStr, innerX, curY + Math.round(10 * scale), boxWidth - pad * 2);
 
-    // Jam besar hijau stabilo + Hari & Tanggal
     curY += Math.round(50 * scale);
     ctx.font = fontJam;
     ctx.fillStyle = '#a3e635';
@@ -976,7 +1201,6 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
     ctx.fillText(hari, dateX, curY - Math.round(22 * scale));
     ctx.fillText(tanggal, dateX, curY - Math.round(2 * scale));
 
-    // Rincian Tujuan, No DO & Konversi Paket (KRT + PKT)
     if (barisInfo.length) {
         curY += Math.round(10 * scale);
         ctx.font = fontDetail;
@@ -987,7 +1211,52 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
         });
     }
 
-    dataUrlFotoWatermarkAktif = canvas.toDataURL('image/jpeg', 0.94);
+    // Pojok kanan atas: [icon.png] Warehouse Logistik tanpa kompresi
+    const namaWh = 'Warehouse Logistik';
+    const whFont = `900 ${Math.round(18 * scale)}px Arial, sans-serif`;
+    const whIconSize = Math.round(22 * scale);
+    const whGap = Math.round(7 * scale);
+
+    ctx.save();
+    ctx.font = whFont;
+    const whTextW = ctx.measureText(namaWh).width;
+    const whTotalW = whIconSize + whGap + whTextW;
+    const whX = w - margin - whTotalW;
+    const whY = margin + Math.round(4 * scale);
+
+    if (iconWhImg) {
+        ctx.drawImage(iconWhImg, whX, whY, whIconSize, whIconSize);
+    }
+
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+    ctx.shadowBlur = Math.round(4 * scale);
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = Math.round(1 * scale);
+    ctx.textBaseline = 'middle';
+    ctx.fillText(namaWh, whX + whIconSize + whGap, whY + whIconSize / 2);
+    ctx.restore();
+
+    // Teks vertikal di sisi kanan: Dokumentasi Terverifikasi
+    const teksVertikal = 'Dokumentasi Terverifikasi';
+    const vFontSize = Math.round(12 * scale);
+    ctx.save();
+    ctx.font = `700 ${vFontSize}px Arial, sans-serif`;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+    ctx.shadowBlur = Math.round(3 * scale);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const vx = w - Math.round(12 * scale);
+    const vy = Math.round(h * 0.52);
+    ctx.translate(vx, vy);
+    ctx.rotate(Math.PI / 2);
+    ctx.fillText(teksVertikal, 0, 0);
+    ctx.restore();
+
+    // Kualitas JPG 1.0 (tanpa kompresi lossy tambahan)
+    dataUrlFotoWatermarkAktif = canvas.toDataURL('image/jpeg', 1.0);
 
     cacheFotoWatermarkHariIni.unshift({
         dataUrl: dataUrlFotoWatermarkAktif,
@@ -1001,6 +1270,8 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
 
     if (videoEl) videoEl.classList.add('hidden');
     if (overlayEl) overlayEl.classList.add('hidden');
+    if (topRightEl) topRightEl.classList.add('hidden');
+    if (rightVertEl) rightVertEl.classList.add('hidden');
     if (gridEl) gridEl.classList.add('hidden');
     canvas.classList.remove('hidden');
 
@@ -1017,8 +1288,7 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
 function jepretFotoWatermarkPaket() {
     const videoEl = document.getElementById('paket-camera-video');
     if (!videoEl || !videoEl.videoWidth) {
-        tampilkanToastPaket('Kamera belum siap. Gunakan tombol Foto Lokal jika kamera tidak aktif.', 'error');
-        return;
+        return notifPaket('Kamera belum siap. Gunakan tombol Foto Lokal jika kamera tidak aktif.');
     }
     gambarWatermarkKeCanvas(videoEl, videoEl.videoWidth, videoEl.videoHeight);
 }
@@ -1064,8 +1334,7 @@ function resetModeKameraPaket() {
 
 async function simpanHasilFotoWatermarkPaket() {
     if (!dataUrlFotoWatermarkAktif) {
-        tampilkanToastPaket('Ambil foto terlebih dahulu.', 'error');
-        return;
+        return notifPaket('Ambil foto terlebih dahulu.');
     }
 
     const namaFile = `PAKET_PAJANG_${getTanggalUnderscore()}_${Date.now()}.jpg`;
@@ -1080,7 +1349,7 @@ async function simpanHasilFotoWatermarkPaket() {
     link.click();
     document.body.removeChild(link);
 
-    tampilkanToastPaket('Foto watermark tersimpan ke perangkat.', 'success');
+    notifPaket('Foto watermark tersimpan ke perangkat.');
 
     try {
         if (navigator.canShare && navigator.share) {
@@ -1136,7 +1405,6 @@ function getSisaPktDariItem(jenisPaket, qty) {
     const totalQty = Number(qty) || 0;
     if (totalQty <= 0) return 0;
 
-    // Jika sudah ada helper konversi KRT + sisa PKT di js/paket.js, pakai itu
     if (typeof hitungKonversiPaket === 'function') {
         const res = hitungKonversiPaket(jenis, totalQty);
         if (res && typeof res.sisaPkt === 'number') {
@@ -1144,7 +1412,6 @@ function getSisaPktDariItem(jenisPaket, qty) {
         }
     }
 
-    // Fallback kapasitas standar: PR-PKT40 & PR-PKT82 = 6 PKT/KRT; PR-PKT59 = 3 PKT/KRT
     const kapasitasKrt = (jenis === 'PR-PKT59') ? 3 : 6;
     return totalQty % kapasitasKrt;
 }
@@ -1190,7 +1457,6 @@ function pecahRecordKeDaftarLabel(records, filterJenis = '') {
             const jenis = (it.jenis_paket || '').trim().toUpperCase();
             if (targetJenis && jenis !== targetJenis) return;
 
-            // Hanya ambil jika ada sisa pembagi KRT (+ PKT > 0)
             const sisaPkt = getSisaPktDariItem(jenis, it.qty);
             if (sisaPkt <= 0) return;
 
@@ -1209,8 +1475,7 @@ function pecahRecordKeDaftarLabel(records, filterJenis = '') {
 
 async function kirimTugasCetakKePrintJobs(daftarLabel, kodeLabelTugas) {
     if (!Array.isArray(daftarLabel) || daftarLabel.length === 0) {
-        tampilkanToastPaket('Tidak ada sisa (+ PKT) untuk dicetak labelnya.', 'info');
-        return;
+        return notifPaket('Tidak ada sisa (+ PKT) untuk dicetak labelnya.');
     }
 
     if (typeof window.showCetakProgress === 'function') {
@@ -1260,31 +1525,53 @@ async function kirimTugasCetakKePrintJobs(daftarLabel, kodeLabelTugas) {
             throw new Error(`HTTP ${resp.status}`);
         }
 
-        tampilkanToastPaket(`Proses Mencetak ${daftarLabel.length} Label Sisa PKT (${kodeLabelTugas}).`, 'success');
+        notifPaket(`Proses Mencetak ${daftarLabel.length} Label Sisa PKT (${kodeLabelTugas}).`);
     } catch (e) {
-        tampilkanToastPaket(`Gagal mengirim perintah cetak label: ${e.message}`, 'error');
+        notifPaket(`Gagal mengirim perintah cetak label: ${e.message}`);
     }
 }
 
 async function cetakLabelPerTujuanPaket(recordId) {
-    if (!Array.isArray(window.__riwayatPaketHariIniCache)) {
+    let records = Array.isArray(window.__riwayatPaketHariIniCache)
+        ? window.__riwayatPaketHariIniCache
+        : [];
+    let target = records.find((r) => r.id === recordId);
+
+    if (!target && Array.isArray(window.__semuaRiwayatPaketCache)) {
+        target = window.__semuaRiwayatPaketCache.find((r) => r.id === recordId);
+    }
+
+    if (!target) {
         await muatRiwayatPaketHariIni();
+        const gabungan = [
+            ...(window.__riwayatPaketHariIniCache || []),
+            ...(window.__semuaRiwayatPaketCache || [])
+        ];
+        target = gabungan.find((r) => r.id === recordId);
     }
 
-    const rec = (window.__riwayatPaketHariIniCache || []).find((item) => item.id === recordId);
-    if (!rec) {
-        tampilkanToastPaket('Data tujuan tidak ditemukan.', 'error');
-        return;
+    if (!target) {
+        return notifPaket('Data tujuan tidak ditemukan.');
     }
 
-    const daftarLabel = pecahRecordKeDaftarLabel([rec]);
+    const daftarLabel = pecahRecordKeDaftarLabel([target]);
     if (!daftarLabel.length) {
-        tampilkanToastPaket(`Tujuan ${rec.tujuan || ''} tidak memiliki sisa (+ PKT) untuk dicetak.`, 'info');
-        return;
+        return notifPaket(`Tujuan ${target.tujuan || ''} tidak memiliki sisa (+ PKT) untuk dicetak.`);
     }
 
-    const kodeTugas = `${rec.tujuan || 'TUJUAN'}_SISA_PKT`;
+    const kodeTugas = `${target.tujuan || 'TUJUAN'}_SISA_PKT`;
     await kirimTugasCetakKePrintJobs(daftarLabel, kodeTugas);
+
+    try {
+        if (typeof firebase !== 'undefined' && firebase.apps?.length && typeof firebase.database === 'function') {
+            await firebase.database().ref(`data_paket/${target.id}`).update({
+                status_cetak: 'TERKIRIM_CETAK',
+                last_print_at: Date.now()
+            });
+        }
+    } catch (err) {
+        console.warn('Gagal memperbarui status_cetak di data_paket:', err);
+    }
 }
 
 async function cetakLabelHariIniPaket(filterJenis = '') {
@@ -1297,8 +1584,7 @@ async function cetakLabelHariIniPaket(filterJenis = '') {
 
     if (!daftarLabel.length) {
         const infoJenis = filterJenis ? ` ${filterJenis}` : '';
-        tampilkanToastPaket(`Tidak ada sisa (+ PKT)${infoJenis} untuk dicetak hari ini.`, 'info');
-        return;
+        return notifPaket(`Tidak ada sisa (+ PKT)${infoJenis} untuk dicetak hari ini.`);
     }
 
     const kodeTugas = filterJenis ? `${filterJenis.toUpperCase()}_SISA_PKT` : 'SISA_PKT_PAJANG';
@@ -1316,6 +1602,9 @@ window.muatRiwayatPaketHariIni = muatRiwayatPaketHariIni;
 window.cetakLabelPerTujuanPaket = cetakLabelPerTujuanPaket;
 window.hapusRiwayatPaket = hapusRiwayatPaket;
 window.pakaiDataKeKameraPaket = pakaiDataKeKameraPaket;
+window.handleGantiTanggalWatermarkPaket = handleGantiTanggalWatermarkPaket;
+window.resetTanggalWatermarkSemua = resetTanggalWatermarkSemua;
+window.isiDropdownDataWatermarkPaket = isiDropdownDataWatermarkPaket;
 window.bukaKameraWatermarkPaket = bukaKameraWatermarkPaket;
 window.tutupKameraWatermarkPaket = tutupKameraWatermarkPaket;
 window.handlePilihDataWatermarkPaket = handlePilihDataWatermarkPaket;
@@ -1327,5 +1616,7 @@ window.jepretFotoWatermarkPaket = jepretFotoWatermarkPaket;
 window.handleFotoFileWatermarkPaket = handleFotoFileWatermarkPaket;
 window.resetModeKameraPaket = resetModeKameraPaket;
 window.simpanHasilFotoWatermarkPaket = simpanHasilFotoWatermarkPaket;
-window.cetakLabelPerTujuanPaket = cetakLabelPerTujuanPaket;
 window.cetakLabelHariIniPaket = cetakLabelHariIniPaket;
+window.setModeRiwayatPaket = setModeRiwayatPaket;
+window.handleGantiTanggalRiwayatPaket = handleGantiTanggalRiwayatPaket;
+window.cetakLabelPerTanggalPaket = cetakLabelPerTanggalPaket;
