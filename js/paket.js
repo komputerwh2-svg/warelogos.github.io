@@ -1624,77 +1624,119 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
 
 let audioCtxKameraPaket = null;
 
+// Membuat WAV PCM 8-bit mono singkat (suara klik shutter kamera) sebagai cadangan pasti
+function buatDataUrlSuaraShutterWav() {
+    const sampleRate = 22050;
+    const durasiDetik = 0.14;
+    const jumlahSample = Math.floor(sampleRate * durasiDetik);
+    const dataBytes = new Uint8Array(jumlahSample);
+
+    for (let i = 0; i < jumlahSample; i++) {
+        const t = i / sampleRate;
+        // Dua hentakan klik cepat (di 0.00s dan 0.055s)
+        const env1 = t < 0.045 ? Math.pow(1 - t / 0.045, 1.5) : 0;
+        const env2 = (t >= 0.055 && t < 0.115) ? Math.pow(1 - (t - 0.055) / 0.06, 1.5) : 0;
+        const noise = Math.random() * 2 - 1;
+        const clickTone = Math.sin(2 * Math.PI * 1200 * t) * 0.45 + Math.sin(2 * Math.PI * 420 * t) * 0.35;
+        const sampleVal = Math.max(-1, Math.min(1, noise * (env1 * 0.95 + env2 * 0.85) + clickTone * (env1 + env2) * 0.6));
+        dataBytes[i] = Math.round((sampleVal * 0.5 + 0.5) * 255);
+    }
+
+    const header = new Uint8Array(44);
+    const view = new DataView(header.buffer);
+    const writeStr = (offset, str) => {
+        for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+    };
+
+    writeStr(0, 'RIFF');
+    view.setUint32(4, 36 + jumlahSample, true);
+    writeStr(8, 'WAVE');
+    writeStr(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // PCM
+    view.setUint16(22, 1, true); // Mono
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate, true);
+    view.setUint16(32, 1, true);
+    view.setUint16(34, 8, true);
+    writeStr(36, 'data');
+    view.setUint32(40, jumlahSample, true);
+
+    const wavBytes = new Uint8Array(44 + jumlahSample);
+    wavBytes.set(header, 0);
+    wavBytes.set(dataBytes, 44);
+
+    let binary = '';
+    for (let i = 0; i < wavBytes.length; i++) {
+        binary += String.fromCharCode(wavBytes[i]);
+    }
+    return 'data:audio/wav;base64,' + btoa(binary);
+}
+
+const DATA_URL_SHUTTER_WAV = buatDataUrlSuaraShutterWav();
+
 async function bunyiJepretKameraPaket() {
+    let webAudioSukses = false;
+
     try {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (!AudioCtx) return;
-
-        if (!audioCtxKameraPaket) {
-            audioCtxKameraPaket = new AudioCtx();
-        }
-        if (audioCtxKameraPaket.state === 'suspended') {
-            await audioCtxKameraPaket.resume();
-        }
-
-        const now = audioCtxKameraPaket.currentTime;
-
-        function buatHentakanShutter(offsetDetik, durasi, frekHighpass, frekBandpass, peakGain) {
-            const start = now + offsetDetik;
-            const jumlahSample = Math.max(1, Math.floor(audioCtxKameraPaket.sampleRate * durasi));
-            const buffer = audioCtxKameraPaket.createBuffer(1, jumlahSample, audioCtxKameraPaket.sampleRate);
-            const data = buffer.getChannelData(0);
-
-            for (let i = 0; i < jumlahSample; i++) {
-                const env = Math.pow(1 - i / jumlahSample, 1.8);
-                data[i] = (Math.random() * 2 - 1) * env;
+        if (AudioCtx) {
+            if (!audioCtxKameraPaket) {
+                audioCtxKameraPaket = new AudioCtx();
+            }
+            if (audioCtxKameraPaket.state === 'suspended') {
+                await audioCtxKameraPaket.resume();
             }
 
-            const noise = audioCtxKameraPaket.createBufferSource();
-            noise.buffer = buffer;
+            if (audioCtxKameraPaket.state === 'running') {
+                const now = audioCtxKameraPaket.currentTime;
 
-            const highpass = audioCtxKameraPaket.createBiquadFilter();
-            highpass.type = 'highpass';
-            highpass.frequency.setValueAtTime(frekHighpass, start);
+                const mainGain = audioCtxKameraPaket.createGain();
+                mainGain.gain.setValueAtTime(1.0, now);
+                mainGain.connect(audioCtxKameraPaket.destination);
 
-            const bandpass = audioCtxKameraPaket.createBiquadFilter();
-            bandpass.type = 'bandpass';
-            bandpass.frequency.setValueAtTime(frekBandpass, start);
-            bandpass.Q.setValueAtTime(1.1, start);
+                // Klik 1 (tegas)
+                const osc1 = audioCtxKameraPaket.createOscillator();
+                const g1 = audioCtxKameraPaket.createGain();
+                osc1.type = 'sawtooth';
+                osc1.frequency.setValueAtTime(1600, now);
+                osc1.frequency.linearRampToValueAtTime(280, now + 0.055);
+                g1.gain.setValueAtTime(0.85, now);
+                g1.gain.linearRampToValueAtTime(0.0001, now + 0.06);
+                osc1.connect(g1);
+                g1.connect(mainGain);
+                osc1.start(now);
+                osc1.stop(now + 0.065);
 
-            const gainNode = audioCtxKameraPaket.createGain();
-            gainNode.gain.setValueAtTime(peakGain, start);
-            gainNode.gain.exponentialRampToValueAtTime(0.001, start + durasi);
+                // Klik 2 (penutup rana)
+                const osc2 = audioCtxKameraPaket.createOscillator();
+                const g2 = audioCtxKameraPaket.createGain();
+                osc2.type = 'square';
+                osc2.frequency.setValueAtTime(1100, now + 0.065);
+                osc2.frequency.linearRampToValueAtTime(220, now + 0.13);
+                g2.gain.setValueAtTime(0.75, now + 0.065);
+                g2.gain.linearRampToValueAtTime(0.0001, now + 0.135);
+                osc2.connect(g2);
+                g2.connect(mainGain);
+                osc2.start(now + 0.065);
+                osc2.stop(now + 0.14);
 
-            noise.connect(highpass);
-            highpass.connect(bandpass);
-            bandpass.connect(gainNode);
-            gainNode.connect(audioCtxKameraPaket.destination);
-
-            noise.start(start);
-            noise.stop(start + durasi);
+                webAudioSukses = true;
+            }
         }
+    } catch (_) {
+        webAudioSukses = false;
+    }
 
-        // Hentakan 1: buka tirai shutter (tegas)
-        buatHentakanShutter(0, 0.045, 700, 2200, 0.95);
-        // Hentakan 2: tutup tirai shutter (khas suara kamera)
-        buatHentakanShutter(0.045, 0.05, 850, 2600, 0.75);
-
-        // Klik mekanis singkat agar bunyi makin berasa
-        const osc = audioCtxKameraPaket.createOscillator();
-        const gainOsc = audioCtxKameraPaket.createGain();
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(1350, now);
-        osc.frequency.exponentialRampToValueAtTime(320, now + 0.04);
-
-        gainOsc.gain.setValueAtTime(0.28, now);
-        gainOsc.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
-
-        osc.connect(gainOsc);
-        gainOsc.connect(audioCtxKameraPaket.destination);
-        osc.start(now);
-        osc.stop(now + 0.05);
+    // Putar juga WAV sintetis agar suara klik/shutter pasti terdengar di perangkat/browser mana pun
+    try {
+        const audioEl = new Audio(DATA_URL_SHUTTER_WAV);
+        audioEl.volume = 1.0;
+        await audioEl.play();
     } catch (err) {
-        console.warn('Suara jepret kamera gagal diputar:', err);
+        if (!webAudioSukses) {
+            console.warn('Suara jepret kamera diblokir browser:', err);
+        }
     }
 }
 
