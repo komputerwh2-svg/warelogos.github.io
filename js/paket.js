@@ -951,6 +951,11 @@ async function unduhUlangFotoCache(index) {
     await simpanHasilFotoWatermarkPaket();
 }
 
+let statusFlashKameraAktif = false;
+let levelZoomKameraAktif = 1.0;
+let daftarKameraBelakangPaket = [];
+let deviceIdKameraAktif = '';
+
 function pakaiDataKeKameraPaket(recordId) {
     bukaKameraWatermarkPaket(recordId || '');
 }
@@ -964,6 +969,11 @@ async function bukaKameraWatermarkPaket(pilihIdOtomatis = '') {
     tutupRiwayatFotoWatermarkPaket();
     updateBadgeRiwayatFotoPaket();
     resetModeKameraPaket();
+
+    levelZoomKameraAktif = 1.0;
+    statusFlashKameraAktif = false;
+    updateTombolZoomUI(1.0);
+    updateTombolFlashUI(false);
 
     await isiDropdownDataWatermarkPaket(pilihIdOtomatis);
 
@@ -981,26 +991,79 @@ function tutupKameraWatermarkPaket() {
     tutupRiwayatFotoWatermarkPaket();
     clearInterval(timerWatermarkPaket);
     hentikanStreamKameraPaket();
+
+    levelZoomKameraAktif = 1.0;
+    statusFlashKameraAktif = false;
+    updateTombolZoomUI(1.0);
+    updateTombolFlashUI(false);
+}
+
+async function muatDaftarKameraBelakangPaket() {
+    if (!navigator.mediaDevices || typeof navigator.mediaDevices.enumerateDevices !== 'function') {
+        daftarKameraBelakangPaket = [];
+        return [];
+    }
+
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoInputs = devices.filter((d) => d.kind === 'videoinput');
+        const belakang = videoInputs.filter((d) => {
+            const lbl = String(d.label || '').toLowerCase();
+            return !lbl.includes('front') && !lbl.includes('depan') && !lbl.includes('user');
+        });
+        daftarKameraBelakangPaket = belakang.length ? belakang : videoInputs;
+        return daftarKameraBelakangPaket;
+    } catch (_) {
+        return [];
+    }
+}
+
+async function bukaKameraDenganDeviceId(targetDeviceId = '') {
+    const videoEl = document.getElementById('paket-camera-video');
+    if (!videoEl) return null;
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Browser tidak mendukung akses kamera langsung.');
+    }
+
+    hentikanStreamKameraPaket();
+
+    const videoConstraint = targetDeviceId
+        ? {
+            deviceId: { exact: targetDeviceId },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+        }
+        : {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+        };
+
+    streamKameraPaket = await navigator.mediaDevices.getUserMedia({
+        video: videoConstraint,
+        audio: false
+    });
+
+    const track = streamKameraPaket.getVideoTracks?.()?.[0];
+    deviceIdKameraAktif = track?.getSettings?.()?.deviceId || targetDeviceId || '';
+    statusFlashKameraAktif = false;
+    updateTombolFlashUI(false);
+
+    videoEl.srcObject = streamKameraPaket;
+    videoEl.style.transform = 'scale(1)';
+    videoEl.classList.remove('hidden');
+
+    await muatDaftarKameraBelakangPaket();
+    return track;
 }
 
 async function mulaiStreamKameraPaket() {
     const videoEl = document.getElementById('paket-camera-video');
     if (!videoEl) return;
 
-    hentikanStreamKameraPaket();
-
     try {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            throw new Error('Browser tidak mendukung akses kamera langsung.');
-        }
-
-        streamKameraPaket = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: 'environment' } },
-            audio: false
-        });
-
-        videoEl.srcObject = streamKameraPaket;
-        videoEl.classList.remove('hidden');
+        await bukaKameraDenganDeviceId('');
     } catch (err) {
         console.warn('Kamera langsung tidak tersedia, gunakan tombol Foto Lokal:', err);
         notifPaket('Kamera tidak tersedia, gunakan tombol Foto Lokal.');
@@ -1033,9 +1096,6 @@ function updatePreviewWatermarkPaket() {
     }
 }
 
-let statusFlashKameraAktif = false;
-let levelZoomKameraAktif = 1.0;
-
 function updateTombolZoomUI(targetZoom) {
     const presets = [
         { id: 'btn-zoom-2', val: 2 },
@@ -1059,49 +1119,117 @@ function updateTombolFlashUI(aktif) {
     if (btnEl) {
         btnEl.className = aktif
             ? 'w-10 h-10 rounded-full bg-amber-400 text-slate-950 border border-amber-300 shadow-lg flex items-center justify-center transition'
-            : 'w-10 h-10 rounded-full bg-slate-900/75 hover:bg-white/15 text-white border border-white/20 shadow-lg flex items-center justify-center transition';
+            : 'w-10 h-10 rounded-full bg-slate-900/80 hover:bg-slate-800 text-white border border-white/25 shadow-lg flex items-center justify-center transition';
     }
 
     if (iconEl) {
         iconEl.className = aktif
             ? 'fa-solid fa-bolt text-sm text-slate-950'
-            : 'fa-solid fa-bolt-slash text-sm text-white';
-    }
-}
-
-async function terapkanZoomKeTrackKamera(zoomVal) {
-    const videoEl = document.getElementById('paket-camera-video');
-    if (videoEl) {
-        videoEl.style.transform = `scale(${zoomVal})`;
-    }
-
-    const track = streamKameraPaket?.getVideoTracks?.()?.[0];
-    if (!track || typeof track.getCapabilities !== 'function' || typeof track.applyConstraints !== 'function') {
-        return;
-    }
-
-    try {
-        const caps = track.getCapabilities();
-        if (caps && typeof caps.zoom === 'object' && caps.zoom !== null) {
-            const minZ = typeof caps.zoom.min === 'number' ? caps.zoom.min : 1;
-            const maxZ = typeof caps.zoom.max === 'number' ? caps.zoom.max : zoomVal;
-            const clampedZ = Math.min(maxZ, Math.max(minZ, zoomVal));
-            await track.applyConstraints({ advanced: [{ zoom: clampedZ }] });
-
-            if (videoEl && Math.abs(clampedZ - zoomVal) < 0.05) {
-                videoEl.style.transform = 'scale(1)';
-            }
-        }
-    } catch (err) {
-        console.warn('Zoom hardware tidak didukung, memakai skala pratinjau:', err);
+            : 'fa-solid fa-bolt text-sm text-white';
     }
 }
 
 async function setZoomKameraPaket(zoomVal) {
-    const angka = Number(zoomVal) || 1.0;
-    levelZoomKameraAktif = angka;
-    updateTombolZoomUI(angka);
-    await terapkanZoomKeTrackKamera(angka);
+    const targetZoom = Number(zoomVal);
+    const zoomSebelumnya = levelZoomKameraAktif;
+    const videoEl = document.getElementById('paket-camera-video');
+
+    if (Math.abs(targetZoom - 1.0) < 0.05) {
+        let track = streamKameraPaket?.getVideoTracks?.()?.[0];
+        const listKamera = daftarKameraBelakangPaket.length
+            ? daftarKameraBelakangPaket
+            : await muatDaftarKameraBelakangPaket();
+
+        const utama = listKamera.find((d) => {
+            const lbl = String(d.label || '').toLowerCase();
+            return !lbl.includes('ultra') && !lbl.includes('0.6') && !lbl.includes('macro');
+        });
+
+        if (utama?.deviceId && utama.deviceId !== deviceIdKameraAktif) {
+            try {
+                track = await bukaKameraDenganDeviceId(utama.deviceId);
+            } catch (_) {}
+        }
+
+        try {
+            if (track?.getCapabilities?.()?.zoom && typeof track.applyConstraints === 'function') {
+                await track.applyConstraints({ advanced: [{ zoom: 1.0 }] });
+            }
+        } catch (_) {}
+
+        if (videoEl) videoEl.style.transform = 'scale(1)';
+        levelZoomKameraAktif = 1.0;
+        updateTombolZoomUI(1.0);
+        return;
+    }
+
+    let track = streamKameraPaket?.getVideoTracks?.()?.[0];
+    if (!track) {
+        return notifPaket('Kamera tidak mendukung zoom ini.');
+    }
+
+    const caps = typeof track.getCapabilities === 'function' ? track.getCapabilities() : null;
+
+    if (Math.abs(targetZoom - 0.6) < 0.05) {
+        const zoomSupports06 = caps && typeof caps.zoom === 'object' && caps.zoom !== null
+            && typeof caps.zoom.min === 'number' && caps.zoom.min <= 0.6;
+
+        if (zoomSupports06 && typeof track.applyConstraints === 'function') {
+            try {
+                await track.applyConstraints({ advanced: [{ zoom: 0.6 }] });
+                if (videoEl) videoEl.style.transform = 'scale(1)';
+                levelZoomKameraAktif = 0.6;
+                updateTombolZoomUI(0.6);
+                return;
+            } catch (_) {}
+        }
+
+        const listKamera = daftarKameraBelakangPaket.length
+            ? daftarKameraBelakangPaket
+            : await muatDaftarKameraBelakangPaket();
+
+        const kandidatUltraWide = listKamera.find((d) => {
+            if (d.deviceId === deviceIdKameraAktif) return false;
+            const lbl = String(d.label || '').toLowerCase();
+            return lbl.includes('0.6') || lbl.includes('ultra') || lbl.includes('wide');
+        });
+
+        if (kandidatUltraWide?.deviceId) {
+            try {
+                const newTrack = await bukaKameraDenganDeviceId(kandidatUltraWide.deviceId);
+                const newCaps = newTrack?.getCapabilities?.();
+                if (newCaps?.zoom && typeof newCaps.zoom.min === 'number' && newCaps.zoom.min <= 0.6) {
+                    await newTrack.applyConstraints({ advanced: [{ zoom: 0.6 }] });
+                }
+                if (videoEl) videoEl.style.transform = 'scale(1)';
+                levelZoomKameraAktif = 0.6;
+                updateTombolZoomUI(0.6);
+                return;
+            } catch (_) {}
+        }
+
+        updateTombolZoomUI(zoomSebelumnya);
+        return notifPaket('Kamera tidak mendukung zoom ini.');
+    }
+
+    const zoomSupportsTarget = caps && typeof caps.zoom === 'object' && caps.zoom !== null
+        && typeof caps.zoom.max === 'number' && caps.zoom.max >= targetZoom
+        && typeof caps.zoom.min === 'number' && caps.zoom.min <= targetZoom;
+
+    if (!zoomSupportsTarget || typeof track.applyConstraints !== 'function') {
+        updateTombolZoomUI(zoomSebelumnya);
+        return notifPaket('Kamera tidak mendukung zoom ini.');
+    }
+
+    try {
+        await track.applyConstraints({ advanced: [{ zoom: targetZoom }] });
+        if (videoEl) videoEl.style.transform = 'scale(1)';
+        levelZoomKameraAktif = targetZoom;
+        updateTombolZoomUI(targetZoom);
+    } catch (_) {
+        updateTombolZoomUI(zoomSebelumnya);
+        notifPaket('Kamera tidak mendukung zoom ini.');
+    }
 }
 
 async function toggleFlashKameraPaket() {
