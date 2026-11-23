@@ -4245,20 +4245,41 @@ window.resetFormSolar = function() {
 
 
 
-// Helper Global Modal Progress Cetak
-window.showCetakProgress = function(pesan = "Memproses Cetak...") {
+// Helper Global Modal Progress Cetak (Hanya mengatur tampilan visual, tidak menghentikan proses latar belakang)
+let waktuTutupProgressCetak = 0;
+let pesanProgressCetakTerkunci = '';
+const COOLDOWN_TUTUP_PROGRESS_MS = 2500;
+
+window.showCetakProgress = function (pesan = 'Memproses Cetak...') {
+    const teksPesan = String(pesan || 'Memproses Cetak...');
+    const selisihWaktu = Date.now() - waktuTutupProgressCetak;
+
+    // Hanya menahan tampilan visual agar modal tidak nongol ulang saat ditutup user
+    if (waktuTutupProgressCetak > 0 && selisihWaktu < COOLDOWN_TUTUP_PROGRESS_MS) {
+        return;
+    }
+
+    if (pesanProgressCetakTerkunci && teksPesan === pesanProgressCetakTerkunci && selisihWaktu < 15000) {
+        return;
+    }
+
+    pesanProgressCetakTerkunci = '';
     const modal = document.getElementById('modal-progress-cetak');
     const textEl = document.getElementById('text-progress-cetak');
-    if (textEl) textEl.innerText = pesan;
+    if (textEl) textEl.innerText = teksPesan;
     if (modal) modal.style.display = 'flex';
 };
 
-window.hideCetakProgress = function() {
+window.hideCetakProgress = function () {
     const modal = document.getElementById('modal-progress-cetak');
     if (modal) modal.style.display = 'none';
 };
 
-window.tutupModalProgressCetak = function() {
+window.tutupModalProgressCetak = function () {
+    waktuTutupProgressCetak = Date.now();
+    const textEl = document.getElementById('text-progress-cetak');
+    pesanProgressCetakTerkunci = String(textEl?.innerText || '').trim();
+
     const modal = document.getElementById('modal-progress-cetak');
     if (modal) {
         modal.style.display = 'none';
