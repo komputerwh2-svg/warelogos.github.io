@@ -14,6 +14,39 @@ const ISI_KRT_PER_PAKET = {
     'PR-PKT82': 6
 };
 
+const KEY_RIWAYAT_FOTO_PAKET = 'wh2_riwayat_foto_paket_v1';
+
+function muatRiwayatFotoDariStoragePaket() {
+    try {
+        const raw = localStorage.getItem(KEY_RIWAYAT_FOTO_PAKET);
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+        return [];
+    }
+}
+
+function simpanRiwayatFotoKeStoragePaket(daftar) {
+    try {
+        localStorage.setItem(KEY_RIWAYAT_FOTO_PAKET, JSON.stringify(daftar.slice(0, 20)));
+    } catch (_) {
+        try {
+            localStorage.setItem(KEY_RIWAYAT_FOTO_PAKET, JSON.stringify(daftar.slice(0, 6)));
+        } catch (_) {}
+    }
+}
+
+function simpanDataUrlKePerangkatPaket(dataUrl, prefixNama = 'PAKET_PAJANG') {
+    if (!dataUrl) return;
+    const namaFile = `${prefixNama}_${getTanggalUnderscore()}_${Date.now()}.jpg`;
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = namaFile;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
 // =========================================================
 // 1. HELPER TANGGAL, FORMAT, KONVERSI & NOTIFIKASI MIUI ALERT
 // =========================================================
@@ -914,17 +947,32 @@ function bukaRiwayatFotoWatermarkPaket() {
     const wadah = document.getElementById('daftar-riwayat-foto-paket');
     if (!modal || !wadah) return;
 
+    cacheFotoWatermarkHariIni = muatRiwayatFotoDariStoragePaket();
     modal.classList.remove('hidden');
+
+    const headerAksiHtml = `
+        <div class="col-span-full flex items-center justify-between gap-2 pb-2 border-b border-orange-100">
+            <span class="text-[10px] font-bold text-slate-500">
+                ${cacheFotoWatermarkHariIni.length} foto tersimpan di riwayat
+            </span>
+            <button type="button" onclick="document.getElementById('paket-wm-file-input')?.click()"
+                class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-[10px] font-black uppercase transition flex items-center gap-1">
+                <i class="fa-solid fa-photo-film text-amber-400"></i>
+                <span>Foto Lokal</span>
+            </button>
+        </div>
+    `;
 
     if (!cacheFotoWatermarkHariIni.length) {
         wadah.innerHTML = `
-            <div class="col-span-full text-center py-8 text-xs font-bold text-slate-400">
-                Belum ada foto watermark yang diambil.
+            ${headerAksiHtml}
+            <div class="col-span-full text-center py-6 text-xs font-bold text-slate-400">
+                Belum ada foto watermark yang diambil. Gunakan kamera atau klik Foto Lokal.
             </div>`;
         return;
     }
 
-    wadah.innerHTML = cacheFotoWatermarkHariIni.map((item, idx) => `
+    wadah.innerHTML = headerAksiHtml + cacheFotoWatermarkHariIni.map((item, idx) => `
         <div class="rounded-xl border border-orange-200 bg-slate-50 overflow-hidden flex flex-col shadow-xs">
             <img src="${item.dataUrl}" alt="Foto ${idx + 1}" class="w-full h-28 object-cover bg-slate-900">
             <div class="p-2 space-y-1.5 flex-1 flex flex-col justify-between">
@@ -967,6 +1015,7 @@ async function bukaKameraWatermarkPaket(pilihIdOtomatis = '') {
     modal.classList.remove('hidden');
     togglePanelEditCatatanWatermark(false);
     tutupRiwayatFotoWatermarkPaket();
+    cacheFotoWatermarkHariIni = muatRiwayatFotoDariStoragePaket();
     updateBadgeRiwayatFotoPaket();
     resetModeKameraPaket();
 
@@ -1273,103 +1322,6 @@ async function setZoomKameraPaket(zoomVal) {
     }
 }
 
-let timerIndikatorFokusPaket = null;
-
-function tampilkanIndikatorFokusVisual(xPx, yPx) {
-    const ringEl = document.getElementById('paket-focus-ring');
-    if (!ringEl) return;
-
-    ringEl.style.left = `${xPx}px`;
-    ringEl.style.top = `${yPx}px`;
-    ringEl.style.transform = 'scale(1.25)';
-    ringEl.classList.remove('hidden');
-
-    requestAnimationFrame(() => {
-        ringEl.style.transform = 'scale(1)';
-    });
-
-    clearTimeout(timerIndikatorFokusPaket);
-    timerIndikatorFokusPaket = setTimeout(() => {
-        ringEl.classList.add('hidden');
-    }, 900);
-}
-
-async function terapkanFokusKameraPaket(normX, normY) {
-    const track = streamKameraPaket?.getVideoTracks?.()?.[0];
-    if (!track || typeof track.getCapabilities !== 'function' || typeof track.applyConstraints !== 'function') {
-        return;
-    }
-
-    try {
-        const caps = track.getCapabilities();
-        const constraints = { advanced: [] };
-        const advItem = {};
-        let punyaConstraint = false;
-
-        if (Array.isArray(caps?.focusMode)) {
-            if (caps.focusMode.includes('manual')) {
-                advItem.focusMode = 'manual';
-                punyaConstraint = true;
-            } else if (caps.focusMode.includes('continuous')) {
-                advItem.focusMode = 'continuous';
-                punyaConstraint = true;
-            }
-        }
-
-        // Beberapa perangkat mendukung pointsOfInterest (koordinat ternormalisasi 0..1)
-        if (caps && 'pointsOfInterest' in caps) {
-            advItem.pointsOfInterest = [{
-                x: Math.min(1, Math.max(0, Number(normX) || 0.5)),
-                y: Math.min(1, Math.max(0, Number(normY) || 0.5))
-            }];
-            punyaConstraint = true;
-        }
-
-        if (punyaConstraint) {
-            constraints.advanced.push(advItem);
-            await track.applyConstraints(constraints);
-
-            // Kembalikan ke continuous setelah memicu fokus manual bila didukung
-            if (advItem.focusMode === 'manual' && caps.focusMode.includes('continuous')) {
-                setTimeout(async () => {
-                    try {
-                        const aktifTrack = streamKameraPaket?.getVideoTracks?.()?.[0];
-                        if (aktifTrack && aktifTrack.readyState === 'live') {
-                            await aktifTrack.applyConstraints({
-                                advanced: [{ focusMode: 'continuous' }]
-                            });
-                        }
-                    } catch (_) {}
-                }, 600);
-            }
-        }
-    } catch (err) {
-        console.warn('Fokus sentuh hardware tidak didukung pada perangkat ini:', err);
-    }
-}
-
-async function handleTapFocusKameraPaket(event, stageEl) {
-    const videoEl = document.getElementById('paket-camera-video');
-    if (!videoEl || videoEl.classList.contains('hidden')) return;
-
-    // Abaikan jika klik berasal dari tombol atau kontrol interaktif di dalam area kamera
-    if (event?.target?.closest('button, select, input, label, #panel-edit-watermark-paket, #panel-zoom-kamera-paket')) {
-        return;
-    }
-
-    const host = stageEl || document.getElementById('paket-camera-stage');
-    if (!host) return;
-
-    const rect = host.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-
-    const xPx = Math.min(rect.width, Math.max(0, (event.clientX ?? rect.left + rect.width / 2) - rect.left));
-    const yPx = Math.min(rect.height, Math.max(0, (event.clientY ?? rect.top + rect.height / 2) - rect.top));
-
-    tampilkanIndikatorFokusVisual(xPx, yPx);
-    await terapkanFokusKameraPaket(xPx / rect.width, yPx / rect.height);
-}
-
 async function toggleFlashKameraPaket() {
     const track = streamKameraPaket?.getVideoTracks?.()?.[0];
     if (!track) {
@@ -1643,31 +1595,31 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
     // Kualitas JPG 1.0 (tanpa kompresi lossy tambahan)
     dataUrlFotoWatermarkAktif = canvas.toDataURL('image/jpeg', 1.0);
 
-    cacheFotoWatermarkHariIni.unshift({
+    const riwayatTerbaru = muatRiwayatFotoDariStoragePaket();
+    riwayatTerbaru.unshift({
         dataUrl: dataUrlFotoWatermarkAktif,
         caption: teksInfo,
         waktu: `${jam} ${hariTanggal}`
     });
-    if (cacheFotoWatermarkHariIni.length > 8) {
-        cacheFotoWatermarkHariIni.pop();
-    }
+    cacheFotoWatermarkHariIni = riwayatTerbaru.slice(0, 20);
+    simpanRiwayatFotoKeStoragePaket(cacheFotoWatermarkHariIni);
     updateBadgeRiwayatFotoPaket();
 
-    if (videoEl) videoEl.classList.add('hidden');
-    if (overlayEl) overlayEl.classList.add('hidden');
-    if (topRightEl) topRightEl.classList.add('hidden');
-    if (rightVertEl) rightVertEl.classList.add('hidden');
-    if (gridEl) gridEl.classList.add('hidden');
-    canvas.classList.remove('hidden');
+    // Langsung simpan ke perangkat tanpa menampilkan layar konfirmasi Foto Ulang / Simpan
+    simpanDataUrlKePerangkatPaket(dataUrlFotoWatermarkAktif, 'PAKET_PAJANG');
 
-    document.getElementById('btn-jepret-watermark')?.classList.add('hidden');
-    document.getElementById('btn-ulang-kamera-paket')?.classList.remove('hidden');
+    canvas.classList.add('hidden');
+    if (videoEl) videoEl.classList.remove('hidden');
+    if (overlayEl) overlayEl.classList.remove('hidden');
+    if (topRightEl) topRightEl.classList.remove('hidden');
+    if (rightVertEl) rightVertEl.classList.remove('hidden');
+    if (gridEl) gridEl.classList.remove('hidden');
 
-    const btnSimpanFoto = document.getElementById('btn-simpan-foto-watermark');
-    if (btnSimpanFoto) {
-        btnSimpanFoto.classList.remove('hidden');
-        btnSimpanFoto.disabled = false;
-    }
+    document.getElementById('btn-jepret-watermark')?.classList.remove('hidden');
+    document.getElementById('btn-ulang-kamera-paket')?.classList.add('hidden');
+    document.getElementById('btn-simpan-foto-watermark')?.classList.add('hidden');
+
+    notifPaket('Foto watermark langsung tersimpan ke perangkat.');
 }
 
 function jepretFotoWatermarkPaket() {
