@@ -1624,7 +1624,7 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
 
 let audioCtxKameraPaket = null;
 
-function bunyiJepretKameraPaket() {
+async function bunyiJepretKameraPaket() {
     try {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         if (!AudioCtx) return;
@@ -1633,64 +1633,78 @@ function bunyiJepretKameraPaket() {
             audioCtxKameraPaket = new AudioCtx();
         }
         if (audioCtxKameraPaket.state === 'suspended') {
-            audioCtxKameraPaket.resume();
+            await audioCtxKameraPaket.resume();
         }
 
         const now = audioCtxKameraPaket.currentTime;
 
-        // 1. Noise burst singkat untuk karakter suara rana/shutter kamera
-        const durasi = 0.065;
-        const jumlahSample = Math.max(1, Math.floor(audioCtxKameraPaket.sampleRate * durasi));
-        const buffer = audioCtxKameraPaket.createBuffer(1, jumlahSample, audioCtxKameraPaket.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < jumlahSample; i++) {
-            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (jumlahSample * 0.28));
+        function buatHentakanShutter(offsetDetik, durasi, frekHighpass, frekBandpass, peakGain) {
+            const start = now + offsetDetik;
+            const jumlahSample = Math.max(1, Math.floor(audioCtxKameraPaket.sampleRate * durasi));
+            const buffer = audioCtxKameraPaket.createBuffer(1, jumlahSample, audioCtxKameraPaket.sampleRate);
+            const data = buffer.getChannelData(0);
+
+            for (let i = 0; i < jumlahSample; i++) {
+                const env = Math.pow(1 - i / jumlahSample, 1.8);
+                data[i] = (Math.random() * 2 - 1) * env;
+            }
+
+            const noise = audioCtxKameraPaket.createBufferSource();
+            noise.buffer = buffer;
+
+            const highpass = audioCtxKameraPaket.createBiquadFilter();
+            highpass.type = 'highpass';
+            highpass.frequency.setValueAtTime(frekHighpass, start);
+
+            const bandpass = audioCtxKameraPaket.createBiquadFilter();
+            bandpass.type = 'bandpass';
+            bandpass.frequency.setValueAtTime(frekBandpass, start);
+            bandpass.Q.setValueAtTime(1.1, start);
+
+            const gainNode = audioCtxKameraPaket.createGain();
+            gainNode.gain.setValueAtTime(peakGain, start);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, start + durasi);
+
+            noise.connect(highpass);
+            highpass.connect(bandpass);
+            bandpass.connect(gainNode);
+            gainNode.connect(audioCtxKameraPaket.destination);
+
+            noise.start(start);
+            noise.stop(start + durasi);
         }
 
-        const noise = audioCtxKameraPaket.createBufferSource();
-        noise.buffer = buffer;
+        // Hentakan 1: buka tirai shutter (tegas)
+        buatHentakanShutter(0, 0.045, 700, 2200, 0.95);
+        // Hentakan 2: tutup tirai shutter (khas suara kamera)
+        buatHentakanShutter(0.045, 0.05, 850, 2600, 0.75);
 
-        const filter = audioCtxKameraPaket.createBiquadFilter();
-        filter.type = 'bandpass';
-        filter.frequency.setValueAtTime(1800, now);
-        filter.Q.setValueAtTime(1.4, now);
-
-        const gainNoise = audioCtxKameraPaket.createGain();
-        gainNoise.gain.setValueAtTime(0.45, now);
-        gainNoise.gain.exponentialRampToValueAtTime(0.001, now + durasi);
-
-        noise.connect(filter);
-        filter.connect(gainNoise);
-        gainNoise.connect(audioCtxKameraPaket.destination);
-        noise.start(now);
-        noise.stop(now + durasi);
-
-        // 2. Klik pendek di akhir agar terasa seperti mekanis shutter
+        // Klik mekanis singkat agar bunyi makin berasa
         const osc = audioCtxKameraPaket.createOscillator();
-        const gainClick = audioCtxKameraPaket.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(950, now + 0.015);
-        osc.frequency.exponentialRampToValueAtTime(260, now + 0.06);
+        const gainOsc = audioCtxKameraPaket.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(1350, now);
+        osc.frequency.exponentialRampToValueAtTime(320, now + 0.04);
 
-        gainClick.gain.setValueAtTime(0.18, now + 0.015);
-        gainClick.gain.exponentialRampToValueAtTime(0.001, now + 0.065);
+        gainOsc.gain.setValueAtTime(0.28, now);
+        gainOsc.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
 
-        osc.connect(gainClick);
-        gainClick.connect(audioCtxKameraPaket.destination);
-        osc.start(now + 0.015);
-        osc.stop(now + 0.07);
+        osc.connect(gainOsc);
+        gainOsc.connect(audioCtxKameraPaket.destination);
+        osc.start(now);
+        osc.stop(now + 0.05);
     } catch (err) {
-        console.warn('Suara jepret kamera dilewati:', err);
+        console.warn('Suara jepret kamera gagal diputar:', err);
     }
 }
 
-function jepretFotoWatermarkPaket() {
+async function jepretFotoWatermarkPaket() {
     const videoEl = document.getElementById('paket-camera-video');
     if (!videoEl || !videoEl.videoWidth) {
         return notifPaket('Kamera belum siap. Gunakan tombol Foto Lokal jika kamera tidak aktif.');
     }
-    bunyiJepretKameraPaket();
-    gambarWatermarkKeCanvas(videoEl, videoEl.videoWidth, videoEl.videoHeight);
+    await bunyiJepretKameraPaket();
+    await gambarWatermarkKeCanvas(videoEl, videoEl.videoWidth, videoEl.videoHeight);
 }
 
 function handleFotoFileWatermarkPaket(event) {
