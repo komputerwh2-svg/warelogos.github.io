@@ -27,13 +27,22 @@ function muatRiwayatFotoDariStoragePaket() {
 }
 
 function simpanRiwayatFotoKeStoragePaket(daftar) {
-    try {
-        localStorage.setItem(KEY_RIWAYAT_FOTO_PAKET, JSON.stringify(daftar.slice(0, 20)));
-    } catch (_) {
+    const salinan = Array.isArray(daftar) ? [...daftar] : [];
+
+    // Coba simpan; jika penuh (QuotaExceededError), buang item paling lama satu per satu
+    while (salinan.length > 0) {
         try {
-            localStorage.setItem(KEY_RIWAYAT_FOTO_PAKET, JSON.stringify(daftar.slice(0, 6)));
-        } catch (_) {}
+            localStorage.setItem(KEY_RIWAYAT_FOTO_PAKET, JSON.stringify(salinan));
+            return salinan;
+        } catch (_) {
+            salinan.pop();
+        }
     }
+
+    try {
+        localStorage.removeItem(KEY_RIWAYAT_FOTO_PAKET);
+    } catch (_) {}
+    return [];
 }
 
 function simpanDataUrlKePerangkatPaket(dataUrl, prefixNama = 'PAKET_PAJANG') {
@@ -974,10 +983,14 @@ function bukaRiwayatFotoWatermarkPaket() {
 
     wadah.innerHTML = headerAksiHtml + cacheFotoWatermarkHariIni.map((item, idx) => `
         <div class="rounded-xl border border-orange-200 bg-slate-50 overflow-hidden flex flex-col shadow-xs">
-            <img src="${item.dataUrl}" alt="Foto ${idx + 1}" class="w-full h-28 object-cover bg-slate-900">
+            <img src="${item.dataUrl}" alt="Foto ${idx + 1}" onclick="lihatPreviewFotoRiwayat(${idx})"
+                title="Klik untuk melihat pratinjau foto"
+                class="w-full h-28 object-cover bg-slate-900 cursor-pointer hover:opacity-90 transition">
             <div class="p-2 space-y-1.5 flex-1 flex flex-col justify-between">
-                <div class="text-[10px] font-mono font-bold text-slate-500 truncate">${escapeHTMLPaket(item.waktu || '')}</div>
-                <div class="text-[10px] font-bold text-slate-700 line-clamp-2 leading-tight">${escapeHTMLPaket(item.caption || 'Paket Pajang')}</div>
+                <div onclick="lihatPreviewFotoRiwayat(${idx})" class="cursor-pointer space-y-0.5">
+                    <div class="text-[10px] font-mono font-bold text-slate-500 truncate">${escapeHTMLPaket(item.waktu || '')}</div>
+                    <div class="text-[10px] font-bold text-slate-700 line-clamp-2 leading-tight">${escapeHTMLPaket(item.caption || 'Paket Pajang')}</div>
+                </div>
                 <button type="button" onclick="unduhUlangFotoCache(${idx})"
                     class="w-full py-1 px-2 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-[10px] font-black uppercase transition">
                     Simpan / Share
@@ -1601,8 +1614,7 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
         caption: teksInfo,
         waktu: `${jam} ${hariTanggal}`
     });
-    cacheFotoWatermarkHariIni = riwayatTerbaru.slice(0, 20);
-    simpanRiwayatFotoKeStoragePaket(cacheFotoWatermarkHariIni);
+    cacheFotoWatermarkHariIni = simpanRiwayatFotoKeStoragePaket(riwayatTerbaru);
     updateBadgeRiwayatFotoPaket();
 
     // Langsung simpan ke perangkat tanpa menampilkan layar konfirmasi Foto Ulang / Simpan
@@ -1866,6 +1878,37 @@ function hapusSemuaRiwayatFotoWatermarkPaket() {
     notifPaket('Riwayat foto berhasil dihapus.');
 }
 
+function lihatPreviewFotoRiwayat(index) {
+    const daftar = cacheFotoWatermarkHariIni.length
+        ? cacheFotoWatermarkHariIni
+        : muatRiwayatFotoDariStoragePaket();
+    const item = daftar[index];
+    if (!item?.dataUrl) return;
+
+    const modal = document.getElementById('modal-preview-foto-riwayat');
+    const imgEl = document.getElementById('preview-riwayat-img');
+    const waktuEl = document.getElementById('preview-riwayat-waktu');
+    const captionEl = document.getElementById('preview-riwayat-caption');
+    const btnSimpan = document.getElementById('btn-simpan-dari-preview-riwayat');
+
+    if (!modal || !imgEl) return;
+
+    imgEl.src = item.dataUrl;
+    if (waktuEl) waktuEl.textContent = item.waktu || 'Dokumentasi Paket Pajang';
+    if (captionEl) captionEl.textContent = item.caption || 'Tanpa catatan detail';
+
+    if (btnSimpan) {
+        btnSimpan.onclick = () => unduhUlangFotoCache(index);
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function tutupPreviewFotoRiwayat() {
+    const modal = document.getElementById('modal-preview-foto-riwayat');
+    if (modal) modal.classList.add('hidden');
+}
+
 // =========================================================
 // 6. INISIALISASI MODUL PAKET PAJANG
 // =========================================================
@@ -2118,3 +2161,5 @@ window.setZoomKameraPaket = setZoomKameraPaket;
 window.toggleFlashKameraPaket = toggleFlashKameraPaket;
 window.refreshRiwayatFotoWatermarkPaket = refreshRiwayatFotoWatermarkPaket;
 window.hapusSemuaRiwayatFotoWatermarkPaket = hapusSemuaRiwayatFotoWatermarkPaket;
+window.lihatPreviewFotoRiwayat = lihatPreviewFotoRiwayat;
+window.tutupPreviewFotoRiwayat = tutupPreviewFotoRiwayat;
