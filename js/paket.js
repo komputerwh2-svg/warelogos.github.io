@@ -1624,24 +1624,35 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
 
 let audioCtxKameraPaket = null;
 
-// Membuat WAV PCM 8-bit mono singkat (suara klik shutter kamera) sebagai cadangan pasti
+// Membuat WAV PCM 16-bit mono singkat (suara klik shutter kamera lebih tegas & keras)
 function buatDataUrlSuaraShutterWav() {
-    const sampleRate = 22050;
-    const durasiDetik = 0.14;
+    const sampleRate = 44100;
+    const durasiDetik = 0.18;
     const jumlahSample = Math.floor(sampleRate * durasiDetik);
-    const dataBytes = new Uint8Array(jumlahSample);
+    const pcmBuffer = new ArrayBuffer(jumlahSample * 2);
+    const pcmView = new DataView(pcmBuffer);
 
     for (let i = 0; i < jumlahSample; i++) {
         const t = i / sampleRate;
-        // Dua hentakan klik cepat (di 0.00s dan 0.055s)
-        const env1 = t < 0.045 ? Math.pow(1 - t / 0.045, 1.5) : 0;
-        const env2 = (t >= 0.055 && t < 0.115) ? Math.pow(1 - (t - 0.055) / 0.06, 1.5) : 0;
+
+        // Hentakan 1 (0.00s - 0.065s): buka rana tegas
+        const env1 = t < 0.065 ? Math.pow(1 - t / 0.065, 1.1) : 0;
+        // Hentakan 2 (0.072s - 0.165s): tutup rana tegas
+        const env2 = (t >= 0.072 && t < 0.165) ? Math.pow(1 - (t - 0.072) / 0.093, 1.1) : 0;
+
+        // Gabungan noise tajam + nada klik mekanis frekuensi tengah-tinggi
         const noise = Math.random() * 2 - 1;
-        const clickTone = Math.sin(2 * Math.PI * 1200 * t) * 0.45 + Math.sin(2 * Math.PI * 420 * t) * 0.35;
-        const sampleVal = Math.max(-1, Math.min(1, noise * (env1 * 0.95 + env2 * 0.85) + clickTone * (env1 + env2) * 0.6));
-        dataBytes[i] = Math.round((sampleVal * 0.5 + 0.5) * 255);
+        const clickHigh = Math.sin(2 * Math.PI * 2100 * t) * 0.65;
+        const clickMid = Math.sin(2 * Math.PI * 780 * t) * 0.55;
+
+        const raw = (noise * (env1 * 1.9 + env2 * 1.75)) + ((clickHigh + clickMid) * (env1 * 1.25 + env2 * 1.1));
+        // Soft clipping agar volume tinggi namun tetap bersih
+        const softClip = Math.tanh(raw * 1.35);
+        const int16 = softClip < 0 ? Math.round(softClip * 32768) : Math.round(softClip * 32767);
+        pcmView.setInt16(i * 2, int16, true);
     }
 
+    const dataBytes = new Uint8Array(pcmBuffer);
     const header = new Uint8Array(44);
     const view = new DataView(header.buffer);
     const writeStr = (offset, str) => {
@@ -1649,26 +1660,28 @@ function buatDataUrlSuaraShutterWav() {
     };
 
     writeStr(0, 'RIFF');
-    view.setUint32(4, 36 + jumlahSample, true);
+    view.setUint32(4, 36 + dataBytes.length, true);
     writeStr(8, 'WAVE');
     writeStr(12, 'fmt ');
     view.setUint32(16, 16, true);
     view.setUint16(20, 1, true); // PCM
     view.setUint16(22, 1, true); // Mono
     view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate, true);
-    view.setUint16(32, 1, true);
-    view.setUint16(34, 8, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true); // 16-bit mono
+    view.setUint16(34, 16, true);
     writeStr(36, 'data');
-    view.setUint32(40, jumlahSample, true);
+    view.setUint32(40, dataBytes.length, true);
 
-    const wavBytes = new Uint8Array(44 + jumlahSample);
+    const wavBytes = new Uint8Array(44 + dataBytes.length);
     wavBytes.set(header, 0);
     wavBytes.set(dataBytes, 44);
 
     let binary = '';
-    for (let i = 0; i < wavBytes.length; i++) {
-        binary += String.fromCharCode(wavBytes[i]);
+    const chunkSize = 8192;
+    for (let i = 0; i < wavBytes.length; i += chunkSize) {
+        const sub = wavBytes.subarray(i, i + chunkSize);
+        binary += String.fromCharCode.apply(null, sub);
     }
     return 'data:audio/wav;base64,' + btoa(binary);
 }
@@ -1691,35 +1704,44 @@ async function bunyiJepretKameraPaket() {
             if (audioCtxKameraPaket.state === 'running') {
                 const now = audioCtxKameraPaket.currentTime;
 
-                const mainGain = audioCtxKameraPaket.createGain();
-                mainGain.gain.setValueAtTime(1.0, now);
-                mainGain.connect(audioCtxKameraPaket.destination);
+                const boostGain = audioCtxKameraPaket.createGain();
+                boostGain.gain.setValueAtTime(2.6, now);
 
-                // Klik 1 (tegas)
+                const compressor = audioCtxKameraPaket.createDynamicsCompressor();
+                compressor.threshold.setValueAtTime(-10, now);
+                compressor.knee.setValueAtTime(12, now);
+                compressor.ratio.setValueAtTime(8, now);
+                compressor.attack.setValueAtTime(0.002, now);
+                compressor.release.setValueAtTime(0.08, now);
+
+                boostGain.connect(compressor);
+                compressor.connect(audioCtxKameraPaket.destination);
+
+                // Klik 1 (buka rana)
                 const osc1 = audioCtxKameraPaket.createOscillator();
                 const g1 = audioCtxKameraPaket.createGain();
                 osc1.type = 'sawtooth';
-                osc1.frequency.setValueAtTime(1600, now);
-                osc1.frequency.linearRampToValueAtTime(280, now + 0.055);
-                g1.gain.setValueAtTime(0.85, now);
-                g1.gain.linearRampToValueAtTime(0.0001, now + 0.06);
+                osc1.frequency.setValueAtTime(1950, now);
+                osc1.frequency.linearRampToValueAtTime(340, now + 0.065);
+                g1.gain.setValueAtTime(1.0, now);
+                g1.gain.linearRampToValueAtTime(0.0001, now + 0.07);
                 osc1.connect(g1);
-                g1.connect(mainGain);
+                g1.connect(boostGain);
                 osc1.start(now);
-                osc1.stop(now + 0.065);
+                osc1.stop(now + 0.075);
 
-                // Klik 2 (penutup rana)
+                // Klik 2 (tutup rana)
                 const osc2 = audioCtxKameraPaket.createOscillator();
                 const g2 = audioCtxKameraPaket.createGain();
                 osc2.type = 'square';
-                osc2.frequency.setValueAtTime(1100, now + 0.065);
-                osc2.frequency.linearRampToValueAtTime(220, now + 0.13);
-                g2.gain.setValueAtTime(0.75, now + 0.065);
-                g2.gain.linearRampToValueAtTime(0.0001, now + 0.135);
+                osc2.frequency.setValueAtTime(1450, now + 0.072);
+                osc2.frequency.linearRampToValueAtTime(260, now + 0.16);
+                g2.gain.setValueAtTime(1.0, now + 0.072);
+                g2.gain.linearRampToValueAtTime(0.0001, now + 0.165);
                 osc2.connect(g2);
-                g2.connect(mainGain);
-                osc2.start(now + 0.065);
-                osc2.stop(now + 0.14);
+                g2.connect(boostGain);
+                osc2.start(now + 0.072);
+                osc2.stop(now + 0.17);
 
                 webAudioSukses = true;
             }
@@ -1728,7 +1750,6 @@ async function bunyiJepretKameraPaket() {
         webAudioSukses = false;
     }
 
-    // Putar juga WAV sintetis agar suara klik/shutter pasti terdengar di perangkat/browser mana pun
     try {
         const audioEl = new Audio(DATA_URL_SHUTTER_WAV);
         audioEl.volume = 1.0;
@@ -1826,6 +1847,23 @@ async function simpanHasilFotoWatermarkPaket() {
             console.warn('Share langsung dilewati:', err);
         }
     }
+}
+
+function refreshRiwayatFotoWatermarkPaket() {
+    cacheFotoWatermarkHariIni = muatRiwayatFotoDariStoragePaket();
+    updateBadgeRiwayatFotoPaket();
+    bukaRiwayatFotoWatermarkPaket();
+    notifPaket('Riwayat foto diperbarui.');
+}
+
+function hapusSemuaRiwayatFotoWatermarkPaket() {
+    cacheFotoWatermarkHariIni = [];
+    try {
+        localStorage.removeItem(KEY_RIWAYAT_FOTO_PAKET);
+    } catch (_) {}
+    updateBadgeRiwayatFotoPaket();
+    bukaRiwayatFotoWatermarkPaket();
+    notifPaket('Riwayat foto berhasil dihapus.');
 }
 
 // =========================================================
@@ -2078,3 +2116,5 @@ window.handleGantiTanggalRiwayatPaket = handleGantiTanggalRiwayatPaket;
 window.cetakLabelPerTanggalPaket = cetakLabelPerTanggalPaket;
 window.setZoomKameraPaket = setZoomKameraPaket;
 window.toggleFlashKameraPaket = toggleFlashKameraPaket;
+window.refreshRiwayatFotoWatermarkPaket = refreshRiwayatFotoWatermarkPaket;
+window.hapusSemuaRiwayatFotoWatermarkPaket = hapusSemuaRiwayatFotoWatermarkPaket;
