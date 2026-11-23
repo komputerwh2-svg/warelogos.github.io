@@ -1018,7 +1018,7 @@ async function muatDaftarKameraBelakangPaket() {
     }
 }
 
-async function bukaKameraDenganDeviceId(targetDeviceId = '') {
+async function bukaKameraDenganDeviceId(targetDeviceId = '', preferRatio43 = true) {
     const videoEl = document.getElementById('paket-camera-video');
     if (!videoEl) return null;
 
@@ -1028,16 +1028,26 @@ async function bukaKameraDenganDeviceId(targetDeviceId = '') {
 
     hentikanStreamKameraPaket();
 
-    const videoConstraint = targetDeviceId
+    // Gunakan constraint 4:3 (1600x1200 / aspectRatio 4:3) agar hasil foto tetap 4:3
+    const baseVideo = preferRatio43
         ? {
-            deviceId: { exact: targetDeviceId },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
+            aspectRatio: { ideal: 4 / 3 },
+            width: { ideal: 1600 },
+            height: { ideal: 1200 }
         }
         : {
-            facingMode: { ideal: 'environment' },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
+            width: { ideal: 1600 },
+            height: { ideal: 1200 }
+        };
+
+    const videoConstraint = targetDeviceId
+        ? {
+            ...baseVideo,
+            deviceId: { exact: targetDeviceId }
+        }
+        : {
+            ...baseVideo,
+            facingMode: { ideal: 'environment' }
         };
 
     streamKameraPaket = await navigator.mediaDevices.getUserMedia({
@@ -1143,11 +1153,11 @@ async function setZoomKameraPaket(zoomVal) {
         const utama = listKamera.find((d) => {
             const lbl = String(d.label || '').toLowerCase();
             return !lbl.includes('ultra') && !lbl.includes('0.6') && !lbl.includes('macro');
-        });
+        }) || listKamera[0];
 
         if (utama?.deviceId && utama.deviceId !== deviceIdKameraAktif) {
             try {
-                track = await bukaKameraDenganDeviceId(utama.deviceId);
+                track = await bukaKameraDenganDeviceId(utama.deviceId, true);
             } catch (_) {}
         }
 
@@ -1171,6 +1181,7 @@ async function setZoomKameraPaket(zoomVal) {
     const caps = typeof track.getCapabilities === 'function' ? track.getCapabilities() : null;
 
     if (Math.abs(targetZoom - 0.6) < 0.05) {
+        // 1. Cek jika track saat ini mendukung zoom <= 0.6
         const zoomSupports06 = caps && typeof caps.zoom === 'object' && caps.zoom !== null
             && typeof caps.zoom.min === 'number' && caps.zoom.min <= 0.6;
 
@@ -1184,34 +1195,73 @@ async function setZoomKameraPaket(zoomVal) {
             } catch (_) {}
         }
 
+        // 2. Cari kamera belakang lain (ultra-wide / deviceId berbeda)
         const listKamera = daftarKameraBelakangPaket.length
             ? daftarKameraBelakangPaket
             : await muatDaftarKameraBelakangPaket();
 
-        const kandidatUltraWide = listKamera.find((d) => {
+        const kandidatBerlabel = listKamera.filter((d) => {
             if (d.deviceId === deviceIdKameraAktif) return false;
             const lbl = String(d.label || '').toLowerCase();
             return lbl.includes('0.6') || lbl.includes('ultra') || lbl.includes('wide');
         });
 
-        if (kandidatUltraWide?.deviceId) {
+        const kandidatLain = listKamera.filter((d) => {
+            if (d.deviceId === deviceIdKameraAktif) return false;
+            const lbl = String(d.label || '').toLowerCase();
+            return !lbl.includes('macro');
+        });
+
+        const urutanKandidat = [...kandidatBerlabel, ...kandidatLain];
+        const streamCadangan = streamKameraPaket;
+        const deviceCadangan = deviceIdKameraAktif;
+
+        for (const cam of urutanKandidat) {
+            if (!cam?.deviceId) continue;
             try {
-                const newTrack = await bukaKameraDenganDeviceId(kandidatUltraWide.deviceId);
+                // Jangan hentikan streamCadangan sebelum kandidat terverifikasi
+                streamKameraPaket = null;
+                const newTrack = await bukaKameraDenganDeviceId(cam.deviceId, true);
                 const newCaps = newTrack?.getCapabilities?.();
-                if (newCaps?.zoom && typeof newCaps.zoom.min === 'number' && newCaps.zoom.min <= 0.6) {
-                    await newTrack.applyConstraints({ advanced: [{ zoom: 0.6 }] });
+                const newSettings = newTrack?.getSettings?.();
+
+                const cocokLabel = kandidatBerlabel.some((k) => k.deviceId === cam.deviceId);
+                const cocokZoomMin = newCaps?.zoom && typeof newCaps.zoom.min === 'number' && newCaps.zoom.min <= 0.6;
+                const cocokZoomSetting = typeof newSettings?.zoom === 'number' && newSettings.zoom <= 0.6;
+
+                if (cocokLabel || cocokZoomMin || cocokZoomSetting) {
+                    if (cocokZoomMin && typeof newTrack.applyConstraints === 'function') {
+                        try {
+                            await newTrack.applyConstraints({ advanced: [{ zoom: 0.6 }] });
+                        } catch (_) {}
+                    }
+                    // Hentikan stream lama setelah stream baru sukses
+                    streamCadangan?.getTracks?.().forEach((t) => t.stop());
+                    if (videoEl) videoEl.style.transform = 'scale(1)';
+                    levelZoomKameraAktif = 0.6;
+                    updateTombolZoomUI(0.6);
+                    return;
                 }
-                if (videoEl) videoEl.style.transform = 'scale(1)';
-                levelZoomKameraAktif = 0.6;
-                updateTombolZoomUI(0.6);
-                return;
-            } catch (_) {}
+
+                // Hentikan stream kandidat yang tidak sesuai lalu lanjut ke kandidat berikutnya
+                streamKameraPaket?.getTracks?.().forEach((t) => t.stop());
+            } catch (_) {
+                streamKameraPaket?.getTracks?.().forEach((t) => t.stop());
+            }
+        }
+
+        // Kembalikan stream sebelumnya jika tidak ada kandidat 0.6x yang cocok
+        streamKameraPaket = streamCadangan;
+        deviceIdKameraAktif = deviceCadangan;
+        if (videoEl && streamCadangan) {
+            videoEl.srcObject = streamCadangan;
         }
 
         updateTombolZoomUI(zoomSebelumnya);
         return notifPaket('Kamera tidak mendukung zoom ini.');
     }
 
+    // Penanganan zoom 2 (2x)
     const zoomSupportsTarget = caps && typeof caps.zoom === 'object' && caps.zoom !== null
         && typeof caps.zoom.max === 'number' && caps.zoom.max >= targetZoom
         && typeof caps.zoom.min === 'number' && caps.zoom.min <= targetZoom;
@@ -1311,9 +1361,24 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
 
     if (!canvas) return;
 
-    // Gunakan resolusi asli media tanpa dikompresi/diperkecil
-    const w = Math.max(1, Math.round(lebarAsli || 900));
-    const h = Math.max(1, Math.round(tinggiAsli || 1200));
+    // Sesuaikan dimensi hasil ke rasio 4:3 (3:4 potret jika h >= w, 4:3 lanskap jika w > h)
+    const rawW = Math.max(1, Math.round(lebarAsli || 1200));
+    const rawH = Math.max(1, Math.round(tinggiAsli || 1600));
+    const isPortrait = rawH >= rawW;
+    const targetRatio = isPortrait ? (3 / 4) : (4 / 3);
+    const currentRatio = rawW / rawH;
+
+    let w = rawW;
+    let h = rawH;
+    if (Math.abs(currentRatio - targetRatio) > 0.02) {
+        if (currentRatio > targetRatio) {
+            w = Math.round(rawH * targetRatio);
+            h = rawH;
+        } else {
+            w = rawW;
+            h = Math.round(rawW / targetRatio);
+        }
+    }
 
     canvas.width = w;
     canvas.height = h;
@@ -1321,15 +1386,22 @@ async function gambarWatermarkKeCanvas(sumberMedia, lebarAsli, tinggiAsli) {
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
-    if (sumberMedia === videoEl && typeof levelZoomKameraAktif === 'number' && Math.abs(levelZoomKameraAktif - 1.0) > 0.01) {
-        const effectiveZoom = Math.max(0.6, Math.min(2.5, levelZoomKameraAktif));
-        const cropW = w / effectiveZoom;
-        const cropH = h / effectiveZoom;
-        const sx = Math.max(0, (w - cropW) / 2);
-        const sy = Math.max(0, (h - cropH) / 2);
+    // Jika pakai kamera 0.6x (ultra-wide) atau foto lokal, gunakan bidang penuh sesuai rasio 4:3.
+    // Jika zoom > 1.0 pada video, lakukan center-crop sesuai zoom aktif.
+    const zoomAktif = (sumberMedia === videoEl && typeof levelZoomKameraAktif === 'number')
+        ? levelZoomKameraAktif
+        : 1.0;
+
+    if (sumberMedia === videoEl && zoomAktif > 1.01) {
+        const cropW = w / zoomAktif;
+        const cropH = h / zoomAktif;
+        const sx = Math.max(0, (rawW - cropW) / 2);
+        const sy = Math.max(0, (rawH - cropH) / 2);
         ctx.drawImage(sumberMedia, sx, sy, cropW, cropH, 0, 0, w, h);
     } else {
-        ctx.drawImage(sumberMedia, 0, 0, w, h);
+        const sx = Math.max(0, Math.round((rawW - w) / 2));
+        const sy = Math.max(0, Math.round((rawH - h) / 2));
+        ctx.drawImage(sumberMedia, sx, sy, w, h, 0, 0, w, h);
     }
 
     const [logoImg, iconWhImg] = await Promise.all([
