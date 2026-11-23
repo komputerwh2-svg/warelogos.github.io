@@ -631,12 +631,14 @@
         <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl">
             <h3 class="text-lg font-black text-slate-800 mb-1"><i class="fa-solid fa-lock text-orange-500"></i> AKSES TERKUNCI</h3>
             <p class="text-[11px] text-slate-500 mb-4 uppercase font-bold">Masukkan username dan password.</p>
-            
+
             <div class="space-y-3">
-                <input type="text" id="admin-user" placeholder="Username" class="w-full px-4 py-2 text-slate-600 border rounded-lg text-sm">
-                <input type="password" id="admin-pass" placeholder="Password" class="w-full px-4 py-2 text-slate-600 border rounded-lg text-sm">
+                <input type="text" id="admin-user" placeholder="Username" autocomplete="username"
+                    class="w-full px-4 py-2 text-slate-600 border rounded-lg text-sm">
+                <input type="password" id="admin-pass" placeholder="Password" autocomplete="current-password"
+                    class="w-full px-4 py-2 text-slate-600 border rounded-lg text-sm">
             </div>
-            
+
             <div class="mt-6 flex gap-2">
                 <button onclick="cekLoginAdmin()" class="flex-1 py-2 bg-orange-500 text-white font-bold rounded-lg text-xs">BUKA AKSES</button>
                 <button onclick="closeModalAdmin()" class="px-4 py-2 bg-gray-200 text-slate-600 font-bold rounded-lg text-xs">BATAL</button>
