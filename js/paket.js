@@ -1033,6 +1033,103 @@ function updatePreviewWatermarkPaket() {
     }
 }
 
+let statusFlashKameraAktif = false;
+let levelZoomKameraAktif = 1.0;
+
+function updateTombolZoomUI(targetZoom) {
+    const presets = [
+        { id: 'btn-zoom-2', val: 2 },
+        { id: 'btn-zoom-1', val: 1.0 },
+        { id: 'btn-zoom-06', val: 0.6 }
+    ];
+    presets.forEach((p) => {
+        const el = document.getElementById(p.id);
+        if (!el) return;
+        const aktif = Math.abs(Number(targetZoom) - p.val) < 0.05;
+        el.className = aktif
+            ? 'w-9 h-8 rounded-full text-[10px] font-black bg-amber-400 text-slate-950 transition'
+            : 'w-9 h-8 rounded-full text-[10px] font-black text-white hover:bg-white/15 transition';
+    });
+}
+
+function updateTombolFlashUI(aktif) {
+    const iconEl = document.getElementById('icon-flash-paket');
+    const btnEl = document.getElementById('btn-toggle-flash-paket');
+
+    if (btnEl) {
+        btnEl.className = aktif
+            ? 'w-10 h-10 rounded-full bg-amber-400 text-slate-950 border border-amber-300 shadow-lg flex items-center justify-center transition'
+            : 'w-10 h-10 rounded-full bg-slate-900/75 hover:bg-white/15 text-white border border-white/20 shadow-lg flex items-center justify-center transition';
+    }
+
+    if (iconEl) {
+        iconEl.className = aktif
+            ? 'fa-solid fa-bolt text-sm text-slate-950'
+            : 'fa-solid fa-bolt-slash text-sm text-white';
+    }
+}
+
+async function terapkanZoomKeTrackKamera(zoomVal) {
+    const videoEl = document.getElementById('paket-camera-video');
+    if (videoEl) {
+        videoEl.style.transform = `scale(${zoomVal})`;
+    }
+
+    const track = streamKameraPaket?.getVideoTracks?.()?.[0];
+    if (!track || typeof track.getCapabilities !== 'function' || typeof track.applyConstraints !== 'function') {
+        return;
+    }
+
+    try {
+        const caps = track.getCapabilities();
+        if (caps && typeof caps.zoom === 'object' && caps.zoom !== null) {
+            const minZ = typeof caps.zoom.min === 'number' ? caps.zoom.min : 1;
+            const maxZ = typeof caps.zoom.max === 'number' ? caps.zoom.max : zoomVal;
+            const clampedZ = Math.min(maxZ, Math.max(minZ, zoomVal));
+            await track.applyConstraints({ advanced: [{ zoom: clampedZ }] });
+
+            if (videoEl && Math.abs(clampedZ - zoomVal) < 0.05) {
+                videoEl.style.transform = 'scale(1)';
+            }
+        }
+    } catch (err) {
+        console.warn('Zoom hardware tidak didukung, memakai skala pratinjau:', err);
+    }
+}
+
+async function setZoomKameraPaket(zoomVal) {
+    const angka = Number(zoomVal) || 1.0;
+    levelZoomKameraAktif = angka;
+    updateTombolZoomUI(angka);
+    await terapkanZoomKeTrackKamera(angka);
+}
+
+async function toggleFlashKameraPaket() {
+    const track = streamKameraPaket?.getVideoTracks?.()?.[0];
+    if (!track) {
+        return notifPaket('Kamera belum aktif. Aktifkan kamera terlebih dahulu untuk menggunakan flash.');
+    }
+
+    if (typeof track.getCapabilities !== 'function' || typeof track.applyConstraints !== 'function') {
+        return notifPaket('Kontrol flash tidak didukung oleh browser atau perangkat ini.');
+    }
+
+    const caps = track.getCapabilities();
+    if (!caps || !caps.torch) {
+        return notifPaket('Lampu flash (torch) tidak tersedia pada perangkat atau kamera ini.');
+    }
+
+    const targetState = !statusFlashKameraAktif;
+    try {
+        await track.applyConstraints({ advanced: [{ torch: targetState }] });
+        statusFlashKameraAktif = targetState;
+        updateTombolFlashUI(statusFlashKameraAktif);
+    } catch (err) {
+        console.warn('Gagal mengubah status flash:', err);
+        notifPaket(`Gagal mengaktifkan flash: ${err.message}`);
+    }
+}
+
 function buatImageIconWarehouse() {
     return new Promise((resolve) => {
         const img = new Image();
@@ -1620,3 +1717,5 @@ window.cetakLabelHariIniPaket = cetakLabelHariIniPaket;
 window.setModeRiwayatPaket = setModeRiwayatPaket;
 window.handleGantiTanggalRiwayatPaket = handleGantiTanggalRiwayatPaket;
 window.cetakLabelPerTanggalPaket = cetakLabelPerTanggalPaket;
+window.setZoomKameraPaket = setZoomKameraPaket;
+window.toggleFlashKameraPaket = toggleFlashKameraPaket;
