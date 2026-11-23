@@ -1181,7 +1181,7 @@ async function setZoomKameraPaket(zoomVal) {
     const caps = typeof track.getCapabilities === 'function' ? track.getCapabilities() : null;
 
     if (Math.abs(targetZoom - 0.6) < 0.05) {
-        // 1. Cek jika track saat ini mendukung zoom <= 0.6
+        // 1. Cek jika track saat ini sudah mendukung zoom <= 0.6
         const zoomSupports06 = caps && typeof caps.zoom === 'object' && caps.zoom !== null
             && typeof caps.zoom.min === 'number' && caps.zoom.min <= 0.6;
 
@@ -1209,7 +1209,7 @@ async function setZoomKameraPaket(zoomVal) {
         const kandidatLain = listKamera.filter((d) => {
             if (d.deviceId === deviceIdKameraAktif) return false;
             const lbl = String(d.label || '').toLowerCase();
-            return !lbl.includes('macro');
+            return !lbl.includes('macro') && !lbl.includes('depth');
         });
 
         const urutanKandidat = [...kandidatBerlabel, ...kandidatLain];
@@ -1219,38 +1219,29 @@ async function setZoomKameraPaket(zoomVal) {
         for (const cam of urutanKandidat) {
             if (!cam?.deviceId) continue;
             try {
-                // Jangan hentikan streamCadangan sebelum kandidat terverifikasi
                 streamKameraPaket = null;
                 const newTrack = await bukaKameraDenganDeviceId(cam.deviceId, true);
-                const newCaps = newTrack?.getCapabilities?.();
-                const newSettings = newTrack?.getSettings?.();
+                if (!newTrack) continue;
 
-                const cocokLabel = kandidatBerlabel.some((k) => k.deviceId === cam.deviceId);
-                const cocokZoomMin = newCaps?.zoom && typeof newCaps.zoom.min === 'number' && newCaps.zoom.min <= 0.6;
-                const cocokZoomSetting = typeof newSettings?.zoom === 'number' && newSettings.zoom <= 0.6;
-
-                if (cocokLabel || cocokZoomMin || cocokZoomSetting) {
-                    if (cocokZoomMin && typeof newTrack.applyConstraints === 'function') {
-                        try {
-                            await newTrack.applyConstraints({ advanced: [{ zoom: 0.6 }] });
-                        } catch (_) {}
-                    }
-                    // Hentikan stream lama setelah stream baru sukses
-                    streamCadangan?.getTracks?.().forEach((t) => t.stop());
-                    if (videoEl) videoEl.style.transform = 'scale(1)';
-                    levelZoomKameraAktif = 0.6;
-                    updateTombolZoomUI(0.6);
-                    return;
+                const newCaps = typeof newTrack.getCapabilities === 'function' ? newTrack.getCapabilities() : null;
+                if (newCaps?.zoom && typeof newCaps.zoom.min === 'number' && newCaps.zoom.min <= 0.6 && typeof newTrack.applyConstraints === 'function') {
+                    try {
+                        await newTrack.applyConstraints({ advanced: [{ zoom: 0.6 }] });
+                    } catch (_) {}
                 }
 
-                // Hentikan stream kandidat yang tidak sesuai lalu lanjut ke kandidat berikutnya
-                streamKameraPaket?.getTracks?.().forEach((t) => t.stop());
+                // Hentikan stream lama setelah kamera alternatif berhasil dibuka
+                streamCadangan?.getTracks?.().forEach((t) => t.stop());
+                if (videoEl) videoEl.style.transform = 'scale(1)';
+                levelZoomKameraAktif = 0.6;
+                updateTombolZoomUI(0.6);
+                return;
             } catch (_) {
                 streamKameraPaket?.getTracks?.().forEach((t) => t.stop());
             }
         }
 
-        // Kembalikan stream sebelumnya jika tidak ada kandidat 0.6x yang cocok
+        // Kembalikan stream sebelumnya jika gagal beralih
         streamKameraPaket = streamCadangan;
         deviceIdKameraAktif = deviceCadangan;
         if (videoEl && streamCadangan) {
@@ -1280,6 +1271,103 @@ async function setZoomKameraPaket(zoomVal) {
         updateTombolZoomUI(zoomSebelumnya);
         notifPaket('Kamera tidak mendukung zoom ini.');
     }
+}
+
+let timerIndikatorFokusPaket = null;
+
+function tampilkanIndikatorFokusVisual(xPx, yPx) {
+    const ringEl = document.getElementById('paket-focus-ring');
+    if (!ringEl) return;
+
+    ringEl.style.left = `${xPx}px`;
+    ringEl.style.top = `${yPx}px`;
+    ringEl.style.transform = 'scale(1.25)';
+    ringEl.classList.remove('hidden');
+
+    requestAnimationFrame(() => {
+        ringEl.style.transform = 'scale(1)';
+    });
+
+    clearTimeout(timerIndikatorFokusPaket);
+    timerIndikatorFokusPaket = setTimeout(() => {
+        ringEl.classList.add('hidden');
+    }, 900);
+}
+
+async function terapkanFokusKameraPaket(normX, normY) {
+    const track = streamKameraPaket?.getVideoTracks?.()?.[0];
+    if (!track || typeof track.getCapabilities !== 'function' || typeof track.applyConstraints !== 'function') {
+        return;
+    }
+
+    try {
+        const caps = track.getCapabilities();
+        const constraints = { advanced: [] };
+        const advItem = {};
+        let punyaConstraint = false;
+
+        if (Array.isArray(caps?.focusMode)) {
+            if (caps.focusMode.includes('manual')) {
+                advItem.focusMode = 'manual';
+                punyaConstraint = true;
+            } else if (caps.focusMode.includes('continuous')) {
+                advItem.focusMode = 'continuous';
+                punyaConstraint = true;
+            }
+        }
+
+        // Beberapa perangkat mendukung pointsOfInterest (koordinat ternormalisasi 0..1)
+        if (caps && 'pointsOfInterest' in caps) {
+            advItem.pointsOfInterest = [{
+                x: Math.min(1, Math.max(0, Number(normX) || 0.5)),
+                y: Math.min(1, Math.max(0, Number(normY) || 0.5))
+            }];
+            punyaConstraint = true;
+        }
+
+        if (punyaConstraint) {
+            constraints.advanced.push(advItem);
+            await track.applyConstraints(constraints);
+
+            // Kembalikan ke continuous setelah memicu fokus manual bila didukung
+            if (advItem.focusMode === 'manual' && caps.focusMode.includes('continuous')) {
+                setTimeout(async () => {
+                    try {
+                        const aktifTrack = streamKameraPaket?.getVideoTracks?.()?.[0];
+                        if (aktifTrack && aktifTrack.readyState === 'live') {
+                            await aktifTrack.applyConstraints({
+                                advanced: [{ focusMode: 'continuous' }]
+                            });
+                        }
+                    } catch (_) {}
+                }, 600);
+            }
+        }
+    } catch (err) {
+        console.warn('Fokus sentuh hardware tidak didukung pada perangkat ini:', err);
+    }
+}
+
+async function handleTapFocusKameraPaket(event, stageEl) {
+    const videoEl = document.getElementById('paket-camera-video');
+    if (!videoEl || videoEl.classList.contains('hidden')) return;
+
+    // Abaikan jika klik berasal dari tombol atau kontrol interaktif di dalam area kamera
+    if (event?.target?.closest('button, select, input, label, #panel-edit-watermark-paket, #panel-zoom-kamera-paket')) {
+        return;
+    }
+
+    const host = stageEl || document.getElementById('paket-camera-stage');
+    if (!host) return;
+
+    const rect = host.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+
+    const xPx = Math.min(rect.width, Math.max(0, (event.clientX ?? rect.left + rect.width / 2) - rect.left));
+    const yPx = Math.min(rect.height, Math.max(0, (event.clientY ?? rect.top + rect.height / 2) - rect.top));
+
+    tampilkanIndikatorFokusVisual(xPx, yPx);
+    await terapkanFokusKameraPaket(xPx / rect.width, yPx / rect.height);
 }
 
 async function toggleFlashKameraPaket() {
