@@ -254,7 +254,7 @@
                 <i class="fa-solid fa-arrows-rotate"></i>
             </button>
             <button type="button" onclick="bukaModalSpeedTest()" title="Tes Speed Internet" aria-label="Tes Speed Internet"
-                class="w-12 h-12 rounded-xl bg-slate-950/60 text-amber-400 border border-white/10 flex items-center justify-center text-xl active:scale-90 transition-all hover:bg-slate-900/80 shadow-md">
+                class="w-12 h-12 rounded-xl bg-slate-950/60 text-orange-500 border border-white/10 flex items-center justify-center text-xl active:scale-90 transition-all hover:bg-slate-900/80 shadow-md">
                 <i class="fa-solid fa-gauge-high"></i>
             </button>
             <div class="miui-dock-line"></div>
@@ -312,18 +312,28 @@
                     </div>
                 </div>
 
+                <!-- Info Koneksi Internet Anda -->
+                <div id="speedtest-info-koneksi" class="rounded-xl border border-slate-300 bg-slate-50 p-2.5 text-left space-y-0.5">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                            INFO KONEKSI INTERNET ANDA
+                        </span>
+                        <span id="speedtest-badge-kualitas"
+                            class="px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-200 text-slate-700">
+                            MENUNGGU TES
+                        </span>
+                    </div>
+                    <p id="speedtest-rekomendasi" class="text-[11px] font-medium text-slate-700 leading-snug">
+                        Hasil pengujian akan menampilkan status kualitas jaringan dan kecocokannya untuk operasional.
+                    </p>
+                </div>
+
                 <!-- Tombol Aksi (Oranye Utama & Netral Sekunder) -->
                 <div class="pt-1 flex items-center gap-2.5">
                     <button type="button" id="btn-mulai-speedtest" onclick="jalankanTesSpeedMandiri()"
                         class="flex-1 py-2.5 px-4 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-xs flex items-center justify-center gap-2 transition active:scale-[0.99]">
                         <i class="fa-solid fa-play"></i>
                         <span>Mulai Tes</span>
-                    </button>
-                    <button type="button" onclick="bukaLayananSpeedTest('https://speed.is/')"
-                        title="Buka Speed.is di tab baru"
-                        class="py-2.5 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition">
-                        <span>Speed.is</span>
-                        <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
                     </button>
                 </div>
             </div>
