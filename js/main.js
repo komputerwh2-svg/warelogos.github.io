@@ -344,6 +344,50 @@ function setSpeedUiProgress(persen, tahap, angkaTeks, satuanTeks, statusTeks) {
     if (detailEl && statusTeks !== undefined) detailEl.textContent = statusTeks;
 }
 
+function setBadgeKualitas(teks, kelasWarna) {
+    const badge = document.getElementById('speedtest-badge-kualitas');
+    if (!badge) return;
+    badge.textContent = teks;
+    badge.className = `px-2 py-0.5 rounded-full text-[10px] font-black ${kelasWarna}`;
+}
+
+function setInfoKoneksiStatus(teks, badgeTeks = 'MENUNGGU TES', badgeKelas = 'bg-slate-200 text-slate-700', boxKelas = 'rounded-xl border border-slate-300 bg-slate-50 p-2.5 text-left space-y-0.5') {
+    const infoBox = document.getElementById('speedtest-info-koneksi');
+    const rekEl = document.getElementById('speedtest-rekomendasi');
+
+    if (infoBox) infoBox.className = boxKelas;
+    setBadgeKualitas(badgeTeks, badgeKelas);
+    if (rekEl) rekEl.textContent = teks;
+}
+
+function evaluasiKoneksiInternet(pingMs, dlMbps, ulMbps) {
+    let label = 'STABIL / CUKUP';
+    let badgeClass = 'bg-amber-100 text-amber-800 border border-amber-200';
+    let boxClass = 'rounded-xl border border-amber-200 bg-amber-50/70 p-2.5 text-left space-y-0.5';
+    let pesan = 'Cukup baik untuk operasional rutin; unggah data besar mungkin memakan waktu beberapa detik.';
+
+    if (dlMbps >= 25 && ulMbps >= 10 && pingMs <= 80) {
+        label = 'SANGAT LANCAR';
+        badgeClass = 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+        boxClass = 'rounded-xl border border-emerald-200 bg-emerald-50/70 p-2.5 text-left space-y-0.5';
+        pesan = 'Respons cepat dan stabil untuk transaksi harian, unggah data/foto, maupun akses aplikasi cloud.';
+    } else if (dlMbps >= 10 && ulMbps >= 3 && pingMs <= 160) {
+        label = 'STABIL / CUKUP';
+        badgeClass = 'bg-amber-100 text-amber-800 border border-amber-200';
+        boxClass = 'rounded-xl border border-amber-200 bg-amber-50/70 p-2.5 text-left space-y-0.5';
+        pesan = pingMs > 100
+            ? 'Kecepatan memadai untuk kerja harian, namun latensi agak tinggi—hindari unggah file besar bersamaan.'
+            : 'Cukup baik untuk operasional rutin; unggah data besar mungkin memakan waktu beberapa detik.';
+    } else {
+        label = 'LAMBAT / TERBATAS';
+        badgeClass = 'bg-rose-100 text-rose-800 border border-rose-200';
+        boxClass = 'rounded-xl border border-rose-200 bg-rose-50/70 p-2.5 text-left space-y-0.5';
+        pesan = 'Koneksi lambat atau latensi tinggi—sebaiknya tunggu koneksi membaik sebelum kirim/unggah data penting.';
+    }
+
+    setInfoKoneksiStatus(pesan, label, badgeClass, boxClass);
+}
+
 async function ukurPingMandiri(jumlahPercobaan = 4) {
     const hasilMs = [];
     for (let i = 0; i < jumlahPercobaan; i++) {
@@ -429,6 +473,8 @@ async function jalankanTesSpeedMandiri() {
     if (dlEl) dlEl.textContent = '...';
     if (ulEl) ulEl.textContent = '...';
 
+    setInfoKoneksiStatus('Sedang menganalisis kualitas jaringan...', 'MENGUJI...');
+
     try {
         // 1. Ping
         setSpeedUiProgress(15, 'Menguji Ping', '...', 'ms', 'Mengukur latensi jaringan...');
@@ -453,6 +499,7 @@ async function jalankanTesSpeedMandiri() {
             'Mbps (DL)',
             `Ping ${pingMs} ms • Download ${dlMbps} Mbps • Upload ${ulMbps} Mbps`
         );
+        evaluasiKoneksiInternet(pingMs, dlMbps, ulMbps);
     } catch (err) {
         console.warn('Tes speed mandiri terkendala:', err);
         setSpeedUiProgress(
@@ -461,6 +508,12 @@ async function jalankanTesSpeedMandiri() {
             '0.0',
             'Mbps',
             'Koneksi terputus atau diblokir jaringan/firewall. Coba lagi atau buka Speed.is.'
+        );
+        setInfoKoneksiStatus(
+            'Tidak dapat menilai koneksi karena pengujian gagal atau terputus.',
+            'GANGGUAN',
+            'bg-rose-100 text-rose-800 border border-rose-200',
+            'rounded-xl border border-rose-200 bg-rose-50/70 p-2.5 text-left space-y-0.5'
         );
     } finally {
         sedangTesSpeed = false;
