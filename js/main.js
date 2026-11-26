@@ -530,6 +530,80 @@ window.tutupModalSpeedTest = tutupModalSpeedTest;
 window.bukaLayananSpeedTest = bukaLayananSpeedTest;
 window.jalankanTesSpeedMandiri = jalankanTesSpeedMandiri;
 
+
+// Buka StoMo
+function onLoadIframeStoMoApp() {
+    const loader = document.getElementById('stomo-app-frame-loader');
+    if (loader) loader.classList.add('hidden');
+}
+
+function bukaSubPageStoMoApp() {
+    const subpage = document.getElementById('subpage-stomo-app');
+    const frame = document.getElementById('iframe-stomo-app');
+    const loader = document.getElementById('stomo-app-frame-loader');
+
+    if (subpage) {
+        subpage.classList.remove('hidden');
+    }
+
+    if (frame && frame.dataset.src) {
+        if (!frame.getAttribute('src')) {
+            if (loader) loader.classList.remove('hidden');
+            frame.setAttribute('src', frame.dataset.src);
+        } else if (loader) {
+            loader.classList.add('hidden');
+        }
+    }
+}
+
+function tutupSubPageStoMoApp() {
+    const subpage = document.getElementById('subpage-stomo-app');
+    if (subpage) {
+        subpage.classList.add('hidden');
+    }
+}
+
+window.bukaSubPageStoMoApp = bukaSubPageStoMoApp;
+window.tutupSubPageStoMoApp = tutupSubPageStoMoApp;
+window.onLoadIframeStoMoApp = onLoadIframeStoMoApp;
+
+
+// Buka JADILO
+function onLoadIframeJadilo() {
+    const loader = document.getElementById('jadilo-frame-loader');
+    if (loader) loader.classList.add('hidden');
+}
+
+function bukaSubPageJadilo() {
+    const subpage = document.getElementById('subpage-jadilo');
+    const frame = document.getElementById('iframe-jadilo');
+    const loader = document.getElementById('jadilo-frame-loader');
+
+    if (subpage) {
+        subpage.classList.remove('hidden');
+    }
+
+    if (frame && frame.dataset.src) {
+        if (!frame.getAttribute('src')) {
+            if (loader) loader.classList.remove('hidden');
+            frame.setAttribute('src', frame.dataset.src);
+        } else if (loader) {
+            loader.classList.add('hidden');
+        }
+    }
+}
+
+function tutupSubPageJadilo() {
+    const subpage = document.getElementById('subpage-jadilo');
+    if (subpage) {
+        subpage.classList.add('hidden');
+    }
+}
+
+window.bukaSubPageJadilo = bukaSubPageJadilo;
+window.tutupSubPageJadilo = tutupSubPageJadilo;
+window.onLoadIframeJadilo = onLoadIframeJadilo;
+
 // =========================================================================
 // 4. NAVIGATION TO SUB-PAGE CONFIGURATION MODAL
 // =========================================================================
