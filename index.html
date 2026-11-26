@@ -233,6 +233,13 @@
                 <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">Stok Opname</span>
             </div>
 
+            <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="bukaSubPageStoMoApp()">
+                <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all bg-white">
+                    <img src="https://komputerwh2-svg.github.io/stomo/icon.png" alt="StoMo" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='img/stomo.png';">
+                </div>
+                <span class="text-[11px] font-bold text-slate-700/90 text-center tracking-wide leading-tight line-clamp-2 w-20">StoMo</span>
+            </div>
+
             <div class="flex flex-col items-center gap-2 cursor-pointer transition-transform active:scale-95 duration-150" onclick="bukaSubPageJadilo()">
                 <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden active:brightness-90 transition-all bg-white">
                     <img src="https://komputerwh2-svg.github.io/jadilo.github.io/icon.png" alt="Jadilo" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='img/jadilo.png';">
@@ -421,6 +428,40 @@
     <div id="subpage-stomo-container"></div>
     <div id="subpage-paket-container"></div>
     <div id="bank-data-container"></div>
+
+    <!-- SUB-PAGE STOMO (STOK OPNAME MOBILE) -->
+    <div id="subpage-stomo-app" class="hidden fixed inset-0 bg-[#f4f4f4] flex flex-col z-50 select-none font-sans text-slate-800">
+        <!-- Header Sub-Page -->
+        <div class="w-full h-14 bg-gradient-to-b from-[#3c3c3c] to-[#2a2a2a] flex items-center px-3 shadow-md border-b border-[#1a1a1a] shrink-0">
+            <div class="flex items-center gap-3 min-w-0">
+                <button type="button" onclick="tutupSubPageStoMoApp()" class="miui-btn-back flex items-center justify-center gap-1 px-3 py-1.5 rounded text-xs font-bold text-orange-400 shadow-inner shrink-0">
+                    <i class="fa-solid fa-chevron-left text-sm"></i>
+                    <span>Kembali</span>
+                </button>
+                <div class="flex items-center gap-2 min-w-0">
+                    <img src="https://komputerwh2-svg.github.io/stomo/icon.png" alt="StoMo" class="w-6 h-6 rounded-md object-cover bg-white shrink-0" onerror="this.onerror=null;this.src='img/stomo.png';">
+                    <h1 class="text-white font-semibold text-base md:text-lg tracking-wide drop-shadow-md truncate">StoMo (Stok Opname Mobile)</h1>
+                </div>
+            </div>
+        </div>
+
+        <!-- Container Isi StoMo di Bawah Header -->
+        <div class="flex-1 w-full h-full min-h-0 relative bg-white overflow-hidden">
+            <div id="stomo-app-frame-loader" class="hidden absolute inset-0 bg-slate-100/90 flex flex-col items-center justify-center gap-2 z-10 text-xs font-semibold text-slate-600">
+                <i class="fa-solid fa-spinner animate-spin text-2xl text-orange-500"></i>
+                <span>Memuat halaman StoMo...</span>
+            </div>
+
+            <iframe id="iframe-stomo-app"
+                src=""
+                data-src="https://komputerwh2-svg.github.io/stomo/"
+                title="StoMo - Stok Opname Mobile"
+                class="w-full h-full border-0 block"
+                referrerpolicy="no-referrer-when-downgrade"
+                onload="onLoadIframeStoMoApp()">
+            </iframe>
+        </div>
+    </div>
 
     <!-- SUB-PAGE JADILO -->
     <div id="subpage-jadilo" class="hidden fixed inset-0 bg-[#f4f4f4] flex flex-col z-50 select-none font-sans text-slate-800">
