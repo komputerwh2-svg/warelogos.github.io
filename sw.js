@@ -1,4 +1,4 @@
-const CACHE_NAME = 'miui-wh-cache-v3.2';
+const CACHE_NAME = 'miui-wh-cache-v3.3';
 const assetsToCache = [
   './',
   './index.html',
