@@ -600,9 +600,85 @@ function tutupSubPageJadilo() {
     }
 }
 
+async function kirimCetakJadiloKePrintJobs(payload = {}) {
+    const rtdbUrl = "https://bank-data-cbd97-default-rtdb.asia-southeast1.firebasedatabase.app";
+    const { tanggalTeks = '-', whTarget = '', html = '' } = payload;
+
+    const tampilkanNotif = (teks) => {
+        if (typeof window.miuiAlert === 'function') window.miuiAlert(teks);
+        else alert(teks);
+    };
+
+    const tutupProgress = () => {
+        if (typeof window.tutupModalProgressCetak === 'function') {
+            window.tutupModalProgressCetak();
+        }
+    };
+
+    if (!html) {
+        tampilkanNotif("Dokumen cetak Jadilo kosong.");
+        return;
+    }
+
+    try {
+        if (typeof window.showCetakProgress === 'function') {
+            window.showCetakProgress("Mengirim Dokumen Jadwal Pengiriman...");
+        }
+
+        const now = new Date();
+        const daftarHari = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+        const hari = daftarHari[now.getDay()];
+        const tglNum = String(now.getDate()).padStart(2, '0');
+        const blnNum = String(now.getMonth() + 1).padStart(2, '0');
+        const thnNum = now.getFullYear();
+        const jam = String(now.getHours()).padStart(2, '0');
+        const menit = String(now.getMinutes()).padStart(2, '0');
+        const detik = String(now.getSeconds()).padStart(2, '0');
+
+        const formatWaktuLengkap = `${hari} / ${tglNum}-${blnNum}-${thnNum} / ${jam}.${menit}.${detik}`;
+        const safeTgl = String(tanggalTeks).replace(/[^a-zA-Z0-9_-]/g, '_');
+        const safeWh = String(whTarget || 'ALL').replace(/[^a-zA-Z0-9_-]/g, '_');
+        const judulTugas = `Jadwal Pengiriman - ${tanggalTeks}${whTarget ? ` (${whTarget})` : ''}`;
+        const safeKeyName = `Cetak_Jadilo_${safeWh}_${safeTgl}_${tglNum}-${blnNum}-${thnNum}_${jam}-${menit}-${detik}`;
+
+        const res = await fetch(`${rtdbUrl}/print_jobs/${safeKeyName}.json`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                judul: judulTugas,
+                waktu_teks: formatWaktuLengkap,
+                html,
+                status: 'PENDING',
+                timestamp: Date.now()
+            })
+        });
+
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+        }
+
+        tutupProgress();
+        tampilkanNotif(`Berhasil mengirim ${judulTugas} ke antrean cetak.`);
+    } catch (err) {
+        console.error("Gagal mengirim Jadwal Pengiriman ke print_jobs:", err);
+        tutupProgress();
+        tampilkanNotif("Gagal mengirim ke print_jobs: " + err.message);
+    }
+}
+
+if (!window.__jadiloPrintJobsBridgeInitialized) {
+    window.__jadiloPrintJobsBridgeInitialized = true;
+    window.addEventListener('message', (event) => {
+        const data = event.data;
+        if (!data || data.type !== 'JADILO_PRINT_JOB' || !data.payload) return;
+        kirimCetakJadiloKePrintJobs(data.payload);
+    });
+}
+
 window.bukaSubPageJadilo = bukaSubPageJadilo;
 window.tutupSubPageJadilo = tutupSubPageJadilo;
 window.onLoadIframeJadilo = onLoadIframeJadilo;
+window.kirimCetakJadiloKePrintJobs = kirimCetakJadiloKePrintJobs;
 
 // =========================================================================
 // 4. NAVIGATION TO SUB-PAGE CONFIGURATION MODAL
